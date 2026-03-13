@@ -7,8 +7,9 @@ import {
   ProjectNotFoundError,
   ProjectValidationError,
 } from "./project";
+import type { Project } from "./schemas";
 import { toast } from "sonner";
-import { addOrUpdateProjectInHistory, addSavedProjectToHistory } from "./history.helpers";
+import { addOrUpdateProjectInHistory, addSavedProjectToHistory, removeProjectFromHistory } from "./history.helpers";
 import { APP_FOLDER } from "./constants";
 
 export function useLoadProject() {
@@ -55,7 +56,7 @@ export function useLoadProject() {
 export function useCreateProject() {
   return useMutation({
     mutationFn: createNewProject,
-    onSuccess: async (data) => {
+    onSuccess: async () => {
       toast.success("Project Created", {
         description: `New project created. Remember to save!`,
       });
@@ -73,8 +74,8 @@ export function useSaveProjectAs() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectName, currentPath }: { projectName: string; currentPath: string }) =>
-      saveProjectAs(projectName, currentPath),
+    mutationFn: ({ projectName, currentPath, project }: { projectName: string; currentPath: string; project: Project }) =>
+      saveProjectAs(projectName, currentPath, project),
     onSuccess: async (data) => {
       if (data) {
         try {
@@ -86,8 +87,8 @@ export function useSaveProjectAs() {
           });
         } catch (error) {
           console.error("Failed to update project history:", error);
-          toast.success("Project Saved", {
-            description: `Successfully saved "${data.project.name}"`,
+          toast.warning("Project Saved", {
+            description: "File saved but history could not be updated.",
           });
         }
       }
@@ -126,10 +127,18 @@ export function useLoadProjectFromPath() {
         }
       }
     },
-    onError: (error) => {
+    onError: async (error, variables) => {
       if (error instanceof ProjectNotFoundError) {
+        // Remove the missing project from history
+        try {
+          await removeProjectFromHistory(variables);
+          queryClient.invalidateQueries({ queryKey: ["projectHistory"] });
+        } catch (historyError) {
+          console.error("Failed to remove project from history:", historyError);
+        }
+
         toast.error("Project Not Found", {
-          description: "The project file could not be found.",
+          description: "The project file could not be found. Removed from recent projects.",
         });
       } else if (error instanceof ProjectValidationError) {
         toast.error("Invalid Project", {

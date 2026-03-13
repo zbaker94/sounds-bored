@@ -1,4 +1,4 @@
-import { ProjectHistoryEntry, ProjectHistory } from "./schemas";
+import { ProjectHistoryEntry } from "./schemas";
 import { loadProjectHistory, saveProjectHistory } from "./history";
 
 /**
@@ -57,5 +57,14 @@ export async function addSavedProjectToHistory(
   // Add the new permanent entry
   filteredHistory.unshift(createHistoryEntry(name, path));
 
+  await saveProjectHistory(filteredHistory);
+}
+
+/**
+ * Removes a project from history by path
+ */
+export async function removeProjectFromHistory(path: string): Promise<void> {
+  const history = await loadProjectHistory();
+  const filteredHistory = history.filter((entry) => entry.path !== path);
   await saveProjectHistory(filteredHistory);
 }

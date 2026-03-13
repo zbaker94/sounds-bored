@@ -1,4 +1,4 @@
-import { useCurrentProject } from "@/state/historyStore.tsx";
+import { useCurrentProject } from "@/state/currentProjectStore.tsx";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { useSaveProjectAs } from "@/lib/project.queries";
@@ -8,10 +8,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { remove } from "@tauri-apps/plugin-fs";
-import { WINDOW_CLOSE_DELAY, APP_FOLDER } from "@/lib/constants";
+import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
 
 export function MainPage() {
-  const { currentProject, markAsSaved } = useCurrentProject();
+  const { currentProject, markAsPermanent, hasUnsavedChanges } = useCurrentProject();
   const navigate = useNavigate();
   const saveProjectMutation = useSaveProjectAs();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -28,7 +28,7 @@ export function MainPage() {
 
   // Handle window close requests
   const { allowClose } = useWindowCloseHandler(
-    !currentProject?.isSaved,
+    hasUnsavedChanges(),
     handleCloseRequested
   );
 
@@ -46,11 +46,12 @@ export function MainPage() {
       const result = await saveProjectMutation.mutateAsync({
         projectName,
         currentPath: currentProject.historyEntry.path,
+        project: currentProject.project,
       });
 
       if (result) {
-        // Update the current project with the new path and mark as saved
-        markAsSaved({
+        // Update the current project with the new path and mark as permanent
+        markAsPermanent({
           name: result.project.name,
           path: result.newPath,
           date: new Date().toISOString(),
@@ -80,16 +81,13 @@ export function MainPage() {
 
   const handleDiscardAndClose = async () => {
     try {
-      // If project is unsaved, clean up the temporary folder
-      if (currentProject && !currentProject.isSaved) {
-        // Double-check it's a temp folder before deleting
-        if (currentProject.historyEntry.path.includes(APP_FOLDER)) {
-          try {
-            await remove(currentProject.historyEntry.path, { recursive: true });
-          } catch (error) {
-            console.error("Failed to remove temporary folder:", error);
-            // Continue even if deletion fails
-          }
+      // If project is temporary, clean up the temporary folder
+      if (currentProject && currentProject.isTemporary) {
+        try {
+          await remove(currentProject.historyEntry.path, { recursive: true });
+        } catch (error) {
+          console.error("Failed to remove temporary folder:", error);
+          // Continue even if deletion fails
         }
       }
     } catch (error) {

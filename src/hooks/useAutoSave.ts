@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useCurrentProject } from "@/state/historyStore.tsx";
+import { useCurrentProject } from "@/state/currentProjectStore.tsx";
 import { saveProject } from "@/lib/project";
 import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 
@@ -8,7 +8,7 @@ import { AUTOSAVE_INTERVAL } from "@/lib/constants";
  * @param interval - Save interval in milliseconds (default: 30 seconds)
  */
 export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
-  const { currentProject } = useCurrentProject();
+  const { currentProject, clearDirtyFlag } = useCurrentProject();
   const lastSaveRef = useRef<string>("");
 
   useEffect(() => {
@@ -22,6 +22,10 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
         if (projectJson !== lastSaveRef.current) {
           await saveProject(currentProject.historyEntry.path, currentProject.project);
           lastSaveRef.current = projectJson;
+
+          // Clear dirty flag after successful save to disk
+          // Note: This does NOT change isSaved - project may still be in temp location
+          clearDirtyFlag();
         }
       } catch (error) {
         console.error("Failed to auto-save project:", error);
@@ -37,5 +41,5 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [currentProject, interval]);
+  }, [currentProject, interval, clearDirtyFlag]);
 }

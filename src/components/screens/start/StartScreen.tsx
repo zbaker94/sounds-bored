@@ -1,6 +1,6 @@
 import { useProjectHistory } from "@/lib/history.queries";
 import { useLoadProject, useLoadProjectFromPath, useCreateProject } from "@/lib/project.queries";
-import { useCurrentProject } from "@/state/historyStore.tsx";
+import { useCurrentProject } from "@/state/currentProjectStore.tsx";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -18,7 +18,7 @@ export function StartScreen() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // Common logic for navigating to main page after loading/creating a project
-  const navigateToProject = useCallback((result: { project: { name: string }, folderPath: string }, isSaved: boolean) => {
+  const navigateToProject = useCallback((result: { project: { name: string }, folderPath: string }, isTemporary: boolean) => {
     setCurrentProject(
       {
         name: result.project.name,
@@ -26,7 +26,7 @@ export function StartScreen() {
         date: new Date().toISOString(),
       },
       result.project,
-      isSaved
+      isTemporary
     );
     navigate("/main");
   }, [setCurrentProject, navigate]);
@@ -35,7 +35,7 @@ export function StartScreen() {
     try {
       const result = await loadProjectFromPathMutation.mutateAsync(entry.path);
       if (result) {
-        navigateToProject(result, true);
+        navigateToProject(result, false); // Existing projects are in permanent locations
       }
     } catch (error) {
       console.error("Failed to load project:", error);
@@ -45,7 +45,7 @@ export function StartScreen() {
   const handleLoadProject = async () => {
     const result = await loadProjectMutation.mutateAsync();
     if (result) {
-      navigateToProject(result, true);
+      navigateToProject(result, false); // Existing projects are in permanent locations
     }
   };
 
@@ -54,7 +54,7 @@ export function StartScreen() {
 
     try {
       const result = await createProjectMutation.mutateAsync(undefined);
-      navigateToProject(result, false);
+      navigateToProject(result, true); // New projects start in temporary location
     } catch (error) {
       console.error("Failed to create project:", error);
     } finally {

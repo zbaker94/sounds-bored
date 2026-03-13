@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
-import { join, tempDir } from "@tauri-apps/api/path";
+import { join, appLocalDataDir } from "@tauri-apps/api/path";
+import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION } from "./constants";
 
@@ -73,7 +74,7 @@ export async function loadProjectFile(
     if (error instanceof SyntaxError) {
       throw new ProjectValidationError(`Invalid JSON in ${PROJECT_FILE_NAME}`);
     }
-    if (error instanceof Error && error.name === "ZodError") {
+    if (error instanceof ZodError) {
       throw new ProjectValidationError(
         `${PROJECT_FILE_NAME} is missing required fields`
       );
@@ -132,18 +133,27 @@ export function generateRandomProjectName(): string {
 }
 
 /**
- * Creates a new project folder in a temporary directory
+ * Creates a new project folder in the app's local data directory
  * @param projectName - The name of the project
  * @returns The path to the created project folder
  */
 export async function createProjectFolder(projectName: string): Promise<string> {
-  const temp = await tempDir();
+  const appDataDir = await appLocalDataDir();
+  console.log("🔍 appLocalDataDir():", appDataDir);
+  console.log("🔍 appLocalDataDir():", appDataDir);
   const timestamp = Date.now();
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "_");
-  const folderName = `soundsbored_${sanitizedName}_${timestamp}`;
-  const projectPath = await join(temp, APP_FOLDER, folderName);
-debugger;
-  await mkdir(projectPath, { recursive: true });
+  const folderName = `temp_${sanitizedName}_${timestamp}`;
+  const projectPath = await join(appDataDir, APP_FOLDER, folderName);
+  console.log("🔍 Full project path:", projectPath);
+
+  try {
+    await mkdir(projectPath, { recursive: true });
+    console.log("✅ Project folder created successfully at:", projectPath);
+  } catch (error) {
+    console.error("❌ Failed to create project folder:", error);
+    throw error;
+  }
 
   return projectPath;
 }
@@ -158,6 +168,7 @@ export async function createProjectFile(
   projectName: string
 ): Promise<void> {
   const projectFilePath = await join(folderPath, PROJECT_FILE_NAME);
+  console.log("🔍 Creating project.json at:", projectFilePath);
 
   const projectData: Project = {
     name: projectName,
@@ -166,7 +177,13 @@ export async function createProjectFile(
     lastSaved: new Date().toISOString(),
   };
 
-  await writeTextFile(projectFilePath, JSON.stringify(projectData, null, 2));
+  try {
+    await writeTextFile(projectFilePath, JSON.stringify(projectData, null, 2));
+    console.log("✅ project.json created successfully");
+  } catch (error) {
+    console.error("❌ Failed to create project.json:", error);
+    throw error;
+  }
 }
 
 /**
@@ -239,7 +256,8 @@ async function copyDirectory(sourcePath: string, destPath: string): Promise<void
  */
 export async function saveProjectAs(
   projectName: string,
-  currentPath: string
+  currentPath: string,
+  project: Project
 ): Promise<{ newPath: string; project: Project } | null> {
   // Open folder picker for the parent directory
   const selectedPath = await open({
@@ -265,12 +283,11 @@ export async function saveProjectAs(
   await copyDirectory(currentPath, newProjectPath);
 
   // Update the project.json with the new name and save timestamp
-  const project: Project = {
+  const updatedProject: Project = {
+    ...project,
     name: projectName,
-    version: DEFAULT_PROJECT_VERSION,
-    description: DEFAULT_PROJECT_DESCRIPTION,
   };
-  await saveProject(newProjectPath, project);
+  await saveProject(newProjectPath, updatedProject);
 
   // Clean up the temporary folder
   try {
@@ -279,11 +296,11 @@ export async function saveProjectAs(
     console.warn("Failed to remove temporary folder:", error);
   }
 
-  // Return with the lastSaved timestamp that was added by saveProject
+  // saveProject already added the lastSaved timestamp
   return {
     newPath: newProjectPath,
     project: {
-      ...project,
+      ...updatedProject,
       lastSaved: new Date().toISOString(),
     },
   };

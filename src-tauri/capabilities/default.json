@@ -29,7 +29,12 @@
       "allow": [
         { "path": "$TEMP/**" },
         { "path": "$APPDATA/**" },
-        { "path": "**" }
+        { "path": "$APPLOCALDATA/SoundsBored/**" },
+        { "path": "$HOME/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$MUSIC/**" }
       ]
     }
   ]
