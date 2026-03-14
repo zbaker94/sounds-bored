@@ -271,7 +271,7 @@ describe("history integration", () => {
   });
 
   it("should roundtrip save and load", async () => {
-    const files = createMockFileSystem({});
+    createMockFileSystem({});
     const history: ProjectHistory = [
       createMockHistoryEntry({ name: "Project 1" }),
       createMockHistoryEntry({ name: "Project 2" }),
@@ -286,7 +286,7 @@ describe("history integration", () => {
   });
 
   it("should handle multiple saves correctly", async () => {
-    const files = createMockFileSystem({});
+    createMockFileSystem({});
 
     await saveProjectHistory([createMockHistoryEntry({ name: "First" })]);
     await saveProjectHistory([
