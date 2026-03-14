@@ -8,9 +8,9 @@
 
 - **Frontend**: React 19 + TypeScript (strict) + Vite 7 + Shadcn with Tailwind 4 + TanStack Query 5
 - **Backend**: Tauri 2.x with Rust
-- **State**: React Context (migrating to Zustand + Immer)
+- **State**: Zustand + Immer (`projectStore`, `playbackStore`)
 - **Validation**: Zod 4
-- **UI**: shadcn/ui components + Sonner (toast notifications)
+- **UI**: shadcn/ui components + Sonner (toast notifications) + HugeIcons (`@hugeicons/react`)
 - **Testing**: Vitest + Testing Library + happy-dom
 - **Audio**: Web Audio API (no Rust audio plugin initially)
 
@@ -22,15 +22,15 @@
 
 **Sound** → **SoundInstance** → **Layer** → **Pad** → **Scene**
 
-- **Sound**: An audio file asset in the library (`.wav`, `.mp3`, etc.)
+- **Sound**: An audio file asset in the library (`.wav`, `.mp3`, etc.) — project-level, shared across pads
 - **SoundInstance**: A reference to a Sound with usage-specific config (volume, startOffsetMs)
 - **Layer**: An independent playback unit within a pad
-  - Contains one or more SoundInstances
-  - Has selection rules (Arrangement: sequential/simultaneous/shuffled)
+  - Has selection rules (LayerSelection: assigned/tag/set)
+  - Has arrangement (simultaneous/sequential/shuffled)
   - Has playback config (PlaybackMode: one-shot/hold/loop)
   - Has retrigger behavior (RetriggerMode: restart/continue/stop/next)
-- **Pad**: A triggerable button containing multiple Layers (with rules to trigger layers all at once, sequentially, shuffled, etc.)
-- **Scene**: A collection of pads with shared context
+- **Pad**: A triggerable button containing multiple Layers (all fire simultaneously on trigger)
+- **Scene**: A collection of pads with a rows/cols grid layout
 
 ### Key Design Principles
 
@@ -39,9 +39,9 @@
 3. **Missing Files**: Get runtime `missing: true` flag (not persisted to disk)
 4. **Playback Config**: Per-layer (not per-sound or per-instance)
 5. **State Split**:
-   - `projectStore` (Zustand) — serializable, saved to disk
-   - `playbackStore` (Zustand) — runtime-only (AudioBuffers, active voices)
-   - `downloadStore` (Zustand) — runtime-only (yt-dlp downloads)
+   - `projectStore` (Zustand + Immer) — serializable, saved to disk
+   - `playbackStore` (Zustand) — runtime-only (AudioBuffers, active voices) — currently empty shell
+   - `downloadStore` (Zustand) — runtime-only (yt-dlp downloads) — not yet created
 
 ### Muting System
 
@@ -50,7 +50,7 @@
 
 ### File Paths
 
-Audio file paths are **relative to project folder**, stored as `Sound.filePath`. The project folder location is tracked separately in state.
+Audio file paths are **relative to project folder**, stored as `Sound.filePath`. The project folder location is tracked separately in state (`folderPath` in `projectStore`).
 
 ---
 
@@ -60,43 +60,46 @@ Audio file paths are **relative to project folder**, stored as `Sound.filePath`.
 src/
 ├── components/
 │   ├── composite/
-│   │   └── MenuBar/          # RENAME TO: SceneTabBar/
+│   │   └── MenuBar/               # TODO: rename to SceneTabBar/
 │   ├── modals/
 │   │   ├── ConfirmCloseDialog.tsx
 │   │   └── SaveProjectDialog.tsx
 │   ├── screens/
-│   │   ├── main/MainPage.tsx      # Main editor (currently empty)
+│   │   ├── main/MainPage.tsx      # Main editor (currently empty shell — Phase 3)
 │   │   └── start/StartScreen.tsx  # New/Load project screen
-│   └── ui/                    # shadcn/ui components
+│   ├── ui/                        # shadcn/ui components
+│   └── ErrorBoundary.tsx          # AppErrorBoundary + RouteErrorElement
 ├── hooks/
-│   ├── useAutoSave.ts         # Auto-save logic
+│   ├── useAutoSave.ts             # Auto-save logic (uses projectStore)
 │   └── useWindowCloseHandler.ts
 ├── lib/
-│   ├── audio/                 # PLANNED: audioEngine, soundLoader, padPlayer, muteManager
-│   ├── constants.ts           # APP_FOLDER, PROJECT_FILE_NAME, etc.
-│   ├── history.ts             # Manages recent projects file
-│   ├── history.queries.ts     # TanStack Query hooks
+│   ├── audio/                     # PLANNED: audioEngine, soundLoader, padPlayer, muteManager
+│   ├── constants.ts               # APP_FOLDER, PROJECT_FILE_NAME, SOUNDS_SUBFOLDER, AUDIO_EXTENSIONS, etc.
+│   ├── history.ts                 # Manages recent projects file
+│   ├── history.queries.ts         # TanStack Query hooks
 │   ├── history.helpers.ts
-│   ├── project.ts             # Project CRUD operations
-│   ├── project.queries.ts     # TanStack Query hooks
-│   ├── schemas.ts             # Zod schemas (Project, ProjectHistory)
+│   ├── migrations.ts              # Versioned project migration registry
+│   ├── project.ts                 # Project CRUD operations
+│   ├── project.queries.ts         # TanStack Query hooks
+│   ├── schemas.ts                 # Zod schemas — full domain model
 │   ├── queryClient.ts
-│   └── utils.ts               # cn() helper
+│   └── utils.ts                   # cn() helper
 ├── state/
-│   └── currentProjectStore.tsx  # Context managing CURRENT project (was historyStore.tsx)
+│   ├── projectStore.ts            # Zustand + Immer — current project state
+│   └── playbackStore.ts           # Zustand — runtime-only (empty shell)
 ├── test/
-│   ├── factories.ts           # Test data factories
-│   ├── setup.ts               # Vitest config
-│   └── tauri-mocks.ts         # Mock Tauri APIs
-├── App.tsx                    # Router setup
-└── main.tsx                   # React entry point
+│   ├── factories.ts               # Test data factories (createMockProject, createMockHistoryEntry, etc.)
+│   ├── setup.ts                   # Vitest config
+│   └── tauri-mocks.ts             # Mock Tauri APIs
+├── App.tsx                        # Router setup (no Provider needed — Zustand is module-level)
+└── main.tsx                       # React entry point
 
 src-tauri/
 ├── src/
-│   ├── lib.rs                 # Tauri app setup + plugins
-│   └── main.rs                # Entry point
+│   ├── lib.rs                     # Tauri app setup + plugins
+│   └── main.rs                    # Entry point
 ├── capabilities/
-│   └── default.json           # Tauri permissions (⚠️ has security issue)
+│   └── default.json               # Tauri permissions
 └── Cargo.toml
 ```
 
@@ -106,60 +109,78 @@ src-tauri/
 
 ---
 
-## State Management (In Progress)
+## State Management
 
-### Current (Context-based)
+### projectStore (`src/state/projectStore.ts`)
 
-- `src/state/currentProjectStore.tsx` — React Context
-- Uses `updateProject()` to set `isDirty=true` on any change
+Zustand + Immer store. Module-level singleton — no Provider needed.
 
-### Planned (Zustand + Immer)
+**State fields:**
+- `project: Project | null` — the loaded project data
+- `folderPath: string | null` — derived from `historyEntry.path`
+- `historyEntry: ProjectHistoryEntry | null`
+- `isTemporary: boolean` — true until "Save As" is completed
+- `isDirty: boolean` — true after any `updateProject()` call
 
-Migrating to three stores:
+**Actions:**
+- `loadProject(historyEntry, project, isTemporary)` — load a project, resets `isDirty` to false
+- `updateProject(project)` — sets new project data + marks `isDirty=true`
+- `clearDirtyFlag()` — called after auto-save to disk (does NOT change `isTemporary`)
+- `markAsPermanent(historyEntry)` — called after Save As; sets `isTemporary=false`, `isDirty=false`
+- `clearProject()` — resets all state to null/false
+- `hasUnsavedChanges()` — returns `isTemporary || isDirty` (use selector `s.isTemporary || s.isDirty` in components)
 
-1. **projectStore.ts** (serializable, includes isDirty/isSaved)
-   - Contains: Project data, scenes, pads, layers, sound library
-   - Saved to `project.json` on disk
+**Usage pattern:**
+```typescript
+const project = useProjectStore((s) => s.project);
+const loadProject = useProjectStore((s) => s.loadProject);
+```
 
-2. **playbackStore.ts** (runtime-only)
-   - Contains: AudioBuffers, active voices, playback state
+### playbackStore (`src/state/playbackStore.ts`)
 
-3. **downloadStore.ts** (runtime-only)
-   - Contains: yt-dlp download progress, temporary streams
-
-**Pattern**: Use specific action methods (e.g., `updatePadName()`, `addLayer()`) instead of generic `updateProject()`. Each action auto-marks `isDirty=true` via Immer's `produce()`.
+Empty shell. Will hold AudioBuffers, active voices, master volume in Phase 5.
 
 ---
 
 ## Project Storage
 
-### Project Structure
+### Project Folder Structure
 
 ```
-MyProject/
-├── project.json           # Project metadata + domain model
-└── sounds/                # Audio files (auto-discovered)
-    ├── kick.wav
-    └── snare.wav
+<UserChosen>/
+  <ProjectName>/
+    project.json       # All metadata + scene/pad/sound/tag/set definitions
+    sounds/            # Audio files (mp3, wav, ogg, flac, aiff, m4a) — auto-discovered on load
+      kick.wav
+      ambience.mp3
 ```
 
-### Project.json Schema
+### Project.json Schema (current)
 
 ```typescript
 {
   name: string
-  version?: string           // default: "0.1.0"
+  version?: string           // default: "1.0.0"
   description?: string       // default: ""
   lastSaved?: string         // ISO timestamp
-  // Future: scenes, pads, layers, sounds, muteGroups
+  scenes: Scene[]            // default: []
+  sounds: Sound[]            // default: []
+  tags: Tag[]                // default: []
+  sets: Set[]                // default: []
 }
 ```
 
+All domain model types are fully defined in `src/lib/schemas.ts`.
+
 ### File Locations
 
-- **Temp Projects**: `$APPLOCALDATA/SoundsBored/temp_*_<timestamp>` (⚠️ should use `appLocalDataDir()`, not `tempDir()`)
+- **Temp Projects**: `$APPLOCALDATA/SoundsBored/temp_<name>_<timestamp>/`
 - **User Projects**: User-selected location via Save As dialog
 - **Recent Projects List**: `$APPLOCALDATA/SoundsBored/history.json`
+
+### Migrations
+
+`src/lib/migrations.ts` — versioned migration registry. Called in `loadProjectFile()` before Zod parse. Currently empty (no migrations needed yet). Register future migrations in the `MIGRATIONS` array.
 
 ---
 
@@ -172,25 +193,23 @@ MyProject/
 
 ## Known Issues & Anti-Patterns
 
-### Critical Bugs (as of commit b2ef9fb)
-
-1. **Temporary project location**: Uses `tempDir()` instead of `appLocalDataDir()` — temp files get cleaned up on reboot
-2. **debugger statement**: Left at `project.ts:145`
-3. **saveProjectAs loses data**: Reconstructs Project from defaults, discards description
-4. **Fragile instanceof check**: `project.ts:76` uses string comparison instead of proper instanceof
-5. **Path guard bug**: Discard check uses `path.includes("SoundsBored")` — should only use `!isSaved`
-6. **Security risk**: `fs:scope` has `{ "path": "**" }` catch-all in capabilities — too permissive
-7. **Dead toast code**: `use-toast.ts`, `toast.tsx`, `toaster.tsx` are unused — only `sonner.tsx` is active
-
 ### What NOT to Do
 
 - ❌ Don't add `debugger;` statements to production code
-- ❌ Don't use generic `updateProject()` — use specific zustand actions instead
+- ❌ Don't use generic `updateProject()` for everything — prefer specific actions (e.g., `addScene()`, `updatePad()`) as the domain grows
 - ❌ Don't persist `missing: true` flags in project.json
-- ❌ Don't store absolute file paths — use project-relative paths
-- ❌ Don't create new toast implementations — use Sonner
+- ❌ Don't store absolute file paths in project.json — use project-relative paths
+- ❌ Don't create new toast implementations — use Sonner only
 - ❌ Don't create documentation files or READMEs unless explicitly requested
 - ❌ Don't add emojis to code or output unless explicitly requested
+- ❌ Don't use `CurrentProjectProvider` or `useCurrentProject` — deleted; use `useProjectStore` instead
+
+### Remaining TODOs
+
+- `src/components/composite/MenuBar/` — rename to `SceneTabBar/`
+- `src/lib/audio/` — implement in Phase 5
+- `downloadStore.ts` — implement in Phase 6 (yt-dlp)
+- `MainPage` — needs real UI (Phase 3: toolbar, scene tab bar, pad grid)
 
 ---
 
@@ -219,14 +238,11 @@ npm run test:rust        # Run Rust tests
 ```typescript
 import { createNewProject, selectAndLoadProject, saveProject, saveProjectAs } from "@/lib/project";
 
-// Create new project
+// Create new project (also creates sounds/ subfolder)
 const { project, folderPath } = await createNewProject("My Project");
 
-// Load existing project
+// Load existing project (runs migrations, defaults arrays, auto-discovers sounds/)
 const result = await selectAndLoadProject();
-if (result) {
-  const { project, folderPath } = result;
-}
 
 // Save current project
 await saveProject(folderPath, project);
@@ -235,25 +251,38 @@ await saveProject(folderPath, project);
 const result = await saveProjectAs(projectName, currentPath, project);
 ```
 
+### Open folder in file browser
+
+```typescript
+import { openPath } from "@tauri-apps/plugin-opener";
+await openPath(folderPath); // requires opener:allow-open-path + opener scope in capabilities
+```
+
 ---
 
 ## Testing Conventions
 
 - **Test files**: `*.test.ts` or `*.test.tsx` colocated with source
 - **Test setup**: `src/test/setup.ts` (global mocks + matchers)
-- **Factories**: `src/test/factories.ts` for creating test data
+- **Factories**: `src/test/factories.ts` — `createMockProject`, `createMockHistoryEntry`, `createProjectJson`, `createHistoryJson`
 - **Tauri mocks**: `src/test/tauri-mocks.ts` (automatically imported in setup)
+- **Store tests**: Use `useProjectStore.setState(initialProjectState)` in `beforeEach` to reset between tests
 
 ### Example Test Pattern
 
 ```typescript
-import { describe, it, expect, vi } from 'vitest';
-import { createTestProject } from '@/test/factories';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createMockProject } from '@/test/factories';
+import { useProjectStore, initialProjectState } from '@/state/projectStore';
 
-describe('MyComponent', () => {
-  it('should do something', () => {
-    const project = createTestProject({ name: 'Test' });
-    expect(project.name).toBe('Test');
+describe('projectStore', () => {
+  beforeEach(() => {
+    useProjectStore.setState({ ...initialProjectState });
+  });
+
+  it('should load a project', () => {
+    const project = createMockProject({ name: 'Test' });
+    // ...
   });
 });
 ```
@@ -262,25 +291,27 @@ describe('MyComponent', () => {
 
 ## Planned Features (Not Yet Implemented)
 
-- [ ] Pad UI with layer management
-- [ ] Audio playback engine (`src/lib/audio/`)
-- [ ] Mute group management
-- [ ] Tag/set-based sound selection
-- [ ] yt-dlp integration (as Tauri sidecar)
-- [ ] Web audio import with stream-while-downloading
-- [ ] Multiple RetriggerModes per layer
+- [ ] Phase 3: MainPage UI shell (toolbar, scene tab bar, pad grid placeholder)
+- [ ] Phase 4: Sound import UI, sound library panel, pad assignment
+- [ ] Phase 5: Audio engine (`src/lib/audio/`: audioEngine, soundLoader, padPlayer, muteManager)
+- [ ] Phase 5: `playbackStore.ts` — AudioBuffers, active voices, master volume
+- [ ] Phase 6: yt-dlp integration (Tauri sidecar), `downloadStore.ts`
+- [ ] Phase 6: Web audio import with stream-while-downloading
+- [ ] Phase 6: Undo/redo (Zustand + Immer middleware)
+- [ ] Phase 6: Auto-save failure warning toast + "last saved at" indicator
 
 ---
 
 ## Code Style & Conventions
 
 - **TypeScript**: Strict mode enabled
-- **Formatting**: Use project's Prettier/ESLint config (if present)
 - **Imports**: Use `@/*` alias for src imports
 - **Components**: Functional components with hooks
-- **Error handling**: Use custom error classes (ProjectNotFoundError, ProjectValidationError)
+- **Icons**: Use `HugeiconsIcon` from `@hugeicons/react` + icon imports from `@hugeicons/core-free-icons`
+- **Error handling**: Use custom error classes (`ProjectNotFoundError`, `ProjectValidationError`)
 - **Validation**: Use Zod schemas for all external data (file I/O, user input)
-- **Toast notifications**: Use `sonner` only (not shadcn toast components)
+- **Toast notifications**: Use `sonner` only
+- **State**: Use `useProjectStore((s) => s.field)` selector pattern in components
 
 ---
 
@@ -290,18 +321,14 @@ describe('MyComponent', () => {
 
 1. **Always read files before editing** — don't modify blindly
 2. **Prefer editing over creating** — avoid file bloat
-3. **Use specific state actions** — not generic `updateProject()`
+3. **Use projectStore actions** — not ad-hoc state manipulation
 4. **Validate with Zod** — all external data must be validated
-5. **Test your changes** — write/update tests for new functionality BEFORE implementation
-6. **Check for known bugs** — don't reintroduce fixed issues
+5. **Write tests before or alongside implementation**
+6. **No console.log in production code** — use toast notifications for user-facing messages
 
-### When Planning Migrations
+### When Working with Audio (Phase 5)
 
-The Zustand + Immer migration should happen **before** implementing complex nested editing (pad UI, layer management). Current Context-based state will be hard to maintain with deep updates.
-
-### When Working with Audio
-
-Web Audio API first. No Rust plugins needed initially. AudioBuffer caching is critical for performance — never load the same sound file multiple times.
+Web Audio API first. No Rust plugins needed initially. AudioBuffer caching is critical — never load the same sound file twice. `Sound.filePath` is relative to project folder; use `convertFileSrc()` to get a loadable URL in the WebView.
 
 ---
 
@@ -312,6 +339,7 @@ Web Audio API first. No Rust plugins needed initially. AudioBuffer caching is cr
 
 ---
 
-**Last Updated**: 2026-03-13
+**Last Updated**: 2026-03-14
 **Current Git Branch**: master
-**Latest Commit**: e89f489 "add tests, begin fixing bugs / refactoring names. Full create / save as/ load flow works."
+**Phase Complete**: Phase 2 (Data Model + Zustand migration)
+**Next Phase**: Phase 3 — UI Shell (MainPage layout, scene tab bar, pad grid)
