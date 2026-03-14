@@ -3,8 +3,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add02Icon } from "@hugeicons/core-free-icons";
+import type { Scene } from "@/lib/schemas";
 
-const EMPTY_SCENES = [] as const;
+const EMPTY_SCENES: Scene[] = [];
 
 export function SceneTabBar() {
   const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
