@@ -8,6 +8,7 @@ interface ProjectState {
   historyEntry: ProjectHistoryEntry | null;
   isTemporary: boolean;
   isDirty: boolean;
+  activeSceneId: string | null;
 }
 
 interface ProjectActions {
@@ -22,6 +23,7 @@ interface ProjectActions {
   clearDirtyFlag: () => void;
   markAsPermanent: (historyEntry: ProjectHistoryEntry, project: Project) => void;
   clearProject: () => void;
+  setActiveSceneId: (sceneId: string) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -32,6 +34,7 @@ export const initialProjectState: ProjectState = {
   historyEntry: null,
   isTemporary: false,
   isDirty: false,
+  activeSceneId: null,
 };
 
 export const useProjectStore = create<ProjectStore>()(
@@ -45,6 +48,7 @@ export const useProjectStore = create<ProjectStore>()(
         draft.folderPath = historyEntry.path;
         draft.isTemporary = isTemporary;
         draft.isDirty = false;
+        draft.activeSceneId = project.scenes.length > 0 ? project.scenes[0].id : null;
       }),
 
     updateProject: (project) =>
@@ -70,5 +74,10 @@ export const useProjectStore = create<ProjectStore>()(
       }),
 
     clearProject: () => set(() => ({ ...initialProjectState })),
+
+    setActiveSceneId: (sceneId) =>
+      set((draft) => {
+        draft.activeSceneId = sceneId;
+      }),
   }))
 );

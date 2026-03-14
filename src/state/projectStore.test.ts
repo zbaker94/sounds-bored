@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore, initialProjectState } from "./projectStore";
-import { createMockProject, createMockHistoryEntry } from "@/test/factories";
+import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
 
 function getState() {
   return useProjectStore.getState();
@@ -137,6 +137,68 @@ describe("projectStore", () => {
       expect(getState().historyEntry).toBeNull();
       expect(getState().isTemporary).toBe(false);
       expect(getState().isDirty).toBe(false);
+    });
+  });
+
+  describe("activeSceneId", () => {
+    it("should start as null", () => {
+      expect(getState().activeSceneId).toBeNull();
+    });
+
+    it("should auto-select first scene on loadProject when scenes exist", () => {
+      const entry = createMockHistoryEntry();
+      const project = createMockProject({
+        scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
+      });
+
+      getState().loadProject(entry, project, false);
+
+      expect(getState().activeSceneId).toBe("s1");
+    });
+
+    it("should remain null on loadProject when scenes is empty", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [] }), false);
+
+      expect(getState().activeSceneId).toBeNull();
+    });
+
+    it("should update on setActiveSceneId", () => {
+      const entry = createMockHistoryEntry();
+      const project = createMockProject({
+        scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
+      });
+      getState().loadProject(entry, project, false);
+
+      getState().setActiveSceneId("s2");
+
+      expect(getState().activeSceneId).toBe("s2");
+    });
+
+    it("should reset to null on clearProject", () => {
+      const entry = createMockHistoryEntry();
+      const project = createMockProject({
+        scenes: [createMockScene({ id: "s1" })],
+      });
+      getState().loadProject(entry, project, false);
+
+      getState().clearProject();
+
+      expect(getState().activeSceneId).toBeNull();
+    });
+
+    it("should preserve activeSceneId through markAsPermanent", () => {
+      const tempEntry = createMockHistoryEntry({ path: "/temp/temp_Test_123" });
+      const project = createMockProject({
+        scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
+      });
+      getState().loadProject(tempEntry, project, true);
+      getState().setActiveSceneId("s2");
+
+      const permEntry = createMockHistoryEntry({ path: "/projects/My Project" });
+      getState().markAsPermanent(permEntry, project);
+
+      expect(getState().activeSceneId).toBe("s2");
     });
   });
 });
