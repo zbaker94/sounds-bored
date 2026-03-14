@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { Project, ProjectHistoryEntry } from "@/lib/schemas";
+import { Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
 
 interface ProjectState {
   project: Project | null;
@@ -24,6 +24,7 @@ interface ProjectActions {
   markAsPermanent: (historyEntry: ProjectHistoryEntry, project: Project) => void;
   clearProject: () => void;
   setActiveSceneId: (sceneId: string) => void;
+  addScene: (name?: string) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -80,6 +81,19 @@ export const useProjectStore = create<ProjectStore>()(
         if (draft.project?.scenes.some((s) => s.id === sceneId)) {
           draft.activeSceneId = sceneId;
         }
+      }),
+
+    addScene: (name) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const newScene: Scene = {
+          id: crypto.randomUUID(),
+          name: name ?? `Scene ${draft.project.scenes.length + 1}`,
+          pads: [],
+        };
+        draft.project.scenes.push(newScene);
+        draft.activeSceneId = newScene.id;
+        draft.isDirty = true;
       }),
   }))
 );

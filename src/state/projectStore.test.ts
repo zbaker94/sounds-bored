@@ -215,4 +215,79 @@ describe("projectStore", () => {
       expect(getState().activeSceneId).toBe("s2");
     });
   });
+
+  describe("addScene", () => {
+    it("should do nothing if no project is loaded", () => {
+      getState().addScene();
+
+      expect(getState().project).toBeNull();
+      expect(getState().activeSceneId).toBeNull();
+    });
+
+    it("should add a scene with default 4x4 grid to an empty project", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [] }), false);
+
+      getState().addScene();
+
+      expect(getState().project?.scenes).toHaveLength(1);
+      expect(getState().project?.scenes[0].rows).toBe(4);
+      expect(getState().project?.scenes[0].cols).toBe(4);
+      expect(getState().project?.scenes[0].pads).toEqual([]);
+    });
+
+    it("should auto-name scenes sequentially based on current count", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(
+        entry,
+        createMockProject({ scenes: [createMockScene({ id: "s1", name: "Scene 1" })] }),
+        false
+      );
+
+      getState().addScene();
+
+      expect(getState().project?.scenes[1].name).toBe("Scene 2");
+    });
+
+    it("should use provided name when given", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [] }), false);
+
+      getState().addScene("Ambient Sounds");
+
+      expect(getState().project?.scenes[0].name).toBe("Ambient Sounds");
+    });
+
+    it("should set activeSceneId to the new scene's id", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [] }), false);
+
+      getState().addScene();
+
+      const newSceneId = getState().project?.scenes[0].id;
+      expect(newSceneId).toBeTruthy();
+      expect(getState().activeSceneId).toBe(newSceneId);
+    });
+
+    it("should generate unique ids for each scene", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [] }), false);
+
+      getState().addScene();
+      getState().addScene();
+
+      const ids = getState().project?.scenes.map((s) => s.id);
+      expect(ids?.[0]).not.toBe(ids?.[1]);
+    });
+
+    it("should mark project as dirty", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [] }), false);
+      expect(getState().isDirty).toBe(false);
+
+      getState().addScene();
+
+      expect(getState().isDirty).toBe(true);
+    });
+  });
 });
