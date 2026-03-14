@@ -8,6 +8,7 @@ import { useState, useCallback } from "react";
 import { Project, ProjectHistoryEntry } from "@/lib/schemas";
 import logo from "@/assets/sleeping knight-emblem.gif";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { exists } from "@tauri-apps/plugin-fs";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderOpenIcon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
@@ -106,7 +107,19 @@ export function StartScreen() {
                       <span className="ml-2 text-xs text-muted-foreground">{new Date(entry.date).toLocaleString()}</span>
                     </span>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => openPath(entry.path)} aria-label={`Open folder for ${entry.name}`}>
+                      <Button variant="ghost" size="sm" onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const pathExists = await exists(entry.path);
+                          if (!pathExists) {
+                            toast.error("Project folder no longer exists at this location.");
+                            return;
+                          }
+                          await openPath(entry.path);
+                        } catch {
+                          toast.error("Could not open project folder.");
+                        }
+                      }} aria-label={`Open folder for ${entry.name}`}>
                         <HugeiconsIcon icon={FolderOpenIcon} size={16} />
                       </Button>
                       <Button size="sm" onClick={() => handleLoad(entry)}>Load</Button>
