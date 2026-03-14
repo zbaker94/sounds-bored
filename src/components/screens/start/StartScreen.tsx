@@ -1,12 +1,15 @@
 import { useProjectHistory } from "@/lib/history.queries";
 import { useLoadProject, useLoadProjectFromPath, useCreateProject } from "@/lib/project.queries";
 import { useCurrentProject } from "@/state/currentProjectStore.tsx";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { ProjectHistoryEntry } from "@/lib/schemas";
-import logo from "@/assets/soundsbored-logo-moshed.gif";
+import logo from "@/assets/sleeping knight-emblem.gif";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { FolderOpenIcon } from "@hugeicons/core-free-icons";
 
 export function StartScreen() {
   const { data: recentProjects = [], isLoading, error } = useProjectHistory();
@@ -87,8 +90,14 @@ export function StartScreen() {
             >
               {loadProjectMutation.isPending ? "Loading..." : "Load Project"}
             </Button>
-            <div className="mt-6">
-              <h3 className="font-semibold mb-2">Recent Projects</h3>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="w-full max-w-md mt-8 shadowed">
+        <CardHeader>
+          <h2 className="font-semibold">Recent Projects</h2>
+        </CardHeader>
+        <CardContent>
               {isLoading && <div>Loading...</div>}
               {error && <div className="text-red-500">{error.message}</div>}
               {recentProjects.length === 0 && !isLoading && <div>No recent projects found.</div>}
@@ -99,12 +108,15 @@ export function StartScreen() {
                       <span className="font-medium">{entry.name}</span>
                       <span className="ml-2 text-xs text-muted-foreground">{new Date(entry.date).toLocaleString()}</span>
                     </span>
-                    <Button size="sm" onClick={() => handleLoad(entry)}>Load</Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openPath(entry.path)} aria-label={`Open folder for ${entry.name}`}>
+                        <HugeiconsIcon icon={FolderOpenIcon} size={16} />
+                      </Button>
+                      <Button size="sm" onClick={() => handleLoad(entry)}>Load</Button>
+                    </div>
                   </li>
                 ))}
               </ul>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
