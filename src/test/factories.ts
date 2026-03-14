@@ -31,13 +31,20 @@ export function createMockHistoryEntry(
   };
 }
 
+let _sceneCounter = 0;
+
+export function resetSceneCounter(): void {
+  _sceneCounter = 0;
+}
+
 /**
  * Factory for creating test Scenes
  */
 export function createMockScene(overrides?: Partial<Scene>): Scene {
+  _sceneCounter++;
   return {
-    id: "scene-1",
-    name: "Scene 1",
+    id: `scene-${_sceneCounter}`,
+    name: `Scene ${_sceneCounter}`,
     pads: [],
     rows: 4,
     cols: 4,
