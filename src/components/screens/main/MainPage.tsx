@@ -1,4 +1,5 @@
 import { useProjectStore } from "@/state/projectStore";
+import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { useSaveProjectAs } from "@/lib/project.queries";
@@ -113,6 +114,10 @@ export function MainPage() {
 
   return (
     <>
+      <div id="main-page" className="w-full h-full flex flex-col">
+        <SceneTabBar />
+        <div className="flex-1" />
+      </div>
       <SaveProjectDialog
         isOpen={showSaveDialog}
         onSave={handleSave}
