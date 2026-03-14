@@ -30,16 +30,12 @@
     "fs:allow-mkdir",
     "fs:allow-remove",
     "fs:allow-exists",
-    "fs:scope-temp-recursive",
     "fs:scope-appdata-recursive",
-    "fs:allow-temp-read-recursive",
-    "fs:allow-temp-write-recursive",
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     {
       "identifier": "fs:scope",
       "allow": [
-        { "path": "$TEMP/**" },
         { "path": "$APPDATA/**" },
         { "path": "$APPLOCALDATA/SoundsBored/**" },
         { "path": "$HOME/**" },
