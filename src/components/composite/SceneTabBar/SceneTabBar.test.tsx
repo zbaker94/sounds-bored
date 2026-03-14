@@ -81,7 +81,7 @@ describe("SceneTabBar", () => {
         onSceneChange={onSceneChange}
       />
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Scene 2" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Scene 2" }));
 
     expect(onSceneChange).toHaveBeenCalledWith("s2");
   });

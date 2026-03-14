@@ -25,7 +25,6 @@ export function SceneTabBar({
             <TabsTrigger
               key={scene.id}
               value={scene.id}
-              onClick={() => onSceneChange(scene.id)}
             >
               {scene.name}
             </TabsTrigger>
