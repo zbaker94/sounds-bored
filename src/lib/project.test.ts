@@ -408,7 +408,7 @@ describe("saveProjectAs", () => {
     const result = await saveProjectAs("New Name", "/app-local-data/SoundsBored/temp_Test_123", project);
 
     expect(result).not.toBeNull();
-    expect(result?.newPath).toBe("/new/location/New Name");
+    expect(result?.newPath).toBe("/new/location/New_Name");
     expect(result?.project.name).toBe("New Name");
     expect(mockFs.remove).toHaveBeenCalledWith("/app-local-data/SoundsBored/temp_Test_123", { recursive: true });
   });
@@ -441,6 +441,22 @@ describe("saveProjectAs", () => {
     const result = await saveProjectAs("My@Project!#$%", "/app-local-data/SoundsBored/temp_Test_123", project);
 
     expect(result?.newPath).toBe("/new/location/My_Project____");
+  });
+
+  it("should replace spaces in project name with underscores", async () => {
+    mockDialog.open.mockResolvedValue("/new/location");
+    mockFs.exists.mockResolvedValue(false);
+    mockFs.readDir.mockResolvedValue([]);
+    const project = createMockProject();
+
+    const result = await saveProjectAs(
+      "My Project",
+      "/app-local-data/SoundsBored/temp_Test_123",
+      project
+    );
+
+    expect(result?.newPath).toContain("My_Project");
+    expect(result?.newPath).not.toContain("My Project");
   });
 
   it("should update lastSaved timestamp", async () => {

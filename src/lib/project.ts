@@ -261,7 +261,7 @@ export async function saveProjectAs(
   }
 
   // Create the project folder in the selected location
-  const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_ ]/g, "_");
+  const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "_");
   const newProjectPath = await join(selectedPath, sanitizedName);
 
   // Check if folder already exists
