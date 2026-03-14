@@ -3,9 +3,15 @@ import {
   ProjectHistoryEntrySchema,
   ProjectHistorySchema,
   ProjectSchema,
+  LayerSelectionSchema,
+  PlaybackModeSchema,
+  RetriggerModeSchema,
+  SoundSchema,
+  hasFilePath,
   type ProjectHistoryEntry,
   type ProjectHistory,
   type Project,
+  type Sound,
 } from "@/lib/schemas";
 
 describe("ProjectHistoryEntrySchema", () => {
@@ -143,6 +149,10 @@ describe("ProjectSchema", () => {
       version: "2.0.0",
       description: "A complete project",
       lastSaved: "2026-03-13T10:00:00.000Z",
+      scenes: [],
+      sounds: [],
+      tags: [],
+      sets: [],
     };
 
     const result = ProjectSchema.safeParse(fullProject);
@@ -226,6 +236,129 @@ describe("ProjectSchema", () => {
   });
 });
 
+describe("ProjectSchema — domain model fields", () => {
+  it("should default scenes, sounds, tags, sets to empty arrays when missing", () => {
+    const result = ProjectSchema.safeParse({ name: "Old Project" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scenes).toEqual([]);
+      expect(result.data.sounds).toEqual([]);
+      expect(result.data.tags).toEqual([]);
+      expect(result.data.sets).toEqual([]);
+    }
+  });
+
+  it("should reject LayerSelectionSchema with unknown type", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "unknown", foo: "bar" });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept LayerSelectionSchema with assigned type", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "assigned", instances: [] });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept LayerSelectionSchema with tag type", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "tag", tagId: "t1", defaultVolume: 0.8 });
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject invalid PlaybackMode value", () => {
+    const result = PlaybackModeSchema.safeParse("invalid");
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept all valid RetriggerMode values", () => {
+    for (const value of ["restart", "continue", "stop", "next"]) {
+      expect(RetriggerModeSchema.safeParse(value).success).toBe(true);
+    }
+  });
+
+  it("should round-trip a project with a full scene/pad/layer", () => {
+    const raw = {
+      name: "Full Project",
+      scenes: [{
+        id: "scene-1",
+        name: "Scene 1",
+        rows: 2,
+        cols: 4,
+        pads: [{
+          id: "pad-1",
+          name: "Kick",
+          layers: [{
+            id: "layer-1",
+            selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s-1", volume: 0.9 }] },
+            arrangement: "simultaneous",
+            playbackMode: "one-shot",
+            retriggerMode: "restart",
+            volume: 1.0,
+          }],
+          muteTargetPadIds: [],
+        }],
+      }],
+      sounds: [{ id: "s-1", name: "Kick", filePath: "sounds/kick.wav", tags: [], sets: [] }],
+      tags: [],
+      sets: [],
+    };
+
+    const result = ProjectSchema.safeParse(raw);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scenes[0].pads[0].layers[0].playbackMode).toBe("one-shot");
+      expect(result.data.sounds[0].name).toBe("Kick");
+    }
+  });
+});
+
+describe("SoundSchema — filePath validation", () => {
+  const validSound = { id: "s1", name: "Kick", tags: [], sets: [] };
+
+  it("should accept a sound with no filePath", () => {
+    expect(SoundSchema.safeParse(validSound).success).toBe(true);
+  });
+
+  it("should accept a relative filePath", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "sounds/kick.wav" }).success).toBe(true);
+  });
+
+  it("should reject filePath containing ..", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "../etc/passwd" }).success).toBe(false);
+  });
+
+  it("should reject filePath containing .. in the middle", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "sounds/../../secrets/key" }).success).toBe(false);
+  });
+
+  it("should reject absolute Unix path", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "/etc/passwd" }).success).toBe(false);
+  });
+
+  it("should reject absolute Windows path with backslash", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "C:\\Windows\\file.wav" }).success).toBe(false);
+  });
+
+  it("should reject Windows drive path with forward slash", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "D:/music/file.wav" }).success).toBe(false);
+  });
+});
+
+describe("hasFilePath", () => {
+  it("should return true when filePath is a non-empty string", () => {
+    const sound: Sound = { id: "s1", name: "Kick", filePath: "sounds/kick.wav", tags: [], sets: [] };
+    expect(hasFilePath(sound)).toBe(true);
+  });
+
+  it("should return false when filePath is undefined", () => {
+    const sound: Sound = { id: "s1", name: "Kick", tags: [], sets: [] };
+    expect(hasFilePath(sound)).toBe(false);
+  });
+
+  it("should return false when filePath is empty string", () => {
+    const sound: Sound = { id: "s1", name: "Kick", filePath: "", tags: [], sets: [] };
+    expect(hasFilePath(sound)).toBe(false);
+  });
+});
+
 describe("Type exports", () => {
   it("should infer correct types from schemas", () => {
     // This is a compile-time test
@@ -239,6 +372,10 @@ describe("Type exports", () => {
 
     const project: Project = {
       name: "test",
+      scenes: [],
+      sounds: [],
+      tags: [],
+      sets: [],
     };
 
     // If these compile without errors, the types are correctly exported
