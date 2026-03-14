@@ -1,101 +1,95 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { SceneTabBar } from "./SceneTabBar";
-import { createMockScene } from "@/test/factories";
+import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
 
 describe("SceneTabBar", () => {
-  function makeProps() {
-    return {
-      scenes: [],
-      activeSceneId: null as string | null,
-      onSceneChange: vi.fn(),
-      onAddScene: vi.fn(),
-    };
+  beforeEach(() => {
+    useProjectStore.setState({ ...initialProjectState });
+  });
+
+  function loadProject(scenes = [createMockScene({ id: "s1", name: "Scene 1" })]) {
+    const entry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(
+      entry,
+      createMockProject({ scenes }),
+      false
+    );
   }
 
   it("should render an add scene button", () => {
-    render(<SceneTabBar {...makeProps()} />);
-
+    render(<SceneTabBar />);
     expect(screen.getByRole("button", { name: /add scene/i })).toBeInTheDocument();
   });
 
-  it("should render no tabs when scenes list is empty", () => {
-    render(<SceneTabBar {...makeProps()} />);
+  it("should render no tabs when no project is loaded", () => {
+    render(<SceneTabBar />);
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+  });
 
+  it("should render no tabs when scenes list is empty", () => {
+    loadProject([]);
+    render(<SceneTabBar />);
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
   it("should render a tab for each scene", () => {
-    const props = makeProps();
-    const scenes = [
+    loadProject([
       createMockScene({ id: "s1", name: "Scene 1" }),
       createMockScene({ id: "s2", name: "Scene 2" }),
-    ];
+    ]);
 
-    render(<SceneTabBar {...props} scenes={scenes} activeSceneId="s1" />);
+    render(<SceneTabBar />);
 
     expect(screen.getByRole("tab", { name: "Scene 1" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Scene 2" })).toBeInTheDocument();
   });
 
-  it("should render data-state=active on the tab whose id matches activeSceneId", () => {
-    const props = makeProps();
-    const scenes = [
+  it("should render data-state=active on the tab matching activeSceneId", () => {
+    loadProject([
       createMockScene({ id: "s1", name: "Scene 1" }),
       createMockScene({ id: "s2", name: "Scene 2" }),
-    ];
+    ]);
+    useProjectStore.getState().setActiveSceneId("s2");
 
-    render(<SceneTabBar {...props} scenes={scenes} activeSceneId="s2" />);
+    render(<SceneTabBar />);
 
-    expect(screen.getByRole("tab", { name: "Scene 2" })).toHaveAttribute(
-      "data-state",
-      "active"
-    );
-    expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute(
-      "data-state",
-      "inactive"
-    );
+    expect(screen.getByRole("tab", { name: "Scene 2" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute("data-state", "inactive");
   });
 
   it("should render no tab as active when activeSceneId is null", () => {
-    const props = makeProps();
-    const scenes = [createMockScene({ id: "s1", name: "Scene 1" })];
+    loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
+    useProjectStore.setState({ activeSceneId: null });
 
-    render(<SceneTabBar {...props} scenes={scenes} activeSceneId={null} />);
+    render(<SceneTabBar />);
 
-    expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute(
-      "data-state",
-      "inactive"
-    );
+    expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute("data-state", "inactive");
   });
 
-  it("should call onAddScene when the add button is clicked", () => {
-    const props = makeProps();
-    render(<SceneTabBar {...props} />);
+  it("should call addScene when the add button is clicked", () => {
+    loadProject([]);
+    render(<SceneTabBar />);
+
     fireEvent.click(screen.getByRole("button", { name: /add scene/i }));
 
-    expect(props.onAddScene).toHaveBeenCalledOnce();
+    expect(useProjectStore.getState().project?.scenes).toHaveLength(1);
   });
 
-  it("should call onSceneChange with the scene id when a tab is clicked", () => {
-    const props = makeProps();
-    const scenes = [
+  it("should update activeSceneId in the store when a tab is clicked", () => {
+    loadProject([
       createMockScene({ id: "s1", name: "Scene 1" }),
       createMockScene({ id: "s2", name: "Scene 2" }),
-    ];
+    ]);
 
-    render(
-      <SceneTabBar
-        {...props}
-        scenes={scenes}
-        activeSceneId="s1"
-      />
-    );
+    render(<SceneTabBar />);
+
     // Radix Tabs does not respond to `click` in happy-dom — it fires onValueChange
     // via the `mousedown` handler internally. Using fireEvent.mouseDown is the
     // correct way to test this in a jsdom/happy-dom environment.
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Scene 2" }));
 
-    expect(props.onSceneChange).toHaveBeenCalledWith("s2");
+    expect(useProjectStore.getState().activeSceneId).toBe("s2");
   });
 });
