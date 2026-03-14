@@ -18,3 +18,8 @@ export const QUERY_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 // Project defaults
 export const DEFAULT_PROJECT_VERSION = "1.0.0";
 export const DEFAULT_PROJECT_DESCRIPTION = "";
+
+// Audio
+export const SOUNDS_SUBFOLDER = "sounds";
+export const AUDIO_EXTENSIONS = [".wav", ".mp3", ".ogg", ".flac", ".aiff", ".m4a"] as const;
+export type AudioExtension = typeof AUDIO_EXTENSIONS[number];

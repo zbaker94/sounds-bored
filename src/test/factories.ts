@@ -9,6 +9,10 @@ export function createMockProject(overrides?: Partial<Project>): Project {
     version: "1.0.0",
     description: "A test project",
     lastSaved: new Date().toISOString(),
+    scenes: [],
+    sounds: [],
+    tags: [],
+    sets: [],
     ...overrides,
   };
 }
@@ -58,7 +62,8 @@ export function waitFor(ms: number): Promise<void> {
  */
 export async function expectToReject<T>(
   promise: Promise<T>,
-  errorType?: new (...args: unknown[]) => Error
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  errorType?: new (...args: any[]) => Error
 ): Promise<Error> {
   try {
     await promise;
