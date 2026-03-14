@@ -133,8 +133,6 @@ export const SceneSchema = z.object({
   id: z.string(),
   name: z.string(),
   pads: z.array(PadSchema),
-  rows: z.number().int().positive(),
-  cols: z.number().int().positive(),
 });
 
 export type Scene = z.infer<typeof SceneSchema>;

@@ -224,15 +224,13 @@ describe("projectStore", () => {
       expect(getState().activeSceneId).toBeNull();
     });
 
-    it("should add a scene with default 4x4 grid to an empty project", () => {
+    it("should add a scene with empty pads to the project", () => {
       const entry = createMockHistoryEntry();
       getState().loadProject(entry, createMockProject({ scenes: [] }), false);
 
       getState().addScene();
 
       expect(getState().project?.scenes).toHaveLength(1);
-      expect(getState().project?.scenes[0].rows).toBe(4);
-      expect(getState().project?.scenes[0].cols).toBe(4);
       expect(getState().project?.scenes[0].pads).toEqual([]);
     });
 
