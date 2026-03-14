@@ -4,18 +4,21 @@ import { MainPage } from "@/components/screens/main/MainPage";
 import { CurrentProjectProvider } from "@/state/currentProjectStore.tsx";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import { AppErrorBoundary, RouteErrorElement } from "@/components/ErrorBoundary";
 
 function App() {
   return (
-    <CurrentProjectProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<StartScreen />} />
-          <Route path="/main" element={<MainPage />} />
-        </Routes>
-        <Toaster />
-      </BrowserRouter>
-    </CurrentProjectProvider>
+    <AppErrorBoundary>
+      <CurrentProjectProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<StartScreen />} errorElement={<RouteErrorElement />} />
+            <Route path="/main" element={<MainPage />} errorElement={<RouteErrorElement />} />
+          </Routes>
+          <Toaster />
+        </BrowserRouter>
+      </CurrentProjectProvider>
+    </AppErrorBoundary>
   );
 }
 
