@@ -19,7 +19,7 @@ export function SceneTabBar({
 }: SceneTabBarProps) {
   return (
     <div className="flex items-center gap-1 border-b px-3 py-1">
-      <Tabs value={activeSceneId ?? undefined} onValueChange={onSceneChange}>
+      <Tabs value={activeSceneId ?? ""} onValueChange={onSceneChange}>
         <TabsList variant="line">
           {scenes.map((scene) => (
             <TabsTrigger
