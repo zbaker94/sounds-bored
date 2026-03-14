@@ -85,7 +85,11 @@ export function MainPage() {
 
   const handleDiscardAndClose = async () => {
     if (isTemporary && folderPath) {
-      await discardTemporaryProject(folderPath);
+      try {
+        await discardTemporaryProject(folderPath);
+      } catch (error) {
+        console.warn("Could not discard temporary project:", error);
+      }
     }
 
     allowClose();

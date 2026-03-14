@@ -275,8 +275,10 @@ export async function saveProjectAs(
   // Update the project.json with the new name and save timestamp
   const savedProject = await saveProject(newProjectPath, { ...project, name: projectName });
 
-  // Clean up the temporary folder (safe: validates temp_ prefix internally)
-  await discardTemporaryProject(currentPath);
+  // Only clean up if this was a temp folder
+  if (currentPath.includes("temp_")) {
+    await discardTemporaryProject(currentPath);
+  }
 
   return {
     newPath: newProjectPath,

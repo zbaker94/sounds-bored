@@ -462,7 +462,7 @@ describe("saveProjectAs", () => {
 
 describe("discardTemporaryProject", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetTauriMocks();
   });
 
   it("should remove a folder whose path contains temp_", async () => {
