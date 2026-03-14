@@ -57,7 +57,9 @@ describe("migrateProject — version warnings", () => {
 
     migrateProject({ name: "Old Project" });
 
-    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("0.0.0")
+    );
     warnSpy.mockRestore();
   });
 });

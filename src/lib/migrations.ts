@@ -27,7 +27,7 @@ export function migrateProject(raw: RawProject): RawProject {
 
   // Warn (don't throw) if the final version doesn't match this app's expected version.
   // This happens when opening a project created by a newer version of SoundsBored.
-  const finalVersion = (current.version as string | undefined) ?? version;
+  const finalVersion = version;
   if (finalVersion !== CURRENT_VERSION) {
     console.warn(
       `Project version "${finalVersion}" does not match app version "${CURRENT_VERSION}". ` +
