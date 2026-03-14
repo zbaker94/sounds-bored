@@ -18,6 +18,7 @@ describe("projectStore", () => {
       expect(getState().historyEntry).toBeNull();
       expect(getState().isTemporary).toBe(false);
       expect(getState().isDirty).toBe(false);
+      expect(getState().activeSceneId).toBeNull();
     });
   });
 
@@ -170,9 +171,22 @@ describe("projectStore", () => {
       });
       getState().loadProject(entry, project, false);
 
+      expect(getState().activeSceneId).toBe("s1"); // pre-condition: loadProject auto-selected first scene
       getState().setActiveSceneId("s2");
 
       expect(getState().activeSceneId).toBe("s2");
+    });
+
+    it("should not update if the sceneId does not exist in the project", () => {
+      const entry = createMockHistoryEntry();
+      const project = createMockProject({
+        scenes: [createMockScene({ id: "s1" })],
+      });
+      getState().loadProject(entry, project, false);
+
+      getState().setActiveSceneId("nonexistent-id");
+
+      expect(getState().activeSceneId).toBe("s1"); // unchanged
     });
 
     it("should reset to null on clearProject", () => {

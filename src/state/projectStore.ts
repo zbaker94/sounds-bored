@@ -77,7 +77,9 @@ export const useProjectStore = create<ProjectStore>()(
 
     setActiveSceneId: (sceneId) =>
       set((draft) => {
-        draft.activeSceneId = sceneId;
+        if (draft.project?.scenes.some((s) => s.id === sceneId)) {
+          draft.activeSceneId = sceneId;
+        }
       }),
   }))
 );
