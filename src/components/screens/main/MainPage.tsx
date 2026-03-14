@@ -1,17 +1,22 @@
-import { useCurrentProject } from "@/state/currentProjectStore.tsx";
+import { useProjectStore } from "@/state/projectStore";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { useSaveProjectAs } from "@/lib/project.queries";
+import { discardTemporaryProject } from "@/lib/project";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { remove } from "@tauri-apps/plugin-fs";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
+import { toast } from "sonner";
 
 export function MainPage() {
-  const { currentProject, markAsPermanent, hasUnsavedChanges } = useCurrentProject();
+  const project = useProjectStore((s) => s.project);
+  const folderPath = useProjectStore((s) => s.folderPath);
+  const isTemporary = useProjectStore((s) => s.isTemporary);
+  const isDirty = useProjectStore((s) => s.isDirty);
+  const markAsPermanent = useProjectStore((s) => s.markAsPermanent);
   const navigate = useNavigate();
   const saveProjectMutation = useSaveProjectAs();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -28,29 +33,29 @@ export function MainPage() {
 
   // Handle window close requests
   const { allowClose } = useWindowCloseHandler(
-    hasUnsavedChanges(),
+    isTemporary || isDirty,
     handleCloseRequested
   );
 
   useEffect(() => {
     // Redirect to start screen if no project is loaded
-    if (!currentProject) {
+    if (!project) {
+      toast.error("No project loaded. Returning to start screen.");
       navigate("/");
     }
-  }, [currentProject, navigate]);
+  }, [project, navigate]);
 
   const handleSave = async (projectName: string) => {
-    if (!currentProject) return;
+    if (!project || !folderPath) return;
 
     try {
       const result = await saveProjectMutation.mutateAsync({
         projectName,
-        currentPath: currentProject.historyEntry.path,
-        project: currentProject.project,
+        currentPath: folderPath,
+        project,
       });
 
       if (result) {
-        // Update the current project with the new path and mark as permanent
         markAsPermanent({
           name: result.project.name,
           path: result.newPath,
@@ -58,7 +63,6 @@ export function MainPage() {
         });
         setShowSaveDialog(false);
 
-        // If we should close after save, do it now
         if (shouldCloseAfterSave) {
           allowClose();
           setTimeout(async () => {
@@ -80,24 +84,12 @@ export function MainPage() {
   };
 
   const handleDiscardAndClose = async () => {
-    try {
-      // If project is temporary, clean up the temporary folder
-      if (currentProject && currentProject.isTemporary) {
-        try {
-          await remove(currentProject.historyEntry.path, { recursive: true });
-        } catch (error) {
-          console.error("Failed to remove temporary folder:", error);
-          // Continue even if deletion fails
-        }
-      }
-    } catch (error) {
-      console.error("Error in cleanup:", error);
+    if (isTemporary && folderPath) {
+      await discardTemporaryProject(folderPath);
     }
 
-    // Set the flag to allow close, then close
     allowClose();
 
-    // Small delay to ensure the flag is set before close is triggered
     setTimeout(async () => {
       try {
         const appWindow = getCurrentWindow();
@@ -112,7 +104,7 @@ export function MainPage() {
     setShowConfirmClose(false);
   };
 
-  if (!currentProject) {
+  if (!project) {
     return null;
   }
 
@@ -125,7 +117,7 @@ export function MainPage() {
           setShowSaveDialog(false);
           setShouldCloseAfterSave(false);
         }}
-        defaultName={currentProject.project.name}
+        defaultName={project.name}
         isPending={saveProjectMutation.isPending}
       />
 

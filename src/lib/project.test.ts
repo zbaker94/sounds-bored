@@ -13,6 +13,7 @@ import {
   createNewProject,
   saveProject,
   saveProjectAs,
+  discardTemporaryProject,
 } from "@/lib/project";
 import {
   mockDialog,
@@ -140,6 +141,17 @@ describe("loadProjectFile", () => {
     expect(result.name).toBe("Minimal Project");
     expect(result.version).toBeUndefined();
   });
+
+  it("should default scenes, sounds, tags, sets to empty arrays for old projects", async () => {
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify({ name: "Old Project" }));
+
+    const result = await loadProjectFile("/test/path/project.json");
+
+    expect(result.scenes).toEqual([]);
+    expect(result.sounds).toEqual([]);
+    expect(result.tags).toEqual([]);
+    expect(result.sets).toEqual([]);
+  });
 });
 
 describe("loadProjectFromPath", () => {
@@ -234,11 +246,20 @@ describe("createProjectFolder", () => {
     await createProjectFolder("MyProject");
 
     expect(mockPath.appLocalDataDir).toHaveBeenCalled();
-    expect(mockFs.mkdir).toHaveBeenCalled();
+    expect(mockFs.mkdir).toHaveBeenCalledTimes(2);
 
     const mkdirCall = mockFs.mkdir.mock.calls[0];
     expect(mkdirCall[0]).toContain("temp_MyProject_");
     expect(mkdirCall[1]).toEqual({ recursive: true });
+  });
+
+  it("should create a sounds/ subfolder inside the project folder", async () => {
+    await createProjectFolder("MyProject");
+
+    expect(mockFs.mkdir).toHaveBeenCalledTimes(2);
+    const soundsCall = mockFs.mkdir.mock.calls[1];
+    expect(soundsCall[0]).toContain("sounds");
+    expect(soundsCall[1]).toEqual({ recursive: true });
   });
 
   it("should sanitize project name", async () => {
@@ -303,7 +324,7 @@ describe("createNewProject", () => {
   });
 
   it("should create new project with given name", async () => {
-    const files = createMockFileSystem({});
+    createMockFileSystem({});
 
     const result = await createNewProject("My New Project");
 
@@ -315,7 +336,7 @@ describe("createNewProject", () => {
   });
 
   it("should generate random name when not provided", async () => {
-    const files = createMockFileSystem({});
+    createMockFileSystem({});
 
     const result = await createNewProject();
 
@@ -323,7 +344,7 @@ describe("createNewProject", () => {
   });
 
   it("should return loadable project", async () => {
-    const files = createMockFileSystem({});
+    createMockFileSystem({});
 
     const result = await createNewProject("Test Project");
 
@@ -384,19 +405,19 @@ describe("saveProjectAs", () => {
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject({ name: "Test Project" });
 
-    const result = await saveProjectAs("New Name", "/old/path", project);
+    const result = await saveProjectAs("New Name", "/app-local-data/SoundsBored/temp_Test_123", project);
 
     expect(result).not.toBeNull();
     expect(result?.newPath).toBe("/new/location/New Name");
     expect(result?.project.name).toBe("New Name");
-    expect(mockFs.remove).toHaveBeenCalledWith("/old/path", { recursive: true });
+    expect(mockFs.remove).toHaveBeenCalledWith("/app-local-data/SoundsBored/temp_Test_123", { recursive: true });
   });
 
   it("should return null when user cancels", async () => {
     mockDialog.open.mockResolvedValue(null);
     const project = createMockProject();
 
-    const result = await saveProjectAs("Test", "/old/path", project);
+    const result = await saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project);
 
     expect(result).toBeNull();
   });
@@ -406,7 +427,7 @@ describe("saveProjectAs", () => {
     mockFs.exists.mockResolvedValue(true);
     const project = createMockProject();
 
-    await expect(saveProjectAs("Test", "/old/path", project)).rejects.toThrow(
+    await expect(saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project)).rejects.toThrow(
       "already exists"
     );
   });
@@ -417,7 +438,7 @@ describe("saveProjectAs", () => {
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject();
 
-    const result = await saveProjectAs("My@Project!#$%", "/old/path", project);
+    const result = await saveProjectAs("My@Project!#$%", "/app-local-data/SoundsBored/temp_Test_123", project);
 
     expect(result?.newPath).toBe("/new/location/My_Project____");
   });
@@ -429,12 +450,55 @@ describe("saveProjectAs", () => {
     const project = createMockProject({ lastSaved: "2020-01-01T00:00:00.000Z" });
 
     const before = Date.now();
-    const result = await saveProjectAs("Test", "/old/path", project);
+    const result = await saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project);
     const after = Date.now();
 
     expect(result).not.toBeNull();
     const saved = new Date(result!.project.lastSaved!).getTime();
     expect(saved).toBeGreaterThanOrEqual(before);
     expect(saved).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("discardTemporaryProject", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should remove a folder whose path contains temp_", async () => {
+    mockFs.remove.mockResolvedValue(undefined);
+
+    await discardTemporaryProject("/app-local-data/SoundsBored/temp_MyProject_1234567890");
+
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      "/app-local-data/SoundsBored/temp_MyProject_1234567890",
+      { recursive: true }
+    );
+  });
+
+  it("should throw if the path does not contain temp_", async () => {
+    await expect(
+      discardTemporaryProject("/users/zack/projects/MyProject")
+    ).rejects.toThrow("Cannot discard");
+
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
+
+  it("should throw if the path is empty", async () => {
+    await expect(
+      discardTemporaryProject("")
+    ).rejects.toThrow("Cannot discard");
+  });
+
+  it("should not throw if remove fails (swallows and warns)", async () => {
+    mockFs.remove.mockRejectedValue(new Error("Permission denied"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(
+      discardTemporaryProject("/app-local-data/SoundsBored/temp_Test_123")
+    ).resolves.toBeUndefined();
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

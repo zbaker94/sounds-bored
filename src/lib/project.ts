@@ -3,7 +3,8 @@ import { exists, readTextFile, writeTextFile, mkdir, readDir, copyFile, remove }
 import { join, appLocalDataDir } from "@tauri-apps/api/path";
 import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
-import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION } from "./constants";
+import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
+import { migrateProject } from "./migrations";
 
 export class ProjectNotFoundError extends Error {
   constructor() {
@@ -68,8 +69,9 @@ export async function loadProjectFile(
 ): Promise<Project> {
   try {
     const fileContent = await readTextFile(projectFilePath);
-    const parsed = JSON.parse(fileContent);
-    return ProjectSchema.parse(parsed);
+    const raw = JSON.parse(fileContent);
+    const migrated = migrateProject(raw);
+    return ProjectSchema.parse(migrated);
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new ProjectValidationError(`Invalid JSON in ${PROJECT_FILE_NAME}`);
@@ -139,21 +141,13 @@ export function generateRandomProjectName(): string {
  */
 export async function createProjectFolder(projectName: string): Promise<string> {
   const appDataDir = await appLocalDataDir();
-  console.log("🔍 appLocalDataDir():", appDataDir);
-  console.log("🔍 appLocalDataDir():", appDataDir);
   const timestamp = Date.now();
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "_");
   const folderName = `temp_${sanitizedName}_${timestamp}`;
   const projectPath = await join(appDataDir, APP_FOLDER, folderName);
-  console.log("🔍 Full project path:", projectPath);
 
-  try {
-    await mkdir(projectPath, { recursive: true });
-    console.log("✅ Project folder created successfully at:", projectPath);
-  } catch (error) {
-    console.error("❌ Failed to create project folder:", error);
-    throw error;
-  }
+  await mkdir(projectPath, { recursive: true });
+  await mkdir(await join(projectPath, SOUNDS_SUBFOLDER), { recursive: true });
 
   return projectPath;
 }
@@ -166,24 +160,22 @@ export async function createProjectFolder(projectName: string): Promise<string> 
 export async function createProjectFile(
   folderPath: string,
   projectName: string
-): Promise<void> {
+): Promise<Project> {
   const projectFilePath = await join(folderPath, PROJECT_FILE_NAME);
-  console.log("🔍 Creating project.json at:", projectFilePath);
 
   const projectData: Project = {
     name: projectName,
     version: DEFAULT_PROJECT_VERSION,
     description: DEFAULT_PROJECT_DESCRIPTION,
     lastSaved: new Date().toISOString(),
+    scenes: [],
+    sounds: [],
+    tags: [],
+    sets: [],
   };
 
-  try {
-    await writeTextFile(projectFilePath, JSON.stringify(projectData, null, 2));
-    console.log("✅ project.json created successfully");
-  } catch (error) {
-    console.error("❌ Failed to create project.json:", error);
-    throw error;
-  }
+  await writeTextFile(projectFilePath, JSON.stringify(projectData, null, 2));
+  return projectData;
 }
 
 /**
@@ -197,10 +189,7 @@ export async function createNewProject(projectName?: string): Promise<{
 }> {
   const name = projectName || generateRandomProjectName();
   const folderPath = await createProjectFolder(name);
-  await createProjectFile(folderPath, name);
-
-  const projectFilePath = await join(folderPath, PROJECT_FILE_NAME);
-  const project = await loadProjectFile(projectFilePath);
+  const project = await createProjectFile(folderPath, name);
 
   return {
     project,
@@ -217,13 +206,14 @@ export async function createNewProject(projectName?: string): Promise<{
 export async function saveProject(
   folderPath: string,
   project: Project
-): Promise<void> {
+): Promise<Project> {
   const projectFilePath = await join(folderPath, PROJECT_FILE_NAME);
   const projectWithTimestamp: Project = {
     ...project,
     lastSaved: new Date().toISOString(),
   };
   await writeTextFile(projectFilePath, JSON.stringify(projectWithTimestamp, null, 2));
+  return projectWithTimestamp;
 }
 
 /**
@@ -283,25 +273,35 @@ export async function saveProjectAs(
   await copyDirectory(currentPath, newProjectPath);
 
   // Update the project.json with the new name and save timestamp
-  const updatedProject: Project = {
-    ...project,
-    name: projectName,
-  };
-  await saveProject(newProjectPath, updatedProject);
+  const savedProject = await saveProject(newProjectPath, { ...project, name: projectName });
 
-  // Clean up the temporary folder
+  // Clean up the temporary folder (safe: validates temp_ prefix internally)
+  await discardTemporaryProject(currentPath);
+
+  return {
+    newPath: newProjectPath,
+    project: savedProject,
+  };
+}
+
+/**
+ * Safely removes a temporary project folder.
+ * Only deletes folders whose path contains "temp_" as a safety guard against
+ * accidentally deleting user project folders.
+ * Swallows removal errors (logs a warning) — callers should not fail if cleanup fails.
+ *
+ * @throws {Error} If the path does not appear to be a temporary folder
+ */
+export async function discardTemporaryProject(folderPath: string): Promise<void> {
+  if (!folderPath || !folderPath.includes("temp_")) {
+    throw new Error(
+      `Cannot discard folder — path does not appear to be a temporary project: "${folderPath}"`
+    );
+  }
+
   try {
-    await remove(currentPath, { recursive: true });
+    await remove(folderPath, { recursive: true });
   } catch (error) {
     console.warn("Failed to remove temporary folder:", error);
   }
-
-  // saveProject already added the lastSaved timestamp
-  return {
-    newPath: newProjectPath,
-    project: {
-      ...updatedProject,
-      lastSaved: new Date().toISOString(),
-    },
-  };
 }
