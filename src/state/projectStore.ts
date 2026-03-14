@@ -20,7 +20,7 @@ interface ProjectActions {
    */
   updateProject: (project: Project) => void;
   clearDirtyFlag: () => void;
-  markAsPermanent: (historyEntry: ProjectHistoryEntry) => void;
+  markAsPermanent: (historyEntry: ProjectHistoryEntry, project: Project) => void;
   clearProject: () => void;
 }
 
@@ -60,9 +60,10 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = false;
       }),
 
-    markAsPermanent: (historyEntry) =>
+    markAsPermanent: (historyEntry, project) =>
       set((draft) => {
         draft.historyEntry = historyEntry;
+        draft.project = project;
         draft.folderPath = historyEntry.path;
         draft.isTemporary = false;
         draft.isDirty = false;

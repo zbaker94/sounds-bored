@@ -56,11 +56,10 @@ export function MainPage() {
       });
 
       if (result) {
-        markAsPermanent({
-          name: result.project.name,
-          path: result.newPath,
-          date: new Date().toISOString(),
-        });
+        markAsPermanent(
+          { name: result.project.name, path: result.newPath, date: new Date().toISOString() },
+          result.project
+        );
         setShowSaveDialog(false);
 
         if (shouldCloseAfterSave) {

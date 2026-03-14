@@ -99,12 +99,28 @@ describe("projectStore", () => {
       getState().updateProject(createMockProject({ name: "Dirty" }));
 
       const permEntry = createMockHistoryEntry({ path: "/permanent/project" });
-      getState().markAsPermanent(permEntry);
+      const savedProject = createMockProject({ name: "User Given Name" });
+      getState().markAsPermanent(permEntry, savedProject);
 
       expect(getState().isTemporary).toBe(false);
       expect(getState().isDirty).toBe(false);
       expect(getState().folderPath).toBe("/permanent/project");
       expect(getState().historyEntry?.path).toBe("/permanent/project");
+    });
+
+    it("should update project.name to the saved project name (Save As bug fix)", () => {
+      // Reproduces the bug: temp project has temp name in store;
+      // after Save As, markAsPermanent must update project so auto-save
+      // doesn't overwrite the correctly-named file with the stale temp name.
+      const tempEntry = createMockHistoryEntry({ path: "/temp/temp_MyProject_123" });
+      const tempProject = createMockProject({ name: "temp_MyProject_123" });
+      getState().loadProject(tempEntry, tempProject, true);
+
+      const permEntry = createMockHistoryEntry({ path: "/projects/My Project" });
+      const savedProject = createMockProject({ name: "My Project" });
+      getState().markAsPermanent(permEntry, savedProject);
+
+      expect(getState().project?.name).toBe("My Project");
     });
   });
 
