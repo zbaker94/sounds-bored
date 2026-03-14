@@ -1,4 +1,4 @@
-import { Project, ProjectHistoryEntry } from "@/lib/schemas";
+import { Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
 
 /**
  * Factory for creating test Projects
@@ -27,6 +27,20 @@ export function createMockHistoryEntry(
     name: "Test Project",
     path: "/test/path/project",
     date: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test Scenes
+ */
+export function createMockScene(overrides?: Partial<Scene>): Scene {
+  return {
+    id: "scene-1",
+    name: "Scene 1",
+    pads: [],
+    rows: 4,
+    cols: 4,
     ...overrides,
   };
 }
