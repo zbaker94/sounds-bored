@@ -72,7 +72,7 @@ export function MainPage() {
         }
       }
     } catch (error) {
-      console.error("Failed to save project:", error);
+      toast.error("Failed to save project. Please try again.");
       setShouldCloseAfterSave(false);
     }
   };

@@ -1,19 +1,20 @@
 import { useProjectHistory } from "@/lib/history.queries";
 import { useLoadProject, useLoadProjectFromPath, useCreateProject } from "@/lib/project.queries";
-import { useCurrentProject } from "@/state/currentProjectStore.tsx";
+import { useProjectStore } from "@/state/projectStore";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
-import { ProjectHistoryEntry } from "@/lib/schemas";
+import { Project, ProjectHistoryEntry } from "@/lib/schemas";
 import logo from "@/assets/sleeping knight-emblem.gif";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderOpenIcon } from "@hugeicons/core-free-icons";
+import { toast } from "sonner";
 
 export function StartScreen() {
   const { data: recentProjects = [], isLoading, error } = useProjectHistory();
-  const { setCurrentProject } = useCurrentProject();
+  const loadProject = useProjectStore((s) => s.loadProject);
   const loadProjectMutation = useLoadProject();
   const loadProjectFromPathMutation = useLoadProjectFromPath();
   const createProjectMutation = useCreateProject();
@@ -21,18 +22,14 @@ export function StartScreen() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // Common logic for navigating to main page after loading/creating a project
-  const navigateToProject = useCallback((result: { project: { name: string }, folderPath: string }, isTemporary: boolean) => {
-    setCurrentProject(
-      {
-        name: result.project.name,
-        path: result.folderPath,
-        date: new Date().toISOString(),
-      },
+  const navigateToProject = useCallback((result: { project: Project, folderPath: string }, isTemporary: boolean) => {
+    loadProject(
+      { name: result.project.name, path: result.folderPath, date: new Date().toISOString() },
       result.project,
       isTemporary
     );
     navigate("/main");
-  }, [setCurrentProject, navigate]);
+  }, [loadProject, navigate]);
 
   const handleLoad = async (entry: ProjectHistoryEntry) => {
     try {
@@ -41,7 +38,7 @@ export function StartScreen() {
         navigateToProject(result, false); // Existing projects are in permanent locations
       }
     } catch (error) {
-      console.error("Failed to load project:", error);
+      toast.error("Failed to load project. The file may be missing or corrupted.");
     }
   };
 
@@ -59,7 +56,7 @@ export function StartScreen() {
       const result = await createProjectMutation.mutateAsync(undefined);
       navigateToProject(result, true); // New projects start in temporary location
     } catch (error) {
-      console.error("Failed to create project:", error);
+      toast.error("Failed to create project. Please try again.");
     } finally {
       setIsCreatingProject(false);
     }
