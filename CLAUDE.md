@@ -30,7 +30,7 @@
   - Has playback config (PlaybackMode: one-shot/hold/loop)
   - Has retrigger behavior (RetriggerMode: restart/continue/stop/next)
 - **Pad**: A triggerable button containing multiple Layers (all fire simultaneously on trigger)
-- **Scene**: A collection of pads with a rows/cols grid layout
+- **Scene**: A collection of pads (using css to produce a rows/cols grid layout in the ui)
 
 ### Key Design Principles
 

@@ -46,8 +46,6 @@ export function createMockScene(overrides?: Partial<Scene>): Scene {
     id: `scene-${_sceneCounter}`,
     name: `Scene ${_sceneCounter}`,
     pads: [],
-    rows: 4,
-    cols: 4,
     ...overrides,
   };
 }

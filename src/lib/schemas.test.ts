@@ -280,8 +280,6 @@ describe("ProjectSchema — domain model fields", () => {
       scenes: [{
         id: "scene-1",
         name: "Scene 1",
-        rows: 2,
-        cols: 4,
         pads: [{
           id: "pad-1",
           name: "Kick",
