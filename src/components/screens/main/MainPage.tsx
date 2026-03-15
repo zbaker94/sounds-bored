@@ -116,7 +116,6 @@ export function MainPage() {
     <>
       <div id="main-page" className="w-full h-full flex flex-col">
         <SceneTabBar />
-        <div className="flex-1" />
       </div>
       <SaveProjectDialog
         isOpen={showSaveDialog}

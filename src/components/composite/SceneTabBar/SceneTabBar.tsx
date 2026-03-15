@@ -14,7 +14,7 @@ export function SceneTabBar() {
   const addScene = useProjectStore((s) => s.addScene);
 
   return (
-    <div className="flex items-center gap-1 border-b px-3 py-1">
+    <div className="flex items-center gap-1 px-3 py-1">
       <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
         <TabsList variant="line">
           {scenes.map((scene) => (
@@ -29,6 +29,7 @@ export function SceneTabBar() {
         size="icon-sm"
         onClick={() => addScene()}
         aria-label="Add scene"
+        className="shadowed"
       >
         <HugeiconsIcon icon={Add02Icon} size={16} />
       </Button>
