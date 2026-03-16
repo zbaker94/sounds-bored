@@ -1,4 +1,4 @@
-import { Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
+import { AppSettings, GlobalFolder, GlobalLibrary, Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
 
 /**
  * Factory for creating test Projects
@@ -46,6 +46,56 @@ export function createMockScene(overrides?: Partial<Scene>): Scene {
     id: `scene-${_sceneCounter}`,
     name: `Scene ${_sceneCounter}`,
     pads: [],
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test GlobalFolder
+ */
+export function createMockGlobalFolder(overrides?: Partial<GlobalFolder>): GlobalFolder {
+  return {
+    id: crypto.randomUUID(),
+    path: "/music/SoundsBored",
+    name: "SoundsBored",
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test AppSettings
+ */
+export function createMockAppSettings(overrides?: Partial<AppSettings>): AppSettings {
+  const downloadFolder = createMockGlobalFolder({
+    path: "/music/SoundsBored/downloads",
+    name: "Downloads",
+  });
+  const importFolder = createMockGlobalFolder({
+    path: "/music/SoundsBored/imported",
+    name: "Imported",
+  });
+  const rootFolder = createMockGlobalFolder({
+    path: "/music/SoundsBored",
+    name: "SoundsBored",
+  });
+  return {
+    version: "1.0.0",
+    globalFolders: [rootFolder, downloadFolder, importFolder],
+    downloadFolderId: downloadFolder.id,
+    importFolderId: importFolder.id,
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test GlobalLibrary
+ */
+export function createMockGlobalLibrary(overrides?: Partial<GlobalLibrary>): GlobalLibrary {
+  return {
+    version: "1.0.0",
+    sounds: [],
+    tags: [],
+    sets: [],
     ...overrides,
   };
 }
