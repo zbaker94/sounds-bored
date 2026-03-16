@@ -32,6 +32,7 @@ export const mockPath = {
   tempDir: vi.fn(() => Promise.resolve("/tmp")),
   appDataDir: vi.fn(() => Promise.resolve("/app-data")),
   appLocalDataDir: vi.fn(() => Promise.resolve("/app-local-data")),
+  musicDir: vi.fn(() => Promise.resolve("/music")),
 };
 
 // Mock modules at the top level
