@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { PlayIcon, StopIcon } from "@hugeicons/core-free-icons";
+import { PlayIcon, SmileDizzyIcon } from "@hugeicons/core-free-icons";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useCallback } from "react";
 
@@ -14,8 +14,8 @@ export function PlaySection() {
 
   return (
     <div className="flex items-center p-1 md:pb-2">
-      <Button variant="default" size="icon" className="size-11 md:size-9" onClick={togglePlay}>
-        <HugeiconsIcon icon={isPlaying ? StopIcon : PlayIcon} />
+      <Button variant={isPlaying ? "destructive" : "default"} size="icon-lg" className="size-11 md:size-9 p-0" onClick={togglePlay}>
+        <HugeiconsIcon size={200} icon={isPlaying ? SmileDizzyIcon : PlayIcon} />
       </Button>
     </div>
   );

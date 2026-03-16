@@ -42,9 +42,13 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
 
         // Secondary guard: skip if data is identical to last save
         if (projectJson !== lastSaveRef.current) {
+      toast.info("Auto-saving project...");
+
           await saveProject(folderPath, project);
           lastSaveRef.current = projectJson;
           clearDirtyFlag();
+          toast.dismiss();
+          toast.success("Project auto-saved successfully.");
         }
       } catch (error) {
         toast.error("Auto-save failed. Your changes may not be saved.");
