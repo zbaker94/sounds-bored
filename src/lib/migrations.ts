@@ -7,11 +7,39 @@ interface Migration {
   migrate: MigrationFn;
 }
 
-export const CURRENT_VERSION = "1.0.0";
+export const CURRENT_VERSION = "1.1.0";
 
-// Register future migrations here in order.
-// Each migration transforms a project from one version to the next.
-const MIGRATIONS: Migration[] = [];
+const MIGRATIONS: Migration[] = [
+  {
+    fromVersion: "1.0.0",
+    toVersion: "1.1.0",
+    migrate: (raw) => {
+      const next = { ...raw };
+      const sounds = next.sounds;
+      const tags = next.tags;
+      const sets = next.sets;
+
+      const soundCount = Array.isArray(sounds) ? sounds.length : 0;
+      const tagCount = Array.isArray(tags) ? tags.length : 0;
+      const setCount = Array.isArray(sets) ? sets.length : 0;
+
+      if (soundCount > 0 || tagCount > 0 || setCount > 0) {
+        console.warn(
+          `Migration 1.0.0 → 1.1.0: discarding ${soundCount} sound(s), ` +
+          `${tagCount} tag(s), ${setCount} set(s) from project. ` +
+          `These are now managed in the global sound library.`
+        );
+      }
+
+      delete next.sounds;
+      delete next.tags;
+      delete next.sets;
+      next.favoritedSetIds = [];
+
+      return next;
+    },
+  },
+];
 
 export function migrateProject(raw: RawProject): RawProject {
   let current = { ...raw };
@@ -25,8 +53,6 @@ export function migrateProject(raw: RawProject): RawProject {
     }
   }
 
-  // Warn (don't throw) if the final version doesn't match this app's expected version.
-  // This happens when opening a project created by a newer version of SoundsBored.
   const finalVersion = version;
   if (finalVersion !== CURRENT_VERSION) {
     console.warn(
