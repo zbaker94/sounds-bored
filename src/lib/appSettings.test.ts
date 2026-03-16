@@ -16,7 +16,7 @@ describe("getSettingsFilePath", () => {
 describe("loadAppSettings", () => {
   beforeEach(() => {
     mockPath.appDataDir.mockResolvedValue("/app-data");
-    mockPath.musicDir.mockResolvedValue("/music");
+    mockPath.audioDir.mockResolvedValue("/music");
     mockFs.mkdir.mockResolvedValue(undefined);
   });
 

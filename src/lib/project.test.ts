@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { migrateProject } from "./migrations";
+import { ProjectSchema } from "./schemas";
 import {
   ProjectNotFoundError,
   ProjectValidationError,
@@ -142,15 +144,18 @@ describe("loadProjectFile", () => {
     expect(result.version).toBeUndefined();
   });
 
-  it("should default scenes, sounds, tags, sets to empty arrays for old projects", async () => {
-    mockFs.readTextFile.mockResolvedValue(JSON.stringify({ name: "Old Project" }));
-
-    const result = await loadProjectFile("/test/path/project.json");
-
-    expect(result.scenes).toEqual([]);
-    expect(result.sounds).toEqual([]);
-    expect(result.tags).toEqual([]);
-    expect(result.sets).toEqual([]);
+  it("should default scenes and favoritedSetIds to empty arrays after migration", () => {
+    // Simulate a 1.0.0 project being migrated — sounds/tags/sets are stripped,
+    // favoritedSetIds is added, and the schema defaults scenes to [].
+    const oldProject = { name: "Old Project", version: "1.0.0", sounds: [], tags: [], sets: [] };
+    const migrated = migrateProject(oldProject);
+    const result = ProjectSchema.safeParse(migrated);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scenes).toEqual([]);
+      expect(result.data.favoritedSetIds).toEqual([]);
+      expect((result.data as Record<string, unknown>).sounds).toBeUndefined();
+    }
   });
 });
 

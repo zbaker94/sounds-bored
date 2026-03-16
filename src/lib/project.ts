@@ -169,9 +169,7 @@ export async function createProjectFile(
     description: DEFAULT_PROJECT_DESCRIPTION,
     lastSaved: new Date().toISOString(),
     scenes: [],
-    sounds: [],
-    tags: [],
-    sets: [],
+    favoritedSetIds: [],
   };
 
   await writeTextFile(projectFilePath, JSON.stringify(projectData, null, 2));

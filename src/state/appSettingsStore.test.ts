@@ -39,7 +39,8 @@ describe("appSettingsStore", () => {
       const newFolder = createMockGlobalFolder({ name: "Extra" });
       getState().addGlobalFolder(newFolder);
       expect(getState().settings!.globalFolders).toHaveLength(initialCount + 1);
-      expect(getState().settings!.globalFolders.at(-1)?.name).toBe("Extra");
+      const folders = getState().settings!.globalFolders;
+      expect(folders[folders.length - 1]?.name).toBe("Extra");
     });
 
     it("should do nothing when settings is null", () => {

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useLibraryStore, initialLibraryState } from "./libraryStore";
 import { createMockGlobalLibrary } from "@/test/factories";
-import { Sound, Tag, Set } from "@/lib/schemas";
 
 function getState() {
   return useLibraryStore.getState();

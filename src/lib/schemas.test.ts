@@ -15,7 +15,6 @@ import {
   type ProjectHistory,
   type Project,
   type Sound,
-  type GlobalFolder,
   type AppSettings,
   type GlobalLibrary,
 } from "@/lib/schemas";

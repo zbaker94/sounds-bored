@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadGlobalLibrary, saveGlobalLibrary, getLibraryFilePath } from "./library";
-import { mockFs, mockPath, createMockFileSystem } from "@/test/tauri-mocks";
+import { mockPath, createMockFileSystem } from "@/test/tauri-mocks";
 import { CURRENT_LIBRARY_VERSION } from "./constants";
 import { createMockGlobalLibrary } from "@/test/factories";
 import { GlobalLibrary } from "./schemas";

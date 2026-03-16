@@ -1,5 +1,5 @@
 import { AppSettings, AppSettingsSchema, GlobalFolder } from "./schemas";
-import { appDataDir, join, musicDir } from "@tauri-apps/api/path";
+import { appDataDir, audioDir, join } from "@tauri-apps/api/path";
 import { readTextFile, writeTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
 import { APP_FOLDER, SETTINGS_FILE_NAME } from "./constants";
 
@@ -9,7 +9,7 @@ export async function getSettingsFilePath(): Promise<string> {
 }
 
 async function createDefaultAppSettings(): Promise<AppSettings> {
-  const music = await musicDir();
+  const music = await audioDir();
   const rootPath = await join(music, "SoundsBored");
   const downloadsPath = await join(music, "SoundsBored", "downloads");
   const importedPath = await join(music, "SoundsBored", "imported");
