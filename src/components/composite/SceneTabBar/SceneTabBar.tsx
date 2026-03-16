@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add02Icon } from "@hugeicons/core-free-icons";
 import type { Scene } from "@/lib/schemas";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const EMPTY_SCENES: Scene[] = [];
 
@@ -24,6 +25,8 @@ export function SceneTabBar() {
           ))}
         </TabsList>
       </Tabs>
+      <Tooltip>
+        <TooltipTrigger asChild>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -33,6 +36,11 @@ export function SceneTabBar() {
       >
         <HugeiconsIcon icon={Add02Icon} size={16} />
       </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p>New Scene</p>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
