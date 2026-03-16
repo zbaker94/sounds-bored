@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CURRENT_SETTINGS_VERSION, CURRENT_LIBRARY_VERSION } from "./constants";
 
 // ─── Project History ────────────────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ export type GlobalFolder = z.infer<typeof GlobalFolderSchema>;
 // ─── App Settings ─────────────────────────────────────────────────────────────
 
 export const AppSettingsSchema = z.object({
-  version: z.string().optional().default("1.0.0"),
+  version: z.string().optional().default(CURRENT_SETTINGS_VERSION),
   globalFolders: z.array(GlobalFolderSchema),
   downloadFolderId: z.string().uuid(),   // ID of the yt-dlp download destination folder
   importFolderId: z.string().uuid(),     // ID of the in-app import destination folder
@@ -168,7 +169,7 @@ export type AppSettings = z.infer<typeof AppSettingsSchema>;
 // ─── Global Library ───────────────────────────────────────────────────────────
 
 export const GlobalLibrarySchema = z.object({
-  version: z.string().optional().default("1.0.0"),
+  version: z.string().optional().default(CURRENT_LIBRARY_VERSION),
   sounds: z.array(SoundSchema),
   tags: z.array(TagSchema),
   sets: z.array(SetSchema),

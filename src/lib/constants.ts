@@ -21,6 +21,10 @@ export const QUERY_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_PROJECT_VERSION = "1.1.0";
 export const DEFAULT_PROJECT_DESCRIPTION = "";
 
+// Global file format versions (independent of project version)
+export const CURRENT_SETTINGS_VERSION = "1.0.0";
+export const CURRENT_LIBRARY_VERSION = "1.0.0";
+
 // Audio
 export const SOUNDS_SUBFOLDER = "sounds";
 export const AUDIO_EXTENSIONS = [".wav", ".mp3", ".ogg", ".flac", ".aiff", ".m4a"] as const;

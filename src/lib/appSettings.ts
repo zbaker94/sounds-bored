@@ -38,12 +38,11 @@ async function createDefaultAppSettings(): Promise<AppSettings> {
     }
   }
 
-  return {
-    version: "1.0.0",
+  return AppSettingsSchema.parse({
     globalFolders: [rootFolder, downloadsFolder, importedFolder],
     downloadFolderId: downloadsFolder.id,
     importFolderId: importedFolder.id,
-  };
+  });
 }
 
 export async function loadAppSettings(): Promise<AppSettings> {

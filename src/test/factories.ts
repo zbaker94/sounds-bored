@@ -1,4 +1,5 @@
 import { AppSettings, GlobalFolder, GlobalLibrary, Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
+import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constants";
 
 /**
  * Factory for creating test Projects
@@ -79,7 +80,7 @@ export function createMockAppSettings(overrides?: Partial<AppSettings>): AppSett
     name: "SoundsBored",
   });
   return {
-    version: "1.0.0",
+    version: CURRENT_SETTINGS_VERSION,
     globalFolders: [rootFolder, downloadFolder, importFolder],
     downloadFolderId: downloadFolder.id,
     importFolderId: importFolder.id,
@@ -92,7 +93,7 @@ export function createMockAppSettings(overrides?: Partial<AppSettings>): AppSett
  */
 export function createMockGlobalLibrary(overrides?: Partial<GlobalLibrary>): GlobalLibrary {
   return {
-    version: "1.0.0",
+    version: CURRENT_LIBRARY_VERSION,
     sounds: [],
     tags: [],
     sets: [],

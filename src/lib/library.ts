@@ -12,7 +12,7 @@ export async function loadGlobalLibrary(): Promise<GlobalLibrary> {
   const filePath = await getLibraryFilePath();
 
   if (!(await exists(filePath))) {
-    return { version: "1.0.0", sounds: [], tags: [], sets: [] };
+    return GlobalLibrarySchema.parse({ sounds: [], tags: [], sets: [] });
   }
 
   const text = await readTextFile(filePath);

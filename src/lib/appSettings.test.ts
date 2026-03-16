@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadAppSettings, saveAppSettings, getSettingsFilePath } from "./appSettings";
 import { mockFs, mockPath, createMockFileSystem } from "@/test/tauri-mocks";
+import { CURRENT_SETTINGS_VERSION } from "./constants";
 import { createMockAppSettings } from "@/test/factories";
 import { AppSettings } from "./schemas";
 
@@ -41,7 +42,7 @@ describe("loadAppSettings", () => {
     const result = await loadAppSettings();
 
     expect(result.globalFolders).toHaveLength(3);
-    expect(result.version).toBe("1.0.0");
+    expect(result.version).toBe(CURRENT_SETTINGS_VERSION);
     expect(result.downloadFolderId).toBeTruthy();
     expect(result.importFolderId).toBeTruthy();
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(

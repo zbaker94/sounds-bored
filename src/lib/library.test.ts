@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadGlobalLibrary, saveGlobalLibrary, getLibraryFilePath } from "./library";
 import { mockFs, mockPath, createMockFileSystem } from "@/test/tauri-mocks";
+import { CURRENT_LIBRARY_VERSION } from "./constants";
 import { createMockGlobalLibrary } from "@/test/factories";
 import { GlobalLibrary } from "./schemas";
 
@@ -24,7 +25,7 @@ describe("loadGlobalLibrary", () => {
     expect(result.sounds).toEqual([]);
     expect(result.tags).toEqual([]);
     expect(result.sets).toEqual([]);
-    expect(result.version).toBe("1.0.0");
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
   });
 
   it("should parse and return the library when file exists", async () => {
