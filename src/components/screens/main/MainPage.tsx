@@ -11,17 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  HeadphonesIcon,
-  PencilEdit01Icon,
-  Upload03Icon,
-  HeadphoneMuteIcon,
-  StopIcon,
-  PlayIcon,
-} from "@hugeicons/core-free-icons";
-import { Slider } from "@/components/ui/slider";
+import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 
 export function MainPage() {
   const project = useProjectStore((s) => s.project);
@@ -34,7 +24,6 @@ export function MainPage() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [shouldCloseAfterSave, setShouldCloseAfterSave] = useState(false);
-  const [volume, setVolume] = useState(100);
 
   // Enable auto-save for the current project
   useAutoSave();
@@ -133,47 +122,8 @@ export function MainPage() {
       <div id="main-page" className="w-full h-screen flex flex-col md:flex-row">
         <div className="flex flex-col flex-1 min-h-0 min-w-0">
           <SceneTabBar />
-          <div className="flex-1" />
         </div>
-        <aside className="h-16 w-full shrink-0 bg-yellow-500 drop-shadow-[0_-5px_0px_rgba(0,0,0,1)] flex flex-row md:h-full md:w-12 md:drop-shadow-[-5px_0_0px_rgba(0,0,0,1)] md:flex-col md:justify-between">
-          {/* Section 1: Edit controls — pinned to start */}
-          <div className="flex flex-row items-center p-1 gap-2 md:flex-col">
-            <Button variant="default" size="icon" className="size-11 md:size-9">
-              <HugeiconsIcon icon={Upload03Icon} />
-            </Button>
-            <Button variant="default" size="icon" className="size-11 md:size-9">
-              <HugeiconsIcon icon={PencilEdit01Icon} />
-            </Button>
-          </div>
-          {/* Section 2: Volume — fills width on horizontal, natural size on vertical */}
-          <div className="flex-1 md:flex-none flex flex-row items-center justify-center gap-2 md:flex-col">
-            <Slider
-              orientation="horizontal"
-              value={[volume]}
-              onValueChange={(vals) => setVolume(vals[0])}
-              max={100}
-              min={0}
-              className="w-42 md:hidden"
-            />
-            <Slider
-              orientation="vertical"
-              value={[volume]}
-              onValueChange={(vals) => setVolume(vals[0])}
-              max={100}
-              min={0}
-              className="hidden md:flex"
-            />
-            <Button variant="default" size="icon" className="size-11 md:size-9" onClick={() => volume > 0 ? setVolume(0) : setVolume(50)}>
-              {volume > 0 ? <HugeiconsIcon icon={HeadphonesIcon} /> : <HugeiconsIcon icon={HeadphoneMuteIcon} />}
-            </Button>
-          </div>
-          {/* Section 3: Play — pinned to end */}
-          <div className="flex items-center p-1 md:pb-2">
-            <Button variant="default" size="icon" className="size-11 md:size-9">
-              <HugeiconsIcon icon={PlayIcon} />
-            </Button>
-          </div>
-        </aside>
+        <SidePanel />
       </div>
       <SaveProjectDialog
         isOpen={showSaveDialog}

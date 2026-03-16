@@ -1,8 +1,15 @@
 import { create } from "zustand";
 
 interface PlaybackState {
-  // Runtime-only state — never persisted to disk.
-  // Populated in Phase 5: audioBuffers, activeVoices, masterVolume, etc.
+  masterVolume: number; // 0–100
+  setMasterVolume: (volume: number) => void;
+  isPlaying: boolean;
+  setIsPlaying: (playing: boolean) => void;
 }
 
-export const usePlaybackStore = create<PlaybackState>()(() => ({}));
+export const usePlaybackStore = create<PlaybackState>()((set) => ({
+  masterVolume: 100,
+  setMasterVolume: (volume) => set({ masterVolume: volume }),
+  isPlaying: false,
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
+}));
