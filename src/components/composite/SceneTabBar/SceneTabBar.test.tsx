@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { SceneTabBar } from "./SceneTabBar";
 import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
+
+function renderWithTooltip(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
 
 describe("SceneTabBar", () => {
   beforeEach(() => {
@@ -19,18 +24,18 @@ describe("SceneTabBar", () => {
   }
 
   it("should render an add scene button", () => {
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
     expect(screen.getByRole("button", { name: /add scene/i })).toBeInTheDocument();
   });
 
   it("should render no tabs when no project is loaded", () => {
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
   it("should render no tabs when scenes list is empty", () => {
     loadProject([]);
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 
@@ -40,7 +45,7 @@ describe("SceneTabBar", () => {
       createMockScene({ id: "s2", name: "Scene 2" }),
     ]);
 
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
 
     expect(screen.getByRole("tab", { name: "Scene 1" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Scene 2" })).toBeInTheDocument();
@@ -53,7 +58,7 @@ describe("SceneTabBar", () => {
     ]);
     useProjectStore.getState().setActiveSceneId("s2");
 
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
 
     expect(screen.getByRole("tab", { name: "Scene 2" })).toHaveAttribute("data-state", "active");
     expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute("data-state", "inactive");
@@ -63,14 +68,14 @@ describe("SceneTabBar", () => {
     loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
     useProjectStore.setState({ activeSceneId: null });
 
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
 
     expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute("data-state", "inactive");
   });
 
   it("should call addScene when the add button is clicked", () => {
     loadProject([]);
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
 
     fireEvent.click(screen.getByRole("button", { name: /add scene/i }));
 
@@ -83,7 +88,7 @@ describe("SceneTabBar", () => {
       createMockScene({ id: "s2", name: "Scene 2" }),
     ]);
 
-    render(<SceneTabBar />);
+    renderWithTooltip(<SceneTabBar />);
 
     // Radix Tabs does not respond to `click` in happy-dom — it fires onValueChange
     // via the `mousedown` handler internally. Using fireEvent.mouseDown is the
