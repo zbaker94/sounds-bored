@@ -3,10 +3,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderMusicIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMd } from "@/hooks/useBreakpoint";
+import { useMemo } from "react";
 
 export function EditSection() {
   const isMd = useIsMd();
-  const tooltipSide = isMd ? "left" : "top";
+  const tooltipSide = useMemo(() => (isMd ? "left" : "top"), [isMd]);
 
   return (
     <div className="flex flex-row items-center p-1 gap-2 md:flex-col">

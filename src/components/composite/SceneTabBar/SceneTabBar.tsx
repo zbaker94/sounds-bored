@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add02Icon } from "@hugeicons/core-free-icons";
 import type { Scene } from "@/lib/schemas";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const EMPTY_SCENES: Scene[] = [];
 
@@ -15,27 +19,29 @@ export function SceneTabBar() {
   const addScene = useProjectStore((s) => s.addScene);
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1">
-      <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
-        <TabsList variant="line">
-          {scenes.map((scene) => (
-            <TabsTrigger key={scene.id} value={scene.id}>
-              {scene.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+    <div className="flex items-center gap-1 px-3 py-1 min-w-0">
+      <div className="min-w-0 max-w-[940px] overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
+        <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
+          <TabsList variant="line">
+            {scenes.map((scene) => (
+              <TabsTrigger key={scene.id} value={scene.id}>
+                {scene.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
       <Tooltip>
         <TooltipTrigger asChild>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => addScene()}
-        aria-label="Add scene"
-        className="shadowed"
-      >
-        <HugeiconsIcon icon={Add02Icon} size={16} />
-      </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => addScene()}
+            aria-label="Add scene"
+            className="shadowed"
+          >
+            <HugeiconsIcon icon={Add02Icon} size={16} />
+          </Button>
         </TooltipTrigger>
         <TooltipContent side="top">
           <p>New Scene</p>

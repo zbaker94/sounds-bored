@@ -1,24 +1,27 @@
 import { useState, useEffect } from "react";
 
-function getBreakpointQuery(name: string): string {
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(`--breakpoint-${name}`)
-    .trim();
-  return `(min-width: ${value})`;
-}
+// Tailwind v4 default breakpoints — hardcoded to avoid relying on
+// getComputedStyle for CSS custom properties, which is unreliable in
+// Tauri's WebKit webview at initialization time.
+const BREAKPOINTS: Record<string, string> = {
+  sm: "40rem",
+  md: "48rem",
+  lg: "64rem",
+  xl: "80rem",
+  "2xl": "96rem",
+};
 
 /** Returns true when the viewport is at or above the named Tailwind breakpoint. */
 export function useBreakpoint(name: string): boolean {
-  const [matches, setMatches] = useState(() =>
-    window.matchMedia(getBreakpointQuery(name)).matches
-  );
+  const query = `(min-width: ${BREAKPOINTS[name] ?? "48rem"})`;
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
 
   useEffect(() => {
-    const mq = window.matchMedia(getBreakpointQuery(name));
+    const mq = window.matchMedia(query);
     const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [name]);
+  }, [query]);
 
   return matches;
 }
