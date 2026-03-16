@@ -138,6 +138,8 @@
     background-image: url('./assets/background-scroll.gif');
     background-repeat: repeat;
     background-attachment: fixed;
+
+    user-select: none;
     }
   html {
     @apply font-sans;
