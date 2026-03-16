@@ -7,11 +7,17 @@ import {
   PlaybackModeSchema,
   RetriggerModeSchema,
   SoundSchema,
+  GlobalFolderSchema,
+  AppSettingsSchema,
+  GlobalLibrarySchema,
   hasFilePath,
   type ProjectHistoryEntry,
   type ProjectHistory,
   type Project,
   type Sound,
+  type GlobalFolder,
+  type AppSettings,
+  type GlobalLibrary,
 } from "@/lib/schemas";
 
 describe("ProjectHistoryEntrySchema", () => {
@@ -144,17 +150,14 @@ describe("ProjectSchema", () => {
   });
 
   it("should validate a project with all fields", () => {
-    const fullProject: Project = {
+    const fullProject = {
       name: "Full Project",
       version: "2.0.0",
       description: "A complete project",
       lastSaved: "2026-03-13T10:00:00.000Z",
       scenes: [],
-      sounds: [],
-      tags: [],
-      sets: [],
+      favoritedSetIds: [],
     };
-
     const result = ProjectSchema.safeParse(fullProject);
     expect(result.success).toBe(true);
     if (result.success) {
@@ -237,14 +240,15 @@ describe("ProjectSchema", () => {
 });
 
 describe("ProjectSchema — domain model fields", () => {
-  it("should default scenes, sounds, tags, sets to empty arrays when missing", () => {
+  it("should default scenes and favoritedSetIds to empty arrays when missing", () => {
     const result = ProjectSchema.safeParse({ name: "Old Project" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.scenes).toEqual([]);
-      expect(result.data.sounds).toEqual([]);
-      expect(result.data.tags).toEqual([]);
-      expect(result.data.sets).toEqual([]);
+      expect(result.data.favoritedSetIds).toEqual([]);
+      expect((result.data as Record<string, unknown>).sounds).toBeUndefined();
+      expect((result.data as Record<string, unknown>).tags).toBeUndefined();
+      expect((result.data as Record<string, unknown>).sets).toBeUndefined();
     }
   });
 
@@ -294,16 +298,11 @@ describe("ProjectSchema — domain model fields", () => {
           muteTargetPadIds: [],
         }],
       }],
-      sounds: [{ id: "s-1", name: "Kick", filePath: "sounds/kick.wav", tags: [], sets: [] }],
-      tags: [],
-      sets: [],
     };
-
     const result = ProjectSchema.safeParse(raw);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.scenes[0].pads[0].layers[0].playbackMode).toBe("one-shot");
-      expect(result.data.sounds[0].name).toBe("Kick");
     }
   });
 });
@@ -315,28 +314,21 @@ describe("SoundSchema — filePath validation", () => {
     expect(SoundSchema.safeParse(validSound).success).toBe(true);
   });
 
-  it("should accept a relative filePath", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "sounds/kick.wav" }).success).toBe(true);
+  it("should accept an absolute Unix path", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "/home/user/music/kick.wav" }).success).toBe(true);
   });
 
-  it("should reject filePath containing ..", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "../etc/passwd" }).success).toBe(false);
+  it("should accept an absolute Windows path", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "C:/Users/user/Music/kick.wav" }).success).toBe(true);
   });
 
-  it("should reject filePath containing .. in the middle", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "sounds/../../secrets/key" }).success).toBe(false);
+  it("should accept a path containing ..", () => {
+    // filePath is now just a non-empty string — path validation is filesystem-level
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "/music/../sounds/kick.wav" }).success).toBe(true);
   });
 
-  it("should reject absolute Unix path", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "/etc/passwd" }).success).toBe(false);
-  });
-
-  it("should reject absolute Windows path with backslash", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "C:\\Windows\\file.wav" }).success).toBe(false);
-  });
-
-  it("should reject Windows drive path with forward slash", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "D:/music/file.wav" }).success).toBe(false);
+  it("should reject an empty string filePath", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "" }).success).toBe(false);
   });
 });
 
@@ -359,26 +351,111 @@ describe("hasFilePath", () => {
 
 describe("Type exports", () => {
   it("should infer correct types from schemas", () => {
-    // This is a compile-time test
     const entry: ProjectHistoryEntry = {
       name: "test",
       path: "/test",
       date: "2026-03-13T10:00:00.000Z",
     };
-
     const history: ProjectHistory = [entry];
-
     const project: Project = {
       name: "test",
       scenes: [],
-      sounds: [],
-      tags: [],
-      sets: [],
+      favoritedSetIds: [],
     };
-
-    // If these compile without errors, the types are correctly exported
     expect(entry).toBeDefined();
     expect(history).toBeDefined();
     expect(project).toBeDefined();
+  });
+});
+
+describe("GlobalFolderSchema", () => {
+  it("should accept a valid global folder", () => {
+    const folder = {
+      id: crypto.randomUUID(),
+      path: "/music/SoundsBored",
+      name: "SoundsBored",
+    };
+    expect(GlobalFolderSchema.safeParse(folder).success).toBe(true);
+  });
+
+  it("should reject a folder with empty path", () => {
+    const folder = { id: crypto.randomUUID(), path: "", name: "Test" };
+    expect(GlobalFolderSchema.safeParse(folder).success).toBe(false);
+  });
+
+  it("should reject a folder with empty name", () => {
+    const folder = { id: crypto.randomUUID(), path: "/music/test", name: "" };
+    expect(GlobalFolderSchema.safeParse(folder).success).toBe(false);
+  });
+
+  it("should reject a folder with invalid UUID id", () => {
+    const folder = { id: "not-a-uuid", path: "/music/test", name: "Test" };
+    expect(GlobalFolderSchema.safeParse(folder).success).toBe(false);
+  });
+});
+
+describe("AppSettingsSchema", () => {
+  const makeValidSettings = (): AppSettings => {
+    const dlId = crypto.randomUUID();
+    const impId = crypto.randomUUID();
+    return {
+      version: "1.0.0",
+      globalFolders: [
+        { id: dlId, path: "/music/downloads", name: "Downloads" },
+        { id: impId, path: "/music/imported", name: "Imported" },
+      ],
+      downloadFolderId: dlId,
+      importFolderId: impId,
+    };
+  };
+
+  it("should accept valid settings", () => {
+    expect(AppSettingsSchema.safeParse(makeValidSettings()).success).toBe(true);
+  });
+
+  it("should default version to 1.0.0 when missing", () => {
+    const settings = makeValidSettings();
+    const { version: _v, ...withoutVersion } = settings;
+    const result = AppSettingsSchema.safeParse(withoutVersion);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.version).toBe("1.0.0");
+    }
+  });
+
+  it("should reject when downloadFolderId is not a valid UUID", () => {
+    const settings = { ...makeValidSettings(), downloadFolderId: "not-a-uuid" };
+    expect(AppSettingsSchema.safeParse(settings).success).toBe(false);
+  });
+
+  it("should reject when globalFolders is missing", () => {
+    const { globalFolders: _gf, ...withoutFolders } = makeValidSettings();
+    expect(AppSettingsSchema.safeParse(withoutFolders).success).toBe(false);
+  });
+});
+
+describe("GlobalLibrarySchema", () => {
+  it("should accept an empty library", () => {
+    const lib = { version: "1.0.0", sounds: [], tags: [], sets: [] };
+    expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
+  });
+
+  it("should default version to 1.0.0 when missing", () => {
+    const lib = { sounds: [], tags: [], sets: [] };
+    const result = GlobalLibrarySchema.safeParse(lib);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.version).toBe("1.0.0");
+    }
+  });
+
+  it("should accept a library with sounds, tags, and sets", () => {
+    const lib: GlobalLibrary = {
+      version: "1.0.0",
+      sounds: [{ id: "s1", name: "Kick", filePath: "/music/kick.wav", tags: [], sets: [] }],
+      tags: [{ id: "t1", name: "Drums" }],
+      sets: [{ id: "set1", name: "My Set" }],
+    };
+    expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
   });
 });

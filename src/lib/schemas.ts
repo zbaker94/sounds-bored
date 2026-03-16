@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-// ─── Project History ───────────────────────────────────────────────────────────
+// ─── Project History ────────────────────────────────────────────────────────
 
 export const ProjectHistoryEntrySchema = z.object({
   name: z.string(),
   path: z.string(),
-  date: z.string(), // ISO string
+  date: z.string(),
 });
 
 export const ProjectHistorySchema = z.array(ProjectHistoryEntrySchema);
@@ -13,7 +13,7 @@ export const ProjectHistorySchema = z.array(ProjectHistoryEntrySchema);
 export type ProjectHistoryEntry = z.infer<typeof ProjectHistoryEntrySchema>;
 export type ProjectHistory = z.infer<typeof ProjectHistorySchema>;
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
+// ─── Enums ──────────────────────────────────────────────────────────────────
 
 export const PlaybackModeSchema = z.enum(["one-shot", "hold", "loop"]);
 export const ArrangementSchema = z.enum(["simultaneous", "sequential", "shuffled"]);
@@ -23,21 +23,15 @@ export type PlaybackMode = z.infer<typeof PlaybackModeSchema>;
 export type Arrangement = z.infer<typeof ArrangementSchema>;
 export type RetriggerMode = z.infer<typeof RetriggerModeSchema>;
 
-// ─── Sound (project-level asset, shared across pads) ──────────────────────────
+// ─── Sound (global library asset) ───────────────────────────────────────────
 
 export const SoundSchema = z.object({
   id: z.string(),
   name: z.string(),
-  filePath: z.string()
-    .refine((p) => !p.includes(".."), { message: "filePath must not contain '..'" })
-    .refine(
-      (p) => !/^[A-Za-z]:/.test(p) && !p.startsWith("/"),
-      { message: "filePath must be a relative path (no drive letters or leading slashes)" }
-    )
-    .optional(),   // relative to project folder
-  sourceUrl: z.string().optional(),  // original web URL for yt-dlp re-download
-  tags: z.array(z.string()),
-  sets: z.array(z.string()),
+  filePath: z.string().min(1).optional(),  // absolute path when present
+  sourceUrl: z.string().optional(),        // original web URL for yt-dlp re-download
+  tags: z.array(z.string()),               // Tag IDs — resolve against global library
+  sets: z.array(z.string()),               // Set IDs — resolve against global library
   durationMs: z.number().optional(),
 });
 
@@ -51,7 +45,7 @@ export function hasFilePath(sound: Sound): sound is Sound & { filePath: string }
   return typeof sound.filePath === "string" && sound.filePath.length > 0;
 }
 
-// ─── Tag / Set ────────────────────────────────────────────────────────────────
+// ─── Tag / Set ───────────────────────────────────────────────────────────────
 
 export const TagSchema = z.object({
   id: z.string(),
@@ -67,18 +61,18 @@ export const SetSchema = z.object({
 export type Tag = z.infer<typeof TagSchema>;
 export type Set = z.infer<typeof SetSchema>;
 
-// ─── SoundInstance (a specific usage of a Sound within a Layer) ───────────────
+// ─── SoundInstance (a specific usage of a Sound within a Layer) ──────────────
 
 export const SoundInstanceSchema = z.object({
   id: z.string(),
-  soundId: z.string(),    // reference to Sound.id in the project library
-  volume: z.number(),     // 0–1 per-instance volume
+  soundId: z.string(),
+  volume: z.number(),
   startOffsetMs: z.number().optional(),
 });
 
 export type SoundInstance = z.infer<typeof SoundInstanceSchema>;
 
-// ─── Layer Selection (how a layer resolves its sounds at trigger time) ─────────
+// ─── Layer Selection ─────────────────────────────────────────────────────────
 
 export const LayerSelectionSchema = z.discriminatedUnion("type", [
   z.object({
@@ -99,7 +93,7 @@ export const LayerSelectionSchema = z.discriminatedUnion("type", [
 
 export type LayerSelection = z.infer<typeof LayerSelectionSchema>;
 
-// ─── Layer (independent playback unit within a pad) ───────────────────────────
+// ─── Layer ────────────────────────────────────────────────────────────────────
 
 export const LayerSchema = z.object({
   id: z.string(),
@@ -108,7 +102,7 @@ export const LayerSchema = z.object({
   arrangement: ArrangementSchema,
   playbackMode: PlaybackModeSchema,
   retriggerMode: RetriggerModeSchema,
-  volume: z.number(),  // 0–1 layer-level volume (multiplied with instance volume)
+  volume: z.number(),
 });
 
 export type Layer = z.infer<typeof LayerSchema>;
@@ -119,8 +113,8 @@ export const PadSchema = z.object({
   id: z.string(),
   name: z.string(),
   layers: z.array(LayerSchema),
-  muteTargetPadIds: z.array(z.string()),  // explicit: this pad stops these pads on trigger
-  muteGroupId: z.string().optional(),      // exclusive group (hi-hat style)
+  muteTargetPadIds: z.array(z.string()),
+  muteGroupId: z.string().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
 });
@@ -145,9 +139,39 @@ export const ProjectSchema = z.object({
   description: z.string().optional(),
   lastSaved: z.string().optional(),
   scenes: z.array(SceneSchema).default([]),
-  sounds: z.array(SoundSchema).default([]),
-  tags: z.array(TagSchema).default([]),
-  sets: z.array(SetSchema).default([]),
+  favoritedSetIds: z.array(z.string()).default([]),  // refs to global Set IDs
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
+
+// ─── Global Folder ────────────────────────────────────────────────────────────
+
+export const GlobalFolderSchema = z.object({
+  id: z.uuid(),
+  path: z.string().min(1),   // absolute path on disk
+  name: z.string().min(1),   // display name
+});
+
+export type GlobalFolder = z.infer<typeof GlobalFolderSchema>;
+
+// ─── App Settings ─────────────────────────────────────────────────────────────
+
+export const AppSettingsSchema = z.object({
+  version: z.string().optional().default("1.0.0"),
+  globalFolders: z.array(GlobalFolderSchema),
+  downloadFolderId: z.string().uuid(),   // ID of the yt-dlp download destination folder
+  importFolderId: z.string().uuid(),     // ID of the in-app import destination folder
+});
+
+export type AppSettings = z.infer<typeof AppSettingsSchema>;
+
+// ─── Global Library ───────────────────────────────────────────────────────────
+
+export const GlobalLibrarySchema = z.object({
+  version: z.string().optional().default("1.0.0"),
+  sounds: z.array(SoundSchema),
+  tags: z.array(TagSchema),
+  sets: z.array(SetSchema),
+});
+
+export type GlobalLibrary = z.infer<typeof GlobalLibrarySchema>;
