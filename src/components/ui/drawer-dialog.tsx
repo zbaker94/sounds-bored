@@ -171,7 +171,6 @@ export const DrawerDialog = ({
   classNames,
   styles,
 }: DrawerDialogProps) => {
-  const [openInternal, setOpenInternal] = useState(open);
 
   const isSm = useBreakpoint("sm");
 
@@ -179,19 +178,11 @@ export const DrawerDialog = ({
     return !isSm && window.innerWidth >= 768;
   }, [isSm]);
 
-  const onOpenChangeComposite = useCallback(
-    (open: boolean) => {
-      setOpenInternal(open);
-      onOpenChange?.(open);
-    },
-    [onOpenChange],
-  );
-
   if (isDesktop) {
     return (
       <StandardDialog
-        open={openInternal}
-        onOpenChange={onOpenChangeComposite}
+        open={open}
+        onOpenChange={onOpenChange}
         trigger={trigger}
         title={title}
         description={description}
