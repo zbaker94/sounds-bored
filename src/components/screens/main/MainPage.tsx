@@ -2,7 +2,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
-import { useSaveProjectAs } from "@/lib/project.queries";
+import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
 import { discardTemporaryProject } from "@/lib/project";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
@@ -13,6 +13,8 @@ import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
 import { toast } from "sonner";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 
+import { useHotkeys } from 'react-hotkeys-hook';
+
 export function MainPage() {
   const project = useProjectStore((s) => s.project);
   const folderPath = useProjectStore((s) => s.folderPath);
@@ -20,10 +22,30 @@ export function MainPage() {
   const isDirty = useProjectStore((s) => s.isDirty);
   const markAsPermanent = useProjectStore((s) => s.markAsPermanent);
   const navigate = useNavigate();
-  const saveProjectMutation = useSaveProjectAs();
+  const saveProjectAsMutation = useSaveProjectAs();
+  const saveProjectMutation = useSaveProject();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [shouldCloseAfterSave, setShouldCloseAfterSave] = useState(false);
+
+  // Register hotkeys for managing project
+  useHotkeys('ctrl+s, meta+s', () => {
+    if (!project) return;
+
+    if (isTemporary) {
+      setShowSaveDialog(true);
+      return;
+    }
+
+    if(!isDirty) {
+      return;
+    }
+
+    if (folderPath) {
+      saveProjectMutation.mutate({ folderPath, project });
+    }
+  });
+
 
   // Enable auto-save for the current project
   useAutoSave();
@@ -51,7 +73,7 @@ export function MainPage() {
     if (!project || !folderPath) return;
 
     try {
-      const result = await saveProjectMutation.mutateAsync({
+      const result = await saveProjectAsMutation.mutateAsync({
         projectName,
         currentPath: folderPath,
         project,
@@ -84,8 +106,24 @@ export function MainPage() {
 
   const handleSaveAndClose = () => {
     setShowConfirmClose(false);
-    setShouldCloseAfterSave(true);
-    setShowSaveDialog(true);
+
+    if (isTemporary) {
+      setShouldCloseAfterSave(true);
+      setShowSaveDialog(true);
+      return;
+    }
+
+    if (folderPath && project) {
+      saveProjectMutation.mutate({ folderPath, project }, {
+        onSuccess: () => {
+          allowClose();
+          setTimeout(async () => {
+            const appWindow = getCurrentWindow();
+            await appWindow.close();
+          }, WINDOW_CLOSE_DELAY);
+        },
+      });
+    }
   };
 
   const handleDiscardAndClose = async () => {
@@ -133,7 +171,7 @@ export function MainPage() {
           setShouldCloseAfterSave(false);
         }}
         defaultName={project.name}
-        isPending={saveProjectMutation.isPending}
+        isPending={saveProjectAsMutation.isPending}
       />
 
       <ConfirmCloseDialog

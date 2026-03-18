@@ -12,10 +12,14 @@ import {
 import { Drawer, DrawerContent, DrawerHeader, DrawerTrigger } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
+import { useCallback, useState } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 
 const EMPTY_SCENES: Scene[] = [];
 
 export function SceneTabBar() {
+  const [drawerOpenOverride, setDrawerOpenOverride] = useState(false);
+
   const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
   const activeSceneId = useProjectStore((s) => s.activeSceneId);
   const setActiveSceneId = useProjectStore((s) => s.setActiveSceneId);
@@ -23,9 +27,19 @@ export function SceneTabBar() {
 
   const isDirty = useProjectStore((s) => s.isDirty);
 
+  const openDrawer = useCallback(() => {
+    setDrawerOpenOverride(true);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpenOverride(false);
+  }, []);
+
+  useHotkeys("esc", drawerOpenOverride ? closeDrawer : openDrawer);
+
   return (
     <div className="flex items-center gap-1 px-3 py-1 min-w-0">
-      <Drawer direction="left">
+      <Drawer direction="left" open={drawerOpenOverride}>
         <DrawerTrigger>
           <Button
             variant="ghost"

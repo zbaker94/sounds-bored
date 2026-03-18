@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   selectAndLoadProject,
   createNewProject,
+  saveProject,
   saveProjectAs,
   loadProjectFromPath,
   ProjectNotFoundError,
@@ -9,6 +10,7 @@ import {
 } from "./project";
 import type { Project } from "./schemas";
 import { toast } from "sonner";
+import { useProjectStore } from "@/state/projectStore";
 import { addOrUpdateProjectInHistory, addSavedProjectToHistory, removeProjectFromHistory } from "./history.helpers";
 import { APP_FOLDER } from "./constants";
 
@@ -66,6 +68,23 @@ export function useCreateProject() {
         description: error instanceof Error ? error.message : "Failed to create project. Please try again.",
       });
       console.error("Failed to create project:", error);
+    },
+  });
+}
+
+export function useSaveProject() {
+  const clearDirtyFlag = useProjectStore((s) => s.clearDirtyFlag);
+
+  return useMutation({
+    mutationFn: ({ folderPath, project }: { folderPath: string; project: Project }) =>
+      saveProject(folderPath, project),
+    onSuccess: () => {
+      clearDirtyFlag();
+      toast.success("Project saved");
+    },
+    onError: (error) => {
+      toast.error("Failed to save project. Please try again.");
+      console.error("Failed to save project:", error);
     },
   });
 }
