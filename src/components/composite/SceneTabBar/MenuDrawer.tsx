@@ -28,9 +28,9 @@ export function MenuDrawer() {
       >
         <HugeiconsIcon icon={Hamburger01Icon} size={16} />
       </Button>
-      <DrawerContent className="w-64" onEscapeKeyDown={(e) => e.preventDefault()}>
+      <DrawerContent className="w-64 bricked-background-overlay" onEscapeKeyDown={(e) => e.preventDefault()}>
         <DrawerHeader>
-          <h1 className="text-lg font-semibold">Menu</h1>
+          <h1 className="text-lg font-semibold ">Menu</h1>
         </DrawerHeader>
         <Button disabled={!isDirty} variant="secondary" className="w-full mb-2" onClick={() => null}>
           <HugeiconsIcon icon={SaveIcon} size={16} />
@@ -49,7 +49,13 @@ export function MenuDrawer() {
           <Kbd className="ml-auto">Ctrl + X</Kbd>
         </Button>
         <Separator />
-        <Button variant="default" className="w-full mt-2" onClick={() => null}>
+        <Button
+          variant="default"
+          className="w-full mt-2"
+          onClick={() => {
+            window.location.assign("/");
+          }}
+        >
           <HugeiconsIcon icon={HomeIcon} size={16} />
           Return to Main Menu
         </Button>

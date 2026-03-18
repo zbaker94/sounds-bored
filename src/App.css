@@ -185,4 +185,21 @@
   .shadowed {
     filter: var(--drop-shadow-down);
   }
+
+  .bricked-background-overlay::before {
+    background-image:
+      linear-gradient(color-mix(in oklch, var(--background) 65%, transparent), color-mix(in oklch, var(--background) 65%, transparent)),
+      url("./assets/brick-overlay.png");
+    background-repeat: repeat;
+    background-color: var(--background);
+  }
+
+  .bricked-yellow-500-overlay {
+    background-image:
+      linear-gradient(color-mix(in oklch, var(--color-yellow-500) 65%, transparent), color-mix(in oklch, var(--color-yellow-500) 65%, transparent)),
+      url("./assets/brick-overlay.png");
+    background-repeat: repeat;
+    background-color: var(--background);
+    filter: blur(2px);
+  }
 }
