@@ -6,6 +6,7 @@ import { useIsMd } from "@/hooks/useBreakpoint";
 import { useMemo, useState } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
+import gibbering from "@/assets/gibbering.gif";
 
 export function EditSection() {
   const isMd = useIsMd();
@@ -23,6 +24,10 @@ export function EditSection() {
         classNames={{
           content: "!max-w-[90vw] h-[90vh]",
           title: "[font-family:DeathLetter]",
+        }}
+        styles={{
+          title: {color: "white", backdropFilter: "blur(10px)"},
+          content: { backgroundImage: `url(${gibbering})`, backgroundRepeat: "repeat" },
         }}
       />
       <Tooltip>
