@@ -27,7 +27,7 @@ export function EditSection() {
         footer={null}
         classNames={{
           content: "!max-w-[98vw] h-[95vh] grid-rows-[auto_1fr]",
-          title: "[font-family:DeathLetter]",
+          title: "[font-family:DeathLetter] tracking-wider text-2xl text-white",
         }}
         styles={{
           title: {color: "white", backdropFilter: "blur(18px)"},
