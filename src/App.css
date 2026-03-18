@@ -124,6 +124,12 @@
 }
 
 @font-face {
+  font-family: DeathLetter;
+  font-weight: bold;
+  src: url("assets/TG-DeathLetter.otf") format("opentype");
+}
+
+@font-face {
   font-family: Gladiator;
   font-weight: bold;
   src: url("assets/Gladiator.otf") format("opentype");
@@ -166,10 +172,14 @@
   }
 
   .logo {
-    font-family: Gladiator, sans-serif;
+    font-family: DeathLetter, sans-serif;
     font-size: 2rem;
     color: var(--primary);
     text-shadow: 0px 5px 0px var(--color-primary);
+  }
+
+  h1 {
+    font-family: DeathLetter, sans-serif;
   }
 
   .shadowed {
