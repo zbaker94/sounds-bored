@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/drawer";
 
 import { useBreakpoint } from "@/hooks/useBreakpoint";
-import { useCallback, useMemo, useState } from "react";
 
 export interface ClassNames {
   trigger?: string;
@@ -46,7 +45,7 @@ export interface Styles {
 export interface DrawerDialogProps {
   open: boolean;
   onOpenChange?: (open: boolean) => void;
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
   title: string;
   description?: string;
   content: React.ReactNode;
@@ -70,13 +69,15 @@ const StandardDialog = ({
 }: DrawerDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger
-        asChild
-        className={classNames?.trigger}
-        style={styles?.trigger}
-      >
-        {trigger}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger
+          asChild
+          className={classNames?.trigger}
+          style={styles?.trigger}
+        >
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className={classNames?.content} style={styles?.content}>
         {(title || description) && (
           <DialogHeader style={styles?.header}>
@@ -118,13 +119,15 @@ const StandardDrawer = ({
 }: DrawerDialogProps) => {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerTrigger
-        asChild
-        className={classNames?.trigger}
-        style={styles?.trigger}
-      >
-        {trigger}
-      </DrawerTrigger>
+      {trigger && (
+        <DrawerTrigger
+          asChild
+          className={classNames?.trigger}
+          style={styles?.trigger}
+        >
+          {trigger}
+        </DrawerTrigger>
+      )}
       <DrawerContent className={classNames?.content} style={styles?.content}>
         {(title || description) && (
           <DrawerHeader className="text-left" style={styles?.header}>
@@ -174,9 +177,7 @@ export const DrawerDialog = ({
 
   const isSm = useBreakpoint("sm");
 
-  const isDesktop = useMemo(() => {
-    return !isSm && window.innerWidth >= 768;
-  }, [isSm]);
+  const isDesktop = !isSm;
 
   if (isDesktop) {
     return (
@@ -196,8 +197,8 @@ export const DrawerDialog = ({
   } else {
     return (
       <StandardDrawer
-        open={openInternal}
-        onOpenChange={onOpenChangeComposite}
+        open={open}
+        onOpenChange={onOpenChange}
         trigger={trigger}
         title={title}
         description={description}

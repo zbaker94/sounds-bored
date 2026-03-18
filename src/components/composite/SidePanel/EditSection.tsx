@@ -3,18 +3,27 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderMusicIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMd } from "@/hooks/useBreakpoint";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Kbd } from "@/components/ui/kbd";
+import { DrawerDialog } from "@/components/ui/drawer-dialog";
 
 export function EditSection() {
   const isMd = useIsMd();
   const tooltipSide = useMemo(() => (isMd ? "left" : "top"), [isMd]);
+  const [soundsOpen, setSoundsOpen] = useState(false);
 
   return (
     <div className="flex flex-row items-center p-1 gap-2 md:flex-col">
+      <DrawerDialog
+        open={soundsOpen}
+        onOpenChange={setSoundsOpen}
+        title="Manage Sounds"
+        content={<p>TODO: sound library UI</p>}
+        footer={null}
+      />
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="default" size="icon" className="size-11 md:size-9">
+          <Button variant="default" size="icon" className="size-11 md:size-9" onClick={() => setSoundsOpen(true)}>
             <HugeiconsIcon icon={FolderMusicIcon} />
           </Button>
         </TooltipTrigger>
