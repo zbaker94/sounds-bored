@@ -6,6 +6,7 @@ interface ConfirmCloseDialogProps {
   onSave: () => void;
   onDiscard: () => void | Promise<void>;
   onCancel: () => void;
+  description?: string;
 }
 
 export function ConfirmCloseDialog({
@@ -13,13 +14,12 @@ export function ConfirmCloseDialog({
   onSave,
   onDiscard,
   onCancel,
+  description = "You have unsaved changes. Do you want to save your project before closing?",
 }: ConfirmCloseDialogProps) {
   return (
     <Dialog isOpen={isOpen}>
       <h2 className="text-2xl font-bold mb-4">Unsaved Changes</h2>
-      <p className="text-sm text-muted-foreground mb-6">
-        You have unsaved changes. Do you want to save your project before closing?
-      </p>
+      <p className="text-sm text-muted-foreground mb-6">{description}</p>
       <div className="flex gap-3 justify-end">
         <Button variant="secondary" onClick={onCancel}>
           Cancel

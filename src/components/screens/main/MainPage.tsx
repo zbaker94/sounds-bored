@@ -2,30 +2,33 @@ import { useProjectStore } from "@/state/projectStore";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
-import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
+import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
 
 export function MainPage() {
   const project = useProjectStore((s) => s.project);
 
+  if (!project) {
+    return null;
+  }
+
+  return (
+    <ProjectActionsProvider>
+      <MainPageInner />
+    </ProjectActionsProvider>
+  );
+}
+
+function MainPageInner() {
   useAutoSave();
 
   const {
-    showSaveDialog,
     showConfirmClose,
-    isSaveAsPending,
-    defaultSaveName,
-    handleSave,
-    handleCancelSave,
     handleSaveAndClose,
     handleDiscardAndClose,
     handleCancelClose,
   } = useProjectLifecycle();
-
-  if (!project) {
-    return null;
-  }
 
   return (
     <>
@@ -35,13 +38,6 @@ export function MainPage() {
         </div>
         <SidePanel />
       </div>
-      <SaveProjectDialog
-        isOpen={showSaveDialog}
-        onSave={handleSave}
-        onCancel={handleCancelSave}
-        defaultName={defaultSaveName}
-        isPending={isSaveAsPending}
-      />
       <ConfirmCloseDialog
         isOpen={showConfirmClose}
         onSave={handleSaveAndClose}

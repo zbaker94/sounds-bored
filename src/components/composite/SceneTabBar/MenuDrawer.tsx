@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useProjectStore } from "@/state/projectStore";
+import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon } from "@hugeicons/core-free-icons";
@@ -10,7 +10,7 @@ import { Kbd } from "@/components/ui/kbd";
 
 export function MenuDrawer() {
   const [isOpen, setIsOpen] = useState(false);
-  const isDirty = useProjectStore((s) => s.isDirty);
+  const { canSave, handleSaveClick, requestNavigateAway } = useProjectActions();
 
   // Vaul's escape handling is disabled via onEscapeKeyDown to avoid a race condition
   // where it closes the drawer and re-renders before this hotkey fires, causing it to reopen.
@@ -32,7 +32,7 @@ export function MenuDrawer() {
         <DrawerHeader>
           <h1 className="text-lg font-semibold ">Menu</h1>
         </DrawerHeader>
-        <Button disabled={!isDirty} variant="secondary" className="w-full mb-2" onClick={() => null}>
+        <Button disabled={!canSave} variant="secondary" className="w-full mb-2" onClick={handleSaveClick}>
           <HugeiconsIcon icon={SaveIcon} size={16} />
           Save
           <Kbd className="ml-auto">Ctrl + S</Kbd>
@@ -52,9 +52,7 @@ export function MenuDrawer() {
         <Button
           variant="default"
           className="w-full mt-2"
-          onClick={() => {
-            window.location.assign("/");
-          }}
+          onClick={() => requestNavigateAway("/")}
         >
           <HugeiconsIcon icon={HomeIcon} size={16} />
           Return to Main Menu
