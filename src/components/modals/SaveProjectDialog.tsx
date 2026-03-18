@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Dialog } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 interface SaveProjectDialogProps {
@@ -19,7 +26,6 @@ export function SaveProjectDialog({
 }: SaveProjectDialogProps) {
   const [projectName, setProjectName] = useState(defaultName);
 
-  // Sync local state when defaultName prop changes
   useEffect(() => {
     setProjectName(defaultName);
   }, [defaultName]);
@@ -39,38 +45,39 @@ export function SaveProjectDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen}>
-      <h2 className="text-2xl font-bold mb-4">Save Project</h2>
-      <p className="text-sm text-muted-foreground mb-4">
-        Enter a name for your project. You'll be prompted to choose a save location next.
-      </p>
-      <div className="mb-6">
-        <label htmlFor="project-name" className="block text-sm font-medium mb-2">
-          Project Name
-        </label>
-        <input
-          id="project-name"
-          type="text"
-          value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="My Awesome Project"
-          autoFocus
-          disabled={isPending}
-        />
-      </div>
-      <div className="flex gap-3 justify-end">
-        <Button variant="secondary" onClick={onCancel} disabled={isPending}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={!projectName.trim() || isPending}
-        >
-          {isPending ? "Saving..." : "Save"}
-        </Button>
-      </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Save Project</DialogTitle>
+          <DialogDescription>
+            Enter a name for your project. You'll be prompted to choose a save location next.
+          </DialogDescription>
+        </DialogHeader>
+        <div>
+          <label htmlFor="project-name" className="block text-sm font-medium mb-2">
+            Project Name
+          </label>
+          <input
+            id="project-name"
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="My Awesome Project"
+            autoFocus
+            disabled={isPending}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" onClick={onCancel} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!projectName.trim() || isPending}>
+            {isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }

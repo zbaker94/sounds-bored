@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +19,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 
-import { useBreakpoint } from "@/hooks/useBreakpoint";
+import { useIsMd } from "@/hooks/useBreakpoint";
 
 export interface ClassNames {
   trigger?: string;
@@ -81,7 +80,7 @@ const StandardDialog = ({
       <DialogContent className={classNames?.content} style={styles?.content}>
         {(title || description) && (
           <DialogHeader style={styles?.header}>
-            {title && <DialogTitle style={styles?.title}>{title}</DialogTitle>}
+            {title && <DialogTitle className={classNames?.title} style={styles?.title}>{title}</DialogTitle>}
             {description && (
               <DialogDescription style={styles?.description}>
                 {description}
@@ -175,10 +174,7 @@ export const DrawerDialog = ({
   styles,
 }: DrawerDialogProps) => {
 
-  const isSm = useBreakpoint("sm");
-
-  const isDesktop = !isSm;
-
+  const isDesktop = useIsMd();
   if (isDesktop) {
     return (
       <StandardDialog

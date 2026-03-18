@@ -17,9 +17,13 @@ export function EditSection() {
       <DrawerDialog
         open={soundsOpen}
         onOpenChange={setSoundsOpen}
-        title="Manage Sounds"
+        title="Sounds"
         content={<p>TODO: sound library UI</p>}
         footer={null}
+        classNames={{
+          content: "!max-w-[90vw] h-[90vh]",
+          title: "[font-family:DeathLetter]",
+        }}
       />
       <Tooltip>
         <TooltipTrigger asChild>
