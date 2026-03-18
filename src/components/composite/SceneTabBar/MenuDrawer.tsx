@@ -52,7 +52,7 @@ export function MenuDrawer() {
         <Button
           variant="default"
           className="w-full mt-2"
-          onClick={() => requestNavigateAway("/")}
+          onClick={() => { setIsOpen(false); requestNavigateAway("/"); }}
         >
           <HugeiconsIcon icon={HomeIcon} size={16} />
           Return to Main Menu

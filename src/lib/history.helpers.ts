@@ -29,12 +29,9 @@ export async function addOrUpdateProjectInHistory(
   const newEntry = createHistoryEntry(name, path);
 
   if (existingIndex !== -1) {
-    // Update existing entry
-    history[existingIndex] = newEntry;
-  } else {
-    // Add new entry at the beginning
-    history.unshift(newEntry);
+    history.splice(existingIndex, 1);
   }
+  history.unshift(newEntry);
 
   await saveProjectHistory(history);
 }
