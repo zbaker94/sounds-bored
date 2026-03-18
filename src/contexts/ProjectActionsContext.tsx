@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
 import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
+import { discardTemporaryProject } from "@/lib/project";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 
@@ -121,11 +122,19 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     }
   };
 
-  const handleNavigateDiscard = () => {
+  const handleNavigateDiscard = async () => {
     setShowNavigateConfirm(false);
     if (pendingNavigatePath) {
-      navigate(pendingNavigatePath);
+      const path = pendingNavigatePath;
       setPendingNavigatePath(null);
+      if (isTemporary && folderPath) {
+        try {
+          await discardTemporaryProject(folderPath);
+        } catch {
+          console.warn("Could not discard temporary project.");
+        }
+      }
+      navigate(path);
     }
   };
 
