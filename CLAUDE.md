@@ -85,7 +85,9 @@ src/
 │   ├── queryClient.ts
 │   └── utils.ts                   # cn() helper
 ├── state/
-│   ├── projectStore.ts            # Zustand + Immer — current project state
+│   ├── projectStore.ts            # Zustand + Immer — current project (scenes, pads)
+│   ├── libraryStore.ts            # Zustand + Immer — global library (sounds, tags, sets)
+│   ├── appSettingsStore.ts        # Zustand — app-level settings
 │   └── playbackStore.ts           # Zustand — runtime-only (empty shell)
 ├── test/
 │   ├── factories.ts               # Test data factories (createMockProject, createMockHistoryEntry, etc.)
@@ -136,6 +138,26 @@ const project = useProjectStore((s) => s.project);
 const loadProject = useProjectStore((s) => s.loadProject);
 ```
 
+### libraryStore (`src/state/libraryStore.ts`)
+
+Zustand + Immer store. Holds the global sound library — **sounds, tags, and sets live here, NOT in projectStore**.
+
+**State fields:**
+- `sounds: Sound[]`
+- `tags: Tag[]`
+- `sets: Set[]`
+- `isDirty: boolean`
+
+**Actions:**
+- `loadLibrary(library)` — load from disk, resets `isDirty`
+- `updateLibrary(updater)` — immer updater fn, marks `isDirty=true`
+- `clearDirtyFlag()` — called after save
+
+**Usage pattern:**
+```typescript
+const sets = useLibraryStore((s) => s.sets);
+```
+
 ### playbackStore (`src/state/playbackStore.ts`)
 
 Empty shell. Will hold AudioBuffers, active voices, master volume in Phase 5.
@@ -149,7 +171,7 @@ Empty shell. Will hold AudioBuffers, active voices, master volume in Phase 5.
 ```
 <UserChosen>/
   <ProjectName>/
-    project.json       # All metadata + scene/pad/sound/tag/set definitions
+    project.json       # Scene/pad definitions only
     sounds/            # Audio files (mp3, wav, ogg, flac, aiff, m4a) — auto-discovered on load
       kick.wav
       ambience.mp3
@@ -164,11 +186,10 @@ Empty shell. Will hold AudioBuffers, active voices, master volume in Phase 5.
   description?: string       // default: ""
   lastSaved?: string         // ISO timestamp
   scenes: Scene[]            // default: []
-  sounds: Sound[]            // default: []
-  tags: Tag[]                // default: []
-  sets: Set[]                // default: []
 }
 ```
+
+Sounds, tags, and sets are stored in the **global library** (separate file), accessed via `useLibraryStore`.
 
 All domain model types are fully defined in `src/lib/schemas.ts`.
 
