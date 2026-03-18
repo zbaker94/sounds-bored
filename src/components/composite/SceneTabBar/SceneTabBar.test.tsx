@@ -1,9 +1,18 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { SceneTabBar } from "./SceneTabBar";
 import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
+
+vi.mock("@/contexts/ProjectActionsContext", () => ({
+  useProjectActions: () => ({
+    canSave: false,
+    handleSaveClick: vi.fn(),
+    requestNavigateAway: vi.fn(),
+    requestSaveAndThen: vi.fn(),
+  }),
+}));
 
 function renderWithTooltip(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
