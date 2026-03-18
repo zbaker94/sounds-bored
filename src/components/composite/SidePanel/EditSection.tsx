@@ -4,6 +4,7 @@ import { FolderMusicIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMd } from "@/hooks/useBreakpoint";
 import { useMemo } from "react";
+import { Kbd } from "@/components/ui/kbd";
 
 export function EditSection() {
   const isMd = useIsMd();
@@ -18,7 +19,8 @@ export function EditSection() {
           </Button>
         </TooltipTrigger>
         <TooltipContent side={tooltipSide}>
-          <p>Manage Project</p>
+          <p>Manage Sounds</p>
+          <Kbd>Ctrl+Shift+M</Kbd>
         </TooltipContent>
       </Tooltip>
       <Tooltip>
@@ -29,6 +31,7 @@ export function EditSection() {
         </TooltipTrigger>
         <TooltipContent side={tooltipSide}>
           <p>Toggle Edit Mode</p>
+          <Kbd>Ctrl+E</Kbd>
         </TooltipContent>
       </Tooltip>
     </div>

@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useProjectStore } from "@/state/projectStore";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon } from "@hugeicons/core-free-icons";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
 
@@ -12,25 +12,23 @@ export function MenuDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const isDirty = useProjectStore((s) => s.isDirty);
 
-  const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
-
-  useHotkeys("esc", isOpen ? close : open);
+  // Vaul's escape handling is disabled via onEscapeKeyDown to avoid a race condition
+  // where it closes the drawer and re-renders before this hotkey fires, causing it to reopen.
+  // This hotkey owns all escape behavior — toggle open/close.
+  useHotkeys("esc", () => setIsOpen((prev) => !prev));
 
   return (
-    <Drawer direction="left" open={isOpen}>
-      {/* <DrawerTrigger> */}
-        <Button
-          onClick={open}
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Open Menu"
-          className="shadowed"
-        >
-          <HugeiconsIcon icon={Hamburger01Icon} size={16} />
-        </Button>
-      {/* </DrawerTrigger> */}
-      <DrawerContent className="w-64">
+    <Drawer direction="left" open={isOpen} onOpenChange={setIsOpen}>
+      <Button
+        onClick={() => setIsOpen(true)}
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Open Menu"
+        className="shadowed"
+      >
+        <HugeiconsIcon icon={Hamburger01Icon} size={16} />
+      </Button>
+      <DrawerContent className="w-64" onEscapeKeyDown={(e) => e.preventDefault()}>
         <DrawerHeader>
           <h1 className="text-lg font-semibold">Menu</h1>
         </DrawerHeader>
