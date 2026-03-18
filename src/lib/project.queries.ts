@@ -80,7 +80,6 @@ export function useSaveProject() {
       saveProject(folderPath, project),
     onSuccess: () => {
       clearDirtyFlag();
-      toast.success("Project saved");
     },
     onError: (error) => {
       toast.error("Failed to save project. Please try again.");

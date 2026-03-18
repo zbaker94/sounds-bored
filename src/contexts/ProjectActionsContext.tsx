@@ -47,7 +47,9 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       return;
     }
     if (!isDirty || !folderPath) return;
-    saveProjectMutation.mutate({ folderPath, project });
+    saveProjectMutation.mutate({ folderPath, project }, {
+      onSuccess: () => toast.success("Project saved"),
+    });
   }, [project, isTemporary, isDirty, folderPath, saveProjectMutation]);
 
   const requestSaveAndThen = useCallback((onSaved: () => void) => {

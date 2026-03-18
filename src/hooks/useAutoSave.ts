@@ -10,6 +10,7 @@ import { AUTOSAVE_INTERVAL } from "@/lib/constants";
  */
 export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const folderPath = useProjectStore((s) => s.folderPath);
+  const isTemporary = useProjectStore((s) => s.isTemporary);
   const projectRef = useRef(useProjectStore.getState().project);
   const isDirtyRef = useRef(useProjectStore.getState().isDirty);
   const lastSaveRef = useRef<string>("");
@@ -24,7 +25,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   }, []);
 
   useEffect(() => {
-    if (!folderPath) return;
+    if (!folderPath || isTemporary) return;
 
     const saveCurrentProject = () => {
       const project = projectRef.current;
@@ -45,5 +46,5 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
 
     const intervalId = setInterval(saveCurrentProject, interval);
     return () => clearInterval(intervalId);
-  }, [folderPath, interval]);
+  }, [folderPath, isTemporary, interval]);
 }
