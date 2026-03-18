@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import gibbering from "@/assets/gibbering.gif";
+import { SoundsPanel } from "./SoundsPanel";
 
 export function EditSection() {
   const isMd = useIsMd();
@@ -19,10 +20,10 @@ export function EditSection() {
         open={soundsOpen}
         onOpenChange={setSoundsOpen}
         title="Sounds"
-        content={<p>TODO: sound library UI</p>}
+        content={<SoundsPanel />}
         footer={null}
         classNames={{
-          content: "!max-w-[90vw] h-[90vh]",
+          content: "!max-w-[98vw] h-[95vh] grid-rows-[auto_1fr]",
           title: "[font-family:DeathLetter]",
         }}
         styles={{
