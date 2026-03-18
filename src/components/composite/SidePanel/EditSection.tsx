@@ -8,11 +8,14 @@ import { Kbd } from "@/components/ui/kbd";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import gibbering from "@/assets/gibbering.gif";
 import { SoundsPanel } from "./SoundsPanel";
+import { useHotkeys } from "react-hotkeys-hook";
 
 export function EditSection() {
   const isMd = useIsMd();
   const tooltipSide = useMemo(() => (isMd ? "left" : "top"), [isMd]);
   const [soundsOpen, setSoundsOpen] = useState(false);
+
+  useHotkeys("ctrl+shift+m, cmd+shift+m", () => setSoundsOpen((open) => !open));
 
   return (
     <div className="flex flex-row items-center p-1 gap-2 md:flex-col">
@@ -27,7 +30,7 @@ export function EditSection() {
           title: "[font-family:DeathLetter]",
         }}
         styles={{
-          title: {color: "white", backdropFilter: "blur(10px)"},
+          title: {color: "white", backdropFilter: "blur(18px)"},
           content: { backgroundImage: `url(${gibbering})`, backgroundRepeat: "repeat" },
         }}
       />
