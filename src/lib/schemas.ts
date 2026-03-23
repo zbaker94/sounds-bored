@@ -30,6 +30,7 @@ export const SoundSchema = z.object({
   id: z.string(),
   name: z.string(),
   filePath: z.string().min(1).optional(),  // absolute path when present
+  folderId: z.string().optional(),         // GlobalFolder ID — null for manually added sounds
   sourceUrl: z.string().optional(),        // original web URL for yt-dlp re-download
   tags: z.array(z.string()),               // Tag IDs — resolve against global library
   sets: z.array(z.string()),               // Set IDs — resolve against global library

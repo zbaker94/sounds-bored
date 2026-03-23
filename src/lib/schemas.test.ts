@@ -306,6 +306,22 @@ describe("ProjectSchema — domain model fields", () => {
   });
 });
 
+describe("SoundSchema — folderId", () => {
+  const validSound = { id: "s1", name: "Kick", tags: [], sets: [] };
+
+  it("should accept a sound without folderId", () => {
+    expect(SoundSchema.safeParse(validSound).success).toBe(true);
+  });
+
+  it("should accept a sound with folderId", () => {
+    expect(SoundSchema.safeParse({ ...validSound, folderId: "folder-1" }).success).toBe(true);
+  });
+
+  it("should accept a sound with folderId undefined", () => {
+    expect(SoundSchema.safeParse({ ...validSound, folderId: undefined }).success).toBe(true);
+  });
+});
+
 describe("SoundSchema — filePath validation", () => {
   const validSound = { id: "s1", name: "Kick", tags: [], sets: [] };
 
@@ -454,6 +470,16 @@ describe("GlobalLibrarySchema", () => {
       sounds: [{ id: "s1", name: "Kick", filePath: "/music/kick.wav", tags: [], sets: [] }],
       tags: [{ id: "t1", name: "Drums" }],
       sets: [{ id: "set1", name: "My Set" }],
+    };
+    expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
+  });
+
+  it("should accept a library with sounds that have folderId", () => {
+    const lib: GlobalLibrary = {
+      version: "1.0.0",
+      sounds: [{ id: "s1", name: "Kick", filePath: "/music/kick.wav", folderId: "folder-1", tags: [], sets: [] }],
+      tags: [],
+      sets: [],
     };
     expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
   });

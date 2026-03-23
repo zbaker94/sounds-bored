@@ -4,10 +4,10 @@ import { MainPage } from "@/components/screens/main/MainPage";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AppErrorBoundary, RouteErrorElement } from "@/components/ErrorBoundary";
-import { useAppSettings } from "@/lib/appSettings.queries";
+import { useBootLoader } from "@/hooks/useBootLoader";
 
 function App() {
-  useAppSettings();
+  useBootLoader();
 
   return (
     <AppErrorBoundary>
