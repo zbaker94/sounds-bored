@@ -53,12 +53,12 @@ describe("reconcileGlobalLibrary", () => {
 
       expect(result.changed).toBe(true);
       expect(result.sounds).toHaveLength(2);
-      expect(result.sounds[0].name).toBe("kick");
+      expect(result.sounds[0].name).toBe("Kick");
       expect(result.sounds[0].filePath).toBe("/music/samples/kick.wav");
       expect(result.sounds[0].folderId).toBe(folder.id);
       expect(result.sounds[0].tags).toEqual([]);
       expect(result.sounds[0].sets).toEqual([]);
-      expect(result.sounds[1].name).toBe("snare");
+      expect(result.sounds[1].name).toBe("Snare");
       expect(result.sounds[1].filePath).toBe("/music/samples/snare.mp3");
     });
 
@@ -76,7 +76,7 @@ describe("reconcileGlobalLibrary", () => {
       const result = await reconcileGlobalLibrary([folder], []);
 
       expect(result.sounds).toHaveLength(1);
-      expect(result.sounds[0].name).toBe("kick");
+      expect(result.sounds[0].name).toBe("Kick");
     });
 
     it("should ignore directories", async () => {
@@ -91,7 +91,7 @@ describe("reconcileGlobalLibrary", () => {
       const result = await reconcileGlobalLibrary([folder], []);
 
       expect(result.sounds).toHaveLength(1);
-      expect(result.sounds[0].name).toBe("kick");
+      expect(result.sounds[0].name).toBe("Kick");
     });
 
     it("should support all audio extensions", async () => {
@@ -146,7 +146,7 @@ describe("reconcileGlobalLibrary", () => {
 
       expect(result.sounds).toHaveLength(2);
       expect(result.sounds[0].id).toBe("existing-1");
-      expect(result.sounds[1].name).toBe("snare");
+      expect(result.sounds[1].name).toBe("Snare");
     });
 
     it("should create separate sounds for files with same name in different folders", async () => {
@@ -320,22 +320,24 @@ describe("reconcileGlobalLibrary", () => {
   });
 
   describe("sound naming", () => {
-    it("should strip extension to derive display name", async () => {
+    it("should normalize filename into a display name", async () => {
       const folder = createMockGlobalFolder({ path: "/music" });
       mockReadDir({
         "/music": [
-          fileEntry("My Cool Sound.wav"),
+          fileEntry("my-audio_bgm_whatever.wav"),
           fileEntry("ambient_rain.mp3"),
+          fileEntry("kick.wav"),
         ],
       });
 
       const result = await reconcileGlobalLibrary([folder], []);
 
-      expect(result.sounds[0].name).toBe("My Cool Sound");
-      expect(result.sounds[1].name).toBe("ambient_rain");
+      expect(result.sounds[0].name).toBe("My Audio Bgm Whatever");
+      expect(result.sounds[1].name).toBe("Ambient Rain");
+      expect(result.sounds[2].name).toBe("Kick");
     });
 
-    it("should handle filenames with multiple dots", async () => {
+    it("should handle filenames with multiple dots (dots are not delimiters)", async () => {
       const folder = createMockGlobalFolder({ path: "/music" });
       mockReadDir({
         "/music": [fileEntry("my.cool.sound.wav")],
@@ -343,7 +345,7 @@ describe("reconcileGlobalLibrary", () => {
 
       const result = await reconcileGlobalLibrary([folder], []);
 
-      expect(result.sounds[0].name).toBe("my.cool.sound");
+      expect(result.sounds[0].name).toBe("My.cool.sound");
     });
   });
 });

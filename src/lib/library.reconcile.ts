@@ -22,11 +22,18 @@ function isAudioFile(name: string): boolean {
 }
 
 /**
- * Derive a display name from a filename by stripping the extension.
+ * Derive a display name from a filename by stripping the extension,
+ * splitting on hyphens/underscores, and title-casing each word.
+ * e.g. "my-audio_bgm_whatever.wav" → "My Audio Bgm Whatever"
  */
 function nameFromFilename(filename: string): string {
   const lastDot = filename.lastIndexOf(".");
-  return lastDot > 0 ? filename.substring(0, lastDot) : filename;
+  const stem = lastDot > 0 ? filename.substring(0, lastDot) : filename;
+  return stem
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 /**
@@ -87,7 +94,7 @@ export async function reconcileGlobalLibrary(
       pathToFolderId.set(filePath, folder.id);
 
       if (!soundsByPath.has(filePath)) {
-        const filename = filePath.split("/").pop() ?? filePath;
+        const filename = filePath.split(/[\\/]/).pop() ?? filePath;
         newSounds.push({
           id: crypto.randomUUID(),
           name: nameFromFilename(filename),
