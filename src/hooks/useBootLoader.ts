@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAppSettings } from "@/lib/appSettings.queries";
-import { useGlobalLibrary } from "@/lib/library.queries";
+import { useGlobalLibrary, useSaveGlobalLibrary } from "@/lib/library.queries";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
@@ -17,6 +17,8 @@ import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
 export function useBootLoader() {
   const { data: settings } = useAppSettings();
   const { data: library } = useGlobalLibrary();
+
+  const saveLibraryMutation = useSaveGlobalLibrary();
 
   const loadSettings = useAppSettingsStore((s) => s.loadSettings);
   const loadLibrary = useLibraryStore((s) => s.loadLibrary);
@@ -45,6 +47,11 @@ export function useBootLoader() {
         if (result.changed) {
           updateLibrary((draft) => {
             draft.sounds = result.sounds;
+          });
+          // Persist the reconciled library immediately so library.json is created on first boot.
+          saveLibraryMutation.mutate({
+            ...library,
+            sounds: result.sounds,
           });
         }
       },

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useProjectStore } from "@/state/projectStore";
+import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject } from "@/lib/project.queries";
+import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 
 /**
@@ -16,11 +18,21 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const lastSaveRef = useRef<string>("");
   const saveProjectMutation = useSaveProject();
 
+  const libraryRef = useRef(useLibraryStore.getState());
+  const lastLibrarySaveRef = useRef<string>("");
+  const saveLibraryMutation = useSaveGlobalLibrary();
+
   // Keep refs current without triggering effect re-runs
   useEffect(() => {
     return useProjectStore.subscribe((state) => {
       projectRef.current = state.project;
       isDirtyRef.current = state.isDirty;
+    });
+  }, []);
+
+  useEffect(() => {
+    return useLibraryStore.subscribe((state) => {
+      libraryRef.current = state;
     });
   }, []);
 
@@ -42,9 +54,26 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       });
     };
 
-    saveCurrentProject();
+    const saveLibrary = () => {
+      const { sounds, tags, sets, isDirty } = libraryRef.current;
+      if (!isDirty) return;
 
-    const intervalId = setInterval(saveCurrentProject, interval);
+      const libraryJson = JSON.stringify({ sounds, tags, sets });
+      if (libraryJson === lastLibrarySaveRef.current) return;
+
+      saveLibraryMutation.mutate(
+        { sounds, tags, sets },
+        { onSuccess: () => { lastLibrarySaveRef.current = libraryJson; } },
+      );
+    };
+
+    saveCurrentProject();
+    saveLibrary();
+
+    const intervalId = setInterval(() => {
+      saveCurrentProject();
+      saveLibrary();
+    }, interval);
     return () => clearInterval(intervalId);
   }, [folderPath, isTemporary, interval]);
 }

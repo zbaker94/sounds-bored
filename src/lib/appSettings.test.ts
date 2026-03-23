@@ -41,7 +41,7 @@ describe("loadAppSettings", () => {
 
     const result = await loadAppSettings();
 
-    expect(result.globalFolders).toHaveLength(3);
+    expect(result.globalFolders).toHaveLength(2);
     expect(result.version).toBe(CURRENT_SETTINGS_VERSION);
     expect(result.downloadFolderId).toBeTruthy();
     expect(result.importFolderId).toBeTruthy();
@@ -57,20 +57,19 @@ describe("loadAppSettings", () => {
     const result = await loadAppSettings();
 
     const paths = result.globalFolders.map((f) => f.path);
-    expect(paths).toContain("/music/SoundsBored");
     expect(paths).toContain("/music/SoundsBored/downloads");
     expect(paths).toContain("/music/SoundsBored/imported");
   });
 
   it("should proceed and return defaults even when folder creation fails", async () => {
     // /app-data/SoundsBored already exists, so mkdir for the app folder is never called.
-    // createDefaultAppSettings calls mkdir three times (once per default music folder) — all fail.
+    // createDefaultAppSettings calls mkdir twice (downloads + imported) — all fail.
     createMockFileSystem({ "/app-data/SoundsBored": null });
     mockFs.mkdir.mockRejectedValue(new Error("Permission denied"));
 
     // Should not throw — warnings are logged but defaults are still returned
     const result = await loadAppSettings();
-    expect(result.globalFolders).toHaveLength(3);
+    expect(result.globalFolders).toHaveLength(2);
   });
 
   it("should throw a ZodError if the file contains invalid JSON structure", async () => {

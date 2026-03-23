@@ -14,23 +14,19 @@ async function createDefaultAppSettings(): Promise<AppSettings> {
   const downloadsPath = await join(music, "SoundsBored", "downloads");
   const importedPath = await join(music, "SoundsBored", "imported");
 
-  const rootFolder: GlobalFolder = {
+
+  const importedFolder: GlobalFolder = {
     id: crypto.randomUUID(),
-    path: rootPath,
-    name: "SoundsBored",
+    path: importedPath,
+    name: "Imported",
   };
   const downloadsFolder: GlobalFolder = {
     id: crypto.randomUUID(),
     path: downloadsPath,
     name: "Downloads",
   };
-  const importedFolder: GlobalFolder = {
-    id: crypto.randomUUID(),
-    path: importedPath,
-    name: "Imported",
-  };
 
-  for (const folder of [rootFolder, downloadsFolder, importedFolder]) {
+  for (const folder of [downloadsFolder, importedFolder]) {
     try {
       await mkdir(folder.path, { recursive: true });
     } catch {
@@ -39,7 +35,7 @@ async function createDefaultAppSettings(): Promise<AppSettings> {
   }
 
   return AppSettingsSchema.parse({
-    globalFolders: [rootFolder, downloadsFolder, importedFolder],
+    globalFolders: [downloadsFolder, importedFolder],
     downloadFolderId: downloadsFolder.id,
     importFolderId: importedFolder.id,
   });
