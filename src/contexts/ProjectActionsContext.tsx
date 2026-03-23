@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
 import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
 import { discardTemporaryProject } from "@/lib/project";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 
@@ -32,8 +33,11 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const saveProjectMutation = useSaveProject();
   const saveProjectAsMutation = useSaveProjectAs();
 
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [showNavigateConfirm, setShowNavigateConfirm] = useState(false);
+  const showSaveDialog = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SAVE_PROJECT_DIALOG));
+  const showNavigateConfirm = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG));
+  const openOverlay = useUiStore((s) => s.openOverlay);
+  const closeOverlay = useUiStore((s) => s.closeOverlay);
+
   const [pendingNavigatePath, setPendingNavigatePath] = useState<string | null>(null);
 
   // Callback to invoke after a successful save — set by requestSaveAndThen / navigate guard
@@ -44,20 +48,20 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const handleSaveClick = useCallback(() => {
     if (!project) return;
     if (isTemporary) {
-      setShowSaveDialog(true);
+      openOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG, "dialog");
       return;
     }
     if (!isDirty || !folderPath) return;
     saveProjectMutation.mutate({ folderPath, project }, {
       onSuccess: () => toast.success("Project saved"),
     });
-  }, [project, isTemporary, isDirty, folderPath, saveProjectMutation]);
+  }, [project, isTemporary, isDirty, folderPath, saveProjectMutation, openOverlay]);
 
   const requestSaveAndThen = useCallback((onSaved: () => void) => {
     if (!project) return;
     onAfterSaveRef.current = onSaved;
     if (isTemporary) {
-      setShowSaveDialog(true);
+      openOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG, "dialog");
       return;
     }
     if (folderPath) {
@@ -69,7 +73,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
         },
       });
     }
-  }, [project, isTemporary, folderPath, saveProjectMutation]);
+  }, [project, isTemporary, folderPath, saveProjectMutation, openOverlay]);
 
   const requestNavigateAway = useCallback((path: string) => {
     if (!canSave) {
@@ -77,8 +81,8 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       return;
     }
     setPendingNavigatePath(path);
-    setShowNavigateConfirm(true);
-  }, [canSave, navigate]);
+    openOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG, "dialog");
+  }, [canSave, navigate, openOverlay]);
 
   // --- Save dialog handlers ---
 
@@ -95,7 +99,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
           { name: result.project.name, path: result.newPath, date: new Date().toISOString() },
           result.project,
         );
-        setShowSaveDialog(false);
+        closeOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG);
         const cb = onAfterSaveRef.current;
         onAfterSaveRef.current = null;
         cb?.();
@@ -107,14 +111,14 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   };
 
   const handleCancelSave = () => {
-    setShowSaveDialog(false);
+    closeOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG);
     onAfterSaveRef.current = null;
   };
 
   // --- Navigate confirm dialog handlers ---
 
   const handleNavigateSave = () => {
-    setShowNavigateConfirm(false);
+    closeOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG);
     if (pendingNavigatePath) {
       const path = pendingNavigatePath;
       setPendingNavigatePath(null);
@@ -123,7 +127,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   };
 
   const handleNavigateDiscard = async () => {
-    setShowNavigateConfirm(false);
+    closeOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG);
     if (pendingNavigatePath) {
       const path = pendingNavigatePath;
       setPendingNavigatePath(null);
@@ -139,7 +143,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   };
 
   const handleNavigateCancel = () => {
-    setShowNavigateConfirm(false);
+    closeOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG);
     setPendingNavigatePath(null);
   };
 

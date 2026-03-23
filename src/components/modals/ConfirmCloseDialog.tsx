@@ -25,7 +25,7 @@ export function ConfirmCloseDialog({
 }: ConfirmCloseDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent showCloseButton={false} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Unsaved Changes</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

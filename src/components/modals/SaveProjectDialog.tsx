@@ -46,7 +46,7 @@ export function SaveProjectDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent showCloseButton={false} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Save Project</DialogTitle>
           <DialogDescription>

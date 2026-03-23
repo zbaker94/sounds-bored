@@ -1,19 +1,18 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
-import { useSaveProject } from "@/lib/project.queries";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { discardTemporaryProject } from "@/lib/project";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
 
 /**
  * Manages the window close lifecycle for MainPage:
- * - Ctrl+S hotkey (delegates to ProjectActionsProvider)
  * - Window close interception with save/discard prompt
+ * Hotkeys (Ctrl+S, Esc, Ctrl+Shift+M, etc.) live in useGlobalHotkeys.
  */
 export function useProjectLifecycle() {
   const project = useProjectStore((s) => s.project);
@@ -22,21 +21,20 @@ export function useProjectLifecycle() {
   const isDirty = useProjectStore((s) => s.isDirty);
   const navigate = useNavigate();
 
-  const saveProjectMutation = useSaveProject();
-  const { handleSaveClick, requestSaveAndThen } = useProjectActions();
+  const { requestSaveAndThen } = useProjectActions();
 
-  const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const showConfirmClose = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.CONFIRM_CLOSE_DIALOG));
+  const openOverlay = useUiStore((s) => s.openOverlay);
+  const closeOverlay = useUiStore((s) => s.closeOverlay);
 
   const handleCloseRequested = useCallback(() => {
-    setShowConfirmClose(true);
-  }, []);
+    openOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG, "dialog");
+  }, [openOverlay]);
 
   const { allowClose } = useWindowCloseHandler(
     isTemporary || isDirty,
     handleCloseRequested,
   );
-
-  useHotkeys("ctrl+s, meta+s", handleSaveClick);
 
   const closeWindow = useCallback(() => {
     allowClose();
@@ -51,12 +49,12 @@ export function useProjectLifecycle() {
   }, [allowClose]);
 
   const handleSaveAndClose = () => {
-    setShowConfirmClose(false);
+    closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
     requestSaveAndThen(closeWindow);
   };
 
   const handleDiscardAndClose = async () => {
-    setShowConfirmClose(false);
+    closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
 
     if (isTemporary && folderPath) {
       try {
@@ -70,7 +68,7 @@ export function useProjectLifecycle() {
   };
 
   const handleCancelClose = () => {
-    setShowConfirmClose(false);
+    closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
   };
 
   // Redirect to start screen if project is unloaded from under us

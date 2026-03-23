@@ -77,7 +77,7 @@ const StandardDialog = ({
           {trigger}
         </DialogTrigger>
       )}
-      <DialogContent className={classNames?.content} style={styles?.content}>
+      <DialogContent className={classNames?.content} style={styles?.content} onEscapeKeyDown={(e) => e.preventDefault()}>
         {(title || description) && (
           <DialogHeader style={styles?.header}>
             {title && <DialogTitle className={classNames?.title} style={styles?.title}>{title}</DialogTitle>}
@@ -127,7 +127,7 @@ const StandardDrawer = ({
           {trigger}
         </DrawerTrigger>
       )}
-      <DrawerContent className={classNames?.content} style={styles?.content}>
+      <DrawerContent className={classNames?.content} style={styles?.content} onEscapeKeyDown={(e) => e.preventDefault()}>
         {(title || description) && (
           <DrawerHeader className="text-left" style={styles?.header}>
             {title && <DrawerTitle className={classNames?.title} style={styles?.title}>{title}</DrawerTitle>}

@@ -1,26 +1,28 @@
-import { useState } from "react";
-import { useHotkeys } from "react-hotkeys-hook";
-import { useProjectActions } from "@/contexts/ProjectActionsContext";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon } from "@hugeicons/core-free-icons";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
+import { useProjectActions } from "@/contexts/ProjectActionsContext";
 
 export function MenuDrawer() {
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.MENU_DRAWER));
+  const openOverlay = useUiStore((s) => s.openOverlay);
+  const closeOverlay = useUiStore((s) => s.closeOverlay);
   const { canSave, handleSaveClick, requestNavigateAway } = useProjectActions();
 
-  // Vaul's escape handling is disabled via onEscapeKeyDown to avoid a race condition
-  // where it closes the drawer and re-renders before this hotkey fires, causing it to reopen.
-  // This hotkey owns all escape behavior — toggle open/close.
-  useHotkeys("esc", () => setIsOpen((prev) => !prev));
-
   return (
-    <Drawer direction="left" open={isOpen} onOpenChange={setIsOpen}>
+    <Drawer
+      direction="left"
+      open={isOpen}
+      onOpenChange={(open) =>
+        open ? openOverlay(OVERLAY_ID.MENU_DRAWER, "drawer") : closeOverlay(OVERLAY_ID.MENU_DRAWER)
+      }
+    >
       <Button
-        onClick={() => setIsOpen(true)}
+        onClick={() => openOverlay(OVERLAY_ID.MENU_DRAWER, "drawer")}
         variant="ghost"
         size="icon-sm"
         aria-label="Open Menu"
@@ -28,6 +30,7 @@ export function MenuDrawer() {
       >
         <HugeiconsIcon icon={Hamburger01Icon} size={16} />
       </Button>
+      {/* onEscapeKeyDown is suppressed here — the global Esc handler owns escape for all overlays. */}
       <DrawerContent className="w-64 bricked-background-overlay" onEscapeKeyDown={(e) => e.preventDefault()}>
         <DrawerHeader>
           <h1 className="text-lg font-semibold ">Menu</h1>
@@ -52,7 +55,7 @@ export function MenuDrawer() {
         <Button
           variant="default"
           className="w-full mt-2"
-          onClick={() => { setIsOpen(false); requestNavigateAway("/"); }}
+          onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); requestNavigateAway("/"); }}
         >
           <HugeiconsIcon icon={HomeIcon} size={16} />
           Return to Main Menu

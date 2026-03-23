@@ -3,25 +3,27 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderMusicIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMd } from "@/hooks/useBreakpoint";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import gibbering from "@/assets/gibbering.gif";
 import { SoundsPanel } from "./SoundsPanel";
-import { useHotkeys } from "react-hotkeys-hook";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 
 export function EditSection() {
   const isMd = useIsMd();
   const tooltipSide = useMemo(() => (isMd ? "left" : "top"), [isMd]);
-  const [soundsOpen, setSoundsOpen] = useState(false);
-
-  useHotkeys("ctrl+shift+m, cmd+shift+m", () => setSoundsOpen((open) => !open));
+  const soundsOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SOUNDS_PANEL));
+  const openOverlay = useUiStore((s) => s.openOverlay);
+  const closeOverlay = useUiStore((s) => s.closeOverlay);
 
   return (
     <div className="flex flex-row items-center p-1 gap-2 md:flex-col">
       <DrawerDialog
         open={soundsOpen}
-        onOpenChange={setSoundsOpen}
+        onOpenChange={(open) =>
+          open ? openOverlay(OVERLAY_ID.SOUNDS_PANEL, "dialog") : closeOverlay(OVERLAY_ID.SOUNDS_PANEL)
+        }
         title="Sounds"
         content={<SoundsPanel />}
         footer={null}
@@ -36,7 +38,12 @@ export function EditSection() {
       />
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="default" size="icon" className="size-11 md:size-9" onClick={() => setSoundsOpen(true)}>
+          <Button
+            variant="default"
+            size="icon"
+            className="size-11 md:size-9"
+            onClick={() => openOverlay(OVERLAY_ID.SOUNDS_PANEL, "dialog")}
+          >
             <HugeiconsIcon icon={FolderMusicIcon} />
           </Button>
         </TooltipTrigger>

@@ -2,6 +2,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
+import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
@@ -22,6 +23,7 @@ export function MainPage() {
 
 function MainPageInner() {
   useAutoSave();
+  useGlobalHotkeys();
 
   const {
     showConfirmClose,
