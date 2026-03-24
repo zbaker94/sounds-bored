@@ -4,7 +4,8 @@
       "Bash(npm run:*)",
       "Bash(ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\state\\\\\" && ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\lib\\\\\")",
       "Bash(grep -E '\\\\.tsx$')",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(npm ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
