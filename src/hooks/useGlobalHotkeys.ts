@@ -21,7 +21,7 @@ export function useGlobalHotkeys() {
   });
 
   // Ctrl+Shift+M: toggle the sounds panel, but not when another overlay is on top.
-  useHotkeys("ctrl+shift+m, cmd+shift+m", () => {
+  useHotkeys("mod+shift+m", () => {
     const { hasOpenOverlay, isTopOverlay, toggleOverlay } = useUiStore.getState();
     if (!hasOpenOverlay() || isTopOverlay(OVERLAY_ID.SOUNDS_PANEL)) {
       toggleOverlay(OVERLAY_ID.SOUNDS_PANEL, "dialog");
@@ -29,7 +29,7 @@ export function useGlobalHotkeys() {
   });
 
   // Ctrl+S: save, but not when the Save dialog is already open.
-  useHotkeys("ctrl+s, meta+s", () => {
+  useHotkeys("mod+s", () => {
     if (!useUiStore.getState().isTopOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG)) {
       handleSaveClick();
     }

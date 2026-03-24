@@ -5,6 +5,7 @@ import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon } 
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
+import { modKey } from "@/lib/utils";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 
 export function MenuDrawer() {
@@ -38,18 +39,18 @@ export function MenuDrawer() {
         <Button disabled={!canSave} variant="secondary" className="w-full mb-2" onClick={handleSaveClick}>
           <HugeiconsIcon icon={SaveIcon} size={16} />
           Save
-          <Kbd className="ml-auto">Ctrl + S</Kbd>
+          <Kbd className="ml-auto">{modKey} + S</Kbd>
         </Button>
         <Button variant="secondary" className="w-full" onClick={() => null}>
           <HugeiconsIcon icon={ClipboardIcon} size={16} />
           Save As
-          <Kbd className="ml-auto">Ctrl + Shift + S</Kbd>
+          <Kbd className="ml-auto">{modKey} + Shift + S</Kbd>
         </Button>
         <Separator />
         <Button variant="secondary" className="w-full mt-2" onClick={() => null}>
           <HugeiconsIcon icon={FolderExportIcon} size={16} />
           Export
-          <Kbd className="ml-auto">Ctrl + X</Kbd>
+          <Kbd className="ml-auto">{modKey} + X</Kbd>
         </Button>
         <Separator />
         <Button

@@ -4,5 +4,9 @@
       "Bash(npm run:*)",
       "Bash(ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\state\\\\\" && ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\lib\\\\\")"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "shadcn"
+  ],
+  "enableAllProjectMcpServers": true
 }

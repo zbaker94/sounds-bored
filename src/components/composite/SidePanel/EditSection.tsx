@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsMd } from "@/hooks/useBreakpoint";
 import { useMemo } from "react";
 import { Kbd } from "@/components/ui/kbd";
+import { modKey } from "@/lib/utils";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import gibbering from "@/assets/gibbering.gif";
 import { SoundsPanel } from "./SoundsPanel";
@@ -49,7 +50,7 @@ export function EditSection() {
         </TooltipTrigger>
         <TooltipContent side={tooltipSide}>
           <p>Manage Sounds</p>
-          <Kbd>Ctrl+Shift+M</Kbd>
+          <Kbd>{modKey}+Shift+M</Kbd>
         </TooltipContent>
       </Tooltip>
       <Tooltip>
@@ -60,7 +61,7 @@ export function EditSection() {
         </TooltipTrigger>
         <TooltipContent side={tooltipSide}>
           <p>Toggle Edit Mode</p>
-          <Kbd>Ctrl+E</Kbd>
+          <Kbd>{modKey}+E</Kbd>
         </TooltipContent>
       </Tooltip>
     </div>

@@ -12,6 +12,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { MenuDrawer } from "./MenuDrawer";
 import { useHotkeys } from "react-hotkeys-hook";
+import { modKey } from "@/lib/utils";
 
 const EMPTY_SCENES: Scene[] = [];
 
@@ -22,7 +23,7 @@ export function SceneTabBar() {
   const addScene = useProjectStore((s) => s.addScene);
 
   // new scene hotkey
-  useHotkeys("ctrl+n, cmd+n", () => addScene());
+  useHotkeys("mod+n", () => addScene());
 
   return (
     <div className="flex items-center gap-1 px-3 py-1 min-w-0">
@@ -56,7 +57,7 @@ export function SceneTabBar() {
         </TooltipTrigger>
         <TooltipContent side="top">
           <p>New Scene</p>
-          <Kbd className="ml-2">Ctrl + N</Kbd>
+          <Kbd className="ml-2">{modKey} + N</Kbd>
         </TooltipContent>
       </Tooltip>
     </div>

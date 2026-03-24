@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/kbd";
 import { useIsMd } from "@/hooks/useBreakpoint";
+import { modKey } from "@/lib/utils";
 
 export function VolumeSection() {
   const isMd = useIsMd();
@@ -58,7 +59,7 @@ export function VolumeSection() {
         </TooltipTrigger>
         <TooltipContent side={tooltipSide}>
           <p>{masterVolume > 0 ? "Mute" : "Unmute"}</p>
-          <Kbd>Ctrl+M</Kbd>
+          <Kbd>{modKey}+M</Kbd>
         </TooltipContent>
       </Tooltip>
     </div>
