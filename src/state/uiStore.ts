@@ -14,6 +14,7 @@ export const OVERLAY_ID = {
   SAVE_PROJECT_DIALOG: "save-project-dialog",
   CONFIRM_NAVIGATE_DIALOG: "confirm-navigate-dialog",
   CONFIRM_CLOSE_DIALOG: "confirm-close-dialog",
+  PAD_CONFIG_DRAWER: "pad-config-drawer",
 } as const;
 
 interface UiState {
