@@ -11,6 +11,8 @@ import {
   AppSettingsSchema,
   GlobalLibrarySchema,
   hasFilePath,
+  LayerConfigFormSchema,
+  PadConfigSchema,
   type ProjectHistoryEntry,
   type ProjectHistory,
   type Project,
@@ -482,5 +484,87 @@ describe("GlobalLibrarySchema", () => {
       sets: [],
     };
     expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
+  });
+});
+
+describe("LayerConfigFormSchema", () => {
+  it("accepts a valid assigned selection", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      selection: { type: "assigned", instances: [] },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a valid tag selection", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      selection: { type: "tag", tagId: "tag-1", defaultVolume: 100 },
+      arrangement: "sequential",
+      playbackMode: "loop",
+      retriggerMode: "continue",
+      volume: 80,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a valid set selection", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      selection: { type: "set", setId: "set-1", defaultVolume: 75 },
+      arrangement: "shuffled",
+      playbackMode: "hold",
+      retriggerMode: "stop",
+      volume: 50,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects volume below 0", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      selection: { type: "assigned", instances: [] },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: -1,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects volume above 100", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      selection: { type: "assigned", instances: [] },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 101,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("PadConfigSchema", () => {
+  const validLayer = {
+    selection: { type: "assigned", instances: [] },
+    arrangement: "simultaneous",
+    playbackMode: "one-shot",
+    retriggerMode: "restart",
+    volume: 100,
+  };
+
+  it("accepts a valid pad config", () => {
+    const result = PadConfigSchema.safeParse({ name: "My Pad", layer: validLayer });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty name", () => {
+    const result = PadConfigSchema.safeParse({ name: "", layer: validLayer });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing name", () => {
+    const result = PadConfigSchema.safeParse({ layer: validLayer });
+    expect(result.success).toBe(false);
   });
 });

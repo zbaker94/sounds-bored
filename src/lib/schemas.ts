@@ -109,6 +109,26 @@ export const LayerSchema = z.object({
 
 export type Layer = z.infer<typeof LayerSchema>;
 
+// ─── Pad Config Form Schemas ──────────────────────────────────────────────────
+// These cover form-validated fields only. LayerConfigFormSchema intentionally
+// omits Layer.id — the store action generates it via crypto.randomUUID().
+
+export const LayerConfigFormSchema = z.object({
+  selection: LayerSelectionSchema,
+  arrangement: ArrangementSchema,
+  playbackMode: PlaybackModeSchema,
+  retriggerMode: RetriggerModeSchema,
+  volume: z.number().min(0).max(100),
+});
+
+export const PadConfigSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  layer: LayerConfigFormSchema,
+});
+
+export type LayerConfigForm = z.infer<typeof LayerConfigFormSchema>;
+export type PadConfigForm = z.infer<typeof PadConfigSchema>;
+
 // ─── Pad ──────────────────────────────────────────────────────────────────────
 
 export const PadSchema = z.object({
@@ -122,6 +142,9 @@ export const PadSchema = z.object({
 });
 
 export type Pad = z.infer<typeof PadSchema>;
+
+/** Writable fields of Pad — used by addPad / updatePad store actions. */
+export type PadConfig = Omit<Pad, "id">;
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
