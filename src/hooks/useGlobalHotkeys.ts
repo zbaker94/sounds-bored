@@ -1,6 +1,7 @@
 import { useHotkeys } from "react-hotkeys-hook";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
+import { useProjectStore } from "@/state/projectStore";
 
 /**
  * All keyboard shortcuts for the main editor in one place.
@@ -34,4 +35,37 @@ export function useGlobalHotkeys() {
       handleSaveClick();
     }
   });
+
+  // Mod+N: add a new pad to the active scene.
+  useHotkeys("mod+shift+n", () => {
+    const { project, activeSceneId, addPad } = useProjectStore.getState();
+    if (activeSceneId && project?.scenes.some((s) => s.id === activeSceneId)) {
+      addPad(activeSceneId);
+    }
+  });
+
+  // 1-9: jump directly to scene by index.
+  useHotkeys("1,2,3,4,5,6,7,8,9", (e) => {
+    const { project, setActiveSceneId } = useProjectStore.getState();
+    const scenes = project?.scenes ?? [];
+    const idx = parseInt(e.key) - 1;
+    if (idx < scenes.length) setActiveSceneId(scenes[idx].id);
+  });
+
+  // Shift+Left/Right: navigate between scenes with wrapping.
+  useHotkeys("left", () => {
+    const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
+    const scenes = project?.scenes ?? [];
+    if (scenes.length < 2) return;
+    const idx = scenes.findIndex((s) => s.id === activeSceneId);
+    setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id);
+  }, { preventDefault: true });
+
+  useHotkeys("right", () => {
+    const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
+    const scenes = project?.scenes ?? [];
+    if (scenes.length < 2) return;
+    const idx = scenes.findIndex((s) => s.id === activeSceneId);
+    setActiveSceneId(scenes[(idx + 1) % scenes.length].id);
+  }, { preventDefault: true });
 }

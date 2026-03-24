@@ -22,7 +22,6 @@ export function SceneTabBar() {
   const setActiveSceneId = useProjectStore((s) => s.setActiveSceneId);
   const addScene = useProjectStore((s) => s.addScene);
 
-  // new scene hotkey
   useHotkeys("mod+n", () => addScene());
 
   return (

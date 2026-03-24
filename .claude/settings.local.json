@@ -2,11 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\state\\\\\" && ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\lib\\\\\")"
+      "Bash(ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\state\\\\\" && ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\lib\\\\\")",
+      "Bash(grep -E '\\\\.tsx$')"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "shadcn"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
