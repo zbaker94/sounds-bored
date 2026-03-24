@@ -1,4 +1,4 @@
-import { AppSettings, GlobalFolder, GlobalLibrary, Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
+import { AppSettings, GlobalFolder, GlobalLibrary, Layer, Pad, Project, ProjectHistoryEntry, Scene, Sound, Tag, Set } from "@/lib/schemas";
 import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constants";
 
 /**
@@ -146,4 +146,67 @@ export async function expectToReject<T>(
     }
     return error as Error;
   }
+}
+
+/**
+ * Factory for creating test Layers
+ */
+export function createMockLayer(overrides?: Partial<Layer>): Layer {
+  return {
+    id: crypto.randomUUID(),
+    selection: { type: "assigned", instances: [] },
+    arrangement: "simultaneous",
+    playbackMode: "one-shot",
+    retriggerMode: "restart",
+    volume: 100,
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test Pads
+ */
+export function createMockPad(overrides?: Partial<Pad>): Pad {
+  return {
+    id: crypto.randomUUID(),
+    name: "Test Pad",
+    layers: [],
+    muteTargetPadIds: [],
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test Sounds
+ */
+export function createMockSound(overrides?: Partial<Sound>): Sound {
+  return {
+    id: crypto.randomUUID(),
+    name: "Test Sound",
+    tags: [],
+    sets: [],
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test Tags
+ */
+export function createMockTag(overrides?: Partial<Tag>): Tag {
+  return {
+    id: crypto.randomUUID(),
+    name: "Test Tag",
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test Sets
+ */
+export function createMockSet(overrides?: Partial<Set>): Set {
+  return {
+    id: crypto.randomUUID(),
+    name: "Test Set",
+    ...overrides,
+  };
 }
