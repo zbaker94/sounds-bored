@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useProjectStore } from "@/state/projectStore";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
+import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add02Icon, ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
@@ -11,7 +13,7 @@ const PADS_PER_PAGE = 12;
 export function SceneView() {
   const activeSceneId = useProjectStore((s) => s.activeSceneId);
   const project = useProjectStore((s) => s.project);
-  const addPad = useProjectStore((s) => s.addPad);
+  const openOverlay = useUiStore((s) => s.openOverlay);
   const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
 
   const activeScene = useMemo(
@@ -46,12 +48,13 @@ export function SceneView() {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <button
-          onClick={() => addPad(activeScene.id)}
+          onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
           className="aspect-square w-40 rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]"
           aria-label="Add pad"
         >
           <HugeiconsIcon icon={Add02Icon} size={48} className="text-foreground/60" />
         </button>
+        <PadConfigDrawer sceneId={activeScene.id} />
       </div>
     );
   }
@@ -66,7 +69,7 @@ export function SceneView() {
         ))}
         {isLastPage && (
           <button
-            onClick={() => addPad(activeScene.id)}
+            onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
             className="w-full h-full rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]"
             aria-label="Add pad"
           >
@@ -100,6 +103,8 @@ export function SceneView() {
           </Button>
         </div>
       )}
+
+      <PadConfigDrawer sceneId={activeScene.id} />
     </div>
   );
 }
