@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore, initialProjectState } from "./projectStore";
-import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
+import { createMockProject, createMockHistoryEntry, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
+import type { PadConfig } from "@/lib/schemas";
 
 function getState() {
   return useProjectStore.getState();
@@ -285,6 +286,94 @@ describe("projectStore", () => {
 
       getState().addScene();
 
+      expect(getState().isDirty).toBe(true);
+    });
+  });
+
+  describe("addPad", () => {
+    function loadWithScene() {
+      const entry = createMockHistoryEntry();
+      const scene = createMockScene({ id: "scene-1" });
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return scene.id;
+    }
+
+    it("should do nothing if no project is loaded", () => {
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      getState().addPad("any-scene", config);
+      expect(getState().project).toBeNull();
+    });
+
+    it("should do nothing if sceneId does not exist", () => {
+      loadWithScene();
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      getState().addPad("nonexistent", config);
+      expect(getState().project?.scenes[0].pads).toHaveLength(0);
+    });
+
+    it("should add a pad with the given name to the scene", () => {
+      const sceneId = loadWithScene();
+      const layer = createMockLayer();
+      const config: PadConfig = {
+        name: "Kick",
+        layers: [layer],
+        muteTargetPadIds: [],
+      };
+      getState().addPad(sceneId, config);
+      expect(getState().project?.scenes[0].pads).toHaveLength(1);
+      expect(getState().project?.scenes[0].pads[0].name).toBe("Kick");
+    });
+
+    it("should assign a generated id to the pad", () => {
+      const sceneId = loadWithScene();
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      getState().addPad(sceneId, config);
+      expect(getState().project?.scenes[0].pads[0].id).toBeTruthy();
+    });
+
+    it("should mark project as dirty", () => {
+      const sceneId = loadWithScene();
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      getState().addPad(sceneId, config);
+      expect(getState().isDirty).toBe(true);
+    });
+  });
+
+  describe("updatePad", () => {
+    function loadWithPad() {
+      const entry = createMockHistoryEntry();
+      const pad = createMockPad({ id: "pad-1", name: "Original" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return { sceneId: scene.id, padId: pad.id };
+    }
+
+    it("should do nothing if no project is loaded", () => {
+      const config: PadConfig = { name: "Updated", layers: [], muteTargetPadIds: [] };
+      getState().updatePad("any-scene", "any-pad", config);
+      expect(getState().project).toBeNull();
+    });
+
+    it("should do nothing if padId does not exist in the scene", () => {
+      const { sceneId } = loadWithPad();
+      const config: PadConfig = { name: "Updated", layers: [], muteTargetPadIds: [] };
+      getState().updatePad(sceneId, "nonexistent-pad", config);
+      expect(getState().project?.scenes[0].pads[0].name).toBe("Original");
+    });
+
+    it("should update the pad fields, leaving id unchanged", () => {
+      const { sceneId, padId } = loadWithPad();
+      const config: PadConfig = { name: "Updated Name", layers: [], muteTargetPadIds: [] };
+      getState().updatePad(sceneId, padId, config);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.id).toBe("pad-1");
+      expect(pad?.name).toBe("Updated Name");
+    });
+
+    it("should mark project as dirty", () => {
+      const { sceneId, padId } = loadWithPad();
+      const config: PadConfig = { name: "Updated", layers: [], muteTargetPadIds: [] };
+      getState().updatePad(sceneId, padId, config);
       expect(getState().isDirty).toBe(true);
     });
   });

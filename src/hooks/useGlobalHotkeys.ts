@@ -36,11 +36,11 @@ export function useGlobalHotkeys() {
     }
   });
 
-  // Mod+N: add a new pad to the active scene.
+  // Mod+Shift+N: open the pad config drawer for the active scene.
   useHotkeys("mod+shift+n", () => {
-    const { project, activeSceneId, addPad } = useProjectStore.getState();
+    const { project, activeSceneId } = useProjectStore.getState();
     if (activeSceneId && project?.scenes.some((s) => s.id === activeSceneId)) {
-      addPad(activeSceneId);
+      useUiStore.getState().openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
     }
   });
 
