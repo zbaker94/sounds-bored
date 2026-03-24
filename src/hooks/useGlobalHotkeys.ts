@@ -11,6 +11,8 @@ export function useGlobalHotkeys() {
   const { handleSaveClick } = useProjectActions();
 
   // Esc: toggle the menu drawer when nothing is open, otherwise close the topmost overlay.
+  // enableOnFormTags: the global Esc handler owns escape for all overlays, including dialogs
+  // with focused inputs (e.g. PadConfigDrawer's name field).
   useHotkeys("esc", () => {
     const { overlayStack, closeOverlay, toggleOverlay } = useUiStore.getState();
     const top = overlayStack[overlayStack.length - 1];
@@ -19,7 +21,7 @@ export function useGlobalHotkeys() {
     } else {
       toggleOverlay(OVERLAY_ID.MENU_DRAWER, "drawer");
     }
-  });
+  }, { enableOnFormTags: true });
 
   // Ctrl+Shift+M: toggle the sounds panel, but not when another overlay is on top.
   useHotkeys("mod+shift+m", () => {
