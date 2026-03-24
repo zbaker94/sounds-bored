@@ -78,6 +78,9 @@ export function PadConfigDrawer({ sceneId, initialConfig }: PadConfigDrawerProps
   return (
     <FormProvider {...methods}>
       <DrawerDialog
+         classNames={{
+          title: "[font-family:DeathLetter] tracking-wider text-2xl",
+        }}
         open={isOpen}
         onOpenChange={(open) => { if (!open) handleClose(); }}
         title={isEditing ? "Edit Pad" : "Configure Pad"}
