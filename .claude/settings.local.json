@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm run:*)",
       "Bash(ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\state\\\\\" && ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\lib\\\\\")",
-      "Bash(grep -E '\\\\.tsx$')"
+      "Bash(grep -E '\\\\.tsx$')",
+      "Skill(update-config)"
     ]
   },
   "enableAllProjectMcpServers": true,
