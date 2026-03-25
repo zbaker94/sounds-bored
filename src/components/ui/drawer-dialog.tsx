@@ -88,7 +88,7 @@ const StandardDialog = ({
             )}
           </DialogHeader>
         )}
-        <div className="overflow-y-auto min-h-0 flex-1">{content}</div>
+        {content}
         {(close || footer) && (
           <DialogFooter style={styles?.footer}>
             {footer && footer}
