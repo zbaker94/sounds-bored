@@ -66,12 +66,14 @@ describe("LayerConfigSection", () => {
   });
 
   it("switching to tag type shows tag selector", async () => {
+    useLibraryStore.setState({ sounds: [], tags: [{ id: "t1", name: "Percussion", color: "#ffffff" }], sets: [], isDirty: false });
     render(<Wrapper />);
     await userEvent.click(screen.getByRole("tab", { name: /tag/i }));
     expect(screen.getByText(/select tag/i)).toBeInTheDocument();
   });
 
   it("switching to set type shows set selector", async () => {
+    useLibraryStore.setState({ sounds: [], tags: [], sets: [{ id: "s1", name: "My Drums" }], isDirty: false });
     render(<Wrapper />);
     await userEvent.click(screen.getByRole("tab", { name: /set/i }));
     expect(screen.getByText(/select set/i)).toBeInTheDocument();

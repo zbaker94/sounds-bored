@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { createMockSound, createMockTag, createMockSet } from "@/test/factories";
 import { SoundSelector } from "./SoundSelector";
 import type { LayerSelection } from "@/lib/schemas";
@@ -112,5 +114,132 @@ describe("SoundSelector", () => {
     if (callArg.type === "assigned") {
       expect(callArg.instances).toHaveLength(0);
     }
+  });
+});
+
+describe("SoundSelector — assigned mode — search", () => {
+  beforeEach(() => {
+    useLibraryStore.setState({ ...initialLibraryState });
+    useAppSettingsStore.setState({ settings: null });
+  });
+
+  it("renders a search input", () => {
+    const sound = createMockSound({ name: "Kick" });
+    useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "assigned", instances: [] }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+  });
+
+  it("filters sounds by name when a query is typed", async () => {
+    const kick = createMockSound({ name: "Kick Drum" });
+    const snare = createMockSound({ name: "Snare" });
+    useLibraryStore.setState({ sounds: [kick, snare], tags: [], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "assigned", instances: [] }}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "Kick");
+    expect(screen.getByText("Kick Drum")).toBeInTheDocument();
+    expect(screen.queryByText("Snare")).not.toBeInTheDocument();
+  });
+
+  it("shows 'No results.' when search query matches nothing", async () => {
+    const sound = createMockSound({ name: "Kick" });
+    useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "assigned", instances: [] }}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "zzzzxxx");
+    expect(screen.getByText(/no results/i)).toBeInTheDocument();
+  });
+
+  it("finds sounds by tag name", async () => {
+    const tag = createMockTag({ id: "t1", name: "Percussion" });
+    const kick = createMockSound({ name: "Kick", tags: ["t1"] });
+    const ambient = createMockSound({ name: "Ambient Pad", tags: [] });
+    useLibraryStore.setState({ sounds: [kick, ambient], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "assigned", instances: [] }}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "Percussion");
+    expect(screen.getByText("Kick")).toBeInTheDocument();
+    expect(screen.queryByText("Ambient Pad")).not.toBeInTheDocument();
+  });
+});
+
+describe("SoundSelector — tag mode — search", () => {
+  beforeEach(() => {
+    useLibraryStore.setState({ ...initialLibraryState });
+    useAppSettingsStore.setState({ settings: null });
+  });
+
+  it("renders a search input for tag mode", () => {
+    const tag = createMockTag({ name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagId: "", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+  });
+
+  it("shows 'No results.' when tag search matches nothing", async () => {
+    const tag = createMockTag({ name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagId: "", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "zzzzxxx");
+    expect(screen.getByText(/no results/i)).toBeInTheDocument();
+  });
+});
+
+describe("SoundSelector — set mode — search", () => {
+  beforeEach(() => {
+    useLibraryStore.setState({ ...initialLibraryState });
+    useAppSettingsStore.setState({ settings: null });
+  });
+
+  it("renders a search input for set mode", () => {
+    const set = createMockSet({ name: "My Drums" });
+    useLibraryStore.setState({ sounds: [], tags: [], sets: [set], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "set", setId: "", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+  });
+
+  it("shows 'No results.' when set search matches nothing", async () => {
+    const set = createMockSet({ name: "My Drums" });
+    useLibraryStore.setState({ sounds: [], tags: [], sets: [set], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "set", setId: "", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    await userEvent.type(screen.getByPlaceholderText(/search/i), "zzzzxxx");
+    expect(screen.getByText(/no results/i)).toBeInTheDocument();
   });
 });
