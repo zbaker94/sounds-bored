@@ -5,7 +5,10 @@
       "Bash(ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\state\\\\\" && ls \"C:\\\\Repos\\\\sounds-bored\\\\src\\\\lib\\\\\")",
       "Bash(grep -E '\\\\.tsx$')",
       "Skill(update-config)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
