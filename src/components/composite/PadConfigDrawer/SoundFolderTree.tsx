@@ -73,6 +73,7 @@ function FolderNodeRow({
           type="checkbox"
           checked={isChecked}
           onChange={() => onToggleFolder(node.folder.id)}
+          aria-label={`Toggle all sounds in ${node.folder.name}`}
           className="accent-primary"
         />
         <CollapsibleTrigger className="flex items-center gap-1 text-sm font-medium hover:text-foreground/80">
