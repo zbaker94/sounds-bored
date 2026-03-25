@@ -176,8 +176,8 @@ export function SoundsPanel() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
-      .onFileDropEvent(async (event) => {
-        if (event.payload.type === "over") {
+      .onDragDropEvent(async (event) => {
+        if (event.payload.type === "enter") {
           setIsDragOver(true);
         } else if (event.payload.type === "leave") {
           setIsDragOver(false);

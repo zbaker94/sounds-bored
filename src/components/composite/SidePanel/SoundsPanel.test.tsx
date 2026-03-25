@@ -15,11 +15,11 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
 
-// Mock Tauri window file-drop events
+// Mock Tauri window drag-drop events
 const mockOnFileDropEvent = vi.fn(() => Promise.resolve(() => {}));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: vi.fn(() => ({
-    onFileDropEvent: mockOnFileDropEvent,
+    onDragDropEvent: mockOnFileDropEvent,
   })),
 }));
 
@@ -203,9 +203,9 @@ describe("SoundsPanel", () => {
     expect(screen.getByText("HiHat")).toBeInTheDocument();
   });
 
-  // 7. Drag overlay renders when isDragOver is true (via onFileDropEvent mock)
-  it("shows drag overlay when a file-drop 'over' event fires", async () => {
-    // Capture the callback passed to onFileDropEvent
+  // 7. Drag overlay renders when isDragOver is true (via onDragDropEvent mock)
+  it("shows drag overlay when a file-drop 'enter' event fires", async () => {
+    // Capture the callback passed to onDragDropEvent
     let fileDropCallback: ((event: { payload: { type: string; paths: string[] } }) => Promise<void>) | null = null;
 
     mockOnFileDropEvent.mockImplementationOnce((cb: (event: { payload: { type: string; paths: string[] } }) => Promise<void>) => {
@@ -222,9 +222,9 @@ describe("SoundsPanel", () => {
 
     expect(fileDropCallback).not.toBeNull();
 
-    // Simulate the "over" event
+    // Simulate the "enter" event
     await act(async () => {
-      await fileDropCallback!({ payload: { type: "over", paths: [] } });
+      await fileDropCallback!({ payload: { type: "enter", paths: [] } });
     });
 
     expect(screen.getByText(/drop audio files to import/i)).toBeInTheDocument();
@@ -244,7 +244,7 @@ describe("SoundsPanel", () => {
 
     // Show overlay
     await act(async () => {
-      await fileDropCallback!({ payload: { type: "over", paths: [] } });
+      await fileDropCallback!({ payload: { type: "enter", paths: [] } });
     });
     expect(screen.getByText(/drop audio files to import/i)).toBeInTheDocument();
 
