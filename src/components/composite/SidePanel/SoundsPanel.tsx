@@ -215,7 +215,7 @@ export function SoundsPanel() {
         unlisten = fn;
       });
     return () => unlisten?.();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative flex flex-col h-full min-h-0 gap-2 p-2">
@@ -233,9 +233,8 @@ export function SoundsPanel() {
       )}
       <div className="flex items-center gap-2 shrink-0">
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
-          className="text-white/70"
           onClick={handleImportSounds}
           disabled={isImporting}
         >
@@ -246,7 +245,7 @@ export function SoundsPanel() {
       <div className="flex flex-1 min-h-0 gap-2">
         <div className="flex flex-col w-1/2 gap-2">
           <div
-            className={`${panelClass} flex-1 border border-white overflow-y-auto`}
+            className={`${panelClass} flex-1 border border-white overflow-y-auto p-2`}
           >
             {sets.map((set) => (
               <div
@@ -293,80 +292,79 @@ export function SoundsPanel() {
             )}
           </div>
           <div
-            className={`${panelClass} flex-1 border border-white overflow-y-auto`}
+            className={`${panelClass} flex-1 border border-white overflow-y-auto flex flex-col`}
           >
-            {folders.map((folder) => (
-              <Item
-                key={folder.id}
-                variant="outline"
-                className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
-                  selectedId === folder.id ? "bg-white/20" : ""
-                }`}
-                onClick={() => handleSelect(folder.id)}
-              >
-                <ItemMedia>
-                  <HugeiconsIcon icon={Folder01Icon} size={14} />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{folder.name}</ItemTitle>
-                  <ItemDescription className="text-white/40">
-                    <TruncatedPath path={folder.path} />
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <HugeiconsIcon icon={ChevronRight} className="size-4" />
-                </ItemActions>
-              </Item>
-            ))}
-            {folders.length === 0 ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <HugeiconsIcon
-                      icon={Folder01Icon}
-                      className="text-black/70"
-                    />
-                  </EmptyMedia>
-                  <EmptyTitle className="text-white/70">
-                    No folders yet...
-                  </EmptyTitle>
-                </EmptyHeader>
-                <EmptyDescription className="text-white/50">
-                  Add a folder to watch for audio files.
-                </EmptyDescription>
-                <EmptyContent className="flex-row justify-center">
-                  <Button
-                    variant="outline"
-                    className="text-white/70"
-                    onClick={handleAddFolder}
-                    disabled={isAddingFolder}
-                  >
-                    Add Folder
-                  </Button>
-                </EmptyContent>
-              </Empty>
-            ) : (
-              <Item
-                className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg border-t border-white/60`}
-                onClick={handleAddFolder}
-              >
-                <ItemMedia>
-                  <HugeiconsIcon icon={Add01Icon} size={14} />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>Add Folder</ItemTitle>
-                  <ItemDescription className="text-white/40">
-                    Add a folder to watch for audio files. This will persist
-                    across projects.
-                  </ItemDescription>
-                </ItemContent>
-                <ItemActions></ItemActions>
-              </Item>
+            {folders.length > 0 && (
+              <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/70 h-7 text-xs px-2"
+                  onClick={handleAddFolder}
+                  disabled={isAddingFolder}
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={12} />
+                  {isAddingFolder ? "Adding..." : "Add Folder"}
+                </Button>
+              </div>
             )}
+            <div className="p-2 flex-1">
+              {folders.map((folder) => (
+                <Item
+                  key={folder.id}
+                  variant="outline"
+                  className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
+                    selectedId === folder.id ? "bg-white/20" : ""
+                  }`}
+                  onClick={() => handleSelect(folder.id)}
+                >
+                  <ItemMedia>
+                    <HugeiconsIcon icon={Folder01Icon} size={14} />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>{folder.name}</ItemTitle>
+                    <ItemDescription className="text-white/40">
+                      <TruncatedPath path={folder.path} />
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <HugeiconsIcon icon={ChevronRight} className="size-4" />
+                  </ItemActions>
+                </Item>
+              ))}
+              {folders.length === 0 && (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <HugeiconsIcon
+                        icon={Folder01Icon}
+                        className="text-black/70"
+                      />
+                    </EmptyMedia>
+                    <EmptyTitle className="text-white/70">
+                      No folders yet...
+                    </EmptyTitle>
+                  </EmptyHeader>
+                  <EmptyDescription className="text-white/50">
+                    Add a folder to watch for audio files.
+                  </EmptyDescription>
+                  <EmptyContent className="flex-row justify-center">
+                    <Button
+                      variant="outline"
+                      className="text-white/70"
+                      onClick={handleAddFolder}
+                      disabled={isAddingFolder}
+                    >
+                      Add Folder
+                    </Button>
+                  </EmptyContent>
+                </Empty>
+              )}
+            </div>
           </div>
         </div>
         <div
-          className={`${panelClass} w-1/2 border border-white overflow-y-auto`}
+          className={`${panelClass} w-1/2 border border-white overflow-y-auto p-2`}
           onMouseEnter={() => setSoundsListHover(true)}
           onMouseLeave={() => setSoundsListHover(false)}
         >
