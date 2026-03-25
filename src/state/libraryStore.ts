@@ -15,6 +15,9 @@ interface LibraryActions {
   loadLibrary: (library: GlobalLibrary) => void;
   updateLibrary: (updater: (draft: LibraryData) => void) => void;
   clearDirtyFlag: () => void;
+  addSet: (name: string) => Set;
+  duplicateSet: (setId: string) => Set | null;
+  addSoundsToSet: (soundIds: string[], setId: string) => void;
 }
 
 export type LibraryStore = LibraryState & LibraryActions;
@@ -27,7 +30,7 @@ export const initialLibraryState: LibraryState = {
 };
 
 export const useLibraryStore = create<LibraryStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     ...initialLibraryState,
 
     loadLibrary: (library) =>
@@ -49,6 +52,46 @@ export const useLibraryStore = create<LibraryStore>()(
     clearDirtyFlag: () =>
       set((draft) => {
         draft.isDirty = false;
+      }),
+
+    addSet: (name) => {
+      const newSet: Set = { id: crypto.randomUUID(), name };
+      set((draft) => {
+        draft.sets.push(newSet);
+        draft.isDirty = true;
+      });
+      return newSet;
+    },
+
+    duplicateSet: (setId) => {
+      const original = get().sets.find((s) => s.id === setId);
+      if (!original) return null;
+
+      const newSet: Set = {
+        id: crypto.randomUUID(),
+        name: original.name + " (Copy)",
+      };
+      set((draft) => {
+        draft.sets.push(newSet);
+        for (const sound of draft.sounds) {
+          if (sound.sets.includes(setId)) {
+            sound.sets.push(newSet.id);
+          }
+        }
+        draft.isDirty = true;
+      });
+      return newSet;
+    },
+
+    addSoundsToSet: (soundIds, setId) =>
+      set((draft) => {
+        for (const soundId of soundIds) {
+          const sound = draft.sounds.find((s) => s.id === soundId);
+          if (sound && !sound.sets.includes(setId)) {
+            sound.sets.push(setId);
+          }
+        }
+        draft.isDirty = true;
       }),
   }))
 );
