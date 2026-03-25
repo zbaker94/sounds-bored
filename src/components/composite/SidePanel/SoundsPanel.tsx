@@ -193,7 +193,7 @@ export function SoundsPanel() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative flex h-full min-h-0 gap-2 p-2">
+    <div className="relative flex flex-col h-full min-h-0 gap-2 p-2">
       {isDragOver && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 rounded-lg bg-black/70 backdrop-blur-sm pointer-events-none">
           <HugeiconsIcon
@@ -206,6 +206,19 @@ export function SoundsPanel() {
           </p>
         </div>
       )}
+      <div className="flex items-center gap-2 shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-white/70"
+          onClick={handleImportSounds}
+          disabled={isImporting}
+        >
+          <HugeiconsIcon icon={CloudUploadIcon} size={14} />
+          {isImporting ? "Importing..." : "Import Sounds"}
+        </Button>
+      </div>
+      <div className="flex flex-1 min-h-0 gap-2">
       <div className="flex flex-col w-1/2 gap-2">
         <div
           className={`${panelClass} flex-1 border border-white overflow-y-auto`}
@@ -350,6 +363,7 @@ export function SoundsPanel() {
             <ItemActions></ItemActions>
           </Item>
         ))}
+      </div>
       </div>
       <img
         src={guyWithTorch}
