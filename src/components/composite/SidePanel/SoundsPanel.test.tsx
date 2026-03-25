@@ -158,6 +158,25 @@ describe("SoundsPanel", () => {
     );
   });
 
+  // 5b. Duplicate folder path shows error toast and does not save
+  it("shows an error toast and does not save when adding a folder that already exists", async () => {
+    const existingFolder = createMockGlobalFolder({ path: "/music/sounds" });
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [existingFolder] },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+    vi.mocked(open).mockResolvedValueOnce("/music/sounds");
+
+    renderPanel();
+    const btn = screen.getByRole("button", { name: /add folder/i });
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
   // 6. Sound list shows all sounds when selectedId is null (useMemo reactivity)
   it("shows all sounds when no selection is active and updates reactively", () => {
     const sound1 = createMockSound({ name: "Kick", folderId: "folder-1" });

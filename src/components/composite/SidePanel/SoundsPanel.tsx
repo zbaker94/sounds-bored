@@ -165,6 +165,10 @@ export function SoundsPanel() {
     try {
       const selected = await open({ directory: true });
       if (!selected || typeof selected !== "string") return;
+      if (settings.globalFolders.some((f) => f.path === selected)) {
+        toast.error("That folder is already in your library.");
+        return;
+      }
       const name = selected.split(/[\\/]/).pop() ?? selected;
       const newFolder: GlobalFolder = {
         id: crypto.randomUUID(),
