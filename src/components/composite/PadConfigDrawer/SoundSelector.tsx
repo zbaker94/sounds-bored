@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import Fuse from "fuse.js";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -25,6 +25,10 @@ interface SoundSelectorProps {
 
 export function SoundSelector({ value, onChange }: SoundSelectorProps) {
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    setQuery("");
+  }, [value.type]);
 
   const sounds = useLibraryStore(useShallow((s) => s.sounds));
   const tags = useLibraryStore(useShallow((s) => s.tags));
