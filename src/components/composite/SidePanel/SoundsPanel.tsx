@@ -297,9 +297,9 @@ export function SoundsPanel() {
             {folders.length > 0 && (
               <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  className="text-white/70 h-7 text-xs px-2"
+                  className="h-7 text-xs px-2"
                   onClick={handleAddFolder}
                   disabled={isAddingFolder}
                 >
