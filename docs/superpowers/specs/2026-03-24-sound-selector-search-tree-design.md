@@ -95,9 +95,10 @@ A folder checkbox renders as:
 - `tag` mode: filters `tags` by case-insensitive substring on `tag.name`; "No results." if empty
 - `set` mode: filters `sets` by case-insensitive substring on `set.name`; "No results." if empty
 - Search query is local state (`useState`) — cleared when selection type tab changes
-- `sounds` selector uses Zustand `useShallow` to avoid unnecessary Fuse index rebuilds:
+- `sounds` and `tags` selectors use Zustand `useShallow` to avoid unnecessary Fuse index rebuilds:
   ```ts
   const sounds = useLibraryStore(useShallow((s) => s.sounds));
+  const tags = useLibraryStore(useShallow((s) => s.tags));
   ```
 
 ### New: `SoundFolderTree.tsx`
@@ -129,15 +130,30 @@ Recursive renderer for a single `TreeNode`:
 
 ### Assigned (Fuse.js)
 
+Search covers both sound name and resolved tag names. `Sound.tags` is an array of Tag IDs, so a denormalized search document is built before indexing:
+
 ```ts
-const fuse = useMemo(
-  () => new Fuse(sounds, { keys: ["name"], threshold: 0.4 }),
-  [sounds]  // sounds is stable reference via useShallow
+type SoundSearchDoc = { sound: Sound; tagNames: string[] }
+
+const docs: SoundSearchDoc[] = useMemo(
+  () => sounds.map((sound) => ({
+    sound,
+    tagNames: sound.tags.map((tid) => tags.find((t) => t.id === tid)?.name ?? ""),
+  })),
+  [sounds, tags]  // both stable via useShallow
 )
+
+const fuse = useMemo(
+  () => new Fuse(docs, { keys: ["sound.name", "tagNames"], threshold: 0.4 }),
+  [docs]
+)
+
 const results = query.trim()
-  ? fuse.search(query.trim()).map((r) => r.item)
+  ? fuse.search(query.trim()).map((r) => r.item.sound)
   : []  // only used when query is active; empty array means no results
 ```
+
+`tags` is read from `useLibraryStore` with `useShallow` alongside `sounds`.
 
 ### Tag / Set (substring)
 
@@ -157,6 +173,7 @@ const filtered = items.filter((item) =>
 - Typing a query filters sounds by name (flat list shown, not tree)
 - Clearing the query restores the tree view (SoundFolderTree rendered)
 - Searching with no matching sounds shows "No results."
+- Searching by tag name returns sounds that have that tag
 - Tag mode: typing filters tags by substring
 - Set mode: typing filters sets by substring
 
