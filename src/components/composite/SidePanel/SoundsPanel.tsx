@@ -27,6 +27,8 @@ import {
   CloudUploadIcon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder } from "@/lib/schemas";
+import { AddSetDialog } from "./AddSetDialog";
+import { AddToSetDialog } from "./AddToSetDialog";
 
 const EMPTY_FOLDERS: GlobalFolder[] = [];
 import { Button } from "@/components/ui/button";
@@ -75,6 +77,13 @@ export function SoundsPanel() {
   const [isImporting, setIsImporting] = useState(false);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [addSetOpen, setAddSetOpen] = useState(false);
+  const [addToSetOpen, setAddToSetOpen] = useState(false);
+  const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
+
+  useEffect(() => {
+    setSelectedSoundIds(new globalThis.Set());
+  }, [selectedId]);
 
   const handleSelect = (id: string) => {
     if (selectedId === id) {
@@ -202,6 +211,23 @@ export function SoundsPanel() {
     }
   }
 
+  async function handleDuplicateSet() {
+    if (!selectedId) return;
+    const newSet = useLibraryStore.getState().duplicateSet(selectedId);
+    if (!newSet) return;
+    const latest = useLibraryStore.getState();
+    await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+    toast.success(`"${newSet.name}" created`);
+  }
+
+  function handleSelectAllNone() {
+    if (selectedSoundIds.size === soundsForSelectedId.length && soundsForSelectedId.length > 0) {
+      setSelectedSoundIds(new globalThis.Set());
+    } else {
+      setSelectedSoundIds(new globalThis.Set(soundsForSelectedId.map((s) => s.id)));
+    }
+  }
+
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -249,8 +275,30 @@ export function SoundsPanel() {
       <div className="flex flex-1 min-h-0 gap-2">
         <div className="flex flex-col w-1/2 gap-2">
           <div
-            className={`${panelClass} flex-1 border border-white overflow-y-auto p-2`}
+            className={`${panelClass} flex-1 border border-white overflow-y-auto flex flex-col`}
           >
+            {sets.length > 0 && (
+              <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs px-2 text-white/70"
+                  onClick={() => setAddSetOpen(true)}
+                >
+                  <HugeiconsIcon icon={Add01Icon} size={12} /> Add Set
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs px-2 text-white/70"
+                  disabled={!selectedId || !sets.some((s) => s.id === selectedId)}
+                  onClick={handleDuplicateSet}
+                >
+                  Duplicate Set
+                </Button>
+              </div>
+            )}
+            <div className="p-2 flex-1">
             {sets.map((set) => (
               <div
                 key={set.id}
@@ -262,6 +310,7 @@ export function SoundsPanel() {
                 {set.name}
               </div>
             ))}
+            </div>
             {sets.length === 0 && (
               <Empty>
                 <EmptyHeader>
@@ -288,7 +337,11 @@ export function SoundsPanel() {
                   >
                     {isImporting ? "Importing..." : "Add Sounds"}
                   </Button>
-                  <Button variant="outline" className="text-white/70">
+                  <Button
+                    variant="outline"
+                    className="text-white/70"
+                    onClick={() => setAddSetOpen(true)}
+                  >
                     Add Set
                   </Button>
                 </EmptyContent>
@@ -368,28 +421,68 @@ export function SoundsPanel() {
           </div>
         </div>
         <div
-          className={`${panelClass} w-1/2 border border-white overflow-y-auto p-2`}
-          onMouseEnter={() => setSoundsListHover(true)}
-          onMouseLeave={() => setSoundsListHover(false)}
+          className={`${panelClass} w-1/2 border border-white flex flex-col overflow-hidden`}
         >
-          {soundsForSelectedId.map((sound) => (
-            <Item
-              key={sound.id}
-              variant="muted"
-              className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
+          <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs px-2 text-white/70"
+              onClick={handleSelectAllNone}
             >
-              <ItemMedia>
-                <HugeiconsIcon icon={Music} size={14} />
-              </ItemMedia>
-              <ItemContent>
-                <ItemTitle>{sound.name}</ItemTitle>
-                <ItemDescription className="text-white/40">
-                  <TruncatedPath path={sound.filePath} />
-                </ItemDescription>
-              </ItemContent>
-              <ItemActions></ItemActions>
-            </Item>
-          ))}
+              {selectedSoundIds.size === soundsForSelectedId.length && soundsForSelectedId.length > 0
+                ? "Select None"
+                : "Select All"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs px-2 text-white/70"
+              disabled={selectedSoundIds.size === 0}
+              onClick={() => setAddToSetOpen(true)}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={12} /> Add to Set
+            </Button>
+          </div>
+          <div
+            className="overflow-y-auto p-2 flex-1"
+            onMouseEnter={() => setSoundsListHover(true)}
+            onMouseLeave={() => setSoundsListHover(false)}
+          >
+            {soundsForSelectedId.map((sound) => (
+              <Item
+                key={sound.id}
+                variant="muted"
+                className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
+              >
+                <ItemMedia>
+                  <input
+                    type="checkbox"
+                    checked={selectedSoundIds.has(sound.id)}
+                    onChange={() => {
+                      setSelectedSoundIds((prev) => {
+                        const next = new globalThis.Set(prev);
+                        if (next.has(sound.id)) next.delete(sound.id);
+                        else next.add(sound.id);
+                        return next;
+                      });
+                    }}
+                    className="accent-white cursor-pointer"
+                  />
+                </ItemMedia>
+                <ItemMedia>
+                  <HugeiconsIcon icon={Music} size={14} />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{sound.name}</ItemTitle>
+                  <ItemDescription className="text-white/40">
+                    <TruncatedPath path={sound.filePath} />
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions></ItemActions>
+              </Item>
+            ))}
+          </div>
         </div>
       </div>
       <img
@@ -405,6 +498,8 @@ export function SoundsPanel() {
         }}
         draggable={false}
       />
+      <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
+      <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={[...selectedSoundIds]} />
     </div>
   );
 }

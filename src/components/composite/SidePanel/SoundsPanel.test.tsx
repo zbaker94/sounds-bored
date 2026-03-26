@@ -7,6 +7,7 @@ import {
   createMockSound,
   createMockGlobalFolder,
   createMockAppSettings,
+  createMockSet,
 } from "@/test/factories";
 
 // Mock Tauri dialog (tauri-mocks.ts already mocks plugin-dialog globally,
@@ -45,6 +46,17 @@ vi.mock("@/lib/appSettings.queries", () => ({
   useSaveAppSettings: vi.fn(() => ({ mutateAsync: mockMutateAsync })),
 }));
 
+// Mock the dialog components to avoid DrawerDialog/useIsMd dependency
+vi.mock("./AddSetDialog", () => ({
+  AddSetDialog: ({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) =>
+    open ? <div data-testid="add-set-dialog">AddSetDialog open</div> : null,
+}));
+
+vi.mock("./AddToSetDialog", () => ({
+  AddToSetDialog: ({ open, onOpenChange, soundIds }: { open: boolean; onOpenChange: (o: boolean) => void; soundIds: string[] }) =>
+    open ? <div data-testid="add-to-set-dialog">AddToSetDialog open ({soundIds.length} sounds)</div> : null,
+}));
+
 // Pull in the mocked modules so tests can configure return values
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAppSettings } from "@/lib/appSettings.queries";
@@ -78,6 +90,7 @@ beforeEach(() => {
   mockOnFileDropEvent.mockClear();
   mockOnFileDropEvent.mockReturnValue(Promise.resolve(() => {}));
   vi.mocked(open).mockReset();
+  mockMutateAsync.mockClear();
 });
 
 // ---------- tests ----------
@@ -272,5 +285,238 @@ describe("SoundsPanel", () => {
       await fileDropCallback!({ payload: { type: "leave", paths: [] } });
     });
     expect(screen.queryByText(/drop audio files to import/i)).not.toBeInTheDocument();
+  });
+
+  // ---------- Sets UI tests ----------
+
+  // 8. "Add Set" button in empty sets panel opens AddSetDialog
+  it("opens AddSetDialog when 'Add Set' button is clicked in empty state", async () => {
+    renderPanel();
+
+    // Verify dialog is not open initially
+    expect(screen.queryByTestId("add-set-dialog")).not.toBeInTheDocument();
+
+    // Click "Add Set" in the empty state
+    const addSetBtn = screen.getByRole("button", { name: /add set/i });
+    await act(async () => {
+      fireEvent.click(addSetBtn);
+    });
+
+    expect(screen.getByTestId("add-set-dialog")).toBeInTheDocument();
+  });
+
+  // 9. Sets sticky toolbar renders when sets exist
+  it("renders sets sticky toolbar with Add Set and Duplicate Set buttons when sets exist", () => {
+    const set1 = createMockSet({ name: "Drums" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sets: [set1],
+    });
+
+    renderPanel();
+
+    // The sticky toolbar should have "Add Set" and "Duplicate Set" buttons
+    const addSetButtons = screen.getAllByRole("button", { name: /add set/i });
+    expect(addSetButtons.length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /duplicate set/i })).toBeInTheDocument();
+  });
+
+  // 10. "Duplicate Set" button disabled when no set is selected
+  it("disables Duplicate Set button when no set is selected in the left panel", () => {
+    const set1 = createMockSet({ name: "Drums" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sets: [set1],
+    });
+
+    // No folders => selectedId defaults to sets[0].id, so we need to make sure
+    // the selectedId doesn't match a set. With a folder present, selectedId will be folder id.
+    const folder = createMockGlobalFolder();
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [folder] },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    // The selectedId defaults to folder[0].id, not a set
+    const dupBtn = screen.getByRole("button", { name: /duplicate set/i });
+    expect(dupBtn).toBeDisabled();
+  });
+
+  // 11. "Duplicate Set" button enabled when a set is selected
+  it("enables Duplicate Set button when a set is selected in the left panel", async () => {
+    const set1 = createMockSet({ name: "Drums" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sets: [set1],
+    });
+
+    // No folders so selectedId defaults to sets[0].id — set is already selected
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    // selectedId defaults to the first set, so Duplicate Set should be enabled
+    const dupBtn = screen.getByRole("button", { name: /duplicate set/i });
+    expect(dupBtn).not.toBeDisabled();
+  });
+
+  // 12. Sound checkboxes render (one per sound)
+  it("renders a checkbox for each sound in the sounds panel", () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    const sound2 = createMockSound({ name: "Snare" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1, sound2],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes.length).toBe(2);
+  });
+
+  // 13. Checking a sound checkbox selects it
+  it("selects a sound when its checkbox is checked", async () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).not.toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(checkbox);
+    });
+
+    expect(checkbox).toBeChecked();
+  });
+
+  // 14. "Select All" selects all visible sounds
+  it("selects all sounds when Select All is clicked", async () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    const sound2 = createMockSound({ name: "Snare" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1, sound2],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    const selectAllBtn = screen.getByRole("button", { name: /select all/i });
+    await act(async () => {
+      fireEvent.click(selectAllBtn);
+    });
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes[0]).toBeChecked();
+    expect(checkboxes[1]).toBeChecked();
+  });
+
+  // 15. "Select None" deselects all sounds
+  it("deselects all sounds when Select None is clicked", async () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    const sound2 = createMockSound({ name: "Snare" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1, sound2],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    // First select all
+    const selectAllBtn = screen.getByRole("button", { name: /select all/i });
+    await act(async () => {
+      fireEvent.click(selectAllBtn);
+    });
+
+    // Button should now say "Select None"
+    const selectNoneBtn = screen.getByRole("button", { name: /select none/i });
+    await act(async () => {
+      fireEvent.click(selectNoneBtn);
+    });
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes[0]).not.toBeChecked();
+    expect(checkboxes[1]).not.toBeChecked();
+  });
+
+  // 16. "Add to Set" button disabled when no sounds selected
+  it("disables Add to Set button when no sounds are selected", () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    const addToSetBtn = screen.getByRole("button", { name: /add to set/i });
+    expect(addToSetBtn).toBeDisabled();
+  });
+
+  // 17. "Add to Set" button enabled after selecting a sound
+  it("enables Add to Set button after selecting a sound", async () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    const checkbox = screen.getByRole("checkbox");
+    await act(async () => {
+      fireEvent.click(checkbox);
+    });
+
+    const addToSetBtn = screen.getByRole("button", { name: /add to set/i });
+    expect(addToSetBtn).not.toBeDisabled();
   });
 });
