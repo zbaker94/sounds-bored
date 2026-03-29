@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
-import { createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
+import { createMockHistoryEntry, createMockProject, createMockScene, createMockSound } from "@/test/factories";
 import { PadConfigDrawer } from "./PadConfigDrawer";
 
 function renderDrawer(sceneId = "scene-1") {
@@ -56,10 +56,18 @@ describe("PadConfigDrawer", () => {
   });
 
   it("calls addPad with form data and closes overlay on valid submit", async () => {
+    const sound = createMockSound({ id: "sound-1", name: "Kick" });
+    useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
     renderDrawer("scene-1");
     openDrawer();
 
     await userEvent.type(screen.getByLabelText(/pad name/i), "Kick");
+
+    // Select the sound in the assigned selector
+    const checkbox = await screen.findByRole("checkbox", { name: /kick/i });
+    await userEvent.click(checkbox);
+
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
