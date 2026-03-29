@@ -19,11 +19,23 @@
     ],
     "security": {
       "csp": {
-        "img-src": ["'self'", "asset:", "https://asset.localhost"]
+        "img-src": ["'self'", "asset:", "https://asset.localhost"],
+        "media-src": ["'self'", "asset:", "https://asset.localhost"],
+        "connect-src": ["'self'", "asset:", "https://asset.localhost"]
       },
       "assetProtocol": {
         "enable": true,
-        "scope": ["$RESOURCE/**", "$APP/**/*"] 
+        "scope": [
+          "$RESOURCE/**",
+          "$APP/**/*",
+          "$MUSIC/**",
+          "$HOME/**",
+          "$DOCUMENT/**",
+          "$DOWNLOAD/**",
+          "$DESKTOP/**",
+          "$APPDATA/**",
+          "$APPLOCALDATA/**"
+        ]
       }
     }
   },

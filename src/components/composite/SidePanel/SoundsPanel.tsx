@@ -26,6 +26,8 @@ import {
   Add01Icon,
   CloudUploadIcon,
   Playlist01Icon,
+  PlayIcon,
+  StopIcon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder } from "@/lib/schemas";
 import { AddSetDialog } from "./AddSetDialog";
@@ -42,8 +44,13 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Checkbox } from "@/components/ui/checkbox";
-
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TruncatedPath } from "@/components/ui/truncated-path";
+import { useSoundPreview } from "@/hooks/useSoundPreview";
 import guyWithTorch from "@/assets/guywithtorch.gif";
 
 const panelClass =
@@ -82,9 +89,11 @@ export function SoundsPanel() {
   const [addSetOpen, setAddSetOpen] = useState(false);
   const [addToSetOpen, setAddToSetOpen] = useState(false);
   const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
+  const { previewingId, togglePreview, stopPreview } = useSoundPreview();
 
   useEffect(() => {
     setSelectedSoundIds(new globalThis.Set());
+    stopPreview();
   }, [selectedId]);
 
   const handleSelect = (id: string) => {
@@ -497,7 +506,41 @@ export function SoundsPanel() {
                     <TruncatedPath path={sound.filePath} />
                   </ItemDescription>
                 </ItemContent>
-                <ItemActions></ItemActions>
+                <ItemActions>
+                  {sound.filePath ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-white/50 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePreview(sound);
+                      }}
+                    >
+                      <HugeiconsIcon
+                        icon={previewingId === sound.id ? StopIcon : PlayIcon}
+                        size={14}
+                      />
+                    </Button>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            disabled
+                            className="text-white/20"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <HugeiconsIcon icon={PlayIcon} size={14} />
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>File not found</TooltipContent>
+                    </Tooltip>
+                  )}
+                </ItemActions>
               </Item>
             ))}
           </div>
