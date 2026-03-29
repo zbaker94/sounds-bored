@@ -3,7 +3,18 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxCollection,
+  ComboboxEmpty,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 
 interface AddToSetDialogProps {
   open: boolean;
@@ -13,30 +24,19 @@ interface AddToSetDialogProps {
 
 export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogProps) {
   const sets = useLibraryStore((s) => s.sets);
-  const [checkedSetIds, setCheckedSetIds] = useState<globalThis.Set<string>>(new globalThis.Set());
+  const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const anchorRef = useComboboxAnchor();
 
   useEffect(() => {
     if (open) {
-      setCheckedSetIds(new globalThis.Set());
+      setSelectedSetIds([]);
     }
   }, [open]);
 
-  function toggleSet(setId: string) {
-    setCheckedSetIds((prev) => {
-      const next = new globalThis.Set(prev);
-      if (next.has(setId)) {
-        next.delete(setId);
-      } else {
-        next.add(setId);
-      }
-      return next;
-    });
-  }
-
   async function handleConfirm() {
     const { addSoundsToSet } = useLibraryStore.getState();
-    for (const setId of checkedSetIds) {
+    for (const setId of selectedSetIds) {
       addSoundsToSet(soundIds, setId);
     }
     const { sounds, tags, sets: currentSets } = useLibraryStore.getState();
@@ -51,22 +51,41 @@ export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogP
       title="Add to Set"
       description={`Add ${soundIds.length} sound(s) to one or more sets.`}
       content={
-        <div className="flex flex-col gap-1 p-4">
-          {sets.length === 0 && (
-            <p className="text-sm text-white/50">No sets yet. Create a set first.</p>
-          )}
-          {sets.map((s) => (
-            <label
-              key={s.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/10 cursor-pointer text-sm text-white/80"
+        <div className="p-4">
+          {sets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sets yet. Create a set first.</p>
+          ) : (
+            <Combobox
+              value={selectedSetIds}
+              onValueChange={setSelectedSetIds}
+              items={sets}
+              multiple
             >
-              <Checkbox
-                checked={checkedSetIds.has(s.id)}
-                onCheckedChange={() => toggleSet(s.id)}
-              />
-              {s.name}
-            </label>
-          ))}
+              <ComboboxChips ref={anchorRef}>
+                {selectedSetIds.map((id) => {
+                  const set = sets.find((s) => s.id === id);
+                  return set ? (
+                    <ComboboxChip key={id}>
+                      {set.name}
+                    </ComboboxChip>
+                  ) : null;
+                })}
+                <ComboboxChipsInput placeholder="Select sets..." />
+              </ComboboxChips>
+              <ComboboxContent anchor={anchorRef}>
+                <ComboboxList>
+                  <ComboboxEmpty>No sets found.</ComboboxEmpty>
+                  <ComboboxCollection>
+                    {(s) => (
+                      <ComboboxItem key={s.id} value={s.id}>
+                        {s.name}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxCollection>
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          )}
         </div>
       }
       footer={
@@ -74,7 +93,7 @@ export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogP
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={checkedSetIds.size === 0} onClick={handleConfirm}>
+          <Button disabled={selectedSetIds.length === 0} onClick={handleConfirm}>
             Confirm
           </Button>
         </div>

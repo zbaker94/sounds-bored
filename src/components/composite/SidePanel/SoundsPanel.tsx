@@ -465,6 +465,14 @@ export function SoundsPanel() {
                 key={sound.id}
                 variant="muted"
                 className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
+                onClick={() => {
+                  setSelectedSoundIds((prev) => {
+                    const next = new globalThis.Set(prev);
+                    if (next.has(sound.id)) next.delete(sound.id);
+                    else next.add(sound.id);
+                    return next;
+                  });
+                }}
               >
                 <ItemMedia>
                   <Checkbox
@@ -477,6 +485,7 @@ export function SoundsPanel() {
                         return next;
                       });
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </ItemMedia>
                 <ItemMedia>
