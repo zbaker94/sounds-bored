@@ -259,7 +259,10 @@ describe("ProjectSchema — domain model fields", () => {
   });
 
   it("should accept LayerSelectionSchema with assigned type", () => {
-    const result = LayerSelectionSchema.safeParse({ type: "assigned", instances: [] });
+    const result = LayerSelectionSchema.safeParse({
+      type: "assigned",
+      instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }],
+    });
     expect(result.success).toBe(true);
   });
 
@@ -490,7 +493,7 @@ describe("GlobalLibrarySchema", () => {
 describe("LayerConfigFormSchema", () => {
   it("accepts a valid assigned selection", () => {
     const result = LayerConfigFormSchema.safeParse({
-      selection: { type: "assigned", instances: [] },
+      selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",
       retriggerMode: "restart",
@@ -523,7 +526,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("rejects volume below 0", () => {
     const result = LayerConfigFormSchema.safeParse({
-      selection: { type: "assigned", instances: [] },
+      selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",
       retriggerMode: "restart",
@@ -534,7 +537,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("rejects volume above 100", () => {
     const result = LayerConfigFormSchema.safeParse({
-      selection: { type: "assigned", instances: [] },
+      selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",
       retriggerMode: "restart",
@@ -546,7 +549,10 @@ describe("LayerConfigFormSchema", () => {
 
 describe("PadConfigSchema", () => {
   const validLayer = {
-    selection: { type: "assigned", instances: [] },
+    selection: {
+      type: "assigned",
+      instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }],
+    },
     arrangement: "simultaneous",
     playbackMode: "one-shot",
     retriggerMode: "restart",
