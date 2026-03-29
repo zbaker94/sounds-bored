@@ -25,6 +25,7 @@ import {
   Music,
   Add01Icon,
   CloudUploadIcon,
+  Playlist01Icon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder } from "@/lib/schemas";
 import { AddSetDialog } from "./AddSetDialog";
@@ -40,6 +41,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { TruncatedPath } from "@/components/ui/truncated-path";
 import guyWithTorch from "@/assets/guywithtorch.gif";
@@ -280,17 +282,17 @@ export function SoundsPanel() {
             {sets.length > 0 && (
               <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  className="h-7 text-xs px-2 text-white/70"
+                  className="h-7 text-xs px-2"
                   onClick={() => setAddSetOpen(true)}
                 >
                   <HugeiconsIcon icon={Add01Icon} size={12} /> Add Set
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  className="h-7 text-xs px-2 text-white/70"
+                  className="h-7 text-xs px-2"
                   disabled={!selectedId || !sets.some((s) => s.id === selectedId)}
                   onClick={handleDuplicateSet}
                 >
@@ -300,15 +302,24 @@ export function SoundsPanel() {
             )}
             <div className="p-2 flex-1">
             {sets.map((set) => (
-              <div
+              <Item
                 key={set.id}
-                className={`px-3 py-2 text-white text-sm ${
+                variant="outline"
+                className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
                   selectedId === set.id ? "bg-white/20" : ""
                 }`}
                 onClick={() => handleSelect(set.id)}
               >
-                {set.name}
-              </div>
+                <ItemMedia>
+                  <HugeiconsIcon icon={Playlist01Icon} size={14} />
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{set.name}</ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <HugeiconsIcon icon={ChevronRight} className="size-4" />
+                </ItemActions>
+              </Item>
             ))}
             </div>
             {sets.length === 0 && (
@@ -425,9 +436,9 @@ export function SoundsPanel() {
         >
           <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="h-7 text-xs px-2 text-white/70"
+              className="h-7 text-xs px-2"
               onClick={handleSelectAllNone}
             >
               {selectedSoundIds.size === soundsForSelectedId.length && soundsForSelectedId.length > 0
@@ -435,9 +446,9 @@ export function SoundsPanel() {
                 : "Select All"}
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="h-7 text-xs px-2 text-white/70"
+              className="h-7 text-xs px-2"
               disabled={selectedSoundIds.size === 0}
               onClick={() => setAddToSetOpen(true)}
             >
@@ -456,10 +467,9 @@ export function SoundsPanel() {
                 className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
               >
                 <ItemMedia>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedSoundIds.has(sound.id)}
-                    onChange={() => {
+                    onCheckedChange={() => {
                       setSelectedSoundIds((prev) => {
                         const next = new globalThis.Set(prev);
                         if (next.has(sound.id)) next.delete(sound.id);
@@ -467,7 +477,6 @@ export function SoundsPanel() {
                         return next;
                       });
                     }}
-                    className="accent-white cursor-pointer"
                   />
                 </ItemMedia>
                 <ItemMedia>
@@ -490,7 +499,7 @@ export function SoundsPanel() {
         alt="Guy with torch"
         style={{
           position: "absolute",
-          bottom: -12,
+          bottom: 0,
           right: -20,
           opacity: soundsListHover ? 0.5 : 1,
           pointerEvents: "none",

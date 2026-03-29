@@ -3,6 +3,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface AddToSetDialogProps {
   open: boolean;
@@ -59,11 +60,9 @@ export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogP
               key={s.id}
               className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/10 cursor-pointer text-sm text-white/80"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={checkedSetIds.has(s.id)}
-                onChange={() => toggleSet(s.id)}
-                className="accent-white cursor-pointer"
+                onCheckedChange={() => toggleSet(s.id)}
               />
               {s.name}
             </label>

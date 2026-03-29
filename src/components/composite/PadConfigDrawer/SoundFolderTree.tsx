@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import {
@@ -10,6 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { buildTree, getSoundsInSubtree, type TreeNode } from "./soundTreeUtils";
 import type { Sound } from "@/lib/schemas";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface SoundFolderTreeProps {
   sounds: Sound[];
@@ -29,12 +30,7 @@ function SoundNodeRow({
 }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer text-sm">
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={onToggle}
-        className="accent-primary"
-      />
+      <Checkbox checked={selected} onCheckedChange={onToggle} />
       {sound.name}
     </label>
   );
@@ -52,29 +48,19 @@ function FolderNodeRow({
   onToggleFolder: (folderId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const checkboxRef = useRef<HTMLInputElement>(null);
 
   const subtreeSounds = useMemo(() => getSoundsInSubtree(node), [node]);
   const selectedCount = subtreeSounds.filter((s) => selectedIds.has(s.id)).length;
   const isChecked = subtreeSounds.length > 0 && selectedCount === subtreeSounds.length;
   const isIndeterminate = selectedCount > 0 && selectedCount < subtreeSounds.length;
 
-  useEffect(() => {
-    if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = isIndeterminate;
-    }
-  }, [isIndeterminate]);
-
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="flex items-center gap-2">
-        <input
-          ref={checkboxRef}
-          type="checkbox"
-          checked={isChecked}
-          onChange={() => onToggleFolder(node.folder.id)}
+        <Checkbox
+          checked={isIndeterminate ? "indeterminate" : isChecked}
+          onCheckedChange={() => onToggleFolder(node.folder.id)}
           aria-label={`Toggle all sounds in ${node.folder.name}`}
-          className="accent-primary"
         />
         <CollapsibleTrigger className="flex items-center gap-1 text-sm font-medium hover:text-foreground/80">
           <HugeiconsIcon

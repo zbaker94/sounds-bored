@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SoundFolderTree } from "./SoundFolderTree";
 import { buildTree, findFolderNode, getSoundsInSubtree } from "./soundTreeUtils";
 
@@ -134,11 +135,9 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
                   key={sound.id}
                   className="flex items-center gap-2 cursor-pointer text-sm"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedIds.has(sound.id)}
-                    onChange={() => toggleSound(sound.id)}
-                    className="accent-primary"
+                    onCheckedChange={() => toggleSound(sound.id)}
                   />
                   {sound.name}
                 </label>
