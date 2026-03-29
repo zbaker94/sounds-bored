@@ -37,7 +37,7 @@ export function LayerConfigSection() {
   const selectionErrors = errors.layer?.selection as Record<string, { message?: string }> | undefined;
 
   function handleSelectionTypeChange(type: LayerSelection["type"]) {
-    setValue("layer.selection", SELECTION_TYPE_DEFAULTS[type], { shouldValidate: true });
+    setValue("layer.selection", SELECTION_TYPE_DEFAULTS[type]);
   }
 
   return (
