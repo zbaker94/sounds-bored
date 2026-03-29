@@ -1,4 +1,4 @@
-import { ensureResumed } from "./audioContext";
+import { ensureResumed, getMasterGain } from "./audioContext";
 import { loadBuffer } from "./bufferCache";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -53,7 +53,7 @@ export async function triggerPad(pad: Pad): Promise<void> {
         const buffer = await loadBuffer(sound);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
-        source.connect(ctx.destination);
+        source.connect(getMasterGain());
         source.onended = () => store.clearVoice(pad.id, source);
         source.start();
         store.recordVoice(pad.id, source);

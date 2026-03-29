@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HeadphonesIcon, HeadphoneMuteIcon } from "@hugeicons/core-free-icons";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -19,9 +19,15 @@ export function VolumeSection() {
 
   const masterVolume = usePlaybackStore((s) => s.masterVolume);
   const setMasterVolume = usePlaybackStore((s) => s.setMasterVolume);
+  const preMuteVolume = useRef<number>(100);
 
   const handleMuteToggle = useCallback(() => {
-    setMasterVolume(masterVolume > 0 ? 0 : 50);
+    if (masterVolume > 0) {
+      preMuteVolume.current = masterVolume;
+      setMasterVolume(0);
+    } else {
+      setMasterVolume(preMuteVolume.current <= 10 ? 100 : preMuteVolume.current);
+    }
   }, [masterVolume, setMasterVolume]);
 
   return (

@@ -1,5 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { getAudioContext, ensureResumed } from "./audioContext";
+import { getAudioContext, ensureResumed, getMasterGain } from "./audioContext";
 
 let currentSource: AudioBufferSourceNode | null = null;
 
@@ -27,7 +27,7 @@ export async function playPreview(filePath: string, onEnded?: () => void): Promi
 
   const source = ctx.createBufferSource();
   source.buffer = audioBuffer;
-  source.connect(ctx.destination);
+  source.connect(getMasterGain());
   source.onended = () => {
     if (currentSource === source) {
       currentSource = null;
