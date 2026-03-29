@@ -28,6 +28,7 @@ function Wrapper({ onSubmit = () => {} }: { onSubmit?: (data: PadConfigForm) => 
     <FormProvider {...methods}>
       <form onSubmit={methods.handleSubmit(onSubmit)}>
         <LayerConfigSection />
+        <button type="submit">Submit</button>
       </form>
     </FormProvider>
   );
@@ -77,5 +78,49 @@ describe("LayerConfigSection", () => {
     render(<Wrapper />);
     await userEvent.click(screen.getByRole("tab", { name: /set/i }));
     expect(screen.getByText(/select set/i)).toBeInTheDocument();
+  });
+
+  it("shows error when assigned with no sounds selected and form is submitted", async () => {
+    useLibraryStore.setState({
+      sounds: [{ id: "s1", name: "Kick", tags: [], sets: [] }],
+      tags: [],
+      sets: [],
+      isDirty: false,
+    });
+    render(<Wrapper />);
+
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    expect(await screen.findByText(/at least one sound is required/i)).toBeInTheDocument();
+  });
+
+  it("shows error when tag type has no tag selected and form is submitted", async () => {
+    useLibraryStore.setState({
+      sounds: [],
+      tags: [{ id: "t1", name: "Percussion", color: "#ffffff" }],
+      sets: [],
+      isDirty: false,
+    });
+    render(<Wrapper />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /tag/i }));
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    expect(await screen.findByText(/a tag must be selected/i)).toBeInTheDocument();
+  });
+
+  it("shows error when set type has no set selected and form is submitted", async () => {
+    useLibraryStore.setState({
+      sounds: [],
+      tags: [],
+      sets: [{ id: "s1", name: "My Drums" }],
+      isDirty: false,
+    });
+    render(<Wrapper />);
+
+    await userEvent.click(screen.getByRole("tab", { name: /set/i }));
+    await userEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    expect(await screen.findByText(/a set must be selected/i)).toBeInTheDocument();
   });
 });

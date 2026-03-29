@@ -31,8 +31,10 @@ const RETRIGGER_MODE_OPTIONS = [
 ] as const;
 
 export function LayerConfigSection() {
-  const { control, watch, setValue } = useFormContext<PadConfigForm>();
+  const { control, watch, setValue, formState: { errors } } = useFormContext<PadConfigForm>();
   const selectionType = watch("layer.selection.type");
+  // Cast needed: TypeScript can't narrow discriminated union error shapes
+  const selectionErrors = errors.layer?.selection as Record<string, { message?: string }> | undefined;
 
   function handleSelectionTypeChange(type: LayerSelection["type"]) {
     setValue("layer.selection", SELECTION_TYPE_DEFAULTS[type], { shouldValidate: true });
@@ -60,6 +62,16 @@ export function LayerConfigSection() {
             <SoundSelector value={field.value} onChange={field.onChange} />
           )}
         />
+
+        {selectionType === "assigned" && selectionErrors?.instances?.message && (
+          <p className="text-sm text-destructive">{selectionErrors.instances.message}</p>
+        )}
+        {selectionType === "tag" && selectionErrors?.tagId?.message && (
+          <p className="text-sm text-destructive">{selectionErrors.tagId.message}</p>
+        )}
+        {selectionType === "set" && selectionErrors?.setId?.message && (
+          <p className="text-sm text-destructive">{selectionErrors.setId.message}</p>
+        )}
       </div>
 
       {/* Arrangement */}

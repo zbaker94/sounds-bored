@@ -79,16 +79,16 @@ export type SoundInstance = z.infer<typeof SoundInstanceSchema>;
 export const LayerSelectionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("assigned"),
-    instances: z.array(SoundInstanceSchema),
+    instances: z.array(SoundInstanceSchema).min(1, "At least one sound is required"),
   }),
   z.object({
     type: z.literal("tag"),
-    tagId: z.string(),
+    tagId: z.string().min(1, "A tag must be selected"),
     defaultVolume: z.number(),
   }),
   z.object({
     type: z.literal("set"),
-    setId: z.string(),
+    setId: z.string().min(1, "A set must be selected"),
     defaultVolume: z.number(),
   }),
 ]);
