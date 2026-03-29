@@ -75,8 +75,30 @@ export const SoundInstanceSchema = z.object({
 export type SoundInstance = z.infer<typeof SoundInstanceSchema>;
 
 // ─── Layer Selection ─────────────────────────────────────────────────────────
+// Permissive schema for persistence/loading — allows empty selections.
+// See LayerSelectionFormSchema below for the stricter form-validation variant.
 
 export const LayerSelectionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("assigned"),
+    instances: z.array(SoundInstanceSchema),
+  }),
+  z.object({
+    type: z.literal("tag"),
+    tagId: z.string(),
+    defaultVolume: z.number(),
+  }),
+  z.object({
+    type: z.literal("set"),
+    setId: z.string(),
+    defaultVolume: z.number(),
+  }),
+]);
+
+export type LayerSelection = z.infer<typeof LayerSelectionSchema>;
+
+// Strict variant used only in form schemas — rejects empty selections.
+export const LayerSelectionFormSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("assigned"),
     instances: z.array(SoundInstanceSchema).min(1, "At least one sound is required"),
@@ -92,8 +114,6 @@ export const LayerSelectionSchema = z.discriminatedUnion("type", [
     defaultVolume: z.number(),
   }),
 ]);
-
-export type LayerSelection = z.infer<typeof LayerSelectionSchema>;
 
 // ─── Layer ────────────────────────────────────────────────────────────────────
 
@@ -114,7 +134,7 @@ export type Layer = z.infer<typeof LayerSchema>;
 // omits Layer.id — the store action generates it via crypto.randomUUID().
 
 export const LayerConfigFormSchema = z.object({
-  selection: LayerSelectionSchema,
+  selection: LayerSelectionFormSchema,
   arrangement: ArrangementSchema,
   playbackMode: PlaybackModeSchema,
   retriggerMode: RetriggerModeSchema,
