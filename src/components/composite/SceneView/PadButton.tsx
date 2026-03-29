@@ -1,5 +1,7 @@
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
+import { triggerPad } from "@/lib/audio/padPlayer";
+import { usePlaybackStore } from "@/state/playbackStore";
 
 interface PadButtonProps {
   pad: Pad;
@@ -7,11 +9,19 @@ interface PadButtonProps {
 }
 
 export function PadButton({ pad, onClick }: PadButtonProps) {
+  const isPlaying = usePlaybackStore((s) => s.playingPadIds.includes(pad.id));
+
+  async function handleClick() {
+    onClick?.();
+    await triggerPad(pad);
+  }
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
-        "w-full h-full rounded-xl border-2 border-black/20",
+        "w-full h-full rounded-xl border-2",
+        isPlaying ? "border-white/70" : "border-black/20",
         "flex items-center justify-center p-2",
         "bg-card text-card-foreground",
         "shadow-[3px_3px_0px_rgba(0,0,0,0.25)]",

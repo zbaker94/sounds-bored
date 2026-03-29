@@ -1,14 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getAudioContext, ensureResumed } from "./audioContext";
 
-let audioContext: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
-
-function getAudioContext(): AudioContext {
-  if (!audioContext) {
-    audioContext = new AudioContext();
-  }
-  return audioContext;
-}
 
 export function stopPreview(): void {
   if (currentSource) {
@@ -24,10 +17,8 @@ export function stopPreview(): void {
 export async function playPreview(filePath: string, onEnded?: () => void): Promise<void> {
   stopPreview();
 
+  await ensureResumed();
   const ctx = getAudioContext();
-  if (ctx.state === "suspended") {
-    await ctx.resume();
-  }
 
   const url = convertFileSrc(filePath);
   const response = await fetch(url);
