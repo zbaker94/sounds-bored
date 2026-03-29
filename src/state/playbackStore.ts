@@ -11,6 +11,10 @@ interface PlaybackState {
   // Which pad IDs currently have active voices (for UI feedback)
   playingPadIds: string[];
 
+  // Per-pad runtime volume (0–1), mirrored from padGainMap for React reactivity
+  padVolumes: Record<string, number>;
+  updatePadVolume: (padId: string, volume: number) => void;
+
   isPadActive: (padId: string) => boolean;
   recordVoice: (padId: string, source: AudioBufferSourceNode) => void;
   clearVoice: (padId: string, source: AudioBufferSourceNode) => void;
@@ -23,6 +27,10 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
   setMasterVolume: (volume) => set({ masterVolume: volume }),
 
   playingPadIds: [],
+  padVolumes: {},
+
+  updatePadVolume: (padId, volume) =>
+    set((s) => ({ padVolumes: { ...s.padVolumes, [padId]: volume } })),
 
   isPadActive: (padId) => (voiceMap.get(padId)?.length ?? 0) > 0,
 

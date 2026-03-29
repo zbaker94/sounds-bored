@@ -1,8 +1,48 @@
-import { ensureResumed, getMasterGain } from "./audioContext";
+import { ensureResumed, getAudioContext, getMasterGain } from "./audioContext";
 import { loadBuffer } from "./bufferCache";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Layer, Pad, Sound } from "@/lib/schemas";
+
+// Per-pad GainNodes: source(s) → padGain → masterGain → destination
+// Kept module-level like voiceMap — GainNodes are non-serializable.
+const padGainMap = new Map<string, GainNode>();
+
+export function getPadGain(padId: string): GainNode {
+  const existing = padGainMap.get(padId);
+  if (existing) return existing;
+  const ctx = getAudioContext();
+  const gain = ctx.createGain();
+  gain.gain.value = 1.0;
+  gain.connect(getMasterGain());
+  padGainMap.set(padId, gain);
+  return gain;
+}
+
+export function setPadVolume(padId: string, volume: number): void {
+  const ctx = getAudioContext();
+  const gain = getPadGain(padId);
+  const clamped = Math.max(0, Math.min(1, volume));
+  // Ramp over one frame to prevent audio clicks
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
+  usePlaybackStore.getState().updatePadVolume(padId, clamped);
+}
+
+export function resetPadGain(padId: string): void {
+  const gain = padGainMap.get(padId);
+  if (gain) {
+    const ctx = getAudioContext();
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(1.0, ctx.currentTime);
+  }
+  usePlaybackStore.getState().updatePadVolume(padId, 1.0);
+}
+
+export function clearAllPadGains(): void {
+  padGainMap.clear();
+}
 
 function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
   const sel = layer.selection;
@@ -18,45 +58,50 @@ function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
   }
 }
 
-export async function triggerPad(pad: Pad): Promise<void> {
+// startVolume: 0–1, sets the pad's gain before voices start.
+// Pass 0 for drag-up gestures (silent start), defaults to 1.
+export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   const { sounds } = useLibraryStore.getState();
-  const store = usePlaybackStore.getState();
+
+  // Set pad volume before any voices connect
+  const ctx = await ensureResumed();
+  const padGain = getPadGain(pad.id);
+  padGain.gain.cancelScheduledValues(ctx.currentTime);
+  padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
+  usePlaybackStore.getState().updatePadVolume(pad.id, startVolume);
 
   for (const layer of pad.layers) {
     const resolved = resolveSounds(layer, sounds);
     if (resolved.length === 0) continue;
 
+    const store = usePlaybackStore.getState();
     const isActive = store.isPadActive(pad.id);
 
-    // Apply retrigger logic
     switch (layer.retriggerMode) {
       case "stop":
         if (isActive) {
           store.stopPad(pad.id);
+          resetPadGain(pad.id);
           return;
         }
         break;
       case "continue":
-        // Start new voices on top of existing — no stop needed
         break;
       case "restart":
-      case "next": // Step 2 will implement proper "next" with sequential index
+      case "next": // Step 2: proper "next" with sequential index
         store.stopPad(pad.id);
         break;
     }
-
-    // Arrangement: simultaneous (Step 2 adds sequential + shuffled)
-    const ctx = await ensureResumed();
 
     for (const sound of resolved) {
       try {
         const buffer = await loadBuffer(sound);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
-        source.connect(getMasterGain());
-        source.onended = () => store.clearVoice(pad.id, source);
+        source.connect(padGain);
+        source.onended = () => usePlaybackStore.getState().clearVoice(pad.id, source);
         source.start();
-        store.recordVoice(pad.id, source);
+        usePlaybackStore.getState().recordVoice(pad.id, source);
       } catch (err) {
         console.error(`[padPlayer] Failed to play "${sound.name}":`, err);
       }
