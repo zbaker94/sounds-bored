@@ -8,6 +8,16 @@ import type { Layer, Pad, Sound } from "@/lib/schemas";
 // Kept module-level like voiceMap — GainNodes are non-serializable.
 const padGainMap = new Map<string, GainNode>();
 
+// Tracks the longest-duration voice per pad for playback progress display.
+const padProgressInfo = new Map<string, { startedAt: number; duration: number }>();
+
+export function getPadProgress(padId: string): number | null {
+  const info = padProgressInfo.get(padId);
+  if (!info) return null;
+  const elapsed = getAudioContext().currentTime - info.startedAt;
+  return Math.min(1, Math.max(0, elapsed / info.duration));
+}
+
 export function getPadGain(padId: string): GainNode {
   const existing = padGainMap.get(padId);
   if (existing) return existing;
@@ -66,6 +76,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   // Set pad volume before any voices connect
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
+  padProgressInfo.delete(pad.id);
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   usePlaybackStore.getState().updatePadVolume(pad.id, startVolume);
@@ -102,6 +113,12 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
         source.onended = () => usePlaybackStore.getState().clearVoice(pad.id, source);
         source.start();
         usePlaybackStore.getState().recordVoice(pad.id, source);
+
+        // Track the longest voice for progress display
+        const existing = padProgressInfo.get(pad.id);
+        if (!existing || buffer.duration > existing.duration) {
+          padProgressInfo.set(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration });
+        }
       } catch (err) {
         console.error(`[padPlayer] Failed to play "${sound.name}":`, err);
       }

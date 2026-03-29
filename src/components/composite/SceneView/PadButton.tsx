@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from "react";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
+import { getPadProgress } from "@/lib/audio/padPlayer";
 
 interface PadButtonProps {
   pad: Pad;
@@ -11,6 +13,25 @@ interface PadButtonProps {
 export function PadButton({ pad, onClick }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.includes(pad.id));
   const { gestureHandlers, fillVolume } = usePadGesture(pad);
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isPlaying) {
+      const animate = () => {
+        const p = getPadProgress(pad.id);
+        if (p !== null) setProgress(p);
+        rafRef.current = requestAnimationFrame(animate);
+      };
+      rafRef.current = requestAnimationFrame(animate);
+    } else {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      setProgress(0);
+    }
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isPlaying, pad.id]);
 
   return (
     <button
@@ -29,6 +50,13 @@ export function PadButton({ pad, onClick }: PadButtonProps) {
       )}
       style={pad.color ? { backgroundColor: pad.color } : undefined}
     >
+      {/* Playback position — left-to-right fill, always visible while playing */}
+      {isPlaying && (
+        <div
+          className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
+          style={{ width: `${progress * 100}%` }}
+        />
+      )}
       {/* Volume fill — visible during hold/drag only */}
       {fillVolume !== null && (
         <div
