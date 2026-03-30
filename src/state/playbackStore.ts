@@ -22,7 +22,7 @@ interface PlaybackState {
   stopAll: () => void;
 }
 
-export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
+export const usePlaybackStore = create<PlaybackState>()((set) => ({
   masterVolume: 100,
   setMasterVolume: (volume) => set({ masterVolume: volume }),
 

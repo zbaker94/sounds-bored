@@ -3,7 +3,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject } from "@/lib/project.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { AUTOSAVE_INTERVAL } from "@/lib/constants";
+import { AUTOSAVE_INTERVAL, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 
 /**
  * Hook to periodically save the current project.
@@ -62,7 +62,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       if (libraryJson === lastLibrarySaveRef.current) return;
 
       saveLibraryMutation.mutate(
-        { sounds, tags, sets },
+        { version: CURRENT_LIBRARY_VERSION, sounds, tags, sets },
         { onSuccess: () => { lastLibrarySaveRef.current = libraryJson; } },
       );
     };

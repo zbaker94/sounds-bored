@@ -95,7 +95,7 @@ export function usePadGesture(pad: Pad) {
     }
   }
 
-  function onPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+  function onPointerUp(_e: React.PointerEvent<HTMLButtonElement>) {
     clearHoldTimer();
     const s = state.current;
 

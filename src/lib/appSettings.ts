@@ -10,7 +10,6 @@ export async function getSettingsFilePath(): Promise<string> {
 
 async function createDefaultAppSettings(): Promise<AppSettings> {
   const music = await audioDir();
-  const rootPath = await join(music, "SoundsBored");
   const downloadsPath = await join(music, "SoundsBored", "downloads");
   const importedPath = await join(music, "SoundsBored", "imported");
 
