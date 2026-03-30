@@ -1,8 +1,9 @@
 import { useProjectStore } from "@/state/projectStore";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Add02Icon } from "@hugeicons/core-free-icons";
+import { SceneTab } from "./SceneTab";
 import type { Scene } from "@/lib/schemas";
 import {
   Tooltip,
@@ -33,9 +34,7 @@ export function SceneTabBar() {
           <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
             <TabsList variant="line">
               {scenes.map((scene) => (
-                <TabsTrigger key={scene.id} value={scene.id}>
-                  {scene.name}
-                </TabsTrigger>
+                <SceneTab key={scene.id} scene={scene} />
               ))}
             </TabsList>
           </Tabs>

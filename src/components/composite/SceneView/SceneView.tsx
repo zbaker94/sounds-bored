@@ -4,9 +4,24 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Kbd } from "@/components/ui/kbd";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add02Icon, ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import {
+  Add02Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  LayersLogoIcon,
+} from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
+import { modKey } from "@/lib/utils";
 
 const PADS_PER_PAGE = 12;
 
@@ -16,9 +31,11 @@ export function SceneView() {
   const openOverlay = useUiStore((s) => s.openOverlay);
   const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
 
+  const addScene = useProjectStore((s) => s.addScene);
+
   const activeScene = useMemo(
     () => project?.scenes.find((s) => s.id === activeSceneId) ?? null,
-    [project, activeSceneId]
+    [project, activeSceneId],
   );
 
   const page = activeScene ? (pageByScene[activeScene.id] ?? 0) : 0;
@@ -37,11 +54,47 @@ export function SceneView() {
   const isLastPage = safePage === totalPages - 1;
 
   // Hooks must be called unconditionally — before any early returns.
-  useHotkeys("shift+left", () => { if (safePage > 0) setPage((p) => p - 1); else setPage(() => totalPages - 1); }, { preventDefault: true });
-  useHotkeys("shift+right", () => { if (!isLastPage) setPage((p) => p + 1); else setPage(() => 0); }, { preventDefault: true });
+  useHotkeys(
+    "shift+left",
+    () => {
+      if (safePage > 0) setPage((p) => p - 1);
+      else setPage(() => totalPages - 1);
+    },
+    { preventDefault: true },
+  );
+  useHotkeys(
+    "shift+right",
+    () => {
+      if (!isLastPage) setPage((p) => p + 1);
+      else setPage(() => 0);
+    },
+    { preventDefault: true },
+  );
 
   if (!activeScene) {
-    return <div className="flex-1" />;
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <Empty className="flex-1 max-w-md max-h-60 border-none corrugated-background shadowed rounded-xl ">
+          <EmptyHeader className="text-white">
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={LayersLogoIcon} />
+            </EmptyMedia>
+            <EmptyTitle>No scenes yet</EmptyTitle>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button
+              onClick={() => addScene()}
+              className="gap-2 "
+              variant="secondary"
+            >
+              <HugeiconsIcon icon={Add02Icon} size={16} />
+              Add Scene
+              <Kbd className="ml-1">{modKey} + N</Kbd>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
   }
 
   if (pads.length === 0) {
@@ -52,14 +105,21 @@ export function SceneView() {
           className="aspect-square w-40 rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]"
           aria-label="Add pad"
         >
-          <HugeiconsIcon icon={Add02Icon} size={48} className="text-foreground/60" />
+          <HugeiconsIcon
+            icon={Add02Icon}
+            size={48}
+            className="text-foreground/60"
+          />
         </button>
         <PadConfigDrawer sceneId={activeScene.id} />
       </div>
     );
   }
 
-  const pagePads = pads.slice(safePage * PADS_PER_PAGE, (safePage + 1) * PADS_PER_PAGE);
+  const pagePads = pads.slice(
+    safePage * PADS_PER_PAGE,
+    (safePage + 1) * PADS_PER_PAGE,
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
@@ -73,7 +133,11 @@ export function SceneView() {
             className="w-full h-full rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]"
             aria-label="Add pad"
           >
-            <HugeiconsIcon icon={Add02Icon} size={32} className="text-foreground/60" />
+            <HugeiconsIcon
+              icon={Add02Icon}
+              size={32}
+              className="text-foreground/60"
+            />
           </button>
         )}
       </div>

@@ -106,4 +106,97 @@ describe("SceneTabBar", () => {
 
     expect(useProjectStore.getState().activeSceneId).toBe("s2");
   });
+
+  describe("inline scene rename", () => {
+    function loadSingleScene() {
+      loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
+    }
+
+    it("should have edit icon with opacity-0 by default", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      const editButton = screen.getByRole("button", { name: /edit scene name/i });
+      expect(editButton).toHaveClass("opacity-0");
+    });
+
+    it("should show an input with the current scene name when edit icon is clicked", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+
+      const input = screen.getByLabelText("Scene name input");
+      expect(input).toBeInTheDocument();
+      expect(input).toHaveValue("Scene 1");
+    });
+
+    it("should commit rename when Enter is pressed", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+      const input = screen.getByLabelText("Scene name input");
+
+      fireEvent.change(input, { target: { value: "Renamed Scene" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(useProjectStore.getState().project?.scenes[0].name).toBe("Renamed Scene");
+      expect(screen.queryByLabelText("Scene name input")).not.toBeInTheDocument();
+    });
+
+    it("should cancel rename when Escape is pressed without updating the store", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+      const input = screen.getByLabelText("Scene name input");
+
+      fireEvent.change(input, { target: { value: "Renamed Scene" } });
+      fireEvent.keyDown(input, { key: "Escape" });
+
+      expect(useProjectStore.getState().project?.scenes[0].name).toBe("Scene 1");
+      expect(screen.queryByLabelText("Scene name input")).not.toBeInTheDocument();
+    });
+
+    it("should commit rename when checkmark button is clicked", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+      const input = screen.getByLabelText("Scene name input");
+
+      fireEvent.change(input, { target: { value: "Check Rename" } });
+      fireEvent.mouseDown(screen.getByRole("button", { name: /confirm rename/i }));
+
+      expect(useProjectStore.getState().project?.scenes[0].name).toBe("Check Rename");
+    });
+
+    it("should commit rename on input blur", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+      const input = screen.getByLabelText("Scene name input");
+
+      fireEvent.change(input, { target: { value: "Blur Rename" } });
+      fireEvent.blur(input);
+
+      expect(useProjectStore.getState().project?.scenes[0].name).toBe("Blur Rename");
+    });
+
+    it("should revert to original name when blank name is submitted", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+      const input = screen.getByLabelText("Scene name input");
+
+      fireEvent.change(input, { target: { value: "   " } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(useProjectStore.getState().project?.scenes[0].name).toBe("Scene 1");
+      expect(screen.queryByLabelText("Scene name input")).not.toBeInTheDocument();
+    });
+  });
 });

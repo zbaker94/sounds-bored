@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
 import { modKey } from "@/lib/utils";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
+import handsigil from "@/assets/handsigil.png";
 
 export function MenuDrawer() {
   const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.MENU_DRAWER));
@@ -34,7 +35,7 @@ export function MenuDrawer() {
       {/* onEscapeKeyDown is suppressed here — the global Esc handler owns escape for all overlays. */}
       <DrawerContent className="w-64 bricked-background-overlay" onEscapeKeyDown={(e) => e.preventDefault()}>
         <DrawerHeader>
-          <h1 className="text-lg font-semibold ">Menu</h1>
+          <h1 className="text-lg font-semibold text-white">Menu</h1>
         </DrawerHeader>
         <Button disabled={!canSave} variant="secondary" className="w-full mb-2" onClick={handleSaveClick}>
           <HugeiconsIcon icon={SaveIcon} size={16} />
@@ -61,6 +62,12 @@ export function MenuDrawer() {
           <HugeiconsIcon icon={HomeIcon} size={16} />
           Return to Main Menu
         </Button>
+        <img
+          src={handsigil}
+          alt=""
+          aria-hidden
+          className="pointer-events-none mt-auto w-full object-contain"
+        />
       </DrawerContent>
     </Drawer>
   );

@@ -25,6 +25,7 @@ interface ProjectActions {
   clearProject: () => void;
   setActiveSceneId: (sceneId: string) => void;
   addScene: (name?: string) => void;
+  renameScene: (sceneId: string, name: string) => void;
   addPad: (sceneId: string, config: PadConfig) => void;
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
 }
@@ -95,6 +96,17 @@ export const useProjectStore = create<ProjectStore>()(
         };
         draft.project.scenes.push(newScene);
         draft.activeSceneId = newScene.id;
+        draft.isDirty = true;
+      }),
+
+    renameScene: (sceneId, name) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        const scene = draft.project.scenes.find((s) => s.id === sceneId);
+        if (!scene) return;
+        scene.name = trimmed;
         draft.isDirty = true;
       }),
 
