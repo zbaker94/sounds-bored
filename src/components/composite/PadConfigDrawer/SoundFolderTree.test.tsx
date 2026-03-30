@@ -90,7 +90,7 @@ describe("SoundFolderTree", () => {
       />
     );
     const checkboxes = screen.getAllByRole("checkbox");
-    expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
+    expect(checkboxes[0]).toHaveAttribute("data-state", "checked");
   });
 
   it("shows folder checkbox as indeterminate when some (not all) subtree sounds are selected", () => {
@@ -107,7 +107,7 @@ describe("SoundFolderTree", () => {
       />
     );
     const checkboxes = screen.getAllByRole("checkbox");
-    expect((checkboxes[0] as HTMLInputElement).indeterminate).toBe(true);
+    expect(checkboxes[0]).toHaveAttribute("data-state", "indeterminate");
   });
 
   it("renders nothing when sounds and folders are both empty", () => {

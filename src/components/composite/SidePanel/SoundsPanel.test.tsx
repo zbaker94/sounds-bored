@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { SoundsPanel } from "./SoundsPanel";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import {
@@ -73,7 +74,9 @@ function renderPanel(queryClient?: QueryClient) {
   const qc = queryClient ?? makeQueryClient();
   return render(
     <QueryClientProvider client={qc}>
-      <SoundsPanel />
+      <TooltipProvider>
+        <SoundsPanel />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
