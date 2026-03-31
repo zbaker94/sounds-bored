@@ -506,7 +506,7 @@ export function SoundsPanel() {
               <Item
                 key={sound.id}
                 variant="muted"
-                className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
+                className={`text-white/70 bg-black/5 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
                 onClick={() => {
                   setSelectedSoundIds((prev) => {
                     const next = new globalThis.Set(prev);
