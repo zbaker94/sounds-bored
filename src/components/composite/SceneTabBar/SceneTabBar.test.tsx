@@ -199,4 +199,73 @@ describe("SceneTabBar", () => {
       expect(screen.queryByLabelText("Scene name input")).not.toBeInTheDocument();
     });
   });
+
+  describe("delete scene", () => {
+    function loadSingleScene() {
+      loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
+    }
+
+    it("should have delete button with opacity-0 by default", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      const deleteButton = screen.getByRole("button", { name: /delete scene/i });
+      expect(deleteButton).toHaveClass("opacity-0");
+    });
+
+    it("should open confirmation dialog when delete button is clicked", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.click(screen.getByRole("button", { name: /delete scene/i }));
+
+      expect(screen.getByText(/delete scene/i, { selector: "[data-slot='dialog-title']" })).toBeInTheDocument();
+      expect(screen.getByText(/are you sure you want to delete/i)).toBeInTheDocument();
+    });
+
+    it("should delete the scene when Delete button in dialog is confirmed", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.click(screen.getByRole("button", { name: /delete scene/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+
+      expect(useProjectStore.getState().project?.scenes).toHaveLength(0);
+    });
+
+    it("should not delete the scene when Cancel is clicked in dialog", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.click(screen.getByRole("button", { name: /delete scene/i }));
+      fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+      expect(useProjectStore.getState().project?.scenes).toHaveLength(1);
+    });
+
+    it("should not show delete button while editing", () => {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+
+      expect(screen.queryByRole("button", { name: /delete scene/i })).not.toBeInTheDocument();
+    });
+
+    it("should update activeSceneId to adjacent scene after deletion", () => {
+      loadProject([
+        createMockScene({ id: "s1", name: "Scene 1" }),
+        createMockScene({ id: "s2", name: "Scene 2" }),
+      ]);
+      useProjectStore.getState().setActiveSceneId("s1");
+      renderWithTooltip(<SceneTabBar />);
+
+      const deleteButtons = screen.getAllByRole("button", { name: /delete scene/i });
+      fireEvent.click(deleteButtons[0]);
+      fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+
+      expect(useProjectStore.getState().project?.scenes).toHaveLength(1);
+      expect(useProjectStore.getState().activeSceneId).toBe("s2");
+    });
+  });
 });

@@ -26,6 +26,7 @@ interface ProjectActions {
   setActiveSceneId: (sceneId: string) => void;
   addScene: (name?: string) => void;
   renameScene: (sceneId: string, name: string) => void;
+  deleteScene: (sceneId: string) => void;
   addPad: (sceneId: string, config: PadConfig) => void;
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
 }
@@ -108,6 +109,21 @@ export const useProjectStore = create<ProjectStore>()(
         if (!scene) return;
         scene.name = trimmed;
         draft.isDirty = true;
+      }),
+
+    deleteScene: (sceneId) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const idx = draft.project.scenes.findIndex((s) => s.id === sceneId);
+        if (idx === -1) return;
+        draft.project.scenes.splice(idx, 1);
+        draft.isDirty = true;
+        if (draft.activeSceneId === sceneId) {
+          const scenes = draft.project.scenes;
+          draft.activeSceneId = scenes.length > 0
+            ? (scenes[idx] ?? scenes[idx - 1])!.id
+            : null;
+        }
       }),
 
     addPad: (sceneId, config) =>

@@ -509,9 +509,9 @@ export function SoundsPanel() {
                 <ItemActions>
                   {sound.filePath ? (
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="icon-xs"
-                      className="text-white/50 hover:text-white"
+                      className="hover:text-white hover:bg-ghost/20"
                       onClick={(e) => {
                         e.stopPropagation();
                         togglePreview(sound);
