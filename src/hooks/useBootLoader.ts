@@ -42,16 +42,52 @@ export function useBootLoader() {
     if (!settings || !library || hasReconciled.current) return;
     hasReconciled.current = true;
 
-    reconcileGlobalLibrary(settings.globalFolders, library.sounds).then(
+    // Use the current store snapshot (not the query-cache snapshot) as the
+    // reconciliation baseline. The store is always up-to-date; the query cache
+    // can be stale while a background refetch is in flight, which would cause
+    // reconciliation to overwrite any tag assignments the user made between
+    // when the effect fired and when the async scan completes.
+    const soundsAtReconcileStart = useLibraryStore.getState().sounds;
+
+    reconcileGlobalLibrary(settings.globalFolders, soundsAtReconcileStart).then(
       (result) => {
-        if (result.changed) {
+        // Only apply if the store hasn't been mutated since we started the scan.
+        // If isDirty is true, the user (or another effect) modified the library
+        // while the async folder scan was running — their changes take priority.
+        if (result.changed && !useLibraryStore.getState().isDirty) {
           updateLibrary((draft) => {
             draft.sounds = result.sounds;
           });
-          // Persist the reconciled library immediately so library.json is created on first boot.
+        }
+
+        // Retroactively ensure all sounds in the import folder have the "imported" tag.
+        // This handles sounds that were imported before this feature existed.
+        const { sounds: currentSounds, tags: currentTags, ensureTagExists, assignTagsToSounds } =
+          useLibraryStore.getState();
+        const importFolderId = settings.importFolderId;
+        const existingImportedTag = currentTags.find(
+          (t) => t.name.toLowerCase() === "imported",
+        );
+        const untaggedImportIds = currentSounds
+          .filter(
+            (s) =>
+              s.folderId === importFolderId &&
+              !(existingImportedTag && s.tags.includes(existingImportedTag.id)),
+          )
+          .map((s) => s.id);
+        if (untaggedImportIds.length > 0) {
+          const importedTag = ensureTagExists("imported");
+          assignTagsToSounds(untaggedImportIds, [importedTag.id]);
+        }
+
+        // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
+        if (useLibraryStore.getState().isDirty) {
+          const latest = useLibraryStore.getState();
           saveLibraryMutation.mutate({
-            ...library,
-            sounds: result.sounds,
+            version: "1.0.0",
+            sounds: latest.sounds,
+            tags: latest.tags,
+            sets: latest.sets,
           });
         }
       },

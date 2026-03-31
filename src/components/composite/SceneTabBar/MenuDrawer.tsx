@@ -8,6 +8,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { modKey } from "@/lib/utils";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import handsigil from "@/assets/handsigil.png";
+import brickOverlay from "@/assets/brick-overlay.png";
 
 export function MenuDrawer() {
   const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.MENU_DRAWER));
@@ -33,7 +34,15 @@ export function MenuDrawer() {
         <HugeiconsIcon icon={Hamburger01Icon} size={16} />
       </Button>
       {/* onEscapeKeyDown is suppressed here — the global Esc handler owns escape for all overlays. */}
-      <DrawerContent className="w-64 bricked-background-overlay" onEscapeKeyDown={(e) => e.preventDefault()}>
+      <DrawerContent
+        className="w-64"
+        style={{
+          backgroundImage: `url(${brickOverlay})`,
+          backgroundRepeat: "repeat",
+          backgroundColor: "var(--background)",
+        }}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DrawerHeader>
           <h1 className="text-lg font-semibold text-white">Menu</h1>
         </DrawerHeader>

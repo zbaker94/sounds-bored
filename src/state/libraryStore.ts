@@ -18,6 +18,12 @@ interface LibraryActions {
   addSet: (name: string) => Set;
   duplicateSet: (setId: string) => Set | null;
   addSoundsToSet: (soundIds: string[], setId: string) => void;
+  /** Ensure a tag with the given name exists (case-insensitive match); create if not found. Returns the tag. */
+  ensureTagExists: (name: string, color?: string) => Tag;
+  /** Add tagIds to each sound in soundIds. Idempotent — won't create duplicates in sound.tags. */
+  assignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
+  /** Remove tagId from each sound in soundIds. */
+  removeTagFromSounds: (soundIds: string[], tagId: string) => void;
 }
 
 export type LibraryStore = LibraryState & LibraryActions;
@@ -89,6 +95,44 @@ export const useLibraryStore = create<LibraryStore>()(
           const sound = draft.sounds.find((s) => s.id === soundId);
           if (sound && !sound.sets.includes(setId)) {
             sound.sets.push(setId);
+          }
+        }
+        draft.isDirty = true;
+      }),
+
+    ensureTagExists: (name, color) => {
+      const existing = get().tags.find(
+        (t) => t.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (existing) return existing;
+
+      const newTag: Tag = { id: crypto.randomUUID(), name, color };
+      set((draft) => {
+        draft.tags.push(newTag);
+        draft.isDirty = true;
+      });
+      return newTag;
+    },
+
+    assignTagsToSounds: (soundIds, tagIds) =>
+      set((draft) => {
+        for (const sound of draft.sounds) {
+          if (soundIds.includes(sound.id)) {
+            for (const tagId of tagIds) {
+              if (!sound.tags.includes(tagId)) {
+                sound.tags.push(tagId);
+              }
+            }
+          }
+        }
+        draft.isDirty = true;
+      }),
+
+    removeTagFromSounds: (soundIds, tagId) =>
+      set((draft) => {
+        for (const sound of draft.sounds) {
+          if (soundIds.includes(sound.id)) {
+            sound.tags = sound.tags.filter((t) => t !== tagId);
           }
         }
         draft.isDirty = true;

@@ -28,10 +28,12 @@ import {
   Playlist01Icon,
   PlayIcon,
   StopIcon,
+  Tag01Icon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder } from "@/lib/schemas";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
+import { AddTagsDialog } from "./AddTagsDialog";
 
 const EMPTY_FOLDERS: GlobalFolder[] = [];
 import { Button } from "@/components/ui/button";
@@ -88,6 +90,7 @@ export function SoundsPanel() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [addSetOpen, setAddSetOpen] = useState(false);
   const [addToSetOpen, setAddToSetOpen] = useState(false);
+  const [addTagsOpen, setAddTagsOpen] = useState(false);
   const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();
 
@@ -114,6 +117,7 @@ export function SoundsPanel() {
     try {
       const copied = await copyFilesToFolder(paths, importFolder.path);
       if (copied.length === 0) return;
+      const previousIds = new Set(useLibraryStore.getState().sounds.map((s) => s.id));
       const result = await reconcileGlobalLibrary(
         settings.globalFolders,
         sounds,
@@ -122,11 +126,20 @@ export function SoundsPanel() {
         updateLibrary((draft) => {
           draft.sounds = result.sounds;
         });
+        const { sounds: currentSounds, ensureTagExists, assignTagsToSounds } = useLibraryStore.getState();
+        const newImportedIds = currentSounds
+          .filter((s) => !previousIds.has(s.id) && s.folderId === importFolder.id)
+          .map((s) => s.id);
+        if (newImportedIds.length > 0) {
+          const importedTag = ensureTagExists("imported");
+          assignTagsToSounds(newImportedIds, [importedTag.id]);
+        }
+        const latest = useLibraryStore.getState();
         await saveLibrary({
           version: "1.0.0",
-          sounds: result.sounds,
-          tags,
-          sets,
+          sounds: latest.sounds,
+          tags: latest.tags,
+          sets: latest.sets,
         });
       }
       toast.success(`${copied.length} sound(s) imported`);
@@ -158,6 +171,7 @@ export function SoundsPanel() {
       const copied = await copyFilesToFolder(paths, importFolder.path);
       if (copied.length === 0) return;
 
+      const previousIds = new Set(useLibraryStore.getState().sounds.map((s) => s.id));
       const result = await reconcileGlobalLibrary(
         settings.globalFolders,
         sounds,
@@ -166,11 +180,20 @@ export function SoundsPanel() {
         updateLibrary((draft) => {
           draft.sounds = result.sounds;
         });
+        const { sounds: currentSounds, ensureTagExists, assignTagsToSounds } = useLibraryStore.getState();
+        const newImportedIds = currentSounds
+          .filter((s) => !previousIds.has(s.id) && s.folderId === importFolder.id)
+          .map((s) => s.id);
+        if (newImportedIds.length > 0) {
+          const importedTag = ensureTagExists("imported");
+          assignTagsToSounds(newImportedIds, [importedTag.id]);
+        }
+        const latest = useLibraryStore.getState();
         await saveLibrary({
           version: "1.0.0",
-          sounds: result.sounds,
-          tags,
-          sets,
+          sounds: latest.sounds,
+          tags: latest.tags,
+          sets: latest.sets,
         });
       }
       toast.success(`${copied.length} sound(s) imported`);
@@ -209,11 +232,12 @@ export function SoundsPanel() {
         updateLibrary((draft) => {
           draft.sounds = result.sounds;
         });
+        const latest = useLibraryStore.getState();
         await saveLibrary({
           version: "1.0.0",
-          sounds: result.sounds,
-          tags,
-          sets,
+          sounds: latest.sounds,
+          tags: latest.tags,
+          sets: latest.sets,
         });
       }
       toast.success(`Folder "${name}" added`);
@@ -463,6 +487,15 @@ export function SoundsPanel() {
             >
               <HugeiconsIcon icon={Add01Icon} size={12} /> Add to Set
             </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 text-xs px-2"
+              disabled={selectedSoundIds.size === 0}
+              onClick={() => setAddTagsOpen(true)}
+            >
+              <HugeiconsIcon icon={Tag01Icon} size={12} /> Manage Tags
+            </Button>
           </div>
           <div
             className="overflow-y-auto p-2 flex-1"
@@ -502,9 +535,23 @@ export function SoundsPanel() {
                 </ItemMedia>
                 <ItemContent>
                   <ItemTitle>{sound.name}</ItemTitle>
-                  <ItemDescription className="text-white/40">
-                    <TruncatedPath path={sound.filePath} />
-                  </ItemDescription>
+                  {(() => {
+                    const soundTags = tags.filter((t) =>
+                      sound.tags.includes(t.id),
+                    );
+                    return soundTags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {soundTags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-[rgba(194,67,113,1)] drop-shadow-[0_2px_0px_rgba(194,67,113,1)] px-1.5 py-0 text-[10px] leading-4"
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
                 </ItemContent>
                 <ItemActions>
                   {sound.filePath ? (
@@ -561,6 +608,7 @@ export function SoundsPanel() {
       />
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
       <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={[...selectedSoundIds]} />
+      <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={[...selectedSoundIds]} />
     </div>
   );
 }

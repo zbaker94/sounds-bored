@@ -186,12 +186,6 @@
     filter: var(--drop-shadow-down);
   }
 
-  .bricked-background-overlay::before {
-    background-image: url("./assets/brick-overlay.png");
-    background-repeat: repeat;
-    background-color: var(--background);
-  }
-
   .corrugated-background {
     background-image: url("./assets/corrugated.gif");
     background-repeat: repeat;

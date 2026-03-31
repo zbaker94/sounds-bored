@@ -1,6 +1,8 @@
 import { exists, copyFile } from "@tauri-apps/plugin-fs";
 import { join, basename } from "@tauri-apps/api/path";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
+import { useLibraryStore } from "@/state/libraryStore";
+import { Sound } from "@/lib/schemas";
 
 /**
  * Copy audio files from sourcePaths into destFolderPath.
@@ -40,4 +42,28 @@ export async function copyFilesToFolder(
   }
 
   return copied;
+}
+
+/**
+ * Tag newly imported sounds with the "imported" tag.
+ *
+ * Compares the sounds that existed before import (`previousSounds`) against the
+ * current store to find new entries, then ensures the "imported" tag exists and
+ * assigns it to all newly added sounds.
+ *
+ * Call this after reconciliation has updated the library store with new sounds.
+ */
+export function tagImportedSounds(previousSounds: Sound[]): void {
+  const { sounds, ensureTagExists, assignTagsToSounds } =
+    useLibraryStore.getState();
+
+  const previousIds = new Set(previousSounds.map((s) => s.id));
+  const newSoundIds = sounds
+    .filter((s) => !previousIds.has(s.id))
+    .map((s) => s.id);
+
+  if (newSoundIds.length === 0) return;
+
+  const importedTag = ensureTagExists("imported");
+  assignTagsToSounds(newSoundIds, [importedTag.id]);
 }
