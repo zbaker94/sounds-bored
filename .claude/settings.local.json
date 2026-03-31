@@ -9,7 +9,8 @@
       "Bash(npm install:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "mcp__shadcn__get_add_command_for_items"
     ]
   },
   "enableAllProjectMcpServers": true,

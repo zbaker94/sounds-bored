@@ -4,18 +4,24 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxCollection,
+  ComboboxEmpty,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 
 interface AddTagsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedSoundIds: string[];
 }
-
-type CheckState = "checked" | "indeterminate" | "unchecked";
 
 export function AddTagsDialog({
   open,
@@ -25,85 +31,53 @@ export function AddTagsDialog({
   const tags = useLibraryStore((s) => s.tags);
   const sounds = useLibraryStore((s) => s.sounds);
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const anchorRef = useComboboxAnchor();
 
-  const [newTagName, setNewTagName] = useState("");
-  // Track explicit user overrides; tags not in this map use their computed state
-  const [overrides, setOverrides] = useState<Record<string, CheckState>>({});
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [inputValue, setInputValue] = useState("");
+
+  // Tags that ALL selected sounds share — used for pre-population and diffing on confirm
+  const originalTagIds = useMemo(() => {
+    const selectedSounds = sounds.filter((s) => selectedSoundIds.includes(s.id));
+    if (selectedSounds.length === 0) return [];
+    return tags
+      .filter((tag) => selectedSounds.every((s) => s.tags.includes(tag.id)))
+      .map((t) => t.id);
+  }, [sounds, tags, selectedSoundIds]);
 
   useEffect(() => {
     if (open) {
-      setNewTagName("");
-      setOverrides({});
+      setSelectedTagIds(originalTagIds);
+      setInputValue("");
     }
+    // originalTagIds intentionally omitted — snapshot at open time only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Compute the "natural" state of each tag based on current sound data
-  const computedStates = useMemo(() => {
-    const states: Record<string, CheckState> = {};
-    const selectedSounds = sounds.filter((s) =>
-      selectedSoundIds.includes(s.id),
-    );
-    for (const tag of tags) {
-      const count = selectedSounds.filter((s) =>
-        s.tags.includes(tag.id),
-      ).length;
-      if (count === 0) {
-        states[tag.id] = "unchecked";
-      } else if (count === selectedSoundIds.length) {
-        states[tag.id] = "checked";
-      } else {
-        states[tag.id] = "indeterminate";
-      }
-    }
-    return states;
-  }, [tags, sounds, selectedSoundIds]);
+  const trimmedInput = inputValue.trim();
+  const inputMatchesExisting = tags.some(
+    (t) => t.name.toLowerCase() === trimmedInput.toLowerCase(),
+  );
+  const canCreate = trimmedInput.length > 0 && !inputMatchesExisting;
 
-  function getEffectiveState(tagId: string): CheckState {
-    return overrides[tagId] ?? computedStates[tagId] ?? "unchecked";
-  }
-
-  function handleToggle(tagId: string) {
-    const current = getEffectiveState(tagId);
-    // Cycle: unchecked/indeterminate -> checked, checked -> unchecked
-    const next: CheckState =
-      current === "checked" ? "unchecked" : "checked";
-    setOverrides((prev) => ({ ...prev, [tagId]: next }));
-  }
-
-  function handleCreateTag() {
-    const trimmed = newTagName.trim();
-    if (!trimmed) return;
-    useLibraryStore.getState().ensureTagExists(trimmed);
-    setNewTagName("");
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleCreateTag();
+  function handleValueChange(newIds: string[]) {
+    if (newIds.includes("__create__")) {
+      const { ensureTagExists } = useLibraryStore.getState();
+      const newTag = ensureTagExists(trimmedInput);
+      setSelectedTagIds([...newIds.filter((id) => id !== "__create__"), newTag.id]);
+    } else {
+      setSelectedTagIds(newIds);
     }
   }
 
   async function handleConfirm() {
-    const {
-      assignTagsToSounds,
-      removeTagFromSounds,
-      tags: currentTags,
-    } = useLibraryStore.getState();
+    const { assignTagsToSounds, removeTagFromSounds } = useLibraryStore.getState();
 
-    const toAssign: string[] = [];
-    const toRemove: string[] = [];
+    const originalSet = new Set(originalTagIds);
+    const selectedSet = new Set(selectedTagIds);
 
-    for (const tag of currentTags) {
-      const original = computedStates[tag.id] ?? "unchecked";
-      const final = getEffectiveState(tag.id);
-
-      if (final === "checked" && original !== "checked") {
-        toAssign.push(tag.id);
-      } else if (final === "unchecked" && original !== "unchecked") {
-        toRemove.push(tag.id);
-      }
-    }
+    const toAssign = selectedTagIds.filter((id) => !originalSet.has(id));
+    const toRemove = originalTagIds.filter((id) => !selectedSet.has(id));
 
     if (toAssign.length > 0) {
       assignTagsToSounds(selectedSoundIds, toAssign);
@@ -135,60 +109,42 @@ export function AddTagsDialog({
     <DrawerDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Add Tags"
+      title="Manage Tags"
       description={`Manage tags for ${selectedSoundIds.length} sound(s).`}
       content={
-        <div className="p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="New tag name..."
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCreateTag}
-              disabled={!newTagName.trim()}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={14} />
-              Create
-            </Button>
-          </div>
-
-          {tags.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No tags yet. Create one above.
-            </p>
-          ) : (
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {tags.map((tag) => {
-                const state = getEffectiveState(tag.id);
-                return (
-                  <div
-                    key={tag.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
-                    onClick={() => handleToggle(tag.id)}
-                  >
-                    <Checkbox
-                      checked={
-                        state === "checked"
-                          ? true
-                          : state === "indeterminate"
-                            ? "indeterminate"
-                            : false
-                      }
-                      onCheckedChange={() => handleToggle(tag.id)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="text-sm">{tag.name}</span>
-                  </div>
-                );
+        <div className="p-4">
+          <Combobox
+            value={selectedTagIds}
+            onValueChange={handleValueChange}
+            onInputValueChange={(val) => setInputValue(val)}
+            items={tags}
+            multiple
+          >
+            <ComboboxChips ref={anchorRef}>
+              {selectedTagIds.map((id) => {
+                const tag = tags.find((t) => t.id === id);
+                return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
               })}
-            </div>
-          )}
+              <ComboboxChipsInput placeholder="Search or create tags..." />
+            </ComboboxChips>
+            <ComboboxContent anchor={anchorRef}>
+              <ComboboxList>
+                <ComboboxEmpty>No tags found.</ComboboxEmpty>
+                <ComboboxCollection>
+                  {(t) => (
+                    <ComboboxItem key={t.id} value={t.id}>
+                      {t.name}
+                    </ComboboxItem>
+                  )}
+                </ComboboxCollection>
+                {canCreate && (
+                  <ComboboxItem value="__create__">
+                    Create "{trimmedInput}"
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
         </div>
       }
       footer={
