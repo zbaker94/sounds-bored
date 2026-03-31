@@ -206,4 +206,39 @@
     background-color: var(--background);
     filter: blur(2px);
   }
+
+  .illuminated-yellow-500-overlay {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--background);
+    filter: blur(2px);
+  }
+
+  /* Horizontal layout (below md): rotate the vertical image 90deg to fill the bar */
+  .illuminated-yellow-500-overlay::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4rem;   /* matches h-16 panel height → becomes visual width after rotation */
+    height: 100vw; /* fills panel width → becomes visual height after rotation */
+    transform: translate(-50%, -50%) rotate(90deg);
+    background-image:
+      linear-gradient(color-mix(in oklch, var(--color-yellow-500) 65%, transparent), color-mix(in oklch, var(--color-yellow-500) 65%, transparent)),
+      url("./assets/side-illumination.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+  }
+
+  /* Vertical layout (md+): image sits naturally without rotation */
+  @media (min-width: 768px) {
+    .illuminated-yellow-500-overlay::before {
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: none;
+    }
+  }
 }
