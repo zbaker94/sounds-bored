@@ -12,8 +12,13 @@ export async function loadBuffer(sound: Sound): Promise<AudioBuffer> {
 
   const ctx = getAudioContext();
   const url = convertFileSrc(sound.filePath);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch "${sound.name}": ${response.status}`);
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (err) {
+    throw new Error(`fetch failed for "${sound.name}" (url: ${url}): ${err}`);
+  }
+  if (!response.ok) throw new Error(`fetch "${sound.name}" returned ${response.status} (url: ${url})`);
   const arrayBuffer = await response.arrayBuffer();
   const buffer = await ctx.decodeAudioData(arrayBuffer);
   cache.set(sound.id, buffer);

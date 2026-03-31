@@ -3,6 +3,7 @@ import { loadBuffer } from "./bufferCache";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Layer, Pad, Sound } from "@/lib/schemas";
+import { toast } from "sonner";
 
 // Per-pad GainNodes: source(s) → padGain → masterGain → destination
 // Kept module-level like voiceMap — GainNodes are non-serializable.
@@ -120,7 +121,9 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           padProgressInfo.set(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration });
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(`[padPlayer] Failed to play "${sound.name}":`, err);
+        toast.error(`Failed to play "${sound.name}": ${message}`);
       }
     }
   }

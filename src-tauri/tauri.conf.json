@@ -14,7 +14,8 @@
       {
         "title": "sounds-bored",
         "width": 1336,
-        "height": 900
+        "height": 900,
+        "devtools": true
       }
     ],
     "security": {
@@ -22,16 +23,19 @@
         "img-src": [
           "'self'",
           "asset:",
+          "http://asset.localhost",
           "https://asset.localhost"
         ],
         "media-src": [
           "'self'",
           "asset:",
+          "http://asset.localhost",
           "https://asset.localhost"
         ],
         "connect-src": [
           "'self'",
           "asset:",
+          "http://asset.localhost",
           "https://asset.localhost"
         ]
       },
