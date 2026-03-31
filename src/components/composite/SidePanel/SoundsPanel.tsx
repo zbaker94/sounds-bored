@@ -600,7 +600,7 @@ export function SoundsPanel() {
           position: "absolute",
           bottom: 0,
           right: -20,
-          opacity: soundsListHover ? 0.5 : 1,
+          opacity: soundsListHover ? 0.2 : 1,
           pointerEvents: "none",
           zIndex: 50,
         }}
