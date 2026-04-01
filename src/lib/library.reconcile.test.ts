@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { reconcileGlobalLibrary } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus } from "./library.reconcile";
 import { mockFs, mockPath } from "@/test/tauri-mocks";
 import { createMockGlobalFolder } from "@/test/factories";
 import { Sound } from "./schemas";
@@ -316,6 +316,68 @@ describe("reconcileGlobalLibrary", () => {
       const result = await reconcileGlobalLibrary([folder], [existingSound]);
 
       expect(result.changed).toBe(false);
+    });
+  });
+
+  describe("checkMissingStatus", () => {
+    it("should flag sounds whose folder is missing", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/missing/folder" });
+      const sound1 = createSound({ id: "s1", name: "kick", filePath: "/missing/folder/kick.wav", folderId: "f1" });
+      const sound2 = createSound({ id: "s2", name: "snare", filePath: "/missing/folder/snare.wav", folderId: "f1" });
+      const sound3 = createSound({ id: "s3", name: "hi-hat", filePath: "/other/hihat.wav" });
+
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/missing/folder") return Promise.resolve(false);
+        return Promise.resolve(true);
+      });
+
+      const result = await checkMissingStatus([folder], [sound1, sound2, sound3]);
+
+      expect(result.missingFolderIds).toContain("f1");
+      expect(result.missingSoundIds).toContain("s1");
+      expect(result.missingSoundIds).toContain("s2");
+      expect(result.missingSoundIds).not.toContain("s3");
+    });
+
+    it("should flag a sound whose individual file is missing", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const presentSound = createSound({ id: "s1", name: "kick", filePath: "/music/kick.wav", folderId: "f1" });
+      const missingSound = createSound({ id: "s2", name: "ghost", filePath: "/music/ghost.wav", folderId: "f1" });
+
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/music/ghost.wav") return Promise.resolve(false);
+        return Promise.resolve(true);
+      });
+
+      const result = await checkMissingStatus([folder], [presentSound, missingSound]);
+
+      expect(result.missingFolderIds.size).toBe(0);
+      expect(result.missingSoundIds).toContain("s2");
+      expect(result.missingSoundIds).not.toContain("s1");
+    });
+
+    it("should return empty sets when everything exists", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sound = createSound({ id: "s1", name: "kick", filePath: "/music/kick.wav", folderId: "f1" });
+
+      mockFs.exists.mockResolvedValue(true);
+
+      const result = await checkMissingStatus([folder], [sound]);
+
+      expect(result.missingFolderIds.size).toBe(0);
+      expect(result.missingSoundIds.size).toBe(0);
+    });
+
+    it("should not flag sounds with no filePath", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/missing/folder" });
+      const noPathSound = createSound({ id: "s1", name: "web-sound", folderId: "f1" });
+
+      mockFs.exists.mockResolvedValue(false);
+
+      const result = await checkMissingStatus([folder], [noPathSound]);
+
+      expect(result.missingFolderIds).toContain("f1");
+      expect(result.missingSoundIds.size).toBe(0);
     });
   });
 

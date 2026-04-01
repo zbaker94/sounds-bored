@@ -7,6 +7,9 @@ interface LibraryState {
   tags: Tag[];
   sets: Set[];
   isDirty: boolean;  // tracked; auto-save hook wired in Phase 4
+  // Runtime-only — never persisted to disk
+  missingSoundIds: globalThis.Set<string>;
+  missingFolderIds: globalThis.Set<string>;
 }
 
 type LibraryData = Pick<LibraryState, "sounds" | "tags" | "sets">;
@@ -26,6 +29,8 @@ interface LibraryActions {
   removeTagFromSounds: (soundIds: string[], tagId: string) => void;
   /** Like assignTagsToSounds but bypasses the system tag guard. For internal use (import, bootloader). */
   systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
+  /** Update runtime missing-file state. Not persisted. */
+  setMissingState: (missingSoundIds: globalThis.Set<string>, missingFolderIds: globalThis.Set<string>) => void;
 }
 
 export type LibraryStore = LibraryState & LibraryActions;
@@ -35,6 +40,8 @@ export const initialLibraryState: LibraryState = {
   tags: [],
   sets: [],
   isDirty: false,
+  missingSoundIds: new globalThis.Set<string>(),
+  missingFolderIds: new globalThis.Set<string>(),
 };
 
 export const useLibraryStore = create<LibraryStore>()(
@@ -182,5 +189,9 @@ export const useLibraryStore = create<LibraryStore>()(
         }
         draft.isDirty = true;
       }),
+
+    // Plain set — Immer + Set can be finicky, and missing state is simple runtime data
+    setMissingState: (missingSoundIds, missingFolderIds) =>
+      set({ missingSoundIds, missingFolderIds }),
   }))
 );

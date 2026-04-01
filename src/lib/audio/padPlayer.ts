@@ -1,7 +1,9 @@
 import { ensureResumed, getAudioContext, getMasterGain } from "./audioContext";
-import { loadBuffer } from "./bufferCache";
+import { loadBuffer, MissingFileError } from "./bufferCache";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { checkMissingStatus } from "@/lib/library.reconcile";
 import type { Layer, Pad, Sound } from "@/lib/schemas";
 import { toast } from "sonner";
 
@@ -126,9 +128,20 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           padProgressInfo.set(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration });
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[padPlayer] Failed to play "${sound.name}":`, err);
-        toast.error(`Failed to play "${sound.name}": ${message}`);
+        if (err instanceof MissingFileError) {
+          const settings = useAppSettingsStore.getState().settings;
+          if (settings) {
+            const { sounds } = useLibraryStore.getState();
+            checkMissingStatus(settings.globalFolders, sounds).then((result) => {
+              useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
+            });
+          }
+          toast.error(`Failed to play "${sound.name}" — file not found. Check the Sounds panel.`);
+        } else {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`[padPlayer] Failed to play "${sound.name}":`, err);
+          toast.error(`Failed to play "${sound.name}": ${message}`);
+        }
       }
     }
   }

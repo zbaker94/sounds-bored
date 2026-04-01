@@ -1,6 +1,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getAudioContext } from "./audioContext";
 import type { Sound } from "@/lib/schemas";
+import { MissingFileError } from "@/lib/library.reconcile";
+export { MissingFileError } from "@/lib/library.reconcile";
 
 const cache = new Map<string, AudioBuffer>();
 
@@ -16,9 +18,9 @@ export async function loadBuffer(sound: Sound): Promise<AudioBuffer> {
   try {
     response = await fetch(url);
   } catch (err) {
-    throw new Error(`fetch failed for "${sound.name}" (url: ${url}): ${err}`);
+    throw new MissingFileError(`Could not load "${sound.name}" (url: ${url}): ${err}`);
   }
-  if (!response.ok) throw new Error(`fetch "${sound.name}" returned ${response.status} (url: ${url})`);
+  if (!response.ok) throw new MissingFileError(`File not found for "${sound.name}" (status: ${response.status}, url: ${url})`);
   const arrayBuffer = await response.arrayBuffer();
   const buffer = await ctx.decodeAudioData(arrayBuffer);
   cache.set(sound.id, buffer);

@@ -1,11 +1,20 @@
-import { useState, useMemo, useEffect, useRef, memo } from "react";
+import { useState, useMemo, useEffect, useRef, memo, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
+import { evictBuffer } from "@/lib/audio/bufferCache";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useImportSounds } from "@/hooks/useImportSounds";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import {
@@ -29,8 +38,11 @@ import {
   StopIcon,
   Tag01Icon,
   LockIcon,
+  Alert02Icon,
 } from "@hugeicons/core-free-icons";
-import type { GlobalFolder, Tag } from "@/lib/schemas";
+import type { GlobalFolder, Sound, Tag } from "@/lib/schemas";
+import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
+import { ResolveMissingFolderDialog } from "@/components/modals/ResolveMissingFolderDialog";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
@@ -104,6 +116,8 @@ export function SoundsPanel() {
   const sounds = useLibraryStore((s) => s.sounds);
   const tags = useLibraryStore((s) => s.tags);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
+  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
+  const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);
 
   const { data: settings } = useAppSettings();
   const folders = settings?.globalFolders ?? EMPTY_FOLDERS;
@@ -135,6 +149,107 @@ export function SoundsPanel() {
     [sounds, selectedId],
   );
 
+  const selectableSounds = useMemo(
+    () => soundsForSelectedId.filter((s) => !missingSoundIds.has(s.id)),
+    [soundsForSelectedId, missingSoundIds],
+  );
+
+  const allMissingSounds = useMemo(
+    () => sounds.filter((s) => missingSoundIds.has(s.id)),
+    [sounds, missingSoundIds],
+  );
+
+  const allMissingFolders = useMemo(
+    () => folders.filter((f) => missingFolderIds.has(f.id)),
+    [folders, missingFolderIds],
+  );
+
+  // ── Dialog queue handlers ──────────────────────────────────────────────────
+
+  const handleSoundDialogResolved = useCallback(() => {
+    soundWasResolved.current = true;
+  }, []);
+
+  const handleSoundDialogClose = useCallback(() => {
+    const resolved = soundWasResolved.current;
+    soundWasResolved.current = false;
+    if (resolved) {
+      setSoundDialogQueue((q) => q.slice(1));
+    } else {
+      setSoundDialogQueue([]);
+    }
+  }, []);
+
+  const handleFolderDialogResolved = useCallback(() => {
+    folderWasResolved.current = true;
+  }, []);
+
+  const handleFolderDialogClose = useCallback(() => {
+    const resolved = folderWasResolved.current;
+    folderWasResolved.current = false;
+    if (resolved) {
+      setFolderDialogQueue((q) => q.slice(1));
+    } else {
+      setFolderDialogQueue([]);
+    }
+  }, []);
+
+  // ── Bulk remove handlers ───────────────────────────────────────────────────
+
+  async function handleRemoveAllMissingSounds() {
+    if (!settings) return;
+    setIsBulkRemoving(true);
+    try {
+      const idsToRemove = new globalThis.Set(allMissingSounds.map((s) => s.id));
+      for (const id of idsToRemove) evictBuffer(id);
+      updateLibrary((draft) => {
+        draft.sounds = draft.sounds.filter((s) => !idsToRemove.has(s.id));
+      });
+      const latest = useLibraryStore.getState();
+      await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      const result = await checkMissingStatus(settings.globalFolders, latest.sounds);
+      useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
+      toast.success(`${idsToRemove.size} missing sound${idsToRemove.size > 1 ? "s" : ""} removed`);
+    } catch {
+      toast.error("Failed to remove missing sounds");
+    } finally {
+      setIsBulkRemoving(false);
+      setConfirmRemoveSoundsOpen(false);
+    }
+  }
+
+  async function handleRemoveAllMissingFolders() {
+    if (!settings) return;
+    setIsBulkRemoving(true);
+    try {
+      const folderIdsToRemove = new globalThis.Set(allMissingFolders.map((f) => f.id));
+      const updatedSettings = {
+        ...settings,
+        globalFolders: settings.globalFolders.filter((f) => !folderIdsToRemove.has(f.id)),
+      };
+      await saveSettings(updatedSettings);
+      const soundIdsToRemove = new globalThis.Set(
+        sounds.filter((s) => s.folderId && folderIdsToRemove.has(s.folderId)).map((s) => s.id),
+      );
+      for (const id of soundIdsToRemove) evictBuffer(id);
+      updateLibrary((draft) => {
+        draft.sounds = draft.sounds.filter((s) => !soundIdsToRemove.has(s.id));
+      });
+      const latest = useLibraryStore.getState();
+      await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      const result = await checkMissingStatus(updatedSettings.globalFolders, latest.sounds);
+      useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
+      toast.success(
+        `${folderIdsToRemove.size} missing folder${folderIdsToRemove.size > 1 ? "s" : ""} and ${soundIdsToRemove.size} sound${soundIdsToRemove.size !== 1 ? "s" : ""} removed`,
+      );
+    } catch {
+      toast.error("Failed to remove missing folders");
+    } finally {
+      setIsBulkRemoving(false);
+      setConfirmRemoveFoldersOpen(false);
+    }
+  }
+
   const [soundsListHover, setSoundsListHover] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
@@ -142,6 +257,16 @@ export function SoundsPanel() {
   const [addSetOpen, setAddSetOpen] = useState(false);
   const [addToSetOpen, setAddToSetOpen] = useState(false);
   const [addTagsOpen, setAddTagsOpen] = useState(false);
+  // Dialog queues — queue[0] is the active item; empty = closed.
+  // One-off clicks push a single-item queue; "Review one by one" pushes all missing items.
+  // onResolved: slice head → continue chain. onClose without onResolved: clear queue → break chain.
+  const [soundDialogQueue, setSoundDialogQueue] = useState<Sound[]>([]);
+  const [folderDialogQueue, setFolderDialogQueue] = useState<GlobalFolder[]>([]);
+  const soundWasResolved = useRef(false);
+  const folderWasResolved = useRef(false);
+  const [confirmRemoveSoundsOpen, setConfirmRemoveSoundsOpen] = useState(false);
+  const [confirmRemoveFoldersOpen, setConfirmRemoveFoldersOpen] = useState(false);
+  const [isBulkRemoving, setIsBulkRemoving] = useState(false);
   const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();
 
@@ -239,10 +364,13 @@ export function SoundsPanel() {
   }
 
   function handleSelectAllNone() {
-    if (selectedSoundIds.size === soundsForSelectedId.length && soundsForSelectedId.length > 0) {
+    const selectableIds = selectableSounds.map((s) => s.id);
+    const allSelectableSelected =
+      selectableIds.length > 0 && selectableIds.every((id) => selectedSoundIds.has(id));
+    if (allSelectableSelected) {
       setSelectedSoundIds(new globalThis.Set());
     } else {
-      setSelectedSoundIds(new globalThis.Set(soundsForSelectedId.map((s) => s.id)));
+      setSelectedSoundIds(new globalThis.Set(selectableIds));
     }
   }
 
@@ -397,30 +525,69 @@ export function SoundsPanel() {
                 </Button>
               </div>
             )}
+            {allMissingFolders.length > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-xs shrink-0">
+                <HugeiconsIcon icon={Alert02Icon} size={12} />
+                <span>{allMissingFolders.length} folder{allMissingFolders.length > 1 ? "s" : ""} missing</span>
+                <div className="ml-auto flex gap-1">
+                  <button
+                    className="px-1.5 py-0.5 rounded hover:bg-amber-500/20 transition-colors"
+                    onClick={() => setConfirmRemoveFoldersOpen(true)}
+                  >
+                    Remove All
+                  </button>
+                  <button
+                    className="px-1.5 py-0.5 rounded hover:bg-amber-500/20 transition-colors"
+                    onClick={() => setFolderDialogQueue([...allMissingFolders])}
+                  >
+                    Review →
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="p-2 flex-1">
-              {folders.map((folder) => (
-                <Item
-                  key={folder.id}
-                  variant="outline"
-                  className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
-                    selectedId === folder.id ? "bg-white/20" : ""
-                  }`}
-                  onClick={() => handleSelect(folder.id)}
-                >
-                  <ItemMedia>
-                    <HugeiconsIcon icon={Folder01Icon} size={14} />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>{folder.name}</ItemTitle>
-                    <ItemDescription className="text-white/40">
-                      <TruncatedPath path={folder.path} />
-                    </ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <HugeiconsIcon icon={ChevronRight} className="size-4" />
-                  </ItemActions>
-                </Item>
-              ))}
+              {folders.map((folder) => {
+                const isFolderMissing = missingFolderIds.has(folder.id);
+                return (
+                  <Item
+                    key={folder.id}
+                    variant="outline"
+                    className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
+                      selectedId === folder.id ? "bg-white/20" : ""
+                    }`}
+                    onClick={() => {
+                      if (isFolderMissing) {
+                        setFolderDialogQueue([folder]);
+                      } else {
+                        handleSelect(folder.id);
+                      }
+                    }}
+                  >
+                    <ItemMedia>
+                      <HugeiconsIcon
+                        icon={isFolderMissing ? Alert02Icon : Folder01Icon}
+                        size={14}
+                        className={isFolderMissing ? "text-destructive" : undefined}
+                      />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle className={isFolderMissing ? "text-destructive" : undefined}>
+                        {folder.name}
+                      </ItemTitle>
+                      <ItemDescription className="text-white/40">
+                        <TruncatedPath path={folder.path} />
+                      </ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      {isFolderMissing ? (
+                        <HugeiconsIcon icon={Alert02Icon} className="size-4 text-destructive" />
+                      ) : (
+                        <HugeiconsIcon icon={ChevronRight} className="size-4" />
+                      )}
+                    </ItemActions>
+                  </Item>
+                );
+              })}
               {folders.length === 0 && (
                 <Empty>
                   <EmptyHeader>
@@ -461,8 +628,10 @@ export function SoundsPanel() {
               size="sm"
               className="h-7 text-xs px-2"
               onClick={handleSelectAllNone}
+              disabled={selectableSounds.length === 0}
             >
-              {selectedSoundIds.size === soundsForSelectedId.length && soundsForSelectedId.length > 0
+              {selectableSounds.length > 0 &&
+               selectableSounds.every((s) => selectedSoundIds.has(s.id))
                 ? "Select None"
                 : "Select All"}
             </Button>
@@ -485,83 +654,122 @@ export function SoundsPanel() {
               <HugeiconsIcon icon={Tag01Icon} size={12} /> Manage Tags
             </Button>
           </div>
+          {allMissingSounds.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-xs shrink-0">
+              <HugeiconsIcon icon={Alert02Icon} size={12} />
+              <span>{allMissingSounds.length} sound{allMissingSounds.length > 1 ? "s" : ""} missing</span>
+              <div className="ml-auto flex gap-1">
+                <button
+                  className="px-1.5 py-0.5 rounded hover:bg-amber-500/20 transition-colors"
+                  onClick={() => setConfirmRemoveSoundsOpen(true)}
+                >
+                  Remove All
+                </button>
+                <button
+                  className="px-1.5 py-0.5 rounded hover:bg-amber-500/20 transition-colors"
+                  onClick={() => setSoundDialogQueue([...allMissingSounds])}
+                >
+                  Review →
+                </button>
+              </div>
+            </div>
+          )}
           <div
             className="overflow-y-auto p-2 flex-1"
             onMouseEnter={() => setSoundsListHover(true)}
             onMouseLeave={() => setSoundsListHover(false)}
           >
-            {soundsForSelectedId.map((sound) => (
-              <Item
-                key={sound.id}
-                variant="muted"
-                className={`text-white/70 bg-black/5 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
-                onClick={() => {
-                  setSelectedSoundIds((prev) => {
-                    const next = new globalThis.Set(prev);
-                    if (next.has(sound.id)) next.delete(sound.id);
-                    else next.add(sound.id);
-                    return next;
-                  });
-                }}
-              >
-                <ItemMedia>
-                  <Checkbox
-                    checked={selectedSoundIds.has(sound.id)}
-                    onCheckedChange={() => {
-                      setSelectedSoundIds((prev) => {
-                        const next = new globalThis.Set(prev);
-                        if (next.has(sound.id)) next.delete(sound.id);
-                        else next.add(sound.id);
-                        return next;
-                      });
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </ItemMedia>
-                <ItemMedia>
-                  <HugeiconsIcon icon={Music} size={14} />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{sound.name}</ItemTitle>
-                  <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
-                </ItemContent>
-                <ItemActions>
-                  {sound.filePath ? (
-                    <Button
-                      variant="secondary"
-                      size="icon-xs"
-                      className="hover:text-white hover:bg-ghost/20"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePreview(sound);
-                      }}
-                    >
-                      <HugeiconsIcon
-                        icon={previewingId === sound.id ? StopIcon : PlayIcon}
-                        size={14}
+            {soundsForSelectedId.map((sound) => {
+              const isSoundMissing = missingSoundIds.has(sound.id);
+              return (
+                <Item
+                  key={sound.id}
+                  variant="muted"
+                  className={`text-white/70 bg-black/5 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
+                  onClick={() => {
+                    if (isSoundMissing) {
+                      setSoundDialogQueue([sound]);
+                      return;
+                    }
+                    setSelectedSoundIds((prev) => {
+                      const next = new globalThis.Set(prev);
+                      if (next.has(sound.id)) next.delete(sound.id);
+                      else next.add(sound.id);
+                      return next;
+                    });
+                  }}
+                >
+                  <ItemMedia>
+                    {isSoundMissing ? (
+                      <HugeiconsIcon icon={Alert02Icon} size={14} className="text-destructive" />
+                    ) : (
+                      <Checkbox
+                        checked={selectedSoundIds.has(sound.id)}
+                        onCheckedChange={() => {
+                          setSelectedSoundIds((prev) => {
+                            const next = new globalThis.Set(prev);
+                            if (next.has(sound.id)) next.delete(sound.id);
+                            else next.add(sound.id);
+                            return next;
+                          });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
                       />
-                    </Button>
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            disabled
-                            className="text-white/20"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <HugeiconsIcon icon={PlayIcon} size={14} />
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>File not found</TooltipContent>
-                    </Tooltip>
-                  )}
-                </ItemActions>
-              </Item>
-            ))}
+                    )}
+                  </ItemMedia>
+                  <ItemMedia>
+                    <HugeiconsIcon
+                      icon={Music}
+                      size={14}
+                      className={isSoundMissing ? "text-destructive/70" : undefined}
+                    />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle className={isSoundMissing ? "text-destructive" : undefined}>
+                      {sound.name}
+                    </ItemTitle>
+                    <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
+                  </ItemContent>
+                  <ItemActions>
+                    {isSoundMissing ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSoundDialogQueue([sound]);
+                              }}
+                            >
+                              <HugeiconsIcon icon={Alert02Icon} size={14} />
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>File missing — click to resolve</TooltipContent>
+                      </Tooltip>
+                    ) : sound.filePath ? (
+                      <Button
+                        variant="secondary"
+                        size="icon-xs"
+                        className="hover:text-white hover:bg-ghost/20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePreview(sound);
+                        }}
+                      >
+                        <HugeiconsIcon
+                          icon={previewingId === sound.id ? StopIcon : PlayIcon}
+                          size={14}
+                        />
+                      </Button>
+                    ) : null}
+                  </ItemActions>
+                </Item>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -581,6 +789,63 @@ export function SoundsPanel() {
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
       <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={selectedSoundIdsArray} />
       <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={selectedSoundIdsArray} />
+      <ResolveMissingDialog
+        sound={soundDialogQueue[0] ?? null}
+        onResolved={handleSoundDialogResolved}
+        onClose={handleSoundDialogClose}
+      />
+      <ResolveMissingFolderDialog
+        folder={folderDialogQueue[0] ?? null}
+        onResolved={handleFolderDialogResolved}
+        onClose={handleFolderDialogClose}
+      />
+
+      {/* Bulk remove — missing sounds */}
+      <Dialog open={confirmRemoveSoundsOpen} onOpenChange={setConfirmRemoveSoundsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove All Missing Sounds</DialogTitle>
+            <DialogDescription>
+              Remove all <strong>{allMissingSounds.length}</strong> missing sound{allMissingSounds.length > 1 ? "s" : ""} from your library?
+              Their files are already gone — this just cleans up the library entries. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmRemoveSoundsOpen(false)} disabled={isBulkRemoving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveAllMissingSounds} disabled={isBulkRemoving}>
+              {isBulkRemoving ? "Removing…" : `Remove ${allMissingSounds.length} Sound${allMissingSounds.length > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk remove — missing folders */}
+      <Dialog open={confirmRemoveFoldersOpen} onOpenChange={setConfirmRemoveFoldersOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove All Missing Folders</DialogTitle>
+            <DialogDescription>
+              Remove all <strong>{allMissingFolders.length}</strong> missing folder{allMissingFolders.length > 1 ? "s" : ""} from your library?
+              This will also remove all sounds associated with{" "}
+              {allMissingFolders.length > 1 ? "those folders" : "that folder"} (
+              <strong>
+                {sounds.filter((s) => s.folderId && missingFolderIds.has(s.folderId)).length} sound{sounds.filter((s) => s.folderId && missingFolderIds.has(s.folderId)).length !== 1 ? "s" : ""}
+              </strong>
+              ). This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmRemoveFoldersOpen(false)} disabled={isBulkRemoving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveAllMissingFolders} disabled={isBulkRemoving}>
+              {isBulkRemoving ? "Removing…" : `Remove ${allMissingFolders.length} Folder${allMissingFolders.length > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

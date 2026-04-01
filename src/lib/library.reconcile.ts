@@ -131,3 +131,56 @@ export async function reconcileGlobalLibrary(
     changed,
   };
 }
+
+// ─── Missing File / Folder Detection ─────────────────────────────────────────
+
+export class MissingFileError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MissingFileError";
+  }
+}
+
+export interface MissingStatusResult {
+  missingSoundIds: Set<string>;
+  missingFolderIds: Set<string>;
+}
+
+/**
+ * Check which global folders and sounds are missing from disk.
+ *
+ * A folder is missing if its path does not exist.
+ * A sound is missing if:
+ *   - it has a filePath that does not exist on disk, OR
+ *   - its folderId points to a missing folder (even if filePath isn't checked separately)
+ * Sounds with no filePath are never flagged.
+ */
+export async function checkMissingStatus(
+  globalFolders: GlobalFolder[],
+  sounds: Sound[],
+): Promise<MissingStatusResult> {
+  // Check all folder paths in parallel
+  const folderChecks = await Promise.all(
+    globalFolders.map(async (f) => ({ id: f.id, missing: !(await exists(f.path)) })),
+  );
+  const missingFolderIds = new Set(folderChecks.filter((f) => f.missing).map((f) => f.id));
+
+  // Check all sound filePaths in parallel (only sounds that have a filePath)
+  const soundsWithPath = sounds.filter((s) => !!s.filePath);
+  const soundFileChecks = await Promise.all(
+    soundsWithPath.map(async (s) => ({
+      id: s.id,
+      folderId: s.folderId,
+      missing: !(await exists(s.filePath!)),
+    })),
+  );
+
+  const missingSoundIds = new Set<string>();
+  for (const check of soundFileChecks) {
+    if (check.missing || (check.folderId && missingFolderIds.has(check.folderId))) {
+      missingSoundIds.add(check.id);
+    }
+  }
+
+  return { missingSoundIds, missingFolderIds };
+}

@@ -1,8 +1,9 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
+import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { discardTemporaryProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
@@ -20,6 +21,9 @@ export function useProjectLifecycle() {
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const isDirty = useProjectStore((s) => s.isDirty);
   const navigate = useNavigate();
+
+  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
+  const lastNotifiedProjectKey = useRef<string | null>(null);
 
   const { requestSaveAndThen } = useProjectActions();
 
@@ -70,6 +74,34 @@ export function useProjectLifecycle() {
   const handleCancelClose = () => {
     closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
   };
+
+  // Notify user if missing sounds are used in the loaded project
+  useEffect(() => {
+    if (!project || missingSoundIds.size === 0) return;
+
+    const projectKey = project.name + (project.lastSaved ?? "");
+    if (lastNotifiedProjectKey.current === projectKey) return;
+    lastNotifiedProjectKey.current = projectKey;
+
+    const usedSoundIds = new globalThis.Set(
+      project.scenes.flatMap((scene) =>
+        scene.pads.flatMap((pad) =>
+          pad.layers.flatMap((layer) =>
+            layer.selection.type === "assigned"
+              ? layer.selection.instances.map((i) => i.soundId)
+              : [],
+          ),
+        ),
+      ),
+    );
+
+    const missingUsedCount = [...usedSoundIds].filter((id) => missingSoundIds.has(id)).length;
+    if (missingUsedCount > 0) {
+      toast.warning(
+        `${missingUsedCount} sound${missingUsedCount > 1 ? "s" : ""} used in this project are missing. Check the Sounds panel.`,
+      );
+    }
+  }, [project, missingSoundIds]);
 
   // Redirect to start screen if project is unloaded from under us
   useEffect(() => {
