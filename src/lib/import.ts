@@ -1,8 +1,7 @@
 import { exists, copyFile } from "@tauri-apps/plugin-fs";
 import { join, basename } from "@tauri-apps/api/path";
 import { AUDIO_EXTENSIONS, SYSTEM_TAG_IMPORTED } from "@/lib/constants";
-import { useLibraryStore } from "@/state/libraryStore";
-import { Sound } from "@/lib/schemas";
+import type { Sound, Tag } from "@/lib/schemas";
 
 /**
  * Copy audio files from sourcePaths into destFolderPath.
@@ -45,20 +44,24 @@ export async function copyFilesToFolder(
 }
 
 /**
- * Tag newly imported sounds with the "imported" tag.
+ * Tag newly imported sounds with the system "imported" tag.
  *
- * Compares the sounds that existed before import (`previousSounds`) against the
- * current store to find new entries, then ensures the "imported" tag exists and
- * assigns it to all newly added sounds.
+ * Pure function — accepts store state and actions as parameters so it
+ * can be called from any context (hook, test) without store coupling.
  *
- * Call this after reconciliation has updated the library store with new sounds.
+ * @param soundsBeforeImport - snapshot of sounds array taken before reconciliation
+ * @param soundsAfterImport  - current sounds array after reconciliation
+ * @param ensureTagExists    - from libraryStore
+ * @param systemAssignTagsToSounds - from libraryStore (bypasses system-tag guard)
  */
-export function tagImportedSounds(previousSounds: Sound[]): void {
-  const { sounds, ensureTagExists, systemAssignTagsToSounds } =
-    useLibraryStore.getState();
-
-  const previousIds = new Set(previousSounds.map((s) => s.id));
-  const newSoundIds = sounds
+export function tagImportedSounds(
+  soundsBeforeImport: Sound[],
+  soundsAfterImport: Sound[],
+  ensureTagExists: (name: string, color?: string, isSystem?: boolean) => Tag,
+  systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void,
+): void {
+  const previousIds = new Set(soundsBeforeImport.map((s) => s.id));
+  const newSoundIds = soundsAfterImport
     .filter((s) => !previousIds.has(s.id))
     .map((s) => s.id);
 
