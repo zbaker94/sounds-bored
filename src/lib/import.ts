@@ -1,6 +1,6 @@
 import { exists, copyFile } from "@tauri-apps/plugin-fs";
 import { join, basename } from "@tauri-apps/api/path";
-import { AUDIO_EXTENSIONS } from "@/lib/constants";
+import { AUDIO_EXTENSIONS, SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 import { useLibraryStore } from "@/state/libraryStore";
 import { Sound } from "@/lib/schemas";
 
@@ -64,6 +64,6 @@ export function tagImportedSounds(previousSounds: Sound[]): void {
 
   if (newSoundIds.length === 0) return;
 
-  const importedTag = ensureTagExists("imported", undefined, true);
+  const importedTag = ensureTagExists(SYSTEM_TAG_IMPORTED, undefined, true);
   systemAssignTagsToSounds(newSoundIds, [importedTag.id]);
 }

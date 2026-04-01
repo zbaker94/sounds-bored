@@ -4,6 +4,7 @@ import { useGlobalLibrary, useSaveGlobalLibrary } from "@/lib/library.queries";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
 /**
  * Loads appSettings and globalLibrary from disk into their respective
@@ -66,7 +67,7 @@ export function useBootLoader() {
           useLibraryStore.getState();
         const importFolderId = settings.importFolderId;
         const existingImportedTag = currentTags.find(
-          (t) => t.name.toLowerCase() === "imported",
+          (t) => t.name.toLowerCase() === SYSTEM_TAG_IMPORTED,
         );
         const untaggedImportIds = currentSounds
           .filter(
@@ -76,7 +77,7 @@ export function useBootLoader() {
           )
           .map((s) => s.id);
         if (untaggedImportIds.length > 0) {
-          const importedTag = ensureTagExists("imported", undefined, true);
+          const importedTag = ensureTagExists(SYSTEM_TAG_IMPORTED, undefined, true);
           systemAssignTagsToSounds(untaggedImportIds, [importedTag.id]);
         }
 

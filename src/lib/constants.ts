@@ -29,3 +29,6 @@ export const CURRENT_LIBRARY_VERSION = "1.0.0";
 export const SOUNDS_SUBFOLDER = "sounds";
 export const AUDIO_EXTENSIONS = [".wav", ".mp3", ".ogg", ".flac", ".aiff", ".m4a"] as const;
 export type AudioExtension = typeof AUDIO_EXTENSIONS[number];
+
+// System tag names
+export const SYSTEM_TAG_IMPORTED = "imported";
