@@ -54,7 +54,10 @@ export function LayerConfigSection() {
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Sound Selection
         </Label>
-        <Tabs value={selectionType} onValueChange={(v) => handleSelectionTypeChange(v as LayerSelection["type"])}>
+        <Tabs value={selectionType} onValueChange={(v) => {
+          if (v === "assigned" || v === "tag" || v === "set")
+            handleSelectionTypeChange(v);
+        }}>
           <TabsList className="w-full">
             <TabsTrigger value="assigned" className="flex-1">Assigned</TabsTrigger>
             <TabsTrigger value="tag" className="flex-1">Tag</TabsTrigger>
@@ -88,7 +91,10 @@ export function LayerConfigSection() {
         </Label>
         <Tabs
           value={arrangement}
-          onValueChange={(v) => setValue("layer.arrangement", v as Arrangement, { shouldDirty: true })}
+          onValueChange={(v) => {
+            if (ARRANGEMENT_OPTIONS.some((o) => o.value === v))
+              setValue("layer.arrangement", v as Arrangement, { shouldDirty: true });
+          }}
         >
           <TabsList className="w-full">
             {ARRANGEMENT_OPTIONS.map((opt) => (
@@ -107,7 +113,10 @@ export function LayerConfigSection() {
         </Label>
         <Tabs
           value={playbackMode}
-          onValueChange={(v) => setValue("layer.playbackMode", v as PlaybackMode, { shouldDirty: true })}
+          onValueChange={(v) => {
+            if (PLAYBACK_MODE_OPTIONS.some((o) => o.value === v))
+              setValue("layer.playbackMode", v as PlaybackMode, { shouldDirty: true });
+          }}
         >
           <TabsList className="w-full">
             {PLAYBACK_MODE_OPTIONS.map((opt) => (
@@ -126,7 +135,10 @@ export function LayerConfigSection() {
         </Label>
         <Tabs
           value={retriggerMode}
-          onValueChange={(v) => setValue("layer.retriggerMode", v as RetriggerMode, { shouldDirty: true })}
+          onValueChange={(v) => {
+            if (RETRIGGER_MODE_OPTIONS.some((o) => o.value === v))
+              setValue("layer.retriggerMode", v as RetriggerMode, { shouldDirty: true });
+          }}
         >
           <TabsList className="w-full">
             {RETRIGGER_MODE_OPTIONS.map((opt) => (

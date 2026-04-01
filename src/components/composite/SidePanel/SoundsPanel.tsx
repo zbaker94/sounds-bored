@@ -1,13 +1,12 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, memo } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettings } from "@/lib/appSettings.queries";
-import { useSaveAppSettings } from "@/lib/appSettings.queries";
+import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { copyFilesToFolder } from "@/lib/import";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { useImportSounds } from "@/hooks/useImportSounds";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import {
   Empty,
@@ -31,12 +30,11 @@ import {
   Tag01Icon,
   LockIcon,
 } from "@hugeicons/core-free-icons";
-import type { GlobalFolder } from "@/lib/schemas";
+import type { GlobalFolder, Tag } from "@/lib/schemas";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
 
-const EMPTY_FOLDERS: GlobalFolder[] = [];
 import { Button } from "@/components/ui/button";
 import {
   Item,
@@ -56,8 +54,50 @@ import { TruncatedPath } from "@/components/ui/truncated-path";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
 import guyWithTorch from "@/assets/guywithtorch.gif";
 
+const EMPTY_FOLDERS: GlobalFolder[] = [];
+
 const panelClass =
   "backdrop-blur-sm hover:backdrop-blur-lg bg-black/50 rounded-lg";
+
+interface SoundListItemTagsProps {
+  soundTagIds: string[];
+  allTags: Tag[];
+}
+
+const SoundListItemTags = memo(function SoundListItemTags({
+  soundTagIds,
+  allTags,
+}: SoundListItemTagsProps) {
+  const soundTags = useMemo(
+    () => allTags.filter((t) => soundTagIds.includes(t.id)),
+    [allTags, soundTagIds]
+  );
+  const systemTags = useMemo(() => soundTags.filter((t) => t.isSystem), [soundTags]);
+  const userTags = useMemo(() => soundTags.filter((t) => !t.isSystem), [soundTags]);
+  if (soundTagIds.length === 0) return null;
+  if (soundTags.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-0.5">
+      {systemTags.map((tag) => (
+        <span
+          key={tag.id}
+          className="inline-flex items-center gap-0.5 rounded-full bg-white/10 text-white/50 border border-white/20 drop-shadow-[0_2px_0px_rgba(255,255,255,0.05)] px-1.5 py-0 text-[10px] leading-4"
+        >
+          <HugeiconsIcon icon={LockIcon} size={8} />
+          {tag.name}
+        </span>
+      ))}
+      {userTags.map((tag) => (
+        <span
+          key={tag.id}
+          className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-[rgba(194,67,113,1)] drop-shadow-[0_2px_0px_rgba(194,67,113,1)] px-1.5 py-0 text-[10px] leading-4"
+        >
+          {tag.name}
+        </span>
+      ))}
+    </div>
+  );
+});
 
 export function SoundsPanel() {
   const sets = useLibraryStore((s) => s.sets);
@@ -70,6 +110,16 @@ export function SoundsPanel() {
 
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
+
+  const importFolder = settings?.globalFolders.find(
+    (f) => f.id === settings?.importFolderId,
+  );
+  const importSounds = useImportSounds(importFolder, folders);
+
+  const importSoundsRef = useRef(importSounds);
+  useEffect(() => {
+    importSoundsRef.current = importSounds;
+  }, [importSounds]);
 
   const [selectedId, setSelectedId] = useState<string | null>(
     folders[0]?.id ?? sets[0]?.id ?? null,
@@ -98,7 +148,7 @@ export function SoundsPanel() {
   useEffect(() => {
     setSelectedSoundIds(new globalThis.Set());
     stopPreview();
-  }, [selectedId]);
+  }, [selectedId, stopPreview]);
 
   const handleSelect = (id: string) => {
     if (selectedId === id) {
@@ -109,41 +159,10 @@ export function SoundsPanel() {
   };
 
   async function handleDropImport(paths: string[]) {
-    if (!settings) return;
-    const importFolder = settings.globalFolders.find(
-      (f) => f.id === settings.importFolderId,
-    );
-    if (!importFolder) return;
     setIsImporting(true);
     try {
-      const copied = await copyFilesToFolder(paths, importFolder.path);
-      if (copied.length === 0) return;
-      const previousIds = new Set(useLibraryStore.getState().sounds.map((s) => s.id));
-      const result = await reconcileGlobalLibrary(
-        settings.globalFolders,
-        sounds,
-      );
-      if (result.changed) {
-        updateLibrary((draft) => {
-          draft.sounds = result.sounds;
-        });
-        const { sounds: currentSounds, ensureTagExists, assignTagsToSounds } = useLibraryStore.getState();
-        const newImportedIds = currentSounds
-          .filter((s) => !previousIds.has(s.id) && s.folderId === importFolder.id)
-          .map((s) => s.id);
-        if (newImportedIds.length > 0) {
-          const importedTag = ensureTagExists("imported");
-          assignTagsToSounds(newImportedIds, [importedTag.id]);
-        }
-        const latest = useLibraryStore.getState();
-        await saveLibrary({
-          version: "1.0.0",
-          sounds: latest.sounds,
-          tags: latest.tags,
-          sets: latest.sets,
-        });
-      }
-      toast.success(`${copied.length} sound(s) imported`);
+      const count = await importSoundsRef.current(paths);
+      if (count > 0) toast.success(`${count} sound(s) imported`);
     } finally {
       setIsImporting(false);
     }
@@ -151,53 +170,16 @@ export function SoundsPanel() {
 
   async function handleImportSounds() {
     if (!settings) return;
-    const importFolder = settings.globalFolders.find(
-      (f) => f.id === settings.importFolderId,
-    );
-    if (!importFolder) return;
-
     setIsImporting(true);
     try {
       const selected = await open({
         multiple: true,
-        filters: [
-          {
-            name: "Audio",
-            extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")),
-          },
-        ],
+        filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
       });
       if (!selected) return;
       const paths = Array.isArray(selected) ? selected : [selected];
-      const copied = await copyFilesToFolder(paths, importFolder.path);
-      if (copied.length === 0) return;
-
-      const previousIds = new Set(useLibraryStore.getState().sounds.map((s) => s.id));
-      const result = await reconcileGlobalLibrary(
-        settings.globalFolders,
-        sounds,
-      );
-      if (result.changed) {
-        updateLibrary((draft) => {
-          draft.sounds = result.sounds;
-        });
-        const { sounds: currentSounds, ensureTagExists, assignTagsToSounds } = useLibraryStore.getState();
-        const newImportedIds = currentSounds
-          .filter((s) => !previousIds.has(s.id) && s.folderId === importFolder.id)
-          .map((s) => s.id);
-        if (newImportedIds.length > 0) {
-          const importedTag = ensureTagExists("imported");
-          assignTagsToSounds(newImportedIds, [importedTag.id]);
-        }
-        const latest = useLibraryStore.getState();
-        await saveLibrary({
-          version: "1.0.0",
-          sounds: latest.sounds,
-          tags: latest.tags,
-          sets: latest.sets,
-        });
-      }
-      toast.success(`${copied.length} sound(s) imported`);
+      const count = await importSounds(paths);
+      if (count > 0) toast.success(`${count} sound(s) imported`);
     } finally {
       setIsImporting(false);
     }
@@ -282,6 +264,11 @@ export function SoundsPanel() {
       });
     return () => unlisten?.();
   }, []);
+
+  const selectedSoundIdsArray = useMemo(
+    () => [...selectedSoundIds],
+    [selectedSoundIds],
+  );
 
   return (
     <div className="relative flex flex-col h-full min-h-0 gap-2 p-2">
@@ -536,34 +523,7 @@ export function SoundsPanel() {
                 </ItemMedia>
                 <ItemContent>
                   <ItemTitle>{sound.name}</ItemTitle>
-                  {(() => {
-                    const soundTags = tags.filter((t) =>
-                      sound.tags.includes(t.id),
-                    );
-                    const systemTags = soundTags.filter((t) => t.isSystem);
-                    const userTags = soundTags.filter((t) => !t.isSystem);
-                    return soundTags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {systemTags.map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="inline-flex items-center gap-0.5 rounded-full bg-white/10 text-white/50 border border-white/20 drop-shadow-[0_2px_0px_rgba(255,255,255,0.05)] px-1.5 py-0 text-[10px] leading-4"
-                          >
-                            <HugeiconsIcon icon={LockIcon} size={8} />
-                            {tag.name}
-                          </span>
-                        ))}
-                        {userTags.map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-[rgba(194,67,113,1)] drop-shadow-[0_2px_0px_rgba(194,67,113,1)] px-1.5 py-0 text-[10px] leading-4"
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null;
-                  })()}
+                  <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
                 </ItemContent>
                 <ItemActions>
                   {sound.filePath ? (
@@ -619,8 +579,8 @@ export function SoundsPanel() {
         draggable={false}
       />
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
-      <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={[...selectedSoundIds]} />
-      <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={[...selectedSoundIds]} />
+      <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={selectedSoundIdsArray} />
+      <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={selectedSoundIdsArray} />
     </div>
   );
 }

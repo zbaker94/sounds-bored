@@ -51,6 +51,10 @@ export const useLibraryStore = create<LibraryStore>()(
 
     updateLibrary: (updater) =>
       set((draft) => {
+        // INVARIANT: Do NOT mutate sound.tags directly via this action — use
+        // assignTagsToSounds / removeTagFromSounds / systemAssignTagsToSounds
+        // so system-tag guards are enforced. updateLibrary is for structural
+        // changes (sounds list, sets) not tag assignments.
         // Pass only the library-data fields to the updater so callers
         // cannot directly mutate isDirty — that is managed by this action.
         updater(draft);
@@ -107,7 +111,11 @@ export const useLibraryStore = create<LibraryStore>()(
         (t) => t.name.toLowerCase() === name.toLowerCase(),
       );
       if (existing) {
-        // If caller requests isSystem: true but existing tag isn't, upgrade it.
+        // NOTE: If a user has already created a tag with the same name as a system
+        // tag (e.g., "imported"), and isSystem:true is requested, the existing tag
+        // is silently promoted to system status and becomes non-removable by the user.
+        // This is an acceptable tradeoff for a desktop app, but callers should be
+        // aware. Use SYSTEM_TAG_IMPORTED (a known name) to reduce collision risk.
         if (isSystem && !existing.isSystem) {
           set((draft) => {
             const tag = draft.tags.find((t) => t.id === existing.id);

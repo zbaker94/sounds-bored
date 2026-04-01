@@ -10,7 +10,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(echo \"exit: $?\")",
-      "mcp__shadcn__get_add_command_for_items"
+      "mcp__shadcn__get_add_command_for_items",
+      "Bash(npx vitest:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

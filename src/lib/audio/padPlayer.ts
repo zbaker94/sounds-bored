@@ -56,13 +56,16 @@ export function clearAllPadGains(): void {
 }
 
 function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
+  // Build a lookup map once per call — O(sounds) build, O(1) per lookup.
+  const soundById = new Map(sounds.map((s) => [s.id, s]));
   const sel = layer.selection;
   switch (sel.type) {
     case "assigned":
       return sel.instances
-        .map((inst) => sounds.find((s) => s.id === inst.soundId))
+        .map((inst) => soundById.get(inst.soundId))
         .filter((s): s is Sound => !!s && !!s.filePath);
     case "tag":
+      // Union/OR semantics: a sound matches if it has ANY of the selected tagIds.
       return sounds.filter(
         (s) => sel.tagIds.some((tid) => s.tags.includes(tid)) && !!s.filePath
       );

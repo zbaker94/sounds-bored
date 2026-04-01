@@ -66,21 +66,16 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
     [searchDocs]
   );
 
-  const tagCountMap = useMemo(
-    () =>
-      Object.fromEntries(
-        tags.map((t) => [t.id, sounds.filter((s) => s.tags.includes(t.id)).length])
-      ),
-    [tags, sounds]
-  );
-
-  const setCountMap = useMemo(
-    () =>
-      Object.fromEntries(
-        sets.map((st) => [st.id, sounds.filter((s) => s.sets.includes(st.id)).length])
-      ),
-    [sets, sounds]
-  );
+  // Single pass over sounds: O(sounds × (avgTagsPerSound + avgSetsPerSound))
+  const { tagCountMap, setCountMap } = useMemo(() => {
+    const tc: Record<string, number> = {};
+    const sc: Record<string, number> = {};
+    for (const s of sounds) {
+      for (const tid of s.tags) tc[tid] = (tc[tid] ?? 0) + 1;
+      for (const sid of s.sets) sc[sid] = (sc[sid] ?? 0) + 1;
+    }
+    return { tagCountMap: tc, setCountMap: sc };
+  }, [sounds]);
 
   // ── Assigned mode ────────────────────────────────────────────────────────────
 

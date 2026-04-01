@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
@@ -37,6 +37,9 @@ export function AddTagsDialog({
 }: AddTagsDialogProps) {
   const tags = useLibraryStore((s) => s.tags);
   const sounds = useLibraryStore((s) => s.sounds);
+  const assignTagsToSounds = useLibraryStore((s) => s.assignTagsToSounds);
+  const removeTagFromSounds = useLibraryStore((s) => s.removeTagFromSounds);
+  const ensureTagExists = useLibraryStore((s) => s.ensureTagExists);
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
   const anchorRef = useComboboxAnchor();
 
@@ -65,31 +68,35 @@ export function AddTagsDialog({
     return map;
   }, [sounds, selectedSoundIds, partialTagIds]);
 
-  useEffect(() => {
-    if (open) {
-      const selectedSounds = sounds.filter((s) => selectedSoundIds.includes(s.id));
-      const fullIds =
-        selectedSounds.length === 0
-          ? []
-          : userTags
-              .filter((tag) => selectedSounds.every((s) => s.tags.includes(tag.id)))
-              .map((t) => t.id);
-      const partialIds = userTags
-        .filter(
-          (tag) =>
-            selectedSounds.some((s) => s.tags.includes(tag.id)) &&
-            !selectedSounds.every((s) => s.tags.includes(tag.id)),
-        )
-        .map((t) => t.id);
+  // Keep a live ref to the values we need at open time.
+  // This avoids listing them as effect deps (which would re-snapshot while open)
+  // without needing an eslint-disable.
+  const snapshotRef = useRef({ sounds, selectedSoundIds, userTags });
+  snapshotRef.current = { sounds, selectedSoundIds, userTags };
 
-      setSelectedTagIds(fullIds);
-      setPartialTagIds(partialIds);
-      setOriginalFullTagIds(fullIds);
-      setOriginalPartialTagIds(partialIds);
-      setInputValue("");
-    }
-    // snapshot at open time only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!open) return;
+    const { sounds: s, selectedSoundIds: ids, userTags: ut } = snapshotRef.current;
+    const selectedSounds = s.filter((sound) => ids.includes(sound.id));
+    const fullIds =
+      selectedSounds.length === 0
+        ? []
+        : ut
+            .filter((tag) => selectedSounds.every((sound) => sound.tags.includes(tag.id)))
+            .map((t) => t.id);
+    const partialIds = ut
+      .filter(
+        (tag) =>
+          selectedSounds.some((sound) => sound.tags.includes(tag.id)) &&
+          !selectedSounds.every((sound) => sound.tags.includes(tag.id)),
+      )
+      .map((t) => t.id);
+
+    setSelectedTagIds(fullIds);
+    setPartialTagIds(partialIds);
+    setOriginalFullTagIds(fullIds);
+    setOriginalPartialTagIds(partialIds);
+    setInputValue("");
   }, [open]);
 
   const trimmedInput = inputValue.trim();
@@ -100,7 +107,6 @@ export function AddTagsDialog({
 
   function handleValueChange(newIds: string[]) {
     if (newIds.includes("__create__")) {
-      const { ensureTagExists } = useLibraryStore.getState();
       const newTag = ensureTagExists(trimmedInput);
       setSelectedTagIds([...newIds.filter((id) => id !== "__create__"), newTag.id]);
       return;
@@ -126,8 +132,6 @@ export function AddTagsDialog({
   }
 
   async function handleConfirm() {
-    const { assignTagsToSounds, removeTagFromSounds } = useLibraryStore.getState();
-
     const originalFullSet = new Set(originalFullTagIds);
     const selectedSet = new Set(selectedTagIds);
     const remainingPartialSet = new Set(partialTagIds);

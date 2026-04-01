@@ -51,7 +51,7 @@ export function hasFilePath(sound: Sound): sound is Sound & { filePath: string }
 
 export const TagSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  name: z.string().min(1).max(100),
   color: z.string().optional(),
   isSystem: z.boolean().optional(),
 });

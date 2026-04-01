@@ -13,6 +13,7 @@ import {
   hasFilePath,
   LayerConfigFormSchema,
   PadConfigSchema,
+  TagSchema,
   type ProjectHistoryEntry,
   type ProjectHistory,
   type Project,
@@ -572,5 +573,27 @@ describe("PadConfigSchema", () => {
   it("rejects missing name", () => {
     const result = PadConfigSchema.safeParse({ layer: validLayer });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("TagSchema", () => {
+  it("accepts a valid tag", () => {
+    const result = TagSchema.safeParse({ id: "t1", name: "drums" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a tag with an empty name", () => {
+    const result = TagSchema.safeParse({ id: "t1", name: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a tag name longer than 100 characters", () => {
+    const result = TagSchema.safeParse({ id: "t1", name: "a".repeat(101) });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a tag name of exactly 100 characters", () => {
+    const result = TagSchema.safeParse({ id: "t1", name: "a".repeat(100) });
+    expect(result.success).toBe(true);
   });
 });
