@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useLibraryStore, initialLibraryState } from "./libraryStore";
-import { createMockGlobalLibrary, createMockSound, createMockSet } from "@/test/factories";
+import { createMockGlobalLibrary, createMockSound, createMockSet, createMockTag } from "@/test/factories";
 
 function getState() {
   return useLibraryStore.getState();
@@ -181,6 +181,101 @@ describe("libraryStore", () => {
       getState().addSoundsToSet(["sound-1"], "set-1");
 
       expect(getState().isDirty).toBe(true);
+    });
+  });
+
+  describe("ensureTagExists", () => {
+    it("should create a tag with isSystem: true when requested", () => {
+      const tag = getState().ensureTagExists("imported", undefined, true);
+
+      expect(tag.isSystem).toBe(true);
+      expect(getState().tags).toHaveLength(1);
+      expect(getState().tags[0].isSystem).toBe(true);
+    });
+
+    it("should upgrade an existing non-system tag to isSystem: true", () => {
+      const existing = createMockTag({ id: "t1", name: "imported" });
+      useLibraryStore.setState({ tags: [existing] });
+
+      const tag = getState().ensureTagExists("imported", undefined, true);
+
+      expect(tag.isSystem).toBe(true);
+      expect(getState().tags[0].isSystem).toBe(true);
+    });
+
+    it("should not downgrade an existing system tag when isSystem is not passed", () => {
+      const existing = createMockTag({ id: "t1", name: "imported", isSystem: true });
+      useLibraryStore.setState({ tags: [existing] });
+
+      const tag = getState().ensureTagExists("imported");
+
+      expect(tag.isSystem).toBe(true);
+      expect(getState().tags[0].isSystem).toBe(true);
+    });
+
+    it("should create a non-system tag by default", () => {
+      const tag = getState().ensureTagExists("drums");
+
+      expect(tag.isSystem).toBeUndefined();
+    });
+  });
+
+  describe("removeTagFromSounds", () => {
+    it("should silently skip system tags (does not remove them)", () => {
+      const systemTag = createMockTag({ id: "sys-t1", name: "imported", isSystem: true });
+      const sound = createMockSound({ id: "sound-1", tags: ["sys-t1"] });
+      useLibraryStore.setState({ tags: [systemTag], sounds: [sound], isDirty: false });
+
+      getState().removeTagFromSounds(["sound-1"], "sys-t1");
+
+      // Tag should still be on the sound
+      expect(getState().sounds[0].tags).toContain("sys-t1");
+    });
+
+    it("should remove non-system tags normally", () => {
+      const tag = createMockTag({ id: "t1", name: "drums" });
+      const sound = createMockSound({ id: "sound-1", tags: ["t1"] });
+      useLibraryStore.setState({ tags: [tag], sounds: [sound], isDirty: false });
+
+      getState().removeTagFromSounds(["sound-1"], "t1");
+
+      expect(getState().sounds[0].tags).not.toContain("t1");
+    });
+  });
+
+  describe("assignTagsToSounds", () => {
+    it("should silently skip system tag IDs", () => {
+      const systemTag = createMockTag({ id: "sys-t1", name: "imported", isSystem: true });
+      const normalTag = createMockTag({ id: "t1", name: "drums" });
+      const sound = createMockSound({ id: "sound-1", tags: [] });
+      useLibraryStore.setState({ tags: [systemTag, normalTag], sounds: [sound] });
+
+      getState().assignTagsToSounds(["sound-1"], ["sys-t1", "t1"]);
+
+      // Only the non-system tag should be assigned
+      expect(getState().sounds[0].tags).toEqual(["t1"]);
+    });
+
+    it("should assign non-system tags normally", () => {
+      const tag = createMockTag({ id: "t1", name: "drums" });
+      const sound = createMockSound({ id: "sound-1", tags: [] });
+      useLibraryStore.setState({ tags: [tag], sounds: [sound] });
+
+      getState().assignTagsToSounds(["sound-1"], ["t1"]);
+
+      expect(getState().sounds[0].tags).toEqual(["t1"]);
+    });
+  });
+
+  describe("systemAssignTagsToSounds", () => {
+    it("should assign system tags (bypasses the guard)", () => {
+      const systemTag = createMockTag({ id: "sys-t1", name: "imported", isSystem: true });
+      const sound = createMockSound({ id: "sound-1", tags: [] });
+      useLibraryStore.setState({ tags: [systemTag], sounds: [sound] });
+
+      getState().systemAssignTagsToSounds(["sound-1"], ["sys-t1"]);
+
+      expect(getState().sounds[0].tags).toEqual(["sys-t1"]);
     });
   });
 });

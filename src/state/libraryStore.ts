@@ -19,11 +19,13 @@ interface LibraryActions {
   duplicateSet: (setId: string) => Set | null;
   addSoundsToSet: (soundIds: string[], setId: string) => void;
   /** Ensure a tag with the given name exists (case-insensitive match); create if not found. Returns the tag. */
-  ensureTagExists: (name: string, color?: string) => Tag;
-  /** Add tagIds to each sound in soundIds. Idempotent — won't create duplicates in sound.tags. */
+  ensureTagExists: (name: string, color?: string, isSystem?: boolean) => Tag;
+  /** Add tagIds to each sound in soundIds. Idempotent — won't create duplicates in sound.tags. Silently skips system tags. */
   assignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
-  /** Remove tagId from each sound in soundIds. */
+  /** Remove tagId from each sound in soundIds. Silently skips system tags. */
   removeTagFromSounds: (soundIds: string[], tagId: string) => void;
+  /** Like assignTagsToSounds but bypasses the system tag guard. For internal use (import, bootloader). */
+  systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
 }
 
 export type LibraryStore = LibraryState & LibraryActions;
@@ -100,13 +102,26 @@ export const useLibraryStore = create<LibraryStore>()(
         draft.isDirty = true;
       }),
 
-    ensureTagExists: (name, color) => {
+    ensureTagExists: (name, color, isSystem) => {
       const existing = get().tags.find(
         (t) => t.name.toLowerCase() === name.toLowerCase(),
       );
-      if (existing) return existing;
+      if (existing) {
+        // If caller requests isSystem: true but existing tag isn't, upgrade it.
+        if (isSystem && !existing.isSystem) {
+          set((draft) => {
+            const tag = draft.tags.find((t) => t.id === existing.id);
+            if (tag) {
+              tag.isSystem = true;
+              draft.isDirty = true;
+            }
+          });
+          return { ...existing, isSystem: true };
+        }
+        return existing;
+      }
 
-      const newTag: Tag = { id: crypto.randomUUID(), name, color };
+      const newTag: Tag = { id: crypto.randomUUID(), name, color, isSystem };
       set((draft) => {
         draft.tags.push(newTag);
         draft.isDirty = true;
@@ -116,9 +131,13 @@ export const useLibraryStore = create<LibraryStore>()(
 
     assignTagsToSounds: (soundIds, tagIds) =>
       set((draft) => {
+        // Filter out system tag IDs — user-facing action should not assign system tags.
+        const nonSystemTagIds = tagIds.filter(
+          (tid) => !draft.tags.find((t) => t.id === tid)?.isSystem,
+        );
         for (const sound of draft.sounds) {
           if (soundIds.includes(sound.id)) {
-            for (const tagId of tagIds) {
+            for (const tagId of nonSystemTagIds) {
               if (!sound.tags.includes(tagId)) {
                 sound.tags.push(tagId);
               }
@@ -130,9 +149,27 @@ export const useLibraryStore = create<LibraryStore>()(
 
     removeTagFromSounds: (soundIds, tagId) =>
       set((draft) => {
+        // Silently skip system tags — they cannot be removed by users.
+        const tag = draft.tags.find((t) => t.id === tagId);
+        if (tag?.isSystem) return;
+
         for (const sound of draft.sounds) {
           if (soundIds.includes(sound.id)) {
             sound.tags = sound.tags.filter((t) => t !== tagId);
+          }
+        }
+        draft.isDirty = true;
+      }),
+
+    systemAssignTagsToSounds: (soundIds, tagIds) =>
+      set((draft) => {
+        for (const sound of draft.sounds) {
+          if (soundIds.includes(sound.id)) {
+            for (const tagId of tagIds) {
+              if (!sound.tags.includes(tagId)) {
+                sound.tags.push(tagId);
+              }
+            }
           }
         }
         draft.isDirty = true;

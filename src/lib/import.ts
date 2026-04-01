@@ -54,7 +54,7 @@ export async function copyFilesToFolder(
  * Call this after reconciliation has updated the library store with new sounds.
  */
 export function tagImportedSounds(previousSounds: Sound[]): void {
-  const { sounds, ensureTagExists, assignTagsToSounds } =
+  const { sounds, ensureTagExists, systemAssignTagsToSounds } =
     useLibraryStore.getState();
 
   const previousIds = new Set(previousSounds.map((s) => s.id));
@@ -64,6 +64,6 @@ export function tagImportedSounds(previousSounds: Sound[]): void {
 
   if (newSoundIds.length === 0) return;
 
-  const importedTag = ensureTagExists("imported");
-  assignTagsToSounds(newSoundIds, [importedTag.id]);
+  const importedTag = ensureTagExists("imported", undefined, true);
+  systemAssignTagsToSounds(newSoundIds, [importedTag.id]);
 }

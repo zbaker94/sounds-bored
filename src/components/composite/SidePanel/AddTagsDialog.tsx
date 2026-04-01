@@ -36,14 +36,18 @@ export function AddTagsDialog({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
 
+  // Only non-system tags are available for manual add/remove
+  const userTags = useMemo(() => tags.filter((t) => !t.isSystem), [tags]);
+
   // Tags that ALL selected sounds share — used for pre-population and diffing on confirm
+  // System tags are excluded since users cannot add/remove them
   const originalTagIds = useMemo(() => {
     const selectedSounds = sounds.filter((s) => selectedSoundIds.includes(s.id));
     if (selectedSounds.length === 0) return [];
-    return tags
+    return userTags
       .filter((tag) => selectedSounds.every((s) => s.tags.includes(tag.id)))
       .map((t) => t.id);
-  }, [sounds, tags, selectedSoundIds]);
+  }, [sounds, userTags, selectedSoundIds]);
 
   useEffect(() => {
     if (open) {
@@ -55,7 +59,7 @@ export function AddTagsDialog({
   }, [open]);
 
   const trimmedInput = inputValue.trim();
-  const inputMatchesExisting = tags.some(
+  const inputMatchesExisting = userTags.some(
     (t) => t.name.toLowerCase() === trimmedInput.toLowerCase(),
   );
   const canCreate = trimmedInput.length > 0 && !inputMatchesExisting;
@@ -117,12 +121,12 @@ export function AddTagsDialog({
             value={selectedTagIds}
             onValueChange={handleValueChange}
             onInputValueChange={(val) => setInputValue(val)}
-            items={tags}
+            items={userTags}
             multiple
           >
             <ComboboxChips ref={anchorRef}>
               {selectedTagIds.map((id) => {
-                const tag = tags.find((t) => t.id === id);
+                const tag = userTags.find((t) => t.id === id);
                 return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
               })}
               <ComboboxChipsInput placeholder="Search or create tags..." />

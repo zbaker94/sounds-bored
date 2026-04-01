@@ -53,6 +53,7 @@ export const TagSchema = z.object({
   id: z.string(),
   name: z.string(),
   color: z.string().optional(),
+  isSystem: z.boolean().optional(),
 });
 
 export const SetSchema = z.object({

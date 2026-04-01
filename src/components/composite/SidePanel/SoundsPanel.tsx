@@ -29,6 +29,7 @@ import {
   PlayIcon,
   StopIcon,
   Tag01Icon,
+  LockIcon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder } from "@/lib/schemas";
 import { AddSetDialog } from "./AddSetDialog";
@@ -539,9 +540,20 @@ export function SoundsPanel() {
                     const soundTags = tags.filter((t) =>
                       sound.tags.includes(t.id),
                     );
+                    const systemTags = soundTags.filter((t) => t.isSystem);
+                    const userTags = soundTags.filter((t) => !t.isSystem);
                     return soundTags.length > 0 ? (
                       <div className="flex flex-wrap gap-1 mt-0.5">
-                        {soundTags.map((tag) => (
+                        {systemTags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="inline-flex items-center gap-0.5 rounded-full bg-white/10 text-white/50 border border-white/20 drop-shadow-[0_2px_0px_rgba(255,255,255,0.05)] px-1.5 py-0 text-[10px] leading-4"
+                          >
+                            <HugeiconsIcon icon={LockIcon} size={8} />
+                            {tag.name}
+                          </span>
+                        ))}
+                        {userTags.map((tag) => (
                           <span
                             key={tag.id}
                             className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-[rgba(194,67,113,1)] drop-shadow-[0_2px_0px_rgba(194,67,113,1)] px-1.5 py-0 text-[10px] leading-4"

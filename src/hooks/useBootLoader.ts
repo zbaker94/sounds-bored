@@ -62,7 +62,7 @@ export function useBootLoader() {
 
         // Retroactively ensure all sounds in the import folder have the "imported" tag.
         // This handles sounds that were imported before this feature existed.
-        const { sounds: currentSounds, tags: currentTags, ensureTagExists, assignTagsToSounds } =
+        const { sounds: currentSounds, tags: currentTags, ensureTagExists, systemAssignTagsToSounds } =
           useLibraryStore.getState();
         const importFolderId = settings.importFolderId;
         const existingImportedTag = currentTags.find(
@@ -76,8 +76,8 @@ export function useBootLoader() {
           )
           .map((s) => s.id);
         if (untaggedImportIds.length > 0) {
-          const importedTag = ensureTagExists("imported");
-          assignTagsToSounds(untaggedImportIds, [importedTag.id]);
+          const importedTag = ensureTagExists("imported", undefined, true);
+          systemAssignTagsToSounds(untaggedImportIds, [importedTag.id]);
         }
 
         // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
