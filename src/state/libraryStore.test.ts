@@ -18,6 +18,11 @@ describe("libraryStore", () => {
       expect(getState().sets).toEqual([]);
       expect(getState().isDirty).toBe(false);
     });
+
+    it("should start with empty missingSoundIds and missingFolderIds sets", () => {
+      expect(getState().missingSoundIds.size).toBe(0);
+      expect(getState().missingFolderIds.size).toBe(0);
+    });
   });
 
   describe("loadLibrary", () => {
@@ -276,6 +281,42 @@ describe("libraryStore", () => {
       getState().systemAssignTagsToSounds(["sound-1"], ["sys-t1"]);
 
       expect(getState().sounds[0].tags).toEqual(["sys-t1"]);
+    });
+  });
+
+  describe("setMissingState", () => {
+    it("should update missingSoundIds and missingFolderIds", () => {
+      const soundIds = new Set(["s1", "s2"]);
+      const folderIds = new Set(["f1"]);
+
+      getState().setMissingState(soundIds, folderIds);
+
+      expect(getState().missingSoundIds).toEqual(soundIds);
+      expect(getState().missingFolderIds).toEqual(folderIds);
+    });
+
+    it("should not mark isDirty", () => {
+      useLibraryStore.setState({ isDirty: false });
+
+      getState().setMissingState(new Set(["s1"]), new Set());
+
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("should replace previous missing state entirely", () => {
+      getState().setMissingState(new Set(["s1", "s2"]), new Set(["f1"]));
+      getState().setMissingState(new Set(["s3"]), new Set());
+
+      expect(getState().missingSoundIds).toEqual(new Set(["s3"]));
+      expect(getState().missingFolderIds.size).toBe(0);
+    });
+
+    it("should clear missing state when called with empty sets", () => {
+      getState().setMissingState(new Set(["s1"]), new Set(["f1"]));
+      getState().setMissingState(new Set(), new Set());
+
+      expect(getState().missingSoundIds.size).toBe(0);
+      expect(getState().missingFolderIds.size).toBe(0);
     });
   });
 });
