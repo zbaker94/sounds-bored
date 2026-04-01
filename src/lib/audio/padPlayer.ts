@@ -63,7 +63,9 @@ function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
         .map((inst) => sounds.find((s) => s.id === inst.soundId))
         .filter((s): s is Sound => !!s && !!s.filePath);
     case "tag":
-      return sounds.filter((s) => s.tags.includes(sel.tagId) && !!s.filePath);
+      return sounds.filter(
+        (s) => sel.tagIds.some((tid) => s.tags.includes(tid)) && !!s.filePath
+      );
     case "set":
       return sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath);
   }

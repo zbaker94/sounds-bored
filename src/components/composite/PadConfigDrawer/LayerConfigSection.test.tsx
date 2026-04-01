@@ -66,18 +66,18 @@ describe("LayerConfigSection", () => {
     expect(screen.getByRole("slider")).toBeInTheDocument();
   });
 
-  it("switching to tag type shows tag selector", async () => {
+  it("switching to tag type shows tag selector combobox", async () => {
     useLibraryStore.setState({ sounds: [], tags: [{ id: "t1", name: "Percussion", color: "#ffffff" }], sets: [], isDirty: false });
     render(<Wrapper />);
     await userEvent.click(screen.getByRole("tab", { name: /tag/i }));
-    expect(screen.getByText(/select tag/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search tags/i)).toBeInTheDocument();
   });
 
-  it("switching to set type shows set selector", async () => {
+  it("switching to set type shows set selector combobox", async () => {
     useLibraryStore.setState({ sounds: [], tags: [], sets: [{ id: "s1", name: "My Drums" }], isDirty: false });
     render(<Wrapper />);
     await userEvent.click(screen.getByRole("tab", { name: /set/i }));
-    expect(screen.getByText(/select set/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search sets/i)).toBeInTheDocument();
   });
 
   it("shows error when assigned with no sounds selected and form is submitted", async () => {
@@ -106,7 +106,7 @@ describe("LayerConfigSection", () => {
     await userEvent.click(screen.getByRole("tab", { name: /tag/i }));
     await userEvent.click(screen.getByRole("button", { name: /submit/i }));
 
-    expect(await screen.findByText(/a tag must be selected/i)).toBeInTheDocument();
+    expect(await screen.findByText(/at least one tag is required/i)).toBeInTheDocument();
   });
 
   it("shows error when set type has no set selected and form is submitted", async () => {

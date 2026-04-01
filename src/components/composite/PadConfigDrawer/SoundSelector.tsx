@@ -4,16 +4,21 @@ import Fuse from "fuse.js";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import type { LayerSelection, Sound, SoundInstance } from "@/lib/schemas";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxCollection,
+  ComboboxEmpty,
+  ComboboxInput,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import { SoundFolderTree } from "./SoundFolderTree";
 import { buildTree, findFolderNode, getSoundsInSubtree } from "./soundTreeUtils";
 
@@ -26,6 +31,8 @@ interface SoundSelectorProps {
 
 export function SoundSelector({ value, onChange }: SoundSelectorProps) {
   const [query, setQuery] = useState("");
+  // Anchor ref for Combobox chips dropdown positioning — always called (hook rule)
+  const tagAnchorRef = useComboboxAnchor();
 
   useEffect(() => {
     setQuery("");
@@ -38,7 +45,7 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
     useShallow((s) => s.settings?.globalFolders ?? [])
   );
 
-  // Build denormalized search docs: sound + resolved tag names
+  // Build denormalized search docs: sound + resolved tag names (used by assigned mode)
   const searchDocs: SoundSearchDoc[] = useMemo(
     () =>
       sounds.map((sound) => ({
@@ -58,6 +65,8 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
       }),
     [searchDocs]
   );
+
+  // ── Assigned mode ────────────────────────────────────────────────────────────
 
   if (value.type === "assigned") {
     const selectedIds = new Set(value.instances.map((i) => i.soundId));
@@ -156,88 +165,71 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
     );
   }
 
-  if (value.type === "tag") {
-    const trimmed = query.trim();
-    const filteredTags = trimmed
-      ? tags.filter((t) => t.name.toLowerCase().includes(trimmed.toLowerCase()))
-      : tags;
+  // ── Tag mode — multi-select Combobox with chips ───────────────────────────────
 
+  if (value.type === "tag") {
     return (
-      <div className="flex flex-col gap-2">
-        <Input
-          placeholder="Search tags..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {filteredTags.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {trimmed ? "No results." : "No tags in library yet."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Select tag</Label>
-            <Select
-              value={value.tagId}
-              onValueChange={(tagId) =>
-                onChange({ type: "tag", tagId, defaultVolume: value.defaultVolume })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a tag..." />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredTags.map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
+      <Combobox
+        value={value.tagIds}
+        onValueChange={(tagIds) =>
+          onChange({ type: "tag", tagIds, defaultVolume: value.defaultVolume })
+        }
+        items={tags}
+        multiple
+      >
+        <ComboboxChips ref={tagAnchorRef}>
+          {value.tagIds.map((id) => {
+            const tag = tags.find((t) => t.id === id);
+            return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
+          })}
+          <ComboboxChipsInput placeholder="Search tags..." />
+        </ComboboxChips>
+        <ComboboxContent anchor={tagAnchorRef}>
+          <ComboboxList>
+            <ComboboxEmpty>
+              {tags.length === 0 ? "No tags in library yet." : "No tags found."}
+            </ComboboxEmpty>
+            <ComboboxCollection>
+              {(t) => (
+                <ComboboxItem key={t.id} value={t.id}>
+                  {t.name}
+                </ComboboxItem>
+              )}
+            </ComboboxCollection>
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
     );
   }
 
-  // value.type === "set"
-  const trimmed = query.trim();
-  const filteredSets = trimmed
-    ? sets.filter((s) => s.name.toLowerCase().includes(trimmed.toLowerCase()))
-    : sets;
+  // ── Set mode — single-select Combobox ────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-2">
-      <Input
+    <Combobox
+      value={value.setId}
+      onValueChange={(setId) =>
+        onChange({ type: "set", setId, defaultVolume: value.defaultVolume })
+      }
+      items={sets}
+    >
+      <ComboboxInput
         placeholder="Search sets..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        showClear={!!value.setId}
       />
-      {filteredSets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {trimmed ? "No results." : "No sets in library yet."}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Select set</Label>
-          <Select
-            value={value.setId}
-            onValueChange={(setId) =>
-              onChange({ type: "set", setId, defaultVolume: value.defaultVolume })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Choose a set..." />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredSets.map((set) => (
-                <SelectItem key={set.id} value={set.id}>
-                  {set.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-    </div>
+      <ComboboxContent>
+        <ComboboxList>
+          <ComboboxEmpty>
+            {sets.length === 0 ? "No sets in library yet." : "No sets found."}
+          </ComboboxEmpty>
+          <ComboboxCollection>
+            {(s) => (
+              <ComboboxItem key={s.id} value={s.id}>
+                {s.name}
+              </ComboboxItem>
+            )}
+          </ComboboxCollection>
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }

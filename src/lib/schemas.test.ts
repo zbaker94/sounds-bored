@@ -267,7 +267,7 @@ describe("ProjectSchema — domain model fields", () => {
   });
 
   it("should accept LayerSelectionSchema with tag type", () => {
-    const result = LayerSelectionSchema.safeParse({ type: "tag", tagId: "t1", defaultVolume: 0.8 });
+    const result = LayerSelectionSchema.safeParse({ type: "tag", tagIds: ["t1"], defaultVolume: 0.8 });
     expect(result.success).toBe(true);
   });
 
@@ -504,7 +504,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("accepts a valid tag selection", () => {
     const result = LayerConfigFormSchema.safeParse({
-      selection: { type: "tag", tagId: "tag-1", defaultVolume: 100 },
+      selection: { type: "tag", tagIds: ["tag-1"], defaultVolume: 100 },
       arrangement: "sequential",
       playbackMode: "loop",
       retriggerMode: "continue",

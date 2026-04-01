@@ -7,7 +7,7 @@ import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constan
 export function createMockProject(overrides?: Partial<Project>): Project {
   return {
     name: "Test Project",
-    version: "1.1.0",
+    version: "1.2.0",
     description: "A test project",
     lastSaved: new Date().toISOString(),
     scenes: [],

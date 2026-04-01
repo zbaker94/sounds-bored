@@ -7,7 +7,7 @@ interface Migration {
   migrate: MigrationFn;
 }
 
-export const CURRENT_VERSION = "1.1.0";
+export const CURRENT_VERSION = "1.2.0";
 
 const MIGRATIONS: Migration[] = [
   {
@@ -35,6 +35,39 @@ const MIGRATIONS: Migration[] = [
       delete next.tags;
       delete next.sets;
       next.favoritedSetIds = [];
+
+      return next;
+    },
+  },
+  {
+    fromVersion: "1.1.0",
+    toVersion: "1.2.0",
+    migrate: (raw) => {
+      const next = { ...raw };
+      if (!Array.isArray(next.scenes)) return next;
+
+      next.scenes = (next.scenes as Array<Record<string, unknown>>).map((scene) => {
+        if (!Array.isArray(scene.pads)) return scene;
+        return {
+          ...scene,
+          pads: (scene.pads as Array<Record<string, unknown>>).map((pad) => {
+            if (!Array.isArray(pad.layers)) return pad;
+            return {
+              ...pad,
+              layers: (pad.layers as Array<Record<string, unknown>>).map((layer) => {
+                const sel = layer.selection as Record<string, unknown> | undefined;
+                if (!sel || sel.type !== "tag") return layer;
+                // Convert old single-tag format { tagId } to multi-tag { tagIds }
+                if (typeof sel.tagId === "string" && !Array.isArray(sel.tagIds)) {
+                  const { tagId, ...rest } = sel;
+                  return { ...layer, selection: { ...rest, tagIds: tagId ? [tagId] : [] } };
+                }
+                return layer;
+              }),
+            };
+          }),
+        };
+      });
 
       return next;
     },

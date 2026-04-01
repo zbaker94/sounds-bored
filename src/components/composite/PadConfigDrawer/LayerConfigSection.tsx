@@ -3,11 +3,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { SoundSelector } from "./SoundSelector";
-import type { PadConfigForm, LayerSelection } from "@/lib/schemas";
+import type { PadConfigForm, LayerSelection, Arrangement, PlaybackMode, RetriggerMode } from "@/lib/schemas";
 
 const SELECTION_TYPE_DEFAULTS: Record<LayerSelection["type"], LayerSelection> = {
   assigned: { type: "assigned", instances: [] },
-  tag: { type: "tag", tagId: "", defaultVolume: 100 },
+  tag: { type: "tag", tagIds: [], defaultVolume: 100 },
   set: { type: "set", setId: "", defaultVolume: 100 },
 };
 
@@ -32,7 +32,14 @@ const RETRIGGER_MODE_OPTIONS = [
 
 export function LayerConfigSection() {
   const { control, watch, setValue, formState: { errors } } = useFormContext<PadConfigForm>();
-  const selectionType = watch("layer.selection.type");
+  // Watch the parent path so the subscription fires when setValue("layer.selection", ...) sets a new
+  // discriminated union variant — child-path watches miss parent-path setValue updates.
+  const selectionType = watch("layer.selection").type;
+  // Using watch+setValue for tab fields avoids a Radix Tabs / react-hook-form Controller
+  // sync issue where the active-tab indicator stays on the initial value after clicking.
+  const arrangement = watch("layer.arrangement");
+  const playbackMode = watch("layer.playbackMode");
+  const retriggerMode = watch("layer.retriggerMode");
   // Cast needed: TypeScript can't narrow discriminated union error shapes
   const selectionErrors = errors.layer?.selection as Record<string, { message?: string }> | undefined;
 
@@ -66,8 +73,8 @@ export function LayerConfigSection() {
         {selectionType === "assigned" && selectionErrors?.instances?.message && (
           <p className="text-sm text-destructive">{selectionErrors.instances.message}</p>
         )}
-        {selectionType === "tag" && selectionErrors?.tagId?.message && (
-          <p className="text-sm text-destructive">{selectionErrors.tagId.message}</p>
+        {selectionType === "tag" && selectionErrors?.tagIds?.message && (
+          <p className="text-sm text-destructive">{selectionErrors.tagIds.message}</p>
         )}
         {selectionType === "set" && selectionErrors?.setId?.message && (
           <p className="text-sm text-destructive">{selectionErrors.setId.message}</p>
@@ -79,21 +86,18 @@ export function LayerConfigSection() {
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Arrangement
         </Label>
-        <Controller
-          control={control}
-          name="layer.arrangement"
-          render={({ field }) => (
-            <Tabs value={field.value} onValueChange={field.onChange}>
-              <TabsList className="w-full">
-                {ARRANGEMENT_OPTIONS.map((opt) => (
-                  <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
-                    {opt.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          )}
-        />
+        <Tabs
+          value={arrangement}
+          onValueChange={(v) => setValue("layer.arrangement", v as Arrangement, { shouldDirty: true })}
+        >
+          <TabsList className="w-full">
+            {ARRANGEMENT_OPTIONS.map((opt) => (
+              <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                {opt.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Playback Mode */}
@@ -101,21 +105,18 @@ export function LayerConfigSection() {
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Playback Mode
         </Label>
-        <Controller
-          control={control}
-          name="layer.playbackMode"
-          render={({ field }) => (
-            <Tabs value={field.value} onValueChange={field.onChange}>
-              <TabsList className="w-full">
-                {PLAYBACK_MODE_OPTIONS.map((opt) => (
-                  <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
-                    {opt.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          )}
-        />
+        <Tabs
+          value={playbackMode}
+          onValueChange={(v) => setValue("layer.playbackMode", v as PlaybackMode, { shouldDirty: true })}
+        >
+          <TabsList className="w-full">
+            {PLAYBACK_MODE_OPTIONS.map((opt) => (
+              <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                {opt.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Retrigger Mode */}
@@ -123,21 +124,18 @@ export function LayerConfigSection() {
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Retrigger Mode
         </Label>
-        <Controller
-          control={control}
-          name="layer.retriggerMode"
-          render={({ field }) => (
-            <Tabs value={field.value} onValueChange={field.onChange}>
-              <TabsList className="w-full">
-                {RETRIGGER_MODE_OPTIONS.map((opt) => (
-                  <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
-                    {opt.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          )}
-        />
+        <Tabs
+          value={retriggerMode}
+          onValueChange={(v) => setValue("layer.retriggerMode", v as RetriggerMode, { shouldDirty: true })}
+        >
+          <TabsList className="w-full">
+            {RETRIGGER_MODE_OPTIONS.map((opt) => (
+              <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                {opt.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Volume */}

@@ -86,7 +86,7 @@ export const LayerSelectionSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("tag"),
-    tagId: z.string(),
+    tagIds: z.array(z.string()),
     defaultVolume: z.number(),
   }),
   z.object({
@@ -106,7 +106,7 @@ export const LayerSelectionFormSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("tag"),
-    tagId: z.string().min(1, "A tag must be selected"),
+    tagIds: z.array(z.string()).min(1, "At least one tag is required"),
     defaultVolume: z.number(),
   }),
   z.object({
