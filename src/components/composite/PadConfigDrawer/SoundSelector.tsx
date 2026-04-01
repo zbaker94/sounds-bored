@@ -66,6 +66,22 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
     [searchDocs]
   );
 
+  const tagCountMap = useMemo(
+    () =>
+      Object.fromEntries(
+        tags.map((t) => [t.id, sounds.filter((s) => s.tags.includes(t.id)).length])
+      ),
+    [tags, sounds]
+  );
+
+  const setCountMap = useMemo(
+    () =>
+      Object.fromEntries(
+        sets.map((st) => [st.id, sounds.filter((s) => s.sets.includes(st.id)).length])
+      ),
+    [sets, sounds]
+  );
+
   // ── Assigned mode ────────────────────────────────────────────────────────────
 
   if (value.type === "assigned") {
@@ -192,7 +208,10 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
             <ComboboxCollection>
               {(t) => (
                 <ComboboxItem key={t.id} value={t.id}>
-                  {t.name}
+                  <span className="flex-1">{t.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {tagCountMap[t.id] ?? 0} sounds
+                  </span>
                 </ComboboxItem>
               )}
             </ComboboxCollection>
@@ -224,7 +243,10 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
           <ComboboxCollection>
             {(s) => (
               <ComboboxItem key={s.id} value={s.id}>
-                {s.name}
+                <span className="flex-1">{s.name}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {setCountMap[s.id] ?? 0} sounds
+                </span>
               </ComboboxItem>
             )}
           </ComboboxCollection>
