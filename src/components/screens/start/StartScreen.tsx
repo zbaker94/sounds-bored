@@ -10,8 +10,9 @@ import logo from "@/assets/sleeping knight-emblem.gif";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { exists } from "@tauri-apps/plugin-fs";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { FolderOpenIcon } from "@hugeicons/core-free-icons";
+import { FolderOpenIcon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 
 export function StartScreen() {
   const { data: recentProjects = [], isLoading, error } = useProjectHistory();
@@ -21,6 +22,7 @@ export function StartScreen() {
   const createProjectMutation = useCreateProject();
   const navigate = useNavigate();
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const openOverlay = useUiStore((s) => s.openOverlay);
 
   // Common logic for navigating to main page after loading/creating a project
   const navigateToProject = useCallback((result: { project: Project, folderPath: string }, isTemporary: boolean) => {
@@ -64,7 +66,16 @@ export function StartScreen() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen backdrop-blur-xs">
+    <div className="relative flex flex-col items-center justify-center min-h-screen backdrop-blur-xs">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Settings"
+        className="absolute top-4 right-4"
+        onClick={() => openOverlay(OVERLAY_ID.SETTINGS_DIALOG, "dialog")}
+      >
+        <HugeiconsIcon icon={Settings01Icon} size={16} />
+      </Button>
       <img src={logo} alt="Sounds Bored Logo" className="mb-8 w-48" style={{filter: "drop-shadow(6px 8px 0px #000000)"}} />
       <h1 className="text-center mb-8 logo tracking-widest text-4xl" style={{color: "var(--secondary)", filter: "drop-shadow(6px 8px 0px #000000)"}}>
         SOUNDS BORED

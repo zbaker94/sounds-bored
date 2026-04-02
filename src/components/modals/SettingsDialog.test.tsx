@@ -6,8 +6,24 @@ import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSetting
 import { createMockAppSettings } from "@/test/factories";
 import { SettingsDialog } from "./SettingsDialog";
 import { open } from "@tauri-apps/plugin-dialog";
+import { StartScreen } from "@/components/screens/start/StartScreen";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
+
+vi.mock("@/lib/history.queries", () => ({
+  useProjectHistory: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+}));
+vi.mock("@/lib/project.queries", () => ({
+  useLoadProject: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useLoadProjectFromPath: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useCreateProject: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+}));
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router-dom")>();
+  return { ...actual, useNavigate: vi.fn(() => vi.fn()) };
+});
+vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn() }));
 
 const mockSaveSettings = vi.fn();
 vi.mock("@/lib/appSettings.queries", () => ({
@@ -56,5 +72,28 @@ describe("SettingsDialog — shell", () => {
     openDialog();
     await user.click(screen.getByRole("button", { name: /close/i }));
     expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(false);
+  });
+});
+
+function renderStartScreen() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <StartScreen />
+    </QueryClientProvider>
+  );
+}
+
+describe("SettingsDialog — StartScreen trigger", () => {
+  it("renders a Settings button on StartScreen", () => {
+    renderStartScreen();
+    expect(screen.getByRole("button", { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it("opens settings dialog when Settings button is clicked", async () => {
+    const user = userEvent.setup();
+    renderStartScreen();
+    await user.click(screen.getByRole("button", { name: /settings/i }));
+    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(true);
   });
 });
