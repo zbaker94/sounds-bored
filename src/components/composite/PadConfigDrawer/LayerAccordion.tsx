@@ -171,7 +171,7 @@ export function LayerAccordion() {
       </DndContext>
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="sm"
         onClick={() => append(DEFAULT_LAYER)}
         className="self-start"

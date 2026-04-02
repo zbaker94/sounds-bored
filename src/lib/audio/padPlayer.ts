@@ -151,12 +151,12 @@ function getOrCreateLayerGain(layer: Layer, padGain: GainNode): GainNode {
 }
 
 /** Returns the 0–1 gain value for a specific sound within a layer.
- *  For "assigned" selections, reads from SoundInstance.volume (already 0–1).
+ *  For "assigned" selections, reads from SoundInstance.volume (0–100 scale, same as layer.volume).
  *  For "tag"/"set" selections, defaults to 1.0 (no per-sound config yet). */
 function getVoiceVolume(layer: Layer, sound: Sound): number {
   if (layer.selection.type === "assigned") {
     const inst = layer.selection.instances.find((i) => i.soundId === sound.id);
-    return inst ? inst.volume : 1.0;
+    return inst ? inst.volume / 100 : 1.0;
   }
   return 1.0;
 }
@@ -328,8 +328,11 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     const resolved = resolveSounds(layer, sounds);
     if (resolved.length === 0) continue;
 
+    // Leading debounce — if startLayerSound is in-flight for this layer, ignore the trigger
+    if (layerPendingMap.has(layer.id)) continue;
+
     const store = usePlaybackStore.getState();
-    const isLayerPlaying = store.isLayerActive(layer.id) || layerPendingMap.has(layer.id);
+    const isLayerPlaying = store.isLayerActive(layer.id);
     const layerGain = getOrCreateLayerGain(layer, padGain);
 
     // ── Retrigger handling ─────────────────────────────────────────────────

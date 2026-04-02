@@ -176,14 +176,14 @@ describe("simultaneous arrangement", () => {
     expect(loadedIds.sort()).toEqual(sounds.map((s) => s.id).sort());
   });
 
-  it("initializes voiceGain from SoundInstance.volume (0-1) for assigned selection", async () => {
+  it("initializes voiceGain from SoundInstance.volume / 100 for assigned selection", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
 
     const layer = createMockLayer({
       arrangement: "simultaneous",
-      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 0.6 }] },
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 60 }] },
     });
     const pad = createMockPad({ layers: [layer] });
 
