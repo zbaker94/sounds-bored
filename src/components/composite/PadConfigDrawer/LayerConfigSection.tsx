@@ -23,12 +23,12 @@ const PLAYBACK_MODE_OPTIONS = [
   { value: "loop", label: "Loop" },
 ] as const;
 
-const RETRIGGER_MODE_OPTIONS = [
+const RETRIGGER_MODE_OPTIONS: { value: RetriggerMode; label: string; arrangements?: Arrangement[] }[] = [
   { value: "restart", label: "Restart" },
   { value: "continue", label: "Continue" },
   { value: "stop", label: "Stop" },
-  { value: "next", label: "Next" },
-] as const;
+  { value: "next", label: "Next", arrangements: ["sequential", "shuffled"] },
+];
 
 interface LayerConfigSectionProps {
   index: number;
@@ -57,6 +57,14 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
 
   function handleSelectionTypeChange(type: LayerSelection["type"]) {
     setValue(selPath, SELECTION_TYPE_DEFAULTS[type] as LayerSelection);
+  }
+
+  function handleArrangementChange(v: Arrangement) {
+    setValue(arrPath, v, { shouldDirty: true });
+    // "next" retrigger requires a chain — reset to "restart" when switching to simultaneous
+    if (v === "simultaneous" && retriggerMode === "next") {
+      setValue(rtPath, "restart", { shouldDirty: true });
+    }
   }
 
   return (
@@ -105,7 +113,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
           value={arrangement}
           onValueChange={(v) => {
             if (ARRANGEMENT_OPTIONS.some((o) => o.value === v))
-              setValue(arrPath, v as Arrangement, { shouldDirty: true });
+              handleArrangementChange(v as Arrangement);
           }}
         >
           <TabsList className="w-full">
@@ -153,11 +161,13 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
           }}
         >
           <TabsList className="w-full">
-            {RETRIGGER_MODE_OPTIONS.map((opt) => (
-              <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
-                {opt.label}
-              </TabsTrigger>
-            ))}
+            {RETRIGGER_MODE_OPTIONS
+              .filter((opt) => !opt.arrangements || opt.arrangements.includes(arrangement))
+              .map((opt) => (
+                <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                  {opt.label}
+                </TabsTrigger>
+              ))}
           </TabsList>
         </Tabs>
       </div>
