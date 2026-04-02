@@ -125,7 +125,7 @@ beforeEach(async () => {
   mockCtx.createMediaElementSource.mockClear();
   clearAllSizeCache();
 
-  mockCtx.createGain.mockReturnValue(makeMockGain());
+  mockCtx.createGain.mockImplementation(() => makeMockGain());
   mockCtx.createBufferSource.mockImplementation(() => {
     const s = makeMockSource();
     createdSources.push(s);
@@ -171,6 +171,53 @@ describe("simultaneous arrangement", () => {
     expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
     const loadedIds = mockLoadBuffer.mock.calls.map((c) => c[0].id);
     expect(loadedIds.sort()).toEqual(sounds.map((s) => s.id).sort());
+  });
+
+  it("initializes voiceGain from SoundInstance.volume (0-1) for assigned selection", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 0.6 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    // createGain is called for padGain (1×), layerGain (1×), voiceGain (1×) = 3 total
+    expect(mockCtx.createGain).toHaveBeenCalledTimes(3);
+  });
+
+  it("initializes layerGain from layer.volume / 100", async () => {
+    const { triggerPad, clearAllPadGains } = await import("./padPlayer");
+    clearAllPadGains();
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      volume: 80,
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1.0 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Collect gain mocks in order
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Gains created in order: padGain (index 0), layerGain (index 1), voiceGain (index 2)
+    // layerGain is gains[1], initialized to layer.volume / 100 = 0.8
+    expect(gains[1].gain.value).toBe(0.8);
   });
 });
 
