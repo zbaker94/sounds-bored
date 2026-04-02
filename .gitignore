@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Bundled sidecar binaries (downloaded via scripts/download-yt-dlp.sh)
+src-tauri/binaries/yt-dlp-*
+src-tauri/binaries/ffmpeg-*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
