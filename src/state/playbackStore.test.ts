@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { usePlaybackStore } from "./playbackStore";
+import type { AudioVoice } from "@/lib/audio/audioVoice";
 
 const initialState = {
   masterVolume: 100,
@@ -7,8 +8,15 @@ const initialState = {
   padVolumes: {},
 };
 
+function makeVoice(opts: { onStop?: () => void } = {}): AudioVoice {
+  return {
+    start: async () => {},
+    stop: opts.onStop ?? (() => {}),
+    setOnEnded: () => {},
+  };
+}
+
 beforeEach(() => {
-  // stopAll() clears the module-level voiceMap and layerVoiceMap
   usePlaybackStore.getState().stopAll();
   usePlaybackStore.setState({ ...initialState });
 });
@@ -19,61 +27,90 @@ describe("layer voice tracking", () => {
   });
 
   it("layer becomes active after recording a voice", () => {
-    const source = {} as AudioBufferSourceNode;
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", source);
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice());
     expect(usePlaybackStore.getState().isLayerActive("layer-1")).toBe(true);
   });
 
   it("layer becomes inactive after clearing its only voice", () => {
-    const source = {} as AudioBufferSourceNode;
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", source);
-    usePlaybackStore.getState().clearLayerVoice("pad-1", "layer-1", source);
+    const voice = makeVoice();
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice);
+    usePlaybackStore.getState().clearLayerVoice("pad-1", "layer-1", voice);
     expect(usePlaybackStore.getState().isLayerActive("layer-1")).toBe(false);
   });
 
   it("layer stays active while other voices remain", () => {
-    const s1 = {} as AudioBufferSourceNode;
-    const s2 = {} as AudioBufferSourceNode;
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", s1);
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", s2);
-    usePlaybackStore.getState().clearLayerVoice("pad-1", "layer-1", s1);
+    const v1 = makeVoice();
+    const v2 = makeVoice();
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", v1);
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", v2);
+    usePlaybackStore.getState().clearLayerVoice("pad-1", "layer-1", v1);
     expect(usePlaybackStore.getState().isLayerActive("layer-1")).toBe(true);
   });
 
   it("stopLayer stops all voices for a layer", () => {
     const stopped: boolean[] = [];
-    const makeSource = () =>
-      ({ stop: () => stopped.push(true) }) as unknown as AudioBufferSourceNode;
-
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeSource());
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeSource());
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice({ onStop: () => stopped.push(true) }));
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice({ onStop: () => stopped.push(true) }));
     usePlaybackStore.getState().stopLayer("pad-1", "layer-1");
-
     expect(stopped).toHaveLength(2);
     expect(usePlaybackStore.getState().isLayerActive("layer-1")).toBe(false);
   });
 
   it("stopLayer does not affect other layers on the same pad", () => {
-    const source = {} as AudioBufferSourceNode;
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", source);
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-2", source);
-
+    const voice = makeVoice();
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice);
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-2", voice);
     usePlaybackStore.getState().stopLayer("pad-1", "layer-1");
-
     expect(usePlaybackStore.getState().isLayerActive("layer-1")).toBe(false);
     expect(usePlaybackStore.getState().isLayerActive("layer-2")).toBe(true);
   });
 
   it("recording a layer voice also marks the pad as active", () => {
-    const source = {} as AudioBufferSourceNode;
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", source);
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice());
     expect(usePlaybackStore.getState().isPadActive("pad-1")).toBe(true);
   });
 
   it("clearing the last layer voice for a pad marks pad inactive", () => {
-    const source = {} as AudioBufferSourceNode;
-    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", source);
-    usePlaybackStore.getState().clearLayerVoice("pad-1", "layer-1", source);
+    const voice = makeVoice();
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice);
+    usePlaybackStore.getState().clearLayerVoice("pad-1", "layer-1", voice);
     expect(usePlaybackStore.getState().isPadActive("pad-1")).toBe(false);
+  });
+});
+
+describe("pad-level stop methods", () => {
+  it("stopPad stops all voices for a pad", () => {
+    const stopped: boolean[] = [];
+    const voice1 = makeVoice({ onStop: () => stopped.push(true) });
+    const voice2 = makeVoice({ onStop: () => stopped.push(true) });
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice1);
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-2", voice2);
+    usePlaybackStore.getState().stopPad("pad-1");
+    expect(stopped).toHaveLength(2);
+    expect(usePlaybackStore.getState().isPadActive("pad-1")).toBe(false);
+  });
+
+  it("stopPad also clears layerVoiceMap — layers become inactive", () => {
+    const voice = makeVoice();
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice);
+    usePlaybackStore.getState().stopPad("pad-1");
+    expect(usePlaybackStore.getState().isLayerActive("layer-1")).toBe(false);
+  });
+
+  it("stopAll stops all voices across all pads", () => {
+    const stopped: boolean[] = [];
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice({ onStop: () => stopped.push(true) }));
+    usePlaybackStore.getState().recordLayerVoice("pad-2", "layer-2", makeVoice({ onStop: () => stopped.push(true) }));
+    usePlaybackStore.getState().stopAll();
+    expect(stopped).toHaveLength(2);
+  });
+
+  it("stopAll clears all active pad IDs", () => {
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice());
+    usePlaybackStore.getState().recordLayerVoice("pad-2", "layer-2", makeVoice());
+    usePlaybackStore.getState().stopAll();
+    expect(usePlaybackStore.getState().playingPadIds).toHaveLength(0);
+    expect(usePlaybackStore.getState().isPadActive("pad-1")).toBe(false);
+    expect(usePlaybackStore.getState().isPadActive("pad-2")).toBe(false);
   });
 });

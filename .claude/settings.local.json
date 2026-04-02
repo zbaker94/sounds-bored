@@ -12,7 +12,8 @@
       "Bash(echo \"exit: $?\")",
       "mcp__shadcn__get_add_command_for_items",
       "Bash(npx vitest:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(ls -la /c/Repos/sounds-bored/src/lib/audio/audioVoice.*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockSound } from "@/test/factories";
+import { clearAllSizeCache } from "./streamingCache";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 
@@ -9,6 +10,7 @@ const mockCtx = {
   currentTime: 0,
   createBufferSource: vi.fn(),
   createGain: vi.fn(),
+  createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
 };
 
 vi.mock("./audioContext", () => ({
@@ -24,8 +26,35 @@ vi.mock("./bufferCache", () => ({
 }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("./streamingCache", () => ({
+  checkIsLargeFile: vi.fn().mockResolvedValue(false), // default: small file → buffer path
+  evictSizeCache: vi.fn(),
+  clearAllSizeCache: vi.fn(),
+}));
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => `asset://localhost/${path}`,
+}));
 vi.mock("@/state/appSettingsStore", () => ({
   useAppSettingsStore: { getState: () => ({ settings: null }) },
+}));
+
+// ── Audio global mock (streaming path) ───────────────────────────────────────
+
+const mockAudioInstances: Array<{
+  src: string;
+  currentTime: number;
+  pause: ReturnType<typeof vi.fn>;
+  play: ReturnType<typeof vi.fn>;
+  onended: ((ev: Event) => any) | null;
+}> = [];
+
+vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any, src?: string) {
+  this.src = src ?? "";
+  this.currentTime = 0;
+  this.pause = vi.fn();
+  this.play = vi.fn().mockResolvedValue(undefined);
+  this.onended = null;
+  mockAudioInstances.push(this);
 }));
 
 // ── Source factory ─────────────────────────────────────────────────────────────
@@ -90,6 +119,11 @@ beforeEach(async () => {
     missingSoundIds: [],
     missingFolderIds: [],
   } as Parameters<typeof useLibraryStore.setState>[0]);
+
+  mockAudioInstances.length = 0;
+  (global.Audio as ReturnType<typeof vi.fn>).mockClear();
+  mockCtx.createMediaElementSource.mockClear();
+  clearAllSizeCache();
 
   mockCtx.createGain.mockReturnValue(makeMockGain());
   mockCtx.createBufferSource.mockImplementation(() => {
@@ -333,5 +367,132 @@ describe("retrigger modes", () => {
     await triggerPad(pad);
     await tick();
     expect(mockLoadBuffer.mock.calls.at(-1)![0].id).toBe(sounds[1].id);
+  });
+});
+
+describe("stopAllPads", () => {
+  it("does not restart a sequential chain after stopping", async () => {
+    const { triggerPad, stopAllPads } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad); // starts sound[0], queues sound[1]
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    stopAllPads(); // should clear queue + stop all voices
+    await tick(); // give any queued microtasks time to run
+
+    // sound[1] must NOT have started
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+    expect(usePlaybackStore.getState().isLayerActive(layer.id)).toBe(false);
+  });
+});
+
+// ── Streaming path tests ─────────────────────────────────────────────────────
+
+describe("streaming path (large files)", () => {
+  let checkIsLargeFile: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    const mod = await import("./streamingCache");
+    checkIsLargeFile = mod.checkIsLargeFile as ReturnType<typeof vi.fn>;
+    checkIsLargeFile.mockResolvedValue(true); // treat all sounds as large
+  });
+
+  afterEach(() => {
+    checkIsLargeFile.mockResolvedValue(false); // restore default
+  });
+
+  it("plays a large sound via createMediaElementSource instead of createBufferSource", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [createMockSound({ filePath: "ambient.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+
+    expect(mockCtx.createMediaElementSource).toHaveBeenCalledOnce();
+    expect(mockCtx.createBufferSource).not.toHaveBeenCalled();
+    expect(mockLoadBuffer).not.toHaveBeenCalled();
+  });
+
+  it("marks the pad as active after triggering a large sound", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [createMockSound({ filePath: "ambient.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+
+    expect(usePlaybackStore.getState().isLayerActive(layer.id)).toBe(true);
+  });
+
+  it("streaming retrigger restart: stops old audio and starts a new one", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [createMockSound({ filePath: "ambient.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad); // first trigger
+    await triggerPad(pad); // restart
+
+    // Two Audio instances created, two createMediaElementSource calls
+    expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(2);
+  });
+
+  it("streaming chains via onended for sequential arrangement", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    // First Audio created and playing
+    expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(1);
+
+    // Simulate first audio ending naturally
+    const firstAudio = (global.Audio as ReturnType<typeof vi.fn>).mock.results[0].value;
+    firstAudio.onended?.(new Event("ended"));
+    await tick();
+
+    // Second Audio created for the chained sound
+    expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(2);
   });
 });
