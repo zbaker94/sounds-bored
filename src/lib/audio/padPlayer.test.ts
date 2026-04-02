@@ -674,6 +674,93 @@ describe("streaming path (large files)", () => {
   });
 });
 
+describe("retrigger next", () => {
+  it("advances to the next sound in the chain immediately", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+    // Sound A is playing
+    expect(mockLoadBuffer.mock.calls[0][0].id).toBe(sounds[0].id);
+
+    // Retrigger with "next" — should stop A and start B directly
+    await triggerPad(pad);
+    await tick();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+    expect(mockLoadBuffer.mock.calls[1][0].id).toBe(sounds[1].id);
+  });
+
+  it("wraps back to the beginning when queue is exhausted on a loop layer", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      playbackMode: "loop",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger → A plays; retrigger → B plays; retrigger again → should wrap to A
+    await triggerPad(pad);
+    await tick();
+
+    await triggerPad(pad);
+    await tick();
+
+    await triggerPad(pad);
+    await tick();
+
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+
+  it("stops without restart on a one-shot layer when queue is exhausted", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+    await triggerPad(pad); // A→B
+    await tick();
+    await triggerPad(pad); // B→exhaust (one-shot: stop, don't restart)
+    await tick();
+
+    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("retrigger stop — ramped stop", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });

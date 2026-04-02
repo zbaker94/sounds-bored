@@ -327,10 +327,26 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
 
       case "next":
         if (isLayerPlaying) {
-          // Don't delete queue — stopping fires onended synchronously (both buffer
-          // and streaming wrappers fire synchronously in stop()), which advances
-          // the chain to the next sound.
+          // Capture queue before clearing it
+          const remaining = [...(layerChainQueue.get(layer.id) ?? [])];
+          // Null onended to prevent the chain-advance callback from firing during stop
+          for (const v of store.getLayerVoices(layer.id)) v.setOnEnded(null);
+          layerChainQueue.delete(layer.id);
           store.stopLayer(pad.id, layer.id);
+
+          if (remaining.length > 0) {
+            // Advance to next sound in chain
+            const [next, ...rest] = remaining;
+            layerChainQueue.set(layer.id, rest);
+            await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+          } else if (layer.playbackMode === "loop" || layer.playbackMode === "hold") {
+            // Chain exhausted — loop back to beginning
+            const newOrder = buildPlayOrder(layer.arrangement, resolved);
+            const [first, ...rest] = newOrder;
+            layerChainQueue.set(layer.id, rest);
+            await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+          }
+          // one-shot: queue exhausted → just stop (already done above)
           continue;
         }
         break;
