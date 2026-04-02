@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { usePlaybackStore } from "./playbackStore";
 import type { AudioVoice } from "@/lib/audio/audioVoice";
 
@@ -112,5 +112,31 @@ describe("pad-level stop methods", () => {
     expect(usePlaybackStore.getState().playingPadIds).toHaveLength(0);
     expect(usePlaybackStore.getState().isPadActive("pad-1")).toBe(false);
     expect(usePlaybackStore.getState().isPadActive("pad-2")).toBe(false);
+  });
+});
+
+describe("getLayerVoices", () => {
+  it("returns empty array for unknown layer", () => {
+    expect(usePlaybackStore.getState().getLayerVoices("no-such-layer")).toEqual([]);
+  });
+
+  it("returns voices for a recorded layer", () => {
+    const voice = { start: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn(), setVolume: vi.fn(), setOnEnded: vi.fn() };
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice as any);
+    const voices = usePlaybackStore.getState().getLayerVoices("layer-1");
+    expect(voices).toHaveLength(1);
+    expect(voices[0]).toBe(voice);
+  });
+});
+
+describe("nullAllOnEnded", () => {
+  it("calls setOnEnded(null) on all recorded voices", () => {
+    const voice1 = { start: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn(), setVolume: vi.fn(), setOnEnded: vi.fn() };
+    const voice2 = { start: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn(), setVolume: vi.fn(), setOnEnded: vi.fn() };
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", voice1 as any);
+    usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-2", voice2 as any);
+    usePlaybackStore.getState().nullAllOnEnded();
+    expect(voice1.setOnEnded).toHaveBeenCalledWith(null);
+    expect(voice2.setOnEnded).toHaveBeenCalledWith(null);
   });
 });

@@ -32,6 +32,10 @@ interface PlaybackState {
   clearLayerVoice: (padId: string, layerId: string, voice: AudioVoice) => void;
   /** Stop all voices for a single layer without affecting other layers. */
   stopLayer: (padId: string, layerId: string) => void;
+  /** Returns all active voices for a layer (read-only). Used by padPlayer for ramp-stop. */
+  getLayerVoices: (layerId: string) => readonly AudioVoice[];
+  /** Null all onended callbacks on all active voices. Prevents chain restarts during ramp. */
+  nullAllOnEnded: () => void;
 }
 
 export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
@@ -140,6 +144,16 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
 
     for (const voice of voices) {
       try { voice.stop(); } catch { /* already ended */ }
+    }
+  },
+
+  getLayerVoices: (layerId) => layerVoiceMap.get(layerId) ?? [],
+
+  nullAllOnEnded: () => {
+    for (const voices of voiceMap.values()) {
+      for (const voice of voices) {
+        voice.setOnEnded(null);
+      }
     }
   },
 }));
