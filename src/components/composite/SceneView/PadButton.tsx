@@ -122,10 +122,10 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
           </div>
         )}
 
-        {/* Pad name — normal mode */}
+        {/* Pad name / volume percentage — normal mode */}
         {!editMode && (
           <span className="relative z-10 line-clamp-3 break-words leading-tight">
-            {pad.name}
+            {fillVolume !== null ? `${Math.round(fillVolume * 100)}%` : pad.name}
           </span>
         )}
       </button>
