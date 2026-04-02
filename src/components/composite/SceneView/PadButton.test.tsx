@@ -8,7 +8,7 @@ import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
-  triggerPad: vi.fn(),
+  triggerPad: vi.fn().mockResolvedValue(undefined),
   setPadVolume: vi.fn(),
   resetPadGain: vi.fn(),
   getPadProgress: vi.fn().mockReturnValue(null),

@@ -54,7 +54,7 @@ export function usePadGesture(pad: Pad) {
 
     // Hold-mode pads trigger immediately on press (not on release)
     if (hasHoldLayer) {
-      triggerPad(pad, 1.0);
+      triggerPad(pad, 1.0).catch(console.error);
     }
 
     holdTimer.current = setTimeout(() => {
@@ -83,7 +83,7 @@ export function usePadGesture(pad: Pad) {
       s.phase = "drag";
 
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
-        triggerPad(pad, 0);
+        triggerPad(pad, 0).catch(console.error);
       }
     }
 
@@ -92,7 +92,7 @@ export function usePadGesture(pad: Pad) {
       s.currentVolume = newVolume;
 
       if (newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {
-        triggerPad(pad, 0);
+        triggerPad(pad, 0).catch(console.error);
       }
 
       setPadVolume(pad.id, newVolume);
@@ -106,9 +106,9 @@ export function usePadGesture(pad: Pad) {
 
     if (s.phase === "down") {
       // Normal tap — only trigger if not a hold-mode pad (those triggered on down)
-      if (!hasHoldLayer) triggerPad(pad, 1.0);
+      if (!hasHoldLayer) triggerPad(pad, 1.0).catch(console.error);
     } else if (s.phase === "hold") {
-      if (!hasHoldLayer) triggerPad(pad, 1.0);
+      if (!hasHoldLayer) triggerPad(pad, 1.0).catch(console.error);
     } else if (s.phase === "drag") {
       if (s.currentVolume < 0.01 && !hasHoldLayer) {
         usePlaybackStore.getState().stopPad(pad.id);
