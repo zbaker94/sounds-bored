@@ -183,6 +183,9 @@ async function startLayerSound(
       audio = new Audio();
       audio.crossOrigin = "anonymous";
       audio.src = url;
+      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && !isChained(layer.arrangement)) {
+        audio.loop = true;
+      }
       const sourceNode = ctx.createMediaElementSource(audio);
       voice = wrapStreamingElement(audio, sourceNode, ctx, layerGain, voiceVolume);
       padStreamingAudio.set(pad.id, audio);
@@ -192,6 +195,9 @@ async function startLayerSound(
       const buffer = await loadBuffer(sound);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
+      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && !isChained(layer.arrangement)) {
+        source.loop = true;
+      }
       voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
 
       const existing = padProgressInfo.get(pad.id);
@@ -205,12 +211,25 @@ async function startLayerSound(
       // ends naturally while a stopWithRamp timeout is pending.
       if (audio && padStreamingAudio.get(pad.id) === audio) padStreamingAudio.delete(pad.id);
       usePlaybackStore.getState().clearLayerVoice(pad.id, layer.id, voice);
-      // Chain to the next sound if one is queued (sequential/shuffled)
+      // Chain to the next sound if one is queued (sequential/shuffled).
+      // `remaining === undefined` means the queue was cleared externally (stop/reset).
+      // `remaining.length === 0` means the chain ran to completion naturally.
       const remaining = layerChainQueue.get(layer.id);
-      if (remaining && remaining.length > 0) {
+      if (remaining === undefined) {
+        // Queue was externally cleared (e.g. stopAll, retrigger restart) — do not chain.
+      } else if (remaining.length > 0) {
         const [next, ...rest] = remaining;
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
+      } else if (
+        (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
+        isChained(layer.arrangement)
+      ) {
+        // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running)
+        const newOrder = buildPlayOrder(layer.arrangement, allSounds);
+        const [first, ...rest] = newOrder;
+        layerChainQueue.set(layer.id, rest);
+        startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), allSounds);
       } else {
         layerChainQueue.delete(layer.id);
       }

@@ -455,6 +455,97 @@ describe("stopAllPads", () => {
   });
 });
 
+describe("loop playback mode", () => {
+  it("simultaneous+loop: sets source.loop = true on buffer source", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      playbackMode: "loop",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    expect(createdSources[0].loop).toBe(true);
+  });
+
+  it("sequential+loop: restarts chain from beginning when exhausted", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      playbackMode: "loop",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Sound A playing; advance chain: A ends → B starts
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+
+    // B ends — chain exhausted — should restart from A (loop)
+    createdSources[1].simulateEnd();
+    await tick();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+
+  it("hold mode: simultaneous+hold sets source.loop = true", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      playbackMode: "hold",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    expect(createdSources[0].loop).toBe(true);
+  });
+
+  it("sequential+hold: restarts chain when exhausted while held", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      playbackMode: "hold",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    createdSources[0].simulateEnd(); // A ends → B
+    await tick();
+    createdSources[1].simulateEnd(); // B ends → chain exhausted → restart from A
+    await tick();
+
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+});
+
 // ── Streaming path tests ─────────────────────────────────────────────────────
 
 describe("streaming path (large files)", () => {
