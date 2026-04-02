@@ -78,12 +78,14 @@ export function usePadGesture(pad: Pad) {
     if (s.phase === "idle" || s.phase === "down") return;
 
     const deltaY = s.startY - e.clientY; // positive = dragged up
+    let justTriggered = false;
 
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
 
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
         triggerPad(pad, 0).catch(console.error);
+        justTriggered = true;
       }
     }
 
@@ -91,7 +93,7 @@ export function usePadGesture(pad: Pad) {
       const newVolume = Math.max(0, Math.min(1, s.startVolume + deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
-      if (newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {
+      if (!justTriggered && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {
         triggerPad(pad, 0).catch(console.error);
       }
 

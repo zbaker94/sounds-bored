@@ -61,6 +61,10 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Download sidecar binaries
+        shell: bash
+        run: bash scripts/download-yt-dlp.sh
+
       - name: Install JS dependencies
         run: npm ci
 
