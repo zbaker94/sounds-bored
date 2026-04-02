@@ -22,7 +22,8 @@ import { TruncatedPath } from "@/components/ui/truncated-path";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, FolderAddIcon } from "@hugeicons/core-free-icons";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useState } from "react";
+import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 type FolderRole = "download" | "import" | "none";
 
@@ -104,8 +105,12 @@ function FoldersTab() {
   }
 
   function handleRemoveFolder(folderId: string) {
-    removeGlobalFolder(folderId);
-    persist();
+    try {
+      removeGlobalFolder(folderId);
+      persist();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not remove folder.");
+    }
   }
 
   function handleRename(folderId: string, newName: string) {
@@ -161,6 +166,12 @@ function FolderRow({
 }: FolderRowProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(folder.name);
+
+  useEffect(() => {
+    if (!editing) {
+      setEditValue(folder.name);
+    }
+  }, [folder.name, editing]);
 
   function commitRename() {
     setEditing(false);
