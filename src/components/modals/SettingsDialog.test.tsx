@@ -3,7 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
-import { createMockAppSettings } from "@/test/factories";
+import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories";
 import { SettingsDialog } from "./SettingsDialog";
 import { open } from "@tauri-apps/plugin-dialog";
 import { StartScreen } from "@/components/screens/start/StartScreen";
@@ -131,5 +131,201 @@ describe("SettingsDialog — MenuDrawer trigger", () => {
     openMenuDrawer();
     await user.click(screen.getByRole("button", { name: /settings/i }));
     expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(true);
+  });
+});
+
+function setupFolderState() {
+  const downloadFolder = createMockGlobalFolder({ id: "dl-id", name: "Downloads", path: "/music/downloads" });
+  const importFolder = createMockGlobalFolder({ id: "imp-id", name: "Imported", path: "/music/imported" });
+  const otherFolder = createMockGlobalFolder({ id: "other-id", name: "Other", path: "/music/other" });
+  const settings = createMockAppSettings({
+    globalFolders: [downloadFolder, importFolder, otherFolder],
+    downloadFolderId: downloadFolder.id,
+    importFolderId: importFolder.id,
+  });
+  useAppSettingsStore.setState({ settings });
+  return { downloadFolder, importFolder, otherFolder };
+}
+
+describe("SettingsDialog — Folders tab display", () => {
+  it("renders folder names when dialog is open", () => {
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    expect(screen.getByText("Downloads")).toBeInTheDocument();
+    expect(screen.getByText("Imported")).toBeInTheDocument();
+    expect(screen.getByText("Other")).toBeInTheDocument();
+  });
+
+  it("shows the Add Folder button", () => {
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    expect(screen.getByRole("button", { name: /add folder/i })).toBeInTheDocument();
+  });
+
+  it("remove button is disabled for the download folder", () => {
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    expect(screen.getByRole("button", { name: /remove downloads/i })).toBeDisabled();
+  });
+
+  it("remove button is disabled for the import folder", () => {
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    expect(screen.getByRole("button", { name: /remove imported/i })).toBeDisabled();
+  });
+
+  it("remove button is enabled for an unassigned folder", () => {
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    expect(screen.getByRole("button", { name: /remove other/i })).not.toBeDisabled();
+  });
+});
+
+describe("SettingsDialog — Add Folder", () => {
+  it("calls Tauri open with directory:true when Add Folder is clicked", async () => {
+    const user = userEvent.setup();
+    vi.mocked(open).mockResolvedValue(null);
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /add folder/i }));
+    expect(open).toHaveBeenCalledWith({ directory: true });
+  });
+
+  it("adds a new folder to the store when a path is returned", async () => {
+    const user = userEvent.setup();
+    vi.mocked(open).mockResolvedValue("/new/folder/path");
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /add folder/i }));
+    const folders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+    expect(folders.some((f) => f.path === "/new/folder/path")).toBe(true);
+  });
+
+  it("uses the last path segment as the default folder name", async () => {
+    const user = userEvent.setup();
+    vi.mocked(open).mockResolvedValue("/some/path/mysounds");
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /add folder/i }));
+    const folders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+    expect(folders.some((f) => f.name === "mysounds")).toBe(true);
+  });
+
+  it("calls saveSettings after adding a folder", async () => {
+    const user = userEvent.setup();
+    vi.mocked(open).mockResolvedValue("/new/folder");
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /add folder/i }));
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+  });
+
+  it("does not modify the store if the picker is cancelled (null)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(open).mockResolvedValue(null);
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    const countBefore = useAppSettingsStore.getState().settings!.globalFolders.length;
+    await user.click(screen.getByRole("button", { name: /add folder/i }));
+    const countAfter = useAppSettingsStore.getState().settings!.globalFolders.length;
+    expect(countAfter).toBe(countBefore);
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe("SettingsDialog — Remove Folder", () => {
+  it("removes a folder from the store when the remove button is clicked", async () => {
+    const user = userEvent.setup();
+    const { otherFolder } = setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /remove other/i }));
+    const folders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+    expect(folders.some((f) => f.id === otherFolder.id)).toBe(false);
+  });
+
+  it("calls saveSettings after removing a folder", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /remove other/i }));
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+  });
+});
+
+describe("SettingsDialog — Rename Folder", () => {
+  it("clicking a folder name shows an input field", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: "Other" }));
+    expect(screen.getByRole("textbox", { name: /folder name/i })).toBeInTheDocument();
+  });
+
+  it("blurring with a changed name updates the store and saves", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: "Other" }));
+    const input = screen.getByRole("textbox", { name: /folder name/i });
+    await user.clear(input);
+    await user.type(input, "Renamed");
+    await user.tab(); // trigger blur
+    const folders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+    expect(folders.some((f) => f.name === "Renamed")).toBe(true);
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+  });
+
+  it("pressing Enter with a changed name updates the store and saves", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: "Other" }));
+    const input = screen.getByRole("textbox", { name: /folder name/i });
+    await user.clear(input);
+    await user.type(input, "EnteredName");
+    await user.keyboard("{Enter}");
+    const folders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+    expect(folders.some((f) => f.name === "EnteredName")).toBe(true);
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+  });
+
+  it("pressing Escape reverts the name without saving", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: "Other" }));
+    const input = screen.getByRole("textbox", { name: /folder name/i });
+    await user.clear(input);
+    await user.type(input, "Abandoned");
+    await user.keyboard("{Escape}");
+    const folders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+    expect(folders.some((f) => f.name === "Other")).toBe(true);
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not save if the name is unchanged on blur", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: "Other" }));
+    await user.tab(); // blur without changing
+    expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 });
