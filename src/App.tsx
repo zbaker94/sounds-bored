@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AppErrorBoundary, RouteErrorElement } from "@/components/ErrorBoundary";
 import { useBootLoader } from "@/hooks/useBootLoader";
+import { SettingsDialog } from "@/components/modals/SettingsDialog";
 
 function App() {
   useBootLoader();
@@ -17,6 +18,7 @@ function App() {
           <Route path="/main" element={<MainPage />} errorElement={<RouteErrorElement />} />
         </Routes>
         <Toaster />
+        <SettingsDialog />
       </BrowserRouter>
     </AppErrorBoundary>
   );
