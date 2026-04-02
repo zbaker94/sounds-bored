@@ -82,9 +82,15 @@ function FoldersTab() {
   }
 
   function handleRoleChange(folderId: string, role: FolderRole) {
-    if (role === "download") setDownloadFolder(folderId);
-    else if (role === "import") setImportFolder(folderId);
-    persist();
+    if (role === "download") {
+      setDownloadFolder(folderId);
+      persist();
+    } else if (role === "import") {
+      setImportFolder(folderId);
+      persist();
+    }
+    // role === "none": no-op — schema requires both roles to always be assigned;
+    // this option is disabled in the UI when the folder is currently assigned.
   }
 
   async function handleAddFolder() {
