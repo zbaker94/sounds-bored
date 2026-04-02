@@ -1,4 +1,4 @@
-const STOP_RAMP_S = 0.025;
+export const STOP_RAMP_S = 0.025;
 
 export interface AudioVoice {
   start(): Promise<void>;

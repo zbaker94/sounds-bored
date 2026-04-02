@@ -1,7 +1,7 @@
 import { ensureResumed, getAudioContext, getMasterGain } from "./audioContext";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile } from "./streamingCache";
-import { wrapBufferSource, wrapStreamingElement } from "./audioVoice";
+import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
 import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -28,6 +28,9 @@ const padStreamingAudio = new Map<string, HTMLAudioElement>();
 // Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
 // Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted.
 const layerChainQueue = new Map<string, Sound[]>();
+
+// Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger.
+const layerPendingMap = new Set<string>();
 
 export function getPadProgress(padId: string): number | null {
   const info = padProgressInfo.get(padId);
@@ -132,26 +135,7 @@ export function releasePadHoldLayers(pad: Pad): void {
     const voices = [...usePlaybackStore.getState().getLayerVoices(layer.id)];
     if (voices.length === 0) continue;
 
-    // Null onended before stopping
-    for (const v of voices) v.setOnEnded(null);
-    // Ramp voiceGains to 0
-    for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
-
-    // Clean up playbackStore + reset layerGain after ramp
-    // Use clearLayerVoice (not stopLayer) to avoid double-stop after stopWithRamp
-    const gain = layerGainMap.get(layer.id);
-    const padId = pad.id;
-    const layerId = layer.id;
-    const resetValue = layer.volume / 100;
-    setTimeout(() => {
-      const cleanupStore = usePlaybackStore.getState();
-      for (const v of voices) cleanupStore.clearLayerVoice(padId, layerId, v);
-      if (gain) {
-        const ctx = getAudioContext();
-        gain.gain.cancelScheduledValues(ctx.currentTime);
-        gain.gain.setValueAtTime(resetValue, ctx.currentTime);
-      }
-    }, STOP_RAMP_S * 1000 + 5);
+    rampStopLayerVoices(pad.id, layer, voices);
   }
 }
 
@@ -301,31 +285,31 @@ async function startLayerSound(
   }
 }
 
-const STOP_RAMP_S = 0.025;
+function rampStopLayerVoices(
+  padId: string,
+  layer: Layer,
+  voices: readonly AudioVoice[],
+): void {
+  for (const v of voices) v.setOnEnded(null);
+  for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
+
+  const gain = layerGainMap.get(layer.id);
+  const resetValue = layer.volume / 100;
+  setTimeout(() => {
+    const cleanupStore = usePlaybackStore.getState();
+    for (const v of voices) cleanupStore.clearLayerVoice(padId, layer.id, v);
+    if (gain) {
+      const ctx = getAudioContext();
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(resetValue, ctx.currentTime);
+    }
+  }, STOP_RAMP_S * 1000 + 5);
+}
 
 function stopLayerWithRamp(pad: Pad, layer: Layer): void {
   const voices = [...usePlaybackStore.getState().getLayerVoices(layer.id)];
   if (voices.length === 0) return;
-
-  // Null onended first — prevents chain restart during ramp window
-  for (const v of voices) v.setOnEnded(null);
-  // Ramp each voice's voiceGain to 0
-  for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
-
-  // Clean up playbackStore state after ramp, reset layerGain.
-  // Use clearLayerVoice (not stopLayer) — voices are already stopped by stopWithRamp's
-  // internal setTimeout; calling voice.stop() again via stopLayer would double-stop.
-  // getState() is called fresh inside the callback to avoid a stale store reference.
-  setTimeout(() => {
-    const cleanupStore = usePlaybackStore.getState();
-    for (const v of voices) cleanupStore.clearLayerVoice(pad.id, layer.id, v);
-    const gain = layerGainMap.get(layer.id);
-    if (gain) {
-      const ctx = getAudioContext();
-      gain.gain.cancelScheduledValues(ctx.currentTime);
-      gain.gain.setValueAtTime(layer.volume / 100, ctx.currentTime);
-    }
-  }, STOP_RAMP_S * 1000 + 5);
+  rampStopLayerVoices(pad.id, layer, voices);
 }
 
 // startVolume: 0–1. Pass 0 for drag-up gestures (silent start), defaults to 1.
@@ -345,7 +329,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     if (resolved.length === 0) continue;
 
     const store = usePlaybackStore.getState();
-    const isLayerPlaying = store.isLayerActive(layer.id);
+    const isLayerPlaying = store.isLayerActive(layer.id) || layerPendingMap.has(layer.id);
     const layerGain = getOrCreateLayerGain(layer, padGain);
 
     // ── Retrigger handling ─────────────────────────────────────────────────
@@ -400,17 +384,22 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     }
 
     // ── Start playback ─────────────────────────────────────────────────────
-    const playOrder = buildPlayOrder(layer.arrangement, resolved);
+    layerPendingMap.add(layer.id);
+    try {
+      const playOrder = buildPlayOrder(layer.arrangement, resolved);
 
-    if (isChained(layer.arrangement)) {
-      const [first, ...rest] = playOrder;
-      layerChainQueue.set(layer.id, rest);
-      await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-    } else {
-      layerChainQueue.delete(layer.id);
-      for (const sound of playOrder) {
-        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      if (isChained(layer.arrangement)) {
+        const [first, ...rest] = playOrder;
+        layerChainQueue.set(layer.id, rest);
+        await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+      } else {
+        layerChainQueue.delete(layer.id);
+        for (const sound of playOrder) {
+          await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+        }
       }
+    } finally {
+      layerPendingMap.delete(layer.id);
     }
   }
 }
