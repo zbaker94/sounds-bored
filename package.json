@@ -12,7 +12,9 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:rust": "cd src-tauri && cargo test"
+    "test:rust": "cd src-tauri && cargo test",
+    "download-yt-dlp": "bash scripts/download-yt-dlp.sh",
+    "download-yt-dlp:all": "bash scripts/download-yt-dlp.sh --all"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

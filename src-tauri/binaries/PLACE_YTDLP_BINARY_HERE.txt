@@ -1,0 +1,18 @@
+Run the download script to fetch both yt-dlp and ffmpeg with correct Tauri sidecar naming:
+
+  bash scripts/download-yt-dlp.sh          # current platform only
+  bash scripts/download-yt-dlp.sh --all    # all platforms (CI)
+
+--- Manual placement ---
+
+yt-dlp (https://github.com/yt-dlp/yt-dlp/releases):
+- Windows x64: yt-dlp-x86_64-pc-windows-msvc.exe
+- macOS arm64: yt-dlp-aarch64-apple-darwin
+- macOS x64:   yt-dlp-x86_64-apple-darwin
+- Linux x64:   yt-dlp-x86_64-unknown-linux-gnu
+
+ffmpeg (required for audio extraction and thumbnail embedding):
+- Windows x64: ffmpeg-x86_64-pc-windows-msvc.exe  (BtbN GPL build)
+- macOS arm64: ffmpeg-aarch64-apple-darwin          (evermeet.cx arm64)
+- macOS x64:   ffmpeg-x86_64-apple-darwin           (evermeet.cx x64)
+- Linux x64:   ffmpeg-x86_64-unknown-linux-gnu      (johnvansickle.com static)

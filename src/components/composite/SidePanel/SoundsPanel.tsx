@@ -39,6 +39,7 @@ import {
   Tag01Icon,
   LockIcon,
   Alert02Icon,
+  Download04Icon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder, Sound, Tag } from "@/lib/schemas";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
@@ -46,6 +47,10 @@ import { ResolveMissingFolderDialog } from "@/components/modals/ResolveMissingFo
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
+import { DownloadDialog } from "@/components/modals/DownloadDialog";
+import { DownloadItem } from "@/components/composite/DownloadManager/DownloadItem";
+import { useDownloadEventListener } from "@/lib/ytdlp.queries";
+import { useDownloadStore } from "@/state/downloadStore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -269,6 +274,21 @@ export function SoundsPanel() {
   const [isBulkRemoving, setIsBulkRemoving] = useState(false);
   const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const downloadJobs = useDownloadStore((s) => s.jobs);
+
+  const downloadFolderId = settings?.downloadFolderId;
+  const isDownloadsFolderSelected = !!downloadFolderId && selectedId === downloadFolderId;
+  const activeDownloadJobs = useMemo(
+    () => isDownloadsFolderSelected
+      ? Object.values(downloadJobs).filter(
+          (j) => j.status === "queued" || j.status === "downloading" || j.status === "processing",
+        )
+      : [],
+    [downloadJobs, isDownloadsFolderSelected],
+  );
+
+  useDownloadEventListener(downloadFolderId);
 
   useEffect(() => {
     setSelectedSoundIds(new globalThis.Set());
@@ -422,6 +442,19 @@ export function SoundsPanel() {
           <HugeiconsIcon icon={CloudUploadIcon} size={14} />
           {isImporting ? "Importing..." : "Import Sounds"}
         </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDownloadDialogOpen(true)}
+            >
+              <HugeiconsIcon icon={Download04Icon} size={14} />
+              Download from URL
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Download from URL</TooltipContent>
+        </Tooltip>
       </div>
       <div className="flex flex-1 min-h-0 gap-2">
         <div className="flex flex-col w-1/2 gap-2">
@@ -679,6 +712,12 @@ export function SoundsPanel() {
             onMouseEnter={() => setSoundsListHover(true)}
             onMouseLeave={() => setSoundsListHover(false)}
           >
+            {activeDownloadJobs.map((job) => (
+              <DownloadItem key={job.id} job={job} />
+            ))}
+            {activeDownloadJobs.length > 0 && soundsForSelectedId.length > 0 && (
+              <div className="border-t border-white/10 my-1" />
+            )}
             {soundsForSelectedId.map((sound) => {
               const isSoundMissing = missingSoundIds.has(sound.id);
               return (
@@ -786,6 +825,7 @@ export function SoundsPanel() {
         }}
         draggable={false}
       />
+      <DownloadDialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen} />
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
       <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={selectedSoundIdsArray} />
       <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={selectedSoundIdsArray} />

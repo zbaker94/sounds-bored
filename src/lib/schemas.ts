@@ -221,3 +221,32 @@ export const GlobalLibrarySchema = z.object({
 });
 
 export type GlobalLibrary = z.infer<typeof GlobalLibrarySchema>;
+
+// ─── Download types ─────────────────────────────────────────────────────────
+
+export type DownloadStatus = "queued" | "downloading" | "processing" | "completed" | "failed" | "cancelled"
+
+export const DownloadProgressEventSchema = z.object({
+  id: z.string(),
+  percent: z.number(),
+  speed: z.string().optional(),
+  eta: z.string().optional(),
+  status: z.enum(["queued", "downloading", "processing", "completed", "failed", "cancelled"]),
+  outputPath: z.string().optional(),
+  error: z.string().optional(),
+});
+export type DownloadProgressEvent = z.infer<typeof DownloadProgressEventSchema>;
+
+export const DownloadJobSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  outputName: z.string(),
+  status: z.enum(["queued", "downloading", "processing", "completed", "failed", "cancelled"]),
+  percent: z.number().default(0),
+  speed: z.string().optional(),
+  eta: z.string().optional(),
+  error: z.string().optional(),
+  outputPath: z.string().optional(),
+  soundId: z.string().optional(),
+});
+export type DownloadJob = z.infer<typeof DownloadJobSchema>;

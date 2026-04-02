@@ -1,3 +1,8 @@
+mod commands;
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -10,7 +15,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .plugin(tauri_plugin_shell::init())
+        .manage(commands::DownloadJobs(Mutex::new(HashMap::new())))
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            commands::start_download,
+            commands::cancel_download,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

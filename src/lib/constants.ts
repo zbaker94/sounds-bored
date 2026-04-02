@@ -32,3 +32,6 @@ export type AudioExtension = typeof AUDIO_EXTENSIONS[number];
 
 // System tag names
 export const SYSTEM_TAG_IMPORTED = "imported";
+
+// Download events
+export const DOWNLOAD_EVENT = "download://progress";

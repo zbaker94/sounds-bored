@@ -35,10 +35,27 @@ export const mockPath = {
   audioDir: vi.fn(() => Promise.resolve("/music")),
 };
 
+/**
+ * Mock implementation of Tauri's core invoke API
+ */
+export const mockCore = {
+  invoke: vi.fn(),
+};
+
+/**
+ * Mock implementation of Tauri's event API
+ */
+export const mockEvent = {
+  listen: vi.fn(() => Promise.resolve(vi.fn())), // returns an unlisten fn
+  emit: vi.fn(() => Promise.resolve()),
+};
+
 // Mock modules at the top level
 vi.mock("@tauri-apps/plugin-dialog", () => mockDialog);
 vi.mock("@tauri-apps/plugin-fs", () => mockFs);
 vi.mock("@tauri-apps/api/path", () => mockPath);
+vi.mock("@tauri-apps/api/core", () => mockCore);
+vi.mock("@tauri-apps/api/event", () => mockEvent);
 
 /**
  * Reset all Tauri mocks to their initial state
@@ -57,6 +74,19 @@ export function resetTauriMocks() {
   Object.values(mockPath).forEach((fn) => {
     if (typeof fn === "function" && "mockReset" in fn) {
       fn.mockReset();
+    }
+  });
+  Object.values(mockCore).forEach((fn) => {
+    if (typeof fn === "function" && "mockReset" in fn) {
+      fn.mockReset();
+    }
+  });
+  Object.values(mockEvent).forEach((fn) => {
+    if (typeof fn === "function" && "mockReset" in fn) {
+      fn.mockReset();
+      if (fn === mockEvent.listen) {
+        fn.mockReturnValue(Promise.resolve(vi.fn()));
+      }
     }
   });
 }

@@ -13,7 +13,9 @@
       "mcp__shadcn__get_add_command_for_items",
       "Bash(npx vitest:*)",
       "Bash(npx tsc:*)",
-      "Bash(ls -la /c/Repos/sounds-bored/src/lib/audio/audioVoice.*)"
+      "Bash(ls -la /c/Repos/sounds-bored/src/lib/audio/audioVoice.*)",
+      "Bash(node -e \"const icons = require\\('@hugeicons/core-free-icons'\\); const settingsKeys = Object.keys\\(icons\\).filter\\(k => k.toLowerCase\\(\\).includes\\('setting'\\) || k.toLowerCase\\(\\).includes\\('gear'\\) || k.toLowerCase\\(\\).includes\\('cog'\\)\\); console.log\\(settingsKeys.join\\('\\\\n'\\)\\);\")",
+      "Read(//tmp/**)"
     ]
   },
   "enableAllProjectMcpServers": true,

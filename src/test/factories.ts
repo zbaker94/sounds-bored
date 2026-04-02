@@ -1,4 +1,4 @@
-import { AppSettings, GlobalFolder, GlobalLibrary, Layer, Pad, Project, ProjectHistoryEntry, Scene, Sound, Tag, Set } from "@/lib/schemas";
+import { AppSettings, DownloadJob, GlobalFolder, GlobalLibrary, Layer, Pad, Project, ProjectHistoryEntry, Scene, Sound, Tag, Set } from "@/lib/schemas";
 import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constants";
 
 /**
@@ -207,6 +207,20 @@ export function createMockSet(overrides?: Partial<Set>): Set {
   return {
     id: crypto.randomUUID(),
     name: "Test Set",
+    ...overrides,
+  };
+}
+
+/**
+ * Factory for creating test DownloadJobs
+ */
+export function createMockDownloadJob(overrides?: Partial<DownloadJob>): DownloadJob {
+  return {
+    id: crypto.randomUUID(),
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    outputName: "test-sound",
+    status: "queued",
+    percent: 0,
     ...overrides,
   };
 }
