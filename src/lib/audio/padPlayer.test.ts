@@ -343,10 +343,13 @@ describe("retrigger modes", () => {
     await triggerPad(pad);
     expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
 
-    // Second trigger while chain is active: stops everything, does NOT chain
+    // Second trigger while chain is active: initiates ramp-stop, does NOT chain
+    vi.useFakeTimers();
     await triggerPad(pad);
-    await tick();
     expect(mockLoadBuffer).toHaveBeenCalledTimes(1); // no new sounds loaded
+    // Layer is cleaned up after ramp completes
+    vi.advanceTimersByTime(35);
+    vi.useRealTimers();
     expect(usePlaybackStore.getState().isLayerActive(layer.id)).toBe(false);
   });
 
@@ -668,5 +671,58 @@ describe("streaming path (large files)", () => {
 
     // Second Audio created for the chained sound
     expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("retrigger stop — ramped stop", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("retrigger stop: does not immediately stop source (ramp in progress)", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      playbackMode: "loop",
+      arrangement: "simultaneous",
+      retriggerMode: "stop",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(createdSources).toHaveLength(1);
+
+    // Retrigger with "stop" — should start ramp, not hard-stop
+    await triggerPad(pad);
+    // Source stop not called synchronously
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+
+    // After ramp completes
+    vi.advanceTimersByTime(35);
+    expect(createdSources[0].stop).toHaveBeenCalledOnce();
+  });
+
+  it("retrigger stop: pad is no longer playing after ramp", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      retriggerMode: "stop",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+
+    await triggerPad(pad);
+    vi.advanceTimersByTime(35);
+
+    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
   });
 });

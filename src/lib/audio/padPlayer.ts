@@ -257,6 +257,32 @@ async function startLayerSound(
   }
 }
 
+const STOP_RAMP_S = 0.025;
+
+function stopLayerWithRamp(pad: Pad, layer: Layer): void {
+  const store = usePlaybackStore.getState();
+  const voices = [...store.getLayerVoices(layer.id)];
+  if (voices.length === 0) return;
+
+  // Null onended first — prevents chain restart during ramp window
+  for (const v of voices) v.setOnEnded(null);
+  // Ramp each voice's voiceGain to 0
+  for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
+
+  // Clean up playbackStore state after ramp, reset layerGain.
+  // Use clearLayerVoice (not stopLayer) — voices are already stopped by stopWithRamp's
+  // internal setTimeout; calling voice.stop() again via stopLayer would double-stop.
+  setTimeout(() => {
+    for (const v of voices) store.clearLayerVoice(pad.id, layer.id, v);
+    const gain = layerGainMap.get(layer.id);
+    if (gain) {
+      const ctx = getAudioContext();
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(layer.volume / 100, ctx.currentTime);
+    }
+  }, STOP_RAMP_S * 1000 + 5);
+}
+
 // startVolume: 0–1. Pass 0 for drag-up gestures (silent start), defaults to 1.
 export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   const { sounds } = useLibraryStore.getState();
@@ -282,8 +308,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
       case "stop":
         if (isLayerPlaying) {
           layerChainQueue.delete(layer.id);
-          store.stopLayer(pad.id, layer.id);
-          resetPadGain(pad.id);
+          stopLayerWithRamp(pad, layer);
           continue;
         }
         break;
