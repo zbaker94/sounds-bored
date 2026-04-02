@@ -11,6 +11,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
+vi.mock("@/contexts/ProjectActionsContext", () => ({
+  useProjectActions: vi.fn(() => ({
+    canSave: false,
+    handleSaveClick: vi.fn(),
+    requestNavigateAway: vi.fn(),
+  })),
+}));
+
 vi.mock("@/lib/history.queries", () => ({
   useProjectHistory: vi.fn(() => ({ data: [], isLoading: false, error: null })),
 }));
@@ -93,6 +101,34 @@ describe("SettingsDialog — StartScreen trigger", () => {
   it("opens settings dialog when Settings button is clicked", async () => {
     const user = userEvent.setup();
     renderStartScreen();
+    await user.click(screen.getByRole("button", { name: /settings/i }));
+    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(true);
+  });
+});
+
+import { MenuDrawer } from "@/components/composite/SceneTabBar/MenuDrawer";
+
+function renderMenuDrawer() {
+  return render(<MenuDrawer />);
+}
+
+function openMenuDrawer() {
+  act(() => {
+    useUiStore.getState().openOverlay(OVERLAY_ID.MENU_DRAWER, "drawer");
+  });
+}
+
+describe("SettingsDialog — MenuDrawer trigger", () => {
+  it("renders a Settings button in the menu drawer", () => {
+    renderMenuDrawer();
+    openMenuDrawer();
+    expect(screen.getByRole("button", { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it("opens settings dialog when Settings is clicked in drawer", async () => {
+    const user = userEvent.setup();
+    renderMenuDrawer();
+    openMenuDrawer();
     await user.click(screen.getByRole("button", { name: /settings/i }));
     expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(true);
   });

@@ -1,7 +1,7 @@
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon } from "@hugeicons/core-free-icons";
+import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Kbd } from "@/components/ui/kbd";
@@ -61,6 +61,16 @@ export function MenuDrawer() {
           <HugeiconsIcon icon={FolderExportIcon} size={16} />
           Export
           <Kbd className="ml-auto">{modKey} + X</Kbd>
+        </Button>
+        <Separator />
+        <Button
+          variant="secondary"
+          className="w-full mt-2"
+          onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); openOverlay(OVERLAY_ID.SETTINGS_DIALOG, "dialog"); }}
+          aria-label="Settings"
+        >
+          <HugeiconsIcon icon={Settings01Icon} size={16} />
+          Settings
         </Button>
         <Separator />
         <Button
