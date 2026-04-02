@@ -96,7 +96,7 @@ export function clearAllLayerChains(): void {
 }
 
 /**
- * Stop all active pads and clear layer chains.
+ * Stop all active pads with a short gain ramp to avoid clicks.
  * Always call this instead of usePlaybackStore.getState().stopAll() directly,
  * because stopAll() stops voices synchronously (firing onended), which would
  * advance layerChainQueue and re-start queued sounds if the queue is not
@@ -104,11 +104,55 @@ export function clearAllLayerChains(): void {
  */
 export function stopAllPads(): void {
   clearAllLayerChains();
-  clearAllLayerGains();
-  clearAllPadGains();
-  padStreamingAudio.clear();
-  padProgressInfo.clear();
-  usePlaybackStore.getState().stopAll();
+  // Null all onended callbacks — prevents loop restarts during ramp window
+  usePlaybackStore.getState().nullAllOnEnded();
+
+  const ctx = getAudioContext();
+  for (const gain of padGainMap.values()) {
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + STOP_RAMP_S);
+  }
+  setTimeout(() => {
+    padStreamingAudio.clear();
+    padProgressInfo.clear();
+    clearAllLayerGains();
+    clearAllPadGains();
+    usePlaybackStore.getState().stopAll();
+  }, STOP_RAMP_S * 1000 + 5);
+}
+
+export function releasePadHoldLayers(pad: Pad): void {
+  for (const layer of pad.layers) {
+    if (layer.playbackMode !== "hold") continue;
+
+    // Clear chain queue first — prevents onended from restarting the chain
+    layerChainQueue.delete(layer.id);
+
+    const voices = [...usePlaybackStore.getState().getLayerVoices(layer.id)];
+    if (voices.length === 0) continue;
+
+    // Null onended before stopping
+    for (const v of voices) v.setOnEnded(null);
+    // Ramp voiceGains to 0
+    for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
+
+    // Clean up playbackStore + reset layerGain after ramp
+    // Use clearLayerVoice (not stopLayer) to avoid double-stop after stopWithRamp
+    const gain = layerGainMap.get(layer.id);
+    const padId = pad.id;
+    const layerId = layer.id;
+    const resetValue = layer.volume / 100;
+    setTimeout(() => {
+      const cleanupStore = usePlaybackStore.getState();
+      for (const v of voices) cleanupStore.clearLayerVoice(padId, layerId, v);
+      if (gain) {
+        const ctx = getAudioContext();
+        gain.gain.cancelScheduledValues(ctx.currentTime);
+        gain.gain.setValueAtTime(resetValue, ctx.currentTime);
+      }
+    }, STOP_RAMP_S * 1000 + 5);
+  }
 }
 
 function getOrCreateLayerGain(layer: Layer, padGain: GainNode): GainNode {

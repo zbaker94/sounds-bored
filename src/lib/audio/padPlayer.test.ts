@@ -432,6 +432,9 @@ describe("retrigger modes", () => {
 });
 
 describe("stopAllPads", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
   it("does not restart a sequential chain after stopping", async () => {
     const { triggerPad, stopAllPads } = await import("./padPlayer");
     const sounds = [
@@ -448,10 +451,11 @@ describe("stopAllPads", () => {
     const pad = createMockPad({ layers: [layer] });
 
     await triggerPad(pad); // starts sound[0], queues sound[1]
+    await vi.runAllTimersAsync();
     expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
 
-    stopAllPads(); // should clear queue + stop all voices
-    await tick(); // give any queued microtasks time to run
+    stopAllPads(); // should clear queue + ramp-stop all voices
+    await vi.runAllTimersAsync(); // let ramp timeout fire
 
     // sound[1] must NOT have started
     expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
@@ -758,6 +762,95 @@ describe("retrigger next", () => {
 
     expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
     expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("stopAllPads — ramped", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("ramps padGain to 0 before stopping voices", async () => {
+    const { triggerPad, stopAllPads, getPadGain } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(createdSources).toHaveLength(1);
+
+    stopAllPads();
+    // Source not yet stopped — ramp in progress
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+    const padGain = getPadGain(pad.id);
+    expect(padGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+
+    vi.advanceTimersByTime(35);
+    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+  });
+});
+
+describe("releasePadHoldLayers", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("stops only hold-mode layers, not one-shot layers", async () => {
+    const { triggerPad, releasePadHoldLayers } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const holdLayer = createMockLayer({
+      playbackMode: "hold",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const oneShotLayer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [holdLayer, oneShotLayer] });
+    mockLoadBuffer.mockResolvedValue({ duration: 2.0 } as AudioBuffer);
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(createdSources).toHaveLength(2);
+
+    releasePadHoldLayers(pad);
+    vi.advanceTimersByTime(35);
+
+    // playbackStore should have cleared the hold layer's voice but not the one-shot's
+    expect(usePlaybackStore.getState().isLayerActive(oneShotLayer.id)).toBe(true);
+    expect(usePlaybackStore.getState().isLayerActive(holdLayer.id)).toBe(false);
+  });
+
+  it("clears the chain queue for hold layers on release", async () => {
+    const { triggerPad, releasePadHoldLayers } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const holdLayer = createMockLayer({
+      playbackMode: "hold",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [holdLayer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+
+    // A is playing, B is queued — release should clear queue and stop
+    releasePadHoldLayers(pad);
+    vi.advanceTimersByTime(35);
+
+    // After release, B should NOT start (queue was cleared)
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
   });
 });
 
