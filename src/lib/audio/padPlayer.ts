@@ -329,7 +329,8 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
         if (isLayerPlaying) {
           // Capture queue before clearing it
           const remaining = [...(layerChainQueue.get(layer.id) ?? [])];
-          // Null onended to prevent the chain-advance callback from firing during stop
+          // setOnEnded(null) must come before stopLayer — stopLayer calls voice.stop() which
+          // fires onended synchronously; nulling first prevents the chain-advance callback from re-firing.
           for (const v of store.getLayerVoices(layer.id)) v.setOnEnded(null);
           layerChainQueue.delete(layer.id);
           store.stopLayer(pad.id, layer.id);
@@ -339,12 +340,14 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
             const [next, ...rest] = remaining;
             layerChainQueue.set(layer.id, rest);
             await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
-          } else if (layer.playbackMode === "loop" || layer.playbackMode === "hold") {
+          } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
             // Chain exhausted — loop back to beginning
             const newOrder = buildPlayOrder(layer.arrangement, resolved);
-            const [first, ...rest] = newOrder;
-            layerChainQueue.set(layer.id, rest);
-            await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+            if (newOrder.length > 0) {
+              const [first, ...rest] = newOrder;
+              layerChainQueue.set(layer.id, rest);
+              await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+            }
           }
           // one-shot: queue exhausted → just stop (already done above)
           continue;
