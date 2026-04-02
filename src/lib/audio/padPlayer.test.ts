@@ -790,6 +790,7 @@ describe("stopAllPads — ramped", () => {
 
     vi.advanceTimersByTime(35);
     expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(createdSources[0].stop).toHaveBeenCalledOnce();
   });
 });
 
