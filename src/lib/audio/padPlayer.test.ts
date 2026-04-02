@@ -103,8 +103,10 @@ beforeEach(async () => {
   vi.clearAllMocks();
   createdSources.length = 0;
   // Clear chain queue before stopAll so old onended callbacks don't chain
-  const { clearAllLayerChains } = await import("./padPlayer");
+  const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains } = await import("./padPlayer");
   clearAllLayerChains();
+  clearAllLayerGains();
+  clearAllPadGains();
   usePlaybackStore.getState().stopAll();
   usePlaybackStore.setState({
     masterVolume: 100,
@@ -184,11 +186,19 @@ describe("simultaneous arrangement", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
     await triggerPad(pad);
     await tick();
 
-    // createGain is called for padGain (1×), layerGain (1×), voiceGain (1×) = 3 total
-    expect(mockCtx.createGain).toHaveBeenCalledTimes(3);
+    // Gains created in order: padGain (0), layerGain (1), voiceGain (2)
+    expect(gains).toHaveLength(3);
+    expect(gains[2].gain.value).toBe(0.6);
   });
 
   it("initializes layerGain from layer.volume / 100", async () => {
