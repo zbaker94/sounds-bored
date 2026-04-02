@@ -725,4 +725,33 @@ describe("retrigger stop — ramped stop", () => {
 
     expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
   });
+
+  it("retrigger stop: ramps all voices when layer has multiple simultaneous sounds", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "stop",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(createdSources).toHaveLength(2);
+
+    await triggerPad(pad);
+    // Neither source should be stopped synchronously
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+    expect(createdSources[1].stop).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(35);
+    expect(createdSources[0].stop).toHaveBeenCalledOnce();
+    expect(createdSources[1].stop).toHaveBeenCalledOnce();
+  });
 });
