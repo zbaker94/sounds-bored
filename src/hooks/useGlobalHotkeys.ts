@@ -38,6 +38,11 @@ export function useGlobalHotkeys() {
     }
   });
 
+  // Mod+E: toggle edit mode.
+  useHotkeys("mod+e", () => {
+    useUiStore.getState().toggleEditMode();
+  });
+
   // Mod+Shift+N: open the pad config drawer for the active scene.
   useHotkeys("mod+shift+n", () => {
     const { project, activeSceneId } = useProjectStore.getState();

@@ -1,4 +1,7 @@
+import { useEffect } from "react";
 import { useProjectStore } from "@/state/projectStore";
+import { usePlaybackStore } from "@/state/playbackStore";
+import { clearAllLayerChains } from "@/lib/audio/padPlayer";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { SceneView } from "@/components/composite/SceneView/SceneView";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -25,6 +28,13 @@ export function MainPage() {
 function MainPageInner() {
   useAutoSave();
   useGlobalHotkeys();
+
+  useEffect(() => {
+    return () => {
+      clearAllLayerChains();
+      usePlaybackStore.getState().stopAll();
+    };
+  }, []);
 
   const {
     showConfirmClose,

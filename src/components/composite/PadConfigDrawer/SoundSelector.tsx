@@ -221,9 +221,9 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
   return (
     <Combobox
       value={value.setId}
-      onValueChange={(setId) =>
-        onChange({ type: "set", setId, defaultVolume: value.defaultVolume })
-      }
+      onValueChange={(setId) => {
+        if (setId) onChange({ type: "set", setId, defaultVolume: value.defaultVolume });
+      }}
       items={sets}
     >
       <ComboboxInput

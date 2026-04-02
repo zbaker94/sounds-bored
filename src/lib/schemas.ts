@@ -144,7 +144,7 @@ export const LayerConfigFormSchema = z.object({
 
 export const PadConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  layer: LayerConfigFormSchema,
+  layers: z.array(LayerConfigFormSchema).min(1, "At least one layer is required"),
 });
 
 export type LayerConfigForm = z.infer<typeof LayerConfigFormSchema>;

@@ -561,7 +561,7 @@ describe("PadConfigSchema", () => {
   };
 
   it("accepts a valid pad config", () => {
-    const result = PadConfigSchema.safeParse({ name: "My Pad", layer: validLayer });
+    const result = PadConfigSchema.safeParse({ name: "My Pad", layers: [validLayer] });
     expect(result.success).toBe(true);
   });
 

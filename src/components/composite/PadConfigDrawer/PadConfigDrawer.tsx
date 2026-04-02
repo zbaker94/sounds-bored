@@ -1,89 +1,103 @@
+import { useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadConfigSchema } from "@/lib/schemas";
-import type { PadConfigForm, PadConfig } from "@/lib/schemas";
+import type { PadConfigForm, PadConfig, LayerConfigForm } from "@/lib/schemas";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LayerConfigSection } from "./LayerConfigSection";
+import { LayerAccordion } from "./LayerAccordion";
+
+const DEFAULT_LAYER: LayerConfigForm = {
+  selection: { type: "assigned", instances: [] },
+  arrangement: "simultaneous",
+  playbackMode: "one-shot",
+  retriggerMode: "restart",
+  volume: 100,
+};
 
 const DEFAULT_VALUES: PadConfigForm = {
   name: "",
-  layer: {
-    selection: { type: "assigned", instances: [] },
-    arrangement: "simultaneous",
-    playbackMode: "one-shot",
-    retriggerMode: "restart",
-    volume: 100,
-  },
+  layers: [DEFAULT_LAYER],
 };
 
 interface PadConfigDrawerProps {
   sceneId: string;
+  /** When set, the drawer operates in edit mode and calls updatePad on submit. */
+  padId?: string;
+  /** Pre-populate the form with existing pad data (only used when padId is set). */
   initialConfig?: Partial<PadConfig>;
+  /** Called when the drawer closes, e.g. to clear parent editingPad state. */
+  onClose?: () => void;
 }
 
-export function PadConfigDrawer({ sceneId, initialConfig }: PadConfigDrawerProps) {
+export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadConfigDrawerProps) {
   const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER));
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const addPad = useProjectStore((s) => s.addPad);
+  const updatePad = useProjectStore((s) => s.updatePad);
 
-  const isEditing = initialConfig !== undefined;
+  const isEditMode = padId !== undefined;
 
   const methods = useForm<PadConfigForm>({
     resolver: zodResolver(PadConfigSchema),
-    defaultValues: initialConfig
-      ? {
-          name: initialConfig.name ?? "",
-          layer: initialConfig.layers?.[0]
-            ? {
-                selection: initialConfig.layers[0].selection,
-                arrangement: initialConfig.layers[0].arrangement,
-                playbackMode: initialConfig.layers[0].playbackMode,
-                retriggerMode: initialConfig.layers[0].retriggerMode,
-                volume: initialConfig.layers[0].volume,
-              }
-            : DEFAULT_VALUES.layer,
-        }
-      : DEFAULT_VALUES,
+    defaultValues: DEFAULT_VALUES,
   });
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = methods;
+  const { register, handleSubmit, reset, formState: { errors } } = methods;
+
+  // Reset form with correct values whenever the drawer opens.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEditMode && initialConfig) {
+      reset({
+        name: initialConfig.name ?? "",
+        layers: (initialConfig.layers ?? []).map((l) => ({
+          selection: l.selection as LayerConfigForm["selection"],
+          arrangement: l.arrangement,
+          playbackMode: l.playbackMode,
+          retriggerMode: l.retriggerMode,
+          volume: l.volume,
+        })),
+      });
+    } else {
+      reset(DEFAULT_VALUES);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, padId]);
 
   function handleClose() {
     reset(DEFAULT_VALUES);
     closeOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER);
+    onClose?.();
   }
 
   function onSubmit(data: PadConfigForm) {
-    // Layer id is generated here (not in addPad) because PadConfig.layers is Layer[].
-    // addPad only generates the pad's own id.
     const config: PadConfig = {
       name: data.name,
-      layers: [{ id: crypto.randomUUID(), ...data.layer }],
-      muteTargetPadIds: [],
+      layers: data.layers.map((l) => ({ id: crypto.randomUUID(), ...l })),
+      muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
     };
-    addPad(sceneId, config);
+    if (isEditMode && padId) {
+      updatePad(sceneId, padId, config);
+    } else {
+      addPad(sceneId, config);
+    }
     handleClose();
   }
 
   return (
     <FormProvider {...methods}>
       <DrawerDialog
-         classNames={{
+        classNames={{
           title: "[font-family:DeathLetter] tracking-wider text-2xl",
         }}
         open={isOpen}
         onOpenChange={(open) => { if (!open) handleClose(); }}
-        title={isEditing ? "Edit Pad" : "Configure Pad"}
+        title={isEditMode ? "Edit Pad" : "New Pad"}
         content={
           <div className="flex flex-col gap-4 px-4 py-2">
             <div className="flex flex-col gap-1">
@@ -98,7 +112,7 @@ export function PadConfigDrawer({ sceneId, initialConfig }: PadConfigDrawerProps
                 <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
-            <LayerConfigSection />
+            <LayerAccordion />
           </div>
         }
         footer={

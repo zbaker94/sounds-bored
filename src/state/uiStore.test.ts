@@ -133,4 +133,21 @@ describe("uiStore", () => {
       expect(useUiStore.getState().isTopOverlay("confirm-close")).toBe(true);
     });
   });
+
+  describe("editMode", () => {
+    it("starts as false", () => {
+      expect(useUiStore.getState().editMode).toBe(false);
+    });
+
+    it("toggleEditMode turns it on", () => {
+      useUiStore.getState().toggleEditMode();
+      expect(useUiStore.getState().editMode).toBe(true);
+    });
+
+    it("toggleEditMode turns it off when already on", () => {
+      useUiStore.getState().toggleEditMode();
+      useUiStore.getState().toggleEditMode();
+      expect(useUiStore.getState().editMode).toBe(false);
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
@@ -29,6 +30,7 @@ export function SceneView() {
   const project = useProjectStore((s) => s.project);
   const openOverlay = useUiStore((s) => s.openOverlay);
   const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
+  const [editingPad, setEditingPad] = useState<Pad | null>(null);
 
   const addScene = useProjectStore((s) => s.addScene);
 
@@ -124,7 +126,15 @@ export function SceneView() {
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
       <div className="flex-1 min-h-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr gap-3">
         {pagePads.map((pad) => (
-          <PadButton key={pad.id} pad={pad} />
+          <PadButton
+            key={pad.id}
+            pad={pad}
+            sceneId={activeScene.id}
+            onEditClick={() => {
+              setEditingPad(pad);
+              openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
+            }}
+          />
         ))}
         {isLastPage && (
           <button
@@ -167,7 +177,23 @@ export function SceneView() {
         </div>
       )}
 
-      <PadConfigDrawer sceneId={activeScene.id} />
+      <PadConfigDrawer
+        sceneId={activeScene.id}
+        padId={editingPad?.id}
+        initialConfig={
+          editingPad
+            ? {
+                name: editingPad.name,
+                layers: editingPad.layers,
+                muteTargetPadIds: editingPad.muteTargetPadIds,
+                muteGroupId: editingPad.muteGroupId,
+                color: editingPad.color,
+                icon: editingPad.icon,
+              }
+            : undefined
+        }
+        onClose={() => setEditingPad(null)}
+      />
     </div>
   );
 }

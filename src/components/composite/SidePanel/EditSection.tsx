@@ -17,6 +17,8 @@ export function EditSection() {
   const soundsOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SOUNDS_PANEL));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
+  const editMode = useUiStore((s) => s.editMode);
+  const toggleEditMode = useUiStore((s) => s.toggleEditMode);
 
   return (
     <div className="flex flex-row items-center p-1 gap-2 md:flex-col">
@@ -55,7 +57,12 @@ export function EditSection() {
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="default" size="icon" className="size-11 md:size-9">
+          <Button
+            variant={editMode ? "secondary" : "default"}
+            size="icon"
+            className="size-11 md:size-9"
+            onClick={toggleEditMode}
+          >
             <HugeiconsIcon icon={PencilEdit01Icon} />
           </Button>
         </TooltipTrigger>

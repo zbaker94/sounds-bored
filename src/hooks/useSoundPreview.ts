@@ -21,7 +21,7 @@ export function useSoundPreview() {
 
       setPreviewingId(sound.id);
       try {
-        await playPreview(sound.filePath, () => {
+        await playPreview(sound, () => {
           setPreviewingId((current) => (current === sound.id ? null : current));
         });
       } catch (err) {

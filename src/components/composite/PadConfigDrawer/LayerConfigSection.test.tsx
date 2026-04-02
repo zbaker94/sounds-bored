@@ -10,16 +10,18 @@ import type { PadConfigForm } from "@/lib/schemas";
 
 const defaultValues: PadConfigForm = {
   name: "",
-  layer: {
-    selection: { type: "assigned", instances: [] },
-    arrangement: "simultaneous",
-    playbackMode: "one-shot",
-    retriggerMode: "restart",
-    volume: 100,
-  },
+  layers: [
+    {
+      selection: { type: "assigned", instances: [] },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    },
+  ],
 };
 
-function Wrapper({ onSubmit = () => {} }: { onSubmit?: (data: PadConfigForm) => void }) {
+function Wrapper({ index = 0, onSubmit = () => {} }: { index?: number; onSubmit?: (data: PadConfigForm) => void }) {
   const methods = useForm<PadConfigForm>({
     resolver: zodResolver(PadConfigSchema),
     defaultValues,
@@ -27,7 +29,7 @@ function Wrapper({ onSubmit = () => {} }: { onSubmit?: (data: PadConfigForm) => 
   return (
     <FormProvider {...methods}>
       <form onSubmit={methods.handleSubmit(onSubmit)}>
-        <LayerConfigSection />
+        <LayerConfigSection index={index} />
         <button type="submit">Submit</button>
       </form>
     </FormProvider>

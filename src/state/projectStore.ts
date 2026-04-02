@@ -29,6 +29,8 @@ interface ProjectActions {
   deleteScene: (sceneId: string) => void;
   addPad: (sceneId: string, config: PadConfig) => void;
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
+  deletePad: (sceneId: string, padId: string) => void;
+  duplicatePad: (sceneId: string, padId: string) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -147,6 +149,34 @@ export const useProjectStore = create<ProjectStore>()(
         const pad = scene.pads.find((p) => p.id === padId);
         if (!pad) return;
         Object.assign(pad, config);
+        draft.isDirty = true;
+      }),
+
+    deletePad: (sceneId, padId) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const scene = draft.project.scenes.find((s) => s.id === sceneId);
+        if (!scene) return;
+        const idx = scene.pads.findIndex((p) => p.id === padId);
+        if (idx === -1) return;
+        scene.pads.splice(idx, 1);
+        draft.isDirty = true;
+      }),
+
+    duplicatePad: (sceneId, padId) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const scene = draft.project.scenes.find((s) => s.id === sceneId);
+        if (!scene) return;
+        const idx = scene.pads.findIndex((p) => p.id === padId);
+        if (idx === -1) return;
+        const source = scene.pads[idx];
+        const duplicate: Pad = {
+          ...source,
+          id: crypto.randomUUID(),
+          layers: source.layers.map((l) => ({ ...l, id: crypto.randomUUID() })),
+        };
+        scene.pads.splice(idx + 1, 0, duplicate);
         draft.isDirty = true;
       }),
   }))

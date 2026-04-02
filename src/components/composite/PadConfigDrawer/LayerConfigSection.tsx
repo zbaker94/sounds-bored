@@ -30,21 +30,33 @@ const RETRIGGER_MODE_OPTIONS = [
   { value: "next", label: "Next" },
 ] as const;
 
-export function LayerConfigSection() {
+interface LayerConfigSectionProps {
+  index: number;
+}
+
+export function LayerConfigSection({ index }: LayerConfigSectionProps) {
   const { control, watch, setValue, formState: { errors } } = useFormContext<PadConfigForm>();
-  // Watch the parent path so the subscription fires when setValue("layer.selection", ...) sets a new
-  // discriminated union variant — child-path watches miss parent-path setValue updates.
-  const selectionType = watch("layer.selection").type;
-  // Using watch+setValue for tab fields avoids a Radix Tabs / react-hook-form Controller
-  // sync issue where the active-tab indicator stays on the initial value after clicking.
-  const arrangement = watch("layer.arrangement");
-  const playbackMode = watch("layer.playbackMode");
-  const retriggerMode = watch("layer.retriggerMode");
-  // Cast needed: TypeScript can't narrow discriminated union error shapes
-  const selectionErrors = errors.layer?.selection as Record<string, { message?: string }> | undefined;
+
+  // Read all layer values reactively via the top-level array watch.
+  const layers = watch("layers");
+  const layer = layers[index];
+  const selectionType = layer?.selection.type ?? "assigned";
+  const arrangement = layer?.arrangement ?? "simultaneous";
+  const playbackMode = layer?.playbackMode ?? "one-shot";
+  const retriggerMode = layer?.retriggerMode ?? "restart";
+
+  // Cast array element paths — react-hook-form requires path strings;
+  // we use fixed-index alias (0) for TypeScript inference.
+  const selPath = `layers.${index}.selection` as `layers.0.selection`;
+  const arrPath = `layers.${index}.arrangement` as `layers.0.arrangement`;
+  const pbPath  = `layers.${index}.playbackMode` as `layers.0.playbackMode`;
+  const rtPath  = `layers.${index}.retriggerMode` as `layers.0.retriggerMode`;
+  const volPath = `layers.${index}.volume` as `layers.0.volume`;
+
+  const selectionErrors = errors.layers?.[index]?.selection as Record<string, { message?: string }> | undefined;
 
   function handleSelectionTypeChange(type: LayerSelection["type"]) {
-    setValue("layer.selection", SELECTION_TYPE_DEFAULTS[type]);
+    setValue(selPath, SELECTION_TYPE_DEFAULTS[type] as LayerSelection);
   }
 
   return (
@@ -67,9 +79,9 @@ export function LayerConfigSection() {
 
         <Controller
           control={control}
-          name="layer.selection"
+          name={selPath}
           render={({ field }) => (
-            <SoundSelector value={field.value} onChange={field.onChange} />
+            <SoundSelector value={field.value as LayerSelection} onChange={field.onChange} />
           )}
         />
 
@@ -93,7 +105,7 @@ export function LayerConfigSection() {
           value={arrangement}
           onValueChange={(v) => {
             if (ARRANGEMENT_OPTIONS.some((o) => o.value === v))
-              setValue("layer.arrangement", v as Arrangement, { shouldDirty: true });
+              setValue(arrPath, v as Arrangement, { shouldDirty: true });
           }}
         >
           <TabsList className="w-full">
@@ -115,7 +127,7 @@ export function LayerConfigSection() {
           value={playbackMode}
           onValueChange={(v) => {
             if (PLAYBACK_MODE_OPTIONS.some((o) => o.value === v))
-              setValue("layer.playbackMode", v as PlaybackMode, { shouldDirty: true });
+              setValue(pbPath, v as PlaybackMode, { shouldDirty: true });
           }}
         >
           <TabsList className="w-full">
@@ -137,7 +149,7 @@ export function LayerConfigSection() {
           value={retriggerMode}
           onValueChange={(v) => {
             if (RETRIGGER_MODE_OPTIONS.some((o) => o.value === v))
-              setValue("layer.retriggerMode", v as RetriggerMode, { shouldDirty: true });
+              setValue(rtPath, v as RetriggerMode, { shouldDirty: true });
           }}
         >
           <TabsList className="w-full">
@@ -157,13 +169,13 @@ export function LayerConfigSection() {
         </Label>
         <Controller
           control={control}
-          name="layer.volume"
+          name={volPath}
           render={({ field }) => (
             <Slider
               min={0}
               max={100}
               step={1}
-              value={[field.value]}
+              value={[field.value as number]}
               onValueChange={([v]) => field.onChange(v)}
             />
           )}

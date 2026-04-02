@@ -19,6 +19,7 @@ export const OVERLAY_ID = {
 
 interface UiState {
   overlayStack: OverlayEntry[];
+  editMode: boolean;
 }
 
 interface UiActions {
@@ -34,12 +35,15 @@ interface UiActions {
   isTopOverlay: (id: string) => boolean;
   /** Returns true if any overlay is currently open. */
   hasOpenOverlay: () => boolean;
+  /** Toggle edit mode on/off. */
+  toggleEditMode: () => void;
 }
 
 export type UiStore = UiState & UiActions;
 
 export const initialUiState: UiState = {
   overlayStack: [],
+  editMode: false,
 };
 
 export const useUiStore = create<UiStore>()((set, get) => ({
@@ -77,4 +81,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   },
 
   hasOpenOverlay: () => get().overlayStack.length > 0,
+
+  toggleEditMode: () =>
+    set((state) => ({ editMode: !state.editMode })),
 }));

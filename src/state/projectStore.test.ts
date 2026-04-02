@@ -377,4 +377,97 @@ describe("projectStore", () => {
       expect(getState().isDirty).toBe(true);
     });
   });
+
+  describe("deletePad", () => {
+    function loadSceneWithPad() {
+      const scene = createMockScene({ id: "scene-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick" });
+      scene.pads.push(pad);
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return { scene, pad };
+    }
+
+    it("removes the pad from the scene", () => {
+      loadSceneWithPad();
+      getState().deletePad("scene-1", "pad-1");
+      expect(getState().project?.scenes[0].pads).toHaveLength(0);
+    });
+
+    it("marks the project as dirty", () => {
+      loadSceneWithPad();
+      getState().deletePad("scene-1", "pad-1");
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("is a no-op if pad does not exist", () => {
+      loadSceneWithPad();
+      getState().deletePad("scene-1", "nonexistent");
+      expect(getState().project?.scenes[0].pads).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if scene does not exist", () => {
+      loadSceneWithPad();
+      getState().deletePad("nonexistent", "pad-1");
+      expect(getState().project?.scenes[0].pads).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
+  });
+
+  describe("duplicatePad", () => {
+    function loadSceneWithTwoPads() {
+      const scene = createMockScene({ id: "scene-1" });
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad1 = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const pad2 = createMockPad({ id: "pad-2", name: "Snare" });
+      scene.pads.push(pad1, pad2);
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return { scene, pad1, pad2, layer };
+    }
+
+    it("inserts a new pad immediately after the source pad", () => {
+      loadSceneWithTwoPads();
+      getState().duplicatePad("scene-1", "pad-1");
+      const pads = getState().project!.scenes[0].pads;
+      expect(pads).toHaveLength(3);
+      expect(pads[0].id).toBe("pad-1");
+      expect(pads[1].name).toBe("Kick"); // duplicate is at index 1
+      expect(pads[2].id).toBe("pad-2");
+    });
+
+    it("assigns a new unique id to the duplicated pad", () => {
+      loadSceneWithTwoPads();
+      getState().duplicatePad("scene-1", "pad-1");
+      const pads = getState().project!.scenes[0].pads;
+      expect(pads[1].id).not.toBe("pad-1");
+      expect(pads[1].id).toBeTruthy();
+    });
+
+    it("assigns new ids to all layers in the duplicated pad", () => {
+      loadSceneWithTwoPads();
+      getState().duplicatePad("scene-1", "pad-1");
+      const duplicate = getState().project!.scenes[0].pads[1];
+      expect(duplicate.layers[0].id).not.toBe("layer-1");
+    });
+
+    it("marks the project as dirty", () => {
+      loadSceneWithTwoPads();
+      getState().duplicatePad("scene-1", "pad-1");
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("is a no-op if pad does not exist", () => {
+      loadSceneWithTwoPads();
+      getState().duplicatePad("scene-1", "nonexistent");
+      expect(getState().project?.scenes[0].pads).toHaveLength(2);
+    });
+
+    it("is a no-op if scene does not exist", () => {
+      loadSceneWithTwoPads();
+      getState().duplicatePad("nonexistent", "pad-1");
+      expect(getState().project?.scenes[0].pads).toHaveLength(2);
+    });
+  });
 });

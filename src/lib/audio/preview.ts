@@ -1,6 +1,6 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { getAudioContext, ensureResumed, getMasterGain } from "./audioContext";
-import { MissingFileError } from "@/lib/library.reconcile";
+import { ensureResumed, getMasterGain } from "./audioContext";
+import { loadBuffer } from "./bufferCache";
+import type { Sound } from "@/lib/schemas";
 
 let currentSource: AudioBufferSourceNode | null = null;
 
@@ -15,25 +15,14 @@ export function stopPreview(): void {
   }
 }
 
-export async function playPreview(filePath: string, onEnded?: () => void): Promise<void> {
+export async function playPreview(sound: Sound, onEnded?: () => void): Promise<void> {
   stopPreview();
 
-  await ensureResumed();
-  const ctx = getAudioContext();
-
-  const url = convertFileSrc(filePath);
-  let response: Response;
-  try {
-    response = await fetch(url);
-  } catch (err) {
-    throw new MissingFileError(`Could not load audio file: ${err}`);
-  }
-  if (!response.ok) throw new MissingFileError(`Audio file not found (status: ${response.status})`);
-  const arrayBuffer = await response.arrayBuffer();
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+  const ctx = await ensureResumed();
+  const buffer = await loadBuffer(sound);
 
   const source = ctx.createBufferSource();
-  source.buffer = audioBuffer;
+  source.buffer = buffer;
   source.connect(getMasterGain());
   source.onended = () => {
     if (currentSource === source) {

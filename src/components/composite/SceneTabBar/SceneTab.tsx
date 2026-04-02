@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/state/projectStore";
+import { useUiStore } from "@/state/uiStore";
 import { TabsTrigger } from "@/components/ui/tabs";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Tick01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -13,6 +15,7 @@ interface SceneTabProps {
 export function SceneTab({ scene }: SceneTabProps) {
   const renameScene = useProjectStore((s) => s.renameScene);
   const deleteScene = useProjectStore((s) => s.deleteScene);
+  const editMode = useUiStore((s) => s.editMode);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(scene.name);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -115,13 +118,18 @@ export function SceneTab({ scene }: SceneTabProps) {
 
   return (
     <>
-      <TabsTrigger value={scene.id} className="group gap-0 hover:gap-1.5">
+      <TabsTrigger value={scene.id} className={cn("group gap-0", editMode ? "gap-1.5" : "hover:gap-1.5")}>
         {scene.name}
         <button
           type="button"
           aria-label="Edit scene name"
           onMouseDown={startEditing}
-          className="w-0 overflow-hidden group-hover:w-[14px] opacity-0 group-hover:opacity-100 transition-all inline-flex items-center justify-center"
+          className={cn(
+            "overflow-hidden transition-all inline-flex items-center justify-center",
+            editMode
+              ? "w-[14px] opacity-100"
+              : "w-0 group-hover:w-[14px] opacity-0 group-hover:opacity-100"
+          )}
         >
           <HugeiconsIcon icon={PencilEdit01Icon} size={14} />
         </button>
@@ -129,7 +137,12 @@ export function SceneTab({ scene }: SceneTabProps) {
           type="button"
           aria-label="Delete scene"
           onClick={handleDeleteClick}
-          className="w-0 overflow-hidden group-hover:w-[14px] opacity-0 group-hover:opacity-100 transition-all inline-flex items-center justify-center"
+          className={cn(
+            "overflow-hidden transition-all inline-flex items-center justify-center",
+            editMode
+              ? "w-[14px] opacity-100"
+              : "w-0 group-hover:w-[14px] opacity-0 group-hover:opacity-100"
+          )}
         >
           <HugeiconsIcon icon={Cancel01Icon} size={14} />
         </button>
