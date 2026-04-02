@@ -5,10 +5,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AppErrorBoundary, RouteErrorElement } from "@/components/ErrorBoundary";
 import { useBootLoader } from "@/hooks/useBootLoader";
+import { useUpdater } from "@/hooks/useUpdater";
 import { SettingsDialog } from "@/components/modals/SettingsDialog";
 
 function App() {
   useBootLoader();
+  useUpdater();
 
   return (
     <AppErrorBoundary>
