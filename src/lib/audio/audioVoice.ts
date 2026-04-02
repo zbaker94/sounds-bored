@@ -1,22 +1,27 @@
-/**
- * Shared abstraction over the two voice implementations:
- *   - AudioBufferSourceNode  (short files: fully decoded, cached in RAM)
- *   - HTMLAudioElement        (large files: browser-managed streaming)
- *
- * Both satisfy this interface so padPlayer and playbackStore can treat
- * them uniformly without knowing which path was taken.
- */
+const STOP_RAMP_S = 0.025;
+
 export interface AudioVoice {
-  /** Begin playback. Always returns Promise<void> for consistent awaiting. */
   start(): Promise<void>;
-  /** Stop playback immediately. For streaming voices, also fires any pending
-   *  onended callback synchronously so retrigger chains can advance. */
+  /** Hard/immediate stop. Fires onended synchronously. */
   stop(): void;
-  /** Register (or clear) the callback to run when playback ends. */
+  /** Ramp voiceGain → 0 over rampS seconds, then stop. Fires onended async. */
+  stopWithRamp(rampS?: number): void;
+  /** Set voiceGain directly (0–1). */
+  setVolume(v: number): void;
   setOnEnded(cb: (() => void) | null): void;
 }
 
-export function wrapBufferSource(source: AudioBufferSourceNode): AudioVoice {
+export function wrapBufferSource(
+  source: AudioBufferSourceNode,
+  ctx: AudioContext,
+  destination: AudioNode,
+  initialVolume = 1.0,
+): AudioVoice {
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = initialVolume;
+  source.connect(voiceGain);
+  voiceGain.connect(destination);
+
   let endedCb: (() => void) | null = null;
 
   return {
@@ -25,30 +30,48 @@ export function wrapBufferSource(source: AudioBufferSourceNode): AudioVoice {
       return Promise.resolve();
     },
     stop() {
-      source.onended = null; // prevent double-fire from Web Audio's async event
-      try {
-        source.stop();
-      } catch {
-        // Already ended — safe to ignore.
-      }
+      source.onended = null;
+      try { source.stop(); } catch { /* already ended */ }
       const cb = endedCb;
       endedCb = null;
-      cb?.(); // fire synchronously so "next" retrigger chains advance
+      cb?.();
+    },
+    stopWithRamp(rampS = STOP_RAMP_S) {
+      voiceGain.gain.cancelScheduledValues(ctx.currentTime);
+      voiceGain.gain.setValueAtTime(voiceGain.gain.value, ctx.currentTime);
+      voiceGain.gain.linearRampToValueAtTime(0, ctx.currentTime + rampS);
+      setTimeout(() => {
+        source.onended = null;
+        try { source.stop(); } catch { /* already ended */ }
+        const cb = endedCb;
+        endedCb = null;
+        cb?.();
+      }, rampS * 1000 + 5);
+    },
+    setVolume(v) {
+      voiceGain.gain.value = v;
     },
     setOnEnded(cb) {
       endedCb = cb;
       source.onended = cb
-        ? () => {
-            endedCb = null;
-            cb();
-          }
+        ? () => { endedCb = null; cb(); }
         : null;
     },
   };
 }
 
-export function wrapStreamingElement(audio: HTMLAudioElement): AudioVoice {
-  // Kept outside the object literal so stop() can clear it before firing.
+export function wrapStreamingElement(
+  audio: HTMLAudioElement,
+  sourceNode: MediaElementAudioSourceNode,
+  ctx: AudioContext,
+  destination: AudioNode,
+  initialVolume = 1.0,
+): AudioVoice {
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = initialVolume;
+  sourceNode.connect(voiceGain);
+  voiceGain.connect(destination);
+
   let endedCb: (() => void) | null = null;
 
   return {
@@ -61,15 +84,28 @@ export function wrapStreamingElement(audio: HTMLAudioElement): AudioVoice {
       audio.onended = null;
       const cb = endedCb;
       endedCb = null;
-      cb?.(); // fire synchronously so "next" retrigger chains advance
+      cb?.();
+    },
+    stopWithRamp(rampS = STOP_RAMP_S) {
+      voiceGain.gain.cancelScheduledValues(ctx.currentTime);
+      voiceGain.gain.setValueAtTime(voiceGain.gain.value, ctx.currentTime);
+      voiceGain.gain.linearRampToValueAtTime(0, ctx.currentTime + rampS);
+      setTimeout(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.onended = null;
+        const cb = endedCb;
+        endedCb = null;
+        cb?.();
+      }, rampS * 1000 + 5);
+    },
+    setVolume(v) {
+      voiceGain.gain.value = v;
     },
     setOnEnded(cb) {
       endedCb = cb;
       audio.onended = cb
-        ? () => {
-            endedCb = null;
-            cb();
-          }
+        ? () => { endedCb = null; cb(); }
         : null;
     },
   };
