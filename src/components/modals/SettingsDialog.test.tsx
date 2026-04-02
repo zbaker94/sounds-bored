@@ -152,8 +152,8 @@ describe("SettingsDialog — Folders tab display", () => {
     setupFolderState();
     renderDialog();
     openDialog();
-    expect(screen.getByText("Downloads")).toBeInTheDocument();
-    expect(screen.getByText("Imported")).toBeInTheDocument();
+    expect(screen.getAllByText("Downloads").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Imported").length).toBeGreaterThan(0);
     expect(screen.getByText("Other")).toBeInTheDocument();
   });
 

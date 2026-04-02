@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TruncatedPath } from "@/components/ui/truncated-path";
@@ -24,8 +25,6 @@ import { Delete02Icon, FolderAddIcon } from "@hugeicons/core-free-icons";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-
-type FolderRole = "download" | "import" | "none";
 
 export function SettingsDialog() {
   const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG));
@@ -68,30 +67,12 @@ function FoldersTab() {
 
   const { globalFolders, downloadFolderId, importFolderId } = settings;
 
-  function getRole(folderId: string): FolderRole {
-    if (folderId === downloadFolderId) return "download";
-    if (folderId === importFolderId) return "import";
-    return "none";
-  }
-
   function isAssigned(folderId: string): boolean {
     return folderId === downloadFolderId || folderId === importFolderId;
   }
 
   function persist() {
     saveSettings(useAppSettingsStore.getState().settings!);
-  }
-
-  function handleRoleChange(folderId: string, role: FolderRole) {
-    if (role === "download") {
-      setDownloadFolder(folderId);
-      persist();
-    } else if (role === "import") {
-      setImportFolder(folderId);
-      persist();
-    }
-    // role === "none": no-op — schema requires both roles to always be assigned;
-    // this option is disabled in the UI when the folder is currently assigned.
   }
 
   async function handleAddFolder() {
@@ -122,45 +103,76 @@ function FoldersTab() {
   }
 
   return (
-    <div className="space-y-2 mt-2">
-      {globalFolders.map((folder) => (
-        <FolderRow
-          key={folder.id}
-          folder={folder}
-          role={getRole(folder.id)}
-          assigned={isAssigned(folder.id)}
-          onRoleChange={(role) => handleRoleChange(folder.id, role)}
-          onRemove={() => handleRemoveFolder(folder.id)}
-          onRename={(name) => handleRename(folder.id, name)}
-        />
-      ))}
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={handleAddFolder}
-        className="mt-4 w-full"
-      >
-        <HugeiconsIcon icon={FolderAddIcon} size={16} />
-        Add Folder
-      </Button>
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium w-28 shrink-0">Download folder</span>
+          <Select
+            value={downloadFolderId}
+            onValueChange={(id) => { setDownloadFolder(id); persist(); }}
+          >
+            <SelectTrigger size="sm" className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {globalFolders.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium w-28 shrink-0">Import folder</span>
+          <Select
+            value={importFolderId}
+            onValueChange={(id) => { setImportFolder(id); persist(); }}
+          >
+            <SelectTrigger size="sm" className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {globalFolders.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Separator />
+      <div className="space-y-2">
+        {globalFolders.map((folder) => (
+          <FolderRow
+            key={folder.id}
+            folder={folder}
+            assigned={isAssigned(folder.id)}
+            onRemove={() => handleRemoveFolder(folder.id)}
+            onRename={(name) => handleRename(folder.id, name)}
+          />
+        ))}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleAddFolder}
+          className="mt-2 w-full"
+        >
+          <HugeiconsIcon icon={FolderAddIcon} size={16} />
+          Add Folder
+        </Button>
+      </div>
     </div>
   );
 }
 
 interface FolderRowProps {
   folder: GlobalFolder;
-  role: FolderRole;
   assigned: boolean;
-  onRoleChange: (role: FolderRole) => void;
   onRemove: () => void;
   onRename: (name: string) => void;
 }
 
 function FolderRow({
   folder,
-  role,
   assigned,
-  onRoleChange,
   onRemove,
   onRename,
 }: FolderRowProps) {
@@ -220,21 +232,6 @@ function FolderRow({
           className="block text-xs text-muted-foreground"
         />
       </div>
-      <Select
-        value={role}
-        onValueChange={(v) => onRoleChange(v as FolderRole)}
-      >
-        <SelectTrigger size="sm" className="w-32">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none" disabled={assigned}>
-            None
-          </SelectItem>
-          <SelectItem value="download">Download</SelectItem>
-          <SelectItem value="import">Import</SelectItem>
-        </SelectContent>
-      </Select>
       <Button
         variant="ghost"
         size="icon-sm"
