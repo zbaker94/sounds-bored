@@ -227,6 +227,7 @@ async function startLayerSound(
       ) {
         // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running)
         const newOrder = buildPlayOrder(layer.arrangement, allSounds);
+        if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
         const [first, ...rest] = newOrder;
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), allSounds);

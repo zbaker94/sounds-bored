@@ -51,6 +51,7 @@ const mockAudioInstances: Array<{
 vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any, src?: string) {
   this.src = src ?? "";
   this.currentTime = 0;
+  this.loop = false;
   this.pause = vi.fn();
   this.play = vi.fn().mockResolvedValue(undefined);
   this.onended = null;
@@ -543,6 +544,31 @@ describe("loop playback mode", () => {
 
     expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
     expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+
+  it("streaming path: simultaneous+loop sets audio.loop = true", async () => {
+    const mod = await import("./streamingCache");
+    const checkIsLargeFile = mod.checkIsLargeFile as ReturnType<typeof vi.fn>;
+    checkIsLargeFile.mockResolvedValue(true);
+
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "big.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      playbackMode: "loop",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    checkIsLargeFile.mockResolvedValue(false);
+
+    const audioInstance = mockAudioInstances[0];
+    expect(audioInstance).toBeDefined();
+    expect(audioInstance.loop).toBe(true);
   });
 });
 
