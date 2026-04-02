@@ -62,9 +62,11 @@ export function usePadGesture(pad: Pad) {
       if (s.phase !== "down") return;
       s.phase = "hold";
 
-      const vol = s.wasPlayingAtStart
+      const vol = hasHoldLayer
         ? (usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0)
-        : 0;
+        : s.wasPlayingAtStart
+          ? (usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0)
+          : 0;
       s.startVolume = vol;
       s.currentVolume = vol;
       setFillVolume(vol);
@@ -80,7 +82,7 @@ export function usePadGesture(pad: Pad) {
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
 
-      if (deltaY > 0 && !s.wasPlayingAtStart) {
+      if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
         triggerPad(pad, 0);
       }
     }
@@ -89,7 +91,7 @@ export function usePadGesture(pad: Pad) {
       const newVolume = Math.max(0, Math.min(1, s.startVolume + deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
-      if (newVolume > 0.01 && !usePlaybackStore.getState().isPadActive(pad.id)) {
+      if (newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {
         triggerPad(pad, 0);
       }
 
@@ -108,7 +110,7 @@ export function usePadGesture(pad: Pad) {
     } else if (s.phase === "hold") {
       if (!hasHoldLayer) triggerPad(pad, 1.0);
     } else if (s.phase === "drag") {
-      if (s.currentVolume < 0.01) {
+      if (s.currentVolume < 0.01 && !hasHoldLayer) {
         usePlaybackStore.getState().stopPad(pad.id);
         resetPadGain(pad.id);
       }
