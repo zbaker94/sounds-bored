@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
-import { triggerPad, setPadVolume, resetPadGain } from "@/lib/audio/padPlayer";
+import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers } from "@/lib/audio/padPlayer";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 // Gesture thresholds
@@ -21,6 +21,8 @@ interface GestureState {
 }
 
 export function usePadGesture(pad: Pad) {
+  const hasHoldLayer = pad.layers.some((l) => l.playbackMode === "hold");
+
   const state = useRef<GestureState>({
     startY: 0,
     startTime: 0,
@@ -50,6 +52,11 @@ export function usePadGesture(pad: Pad) {
     s.phase = "down";
     s.wasPlayingAtStart = usePlaybackStore.getState().isPadActive(pad.id);
 
+    // Hold-mode pads trigger immediately on press (not on release)
+    if (hasHoldLayer) {
+      triggerPad(pad, 1.0);
+    }
+
     holdTimer.current = setTimeout(() => {
       const s = state.current;
       if (s.phase !== "down") return;
@@ -73,7 +80,6 @@ export function usePadGesture(pad: Pad) {
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
 
-      // Drag up on a non-playing pad: start it silently and ramp up
       if (deltaY > 0 && !s.wasPlayingAtStart) {
         triggerPad(pad, 0);
       }
@@ -83,9 +89,6 @@ export function usePadGesture(pad: Pad) {
       const newVolume = Math.max(0, Math.min(1, s.startVolume + deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
-      // If volume is rising but there are no active voices (one-shot ended while
-      // silenced, or pad was stopped by a previous drag-to-zero), re-trigger at
-      // vol 0 so the ramp has something to work with.
       if (newVolume > 0.01 && !usePlaybackStore.getState().isPadActive(pad.id)) {
         triggerPad(pad, 0);
       }
@@ -100,17 +103,20 @@ export function usePadGesture(pad: Pad) {
     const s = state.current;
 
     if (s.phase === "down") {
-      // Normal click — trigger the pad
-      triggerPad(pad, 1.0);
+      // Normal tap — only trigger if not a hold-mode pad (those triggered on down)
+      if (!hasHoldLayer) triggerPad(pad, 1.0);
     } else if (s.phase === "hold") {
-      triggerPad(pad, 1.0);
+      if (!hasHoldLayer) triggerPad(pad, 1.0);
     } else if (s.phase === "drag") {
       if (s.currentVolume < 0.01) {
-        // Dragged to zero — stop the pad and reset gain for next trigger
         usePlaybackStore.getState().stopPad(pad.id);
         resetPadGain(pad.id);
       }
-      // Otherwise pad keeps playing at whatever volume it was dragged to
+    }
+
+    // Release hold-mode layers on pointer up (regardless of gesture phase)
+    if (hasHoldLayer) {
+      releasePadHoldLayers(pad);
     }
 
     setFillVolume(null);
