@@ -19,7 +19,7 @@ const padGainMap = new Map<string, GainNode>();
 const layerGainMap = new Map<string, GainNode>();
 
 // Tracks the longest-duration voice per pad for playback progress display (buffer path).
-const padProgressInfo = new Map<string, { startedAt: number; duration: number }>();
+const padProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
 
 // Tracks the most-recently-started streaming element per pad for progress display.
 // HTMLAudioElement exposes currentTime/duration after loadedmetadata fires.
@@ -36,6 +36,9 @@ export function getPadProgress(padId: string): number | null {
   const info = padProgressInfo.get(padId);
   if (info) {
     const elapsed = getAudioContext().currentTime - info.startedAt;
+    if (info.isLooping && info.duration > 0) {
+      return (elapsed % info.duration) / info.duration;
+    }
     return Math.min(1, Math.max(0, elapsed / info.duration));
   }
   const audio = padStreamingAudio.get(padId);
@@ -94,8 +97,25 @@ export function clearAllLayerGains(): void {
   layerGainMap.clear();
 }
 
+/** Update a live layer gain node immediately (e.g. when pad config is saved mid-playback). No-op if the layer isn't active. */
+export function syncLayerVolume(layerId: string, volume: number): void {
+  const gain = layerGainMap.get(layerId);
+  if (!gain) return;
+  const ctx = getAudioContext();
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
+}
+
 export function clearAllLayerChains(): void {
   layerChainQueue.clear();
+}
+
+/** Stop a single pad, clearing its layer chain queues first so onended doesn't advance the chain. */
+export function stopPad(pad: Pad): void {
+  for (const layer of pad.layers) {
+    layerChainQueue.delete(layer.id);
+  }
+  usePlaybackStore.getState().stopPad(pad.id);
 }
 
 /**
@@ -141,7 +161,14 @@ export function releasePadHoldLayers(pad: Pad): void {
 
 function getOrCreateLayerGain(layer: Layer, padGain: GainNode): GainNode {
   const existing = layerGainMap.get(layer.id);
-  if (existing) return existing;
+  if (existing) {
+    // Sync cached gain to the current layer.volume in case it was changed via the config dialog.
+    // cancelScheduledValues clears any pending reset from a previous ramp-stop timeout.
+    const ctx = getAudioContext();
+    existing.gain.cancelScheduledValues(ctx.currentTime);
+    existing.gain.setValueAtTime(layer.volume / 100, ctx.currentTime);
+    return existing;
+  }
   const ctx = getAudioContext();
   const gain = ctx.createGain();
   gain.gain.value = layer.volume / 100;
@@ -228,9 +255,11 @@ async function startLayerSound(
       }
       voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
 
+      // Chained arrangements play one sound at a time — always update to track the current sound.
+      // Simultaneous plays all sounds at once — keep the longest so the bar fills on the slowest sound.
       const existing = padProgressInfo.get(pad.id);
-      if (!existing || buffer.duration > existing.duration) {
-        padProgressInfo.set(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration });
+      if (isChained(layer.arrangement) || !existing || buffer.duration > existing.duration) {
+        padProgressInfo.set(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
       }
     }
 

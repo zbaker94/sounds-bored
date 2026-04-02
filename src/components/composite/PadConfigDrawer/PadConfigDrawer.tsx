@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LayerAccordion } from "./LayerAccordion";
+import { syncLayerVolume } from "@/lib/audio/padPlayer";
 
 const DEFAULT_LAYER: LayerConfigForm = {
   selection: { type: "assigned", instances: [] },
@@ -42,6 +43,9 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
 
   const isEditMode = padId !== undefined;
 
+  // Preserve layer IDs across edits so audio engine retrigger tracking (keyed by layer.id) stays valid.
+  const layerIdsRef = useRef<string[]>([]);
+
   const methods = useForm<PadConfigForm>({
     resolver: zodResolver(PadConfigSchema),
     defaultValues: DEFAULT_VALUES,
@@ -53,6 +57,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   useEffect(() => {
     if (!isOpen) return;
     if (isEditMode && initialConfig) {
+      layerIdsRef.current = (initialConfig.layers ?? []).map((l) => l.id);
       reset({
         name: initialConfig.name ?? "",
         layers: (initialConfig.layers ?? []).map((l) => ({
@@ -64,6 +69,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         })),
       });
     } else {
+      layerIdsRef.current = [];
       reset(DEFAULT_VALUES);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,11 +84,12 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   function onSubmit(data: PadConfigForm) {
     const config: PadConfig = {
       name: data.name,
-      layers: data.layers.map((l) => ({ id: crypto.randomUUID(), ...l })),
+      layers: data.layers.map((l, i) => ({ id: layerIdsRef.current[i] ?? crypto.randomUUID(), ...l })),
       muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
     };
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);
+      config.layers.forEach((l) => syncLayerVolume(l.id, l.volume));
     } else {
       addPad(sceneId, config);
     }

@@ -164,9 +164,14 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
 
       {/* Volume */}
       <div className="flex flex-col gap-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Volume
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Volume
+          </Label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {layer?.volume ?? 100}%
+          </span>
+        </div>
         <Controller
           control={control}
           name={volPath}

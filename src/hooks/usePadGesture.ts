@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
-import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers } from "@/lib/audio/padPlayer";
+import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio/padPlayer";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 // Gesture thresholds
@@ -111,7 +111,7 @@ export function usePadGesture(pad: Pad) {
       if (!hasHoldLayer) triggerPad(pad, 1.0).catch(console.error);
     } else if (s.phase === "drag") {
       if (s.currentVolume < 0.01 && !hasHoldLayer) {
-        usePlaybackStore.getState().stopPad(pad.id);
+        stopPad(pad);
         resetPadGain(pad.id);
       }
     }
