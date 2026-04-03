@@ -38,7 +38,10 @@ if [ -z "$SUMMARY" ]; then
 fi
 
 # Update CHANGELOG.md: insert bullets under '## Current Changes', creating the section if needed
+echo "[changelog] cwd: $(pwd)"
+echo "[changelog] CHANGELOG before: $(wc -l < $CHANGELOG) lines"
 SUMMARY="$SUMMARY" node scripts/changelog-entry.cjs
-
+echo "[changelog] CHANGELOG after: $(wc -l < $CHANGELOG) lines"
+echo "[changelog] git status: $(git status --short $CHANGELOG)"
 git add "$CHANGELOG"
 echo "[changelog] CHANGELOG.md updated"
