@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Fixed release pipeline to pull the latest changelog from the master branch before extracting release notes, preventing stale or missing changelog entries in releases.
+
 ## v1.1.2
 
 Changelog generation now focuses on customer-facing improvements rather than internal developer details, and section detection has been made more reliable using precise regex matching to prevent false positives on embedded text.
