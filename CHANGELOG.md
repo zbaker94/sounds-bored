@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.1.4
+
+No user-facing changes in this release.
+
 - No user-facing changes in this release.
 
 ## v1.1.3
