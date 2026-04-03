@@ -47,7 +47,7 @@ else
     SUMMARY=""
   else
     echo "[changelog] Generating summary for $VERSION_TAG with Claude..."
-    SUMMARY=$(printf '%s' "$BULLETS" | claude -p "Write a concise 1-2 sentence summary of these changelog entries for a release announcement. Focus on the most important user-facing improvements. Output ONLY the summary sentences, no bullet points, no preamble.") || {
+    SUMMARY=$(printf '%s' "$BULLETS" | claude -p "Write a concise 1-2 sentence summary of these changelog entries for a release announcement. Focus on the most important customer/user-facing improvements. Output ONLY the summary sentences, no bullet points, no preamble.") || {
       echo "[changelog] Claude error — stamping without summary"
       SUMMARY=""
     }

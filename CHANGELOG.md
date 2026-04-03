@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Changelog generation prompts updated to focus on customer-facing changes rather than developer-facing details
 - Removed debug logging statements from the pre-commit hook and changelog-entry script
 - Fixed changelog section detection to use regex with multiline anchors (`^## Current Changes$`) instead of plain `indexOf`, preventing false matches on embedded text
 
