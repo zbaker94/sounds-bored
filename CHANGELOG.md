@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.1.2
+
+Changelog generation now focuses on customer-facing improvements rather than internal developer details, and section detection has been made more reliable using precise regex matching to prevent false positives on embedded text.
+
 - Changelog generation prompts updated to focus on customer-facing changes rather than developer-facing details
 - Removed debug logging statements from the pre-commit hook and changelog-entry script
 - Fixed changelog section detection to use regex with multiline anchors (`^## Current Changes$`) instead of plain `indexOf`, preventing false matches on embedded text
