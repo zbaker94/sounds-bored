@@ -9,6 +9,10 @@ const changelogPath = path.resolve('CHANGELOG.md');
 const summary = process.env.SUMMARY;
 const marker = '## Current Changes';
 
+console.error('[changelog-entry] cwd:', process.cwd());
+console.error('[changelog-entry] summary length:', summary ? summary.length : 'EMPTY');
+console.error('[changelog-entry] summary first 80 chars:', JSON.stringify((summary || '').slice(0, 80)));
+
 if (!summary) {
   console.error('[changelog-entry] SUMMARY env var is empty — nothing to write');
   process.exit(1);
@@ -27,4 +31,7 @@ if (changelog.includes(marker)) {
     : '# Changelog\n\n' + marker + '\n' + summary + '\n';
 }
 
+console.error('[changelog-entry] writing to:', changelogPath);
+console.error('[changelog-entry] new line count:', changelog.split('\n').length);
 fs.writeFileSync(changelogPath, changelog, 'utf8');
+console.error('[changelog-entry] write complete');
