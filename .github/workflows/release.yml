@@ -81,3 +81,28 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
+
+      - name: Publish artifacts to public releases repo
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ env.VERSION }}
+        run: |
+          gh release download "$TAG" --dir release-artifacts --repo zbaker94/sounds-bored
+
+          node -e "
+            const fs = require('fs');
+            const json = JSON.parse(fs.readFileSync('release-artifacts/latest.json', 'utf8'));
+            for (const platform of Object.values(json.platforms)) {
+              const filename = platform.url.split('/').pop();
+              platform.url = 'https://github.com/zbaker94/sounds-bored-releases/releases/download/' + process.env.TAG + '/' + filename;
+            }
+            fs.writeFileSync('release-artifacts/latest.json', JSON.stringify(json, null, 2) + '\n');
+          "
+
+          GH_TOKEN="$RELEASES_TOKEN" gh release create "$TAG" release-artifacts/* \
+            --repo zbaker94/sounds-bored-releases \
+            --title "SoundsBored $VERSION" \
+            --notes ""
