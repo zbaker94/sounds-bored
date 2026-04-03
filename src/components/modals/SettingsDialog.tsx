@@ -1,6 +1,7 @@
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
+import { useUpdaterStore } from "@/state/updaterStore";
 import { GlobalFolder } from "@/lib/schemas";
 import {
   Dialog,
@@ -21,8 +22,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TruncatedPath } from "@/components/ui/truncated-path";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Delete02Icon, FolderAddIcon } from "@hugeicons/core-free-icons";
+import { Delete02Icon, FolderAddIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { open } from "@tauri-apps/plugin-dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { getVersion } from "@tauri-apps/api/app";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
@@ -44,9 +47,13 @@ export function SettingsDialog() {
         <Tabs defaultValue="folders">
           <TabsList>
             <TabsTrigger value="folders">Folders</TabsTrigger>
+            <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
           <TabsContent value="folders">
             <FoldersTab />
+          </TabsContent>
+          <TabsContent value="about">
+            <AboutTab />
           </TabsContent>
         </Tabs>
       </DialogContent>
@@ -159,6 +166,131 @@ function FoldersTab() {
           Add Folder
         </Button>
       </div>
+    </div>
+  );
+}
+
+function AboutTab() {
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const status = useUpdaterStore((s) => s.status);
+  const availableVersion = useUpdaterStore((s) => s.availableVersion);
+  const progress = useUpdaterStore((s) => s.progress);
+  const hasChecked = useUpdaterStore((s) => s.hasChecked);
+  const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates);
+  const install = useUpdaterStore((s) => s.install);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion(null));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">SoundsBored</p>
+        <p className="text-sm text-muted-foreground">
+          Version {appVersion ?? '…'}
+        </p>
+      </div>
+      <Separator />
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Updates</p>
+        <UpdateStatusRow
+          status={status}
+          availableVersion={availableVersion}
+          progress={progress}
+          hasChecked={hasChecked}
+          onCheck={checkForUpdates}
+          onInstall={install}
+          onRestart={relaunch}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface UpdateStatusRowProps {
+  status: ReturnType<typeof useUpdaterStore.getState>['status'];
+  availableVersion: string | null;
+  progress: number | null;
+  hasChecked: boolean;
+  onCheck: () => void;
+  onInstall: () => void;
+  onRestart: () => void;
+}
+
+function UpdateStatusRow({ status, availableVersion, progress, hasChecked, onCheck, onInstall, onRestart }: UpdateStatusRowProps) {
+  if (status === 'checking') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+        Checking for updates…
+      </div>
+    );
+  }
+
+  if (status === 'downloading') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+        {progress !== null ? `Downloading… ${progress}%` : 'Downloading…'}
+      </div>
+    );
+  }
+
+  if (status === 'ready') {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm">
+          <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="text-green-500" />
+          Update installed — restart to apply
+        </div>
+        <Button size="sm" onClick={onRestart}>
+          <HugeiconsIcon icon={Refresh01Icon} size={14} />
+          Restart now
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === 'available') {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm">
+          <HugeiconsIcon icon={Download04Icon} size={16} className="text-blue-500" />
+          Version {availableVersion} available
+        </div>
+        <Button size="sm" onClick={onInstall}>
+          Install now
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <HugeiconsIcon icon={Alert01Icon} size={16} />
+          Update check failed
+        </div>
+        <Button variant="secondary" size="sm" onClick={onCheck}>
+          <HugeiconsIcon icon={RefreshIcon} size={14} />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // idle
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-sm text-muted-foreground">
+        {hasChecked ? 'Up to date' : 'Check for latest updates'}
+      </p>
+      <Button variant="secondary" size="sm" onClick={onCheck}>
+        <HugeiconsIcon icon={RefreshIcon} size={14} />
+        Check for updates
+      </Button>
     </div>
   );
 }
