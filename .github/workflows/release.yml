@@ -22,6 +22,34 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
+      - name: Extract release notes and stamp CHANGELOG.md
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const version = process.env.VERSION;
+            const changelogPath = 'CHANGELOG.md';
+            const marker = '## Current Changes';
+
+            let changelog = fs.existsSync(changelogPath)
+              ? fs.readFileSync(changelogPath, 'utf8')
+              : '# Changelog\n';
+
+            let notes = '';
+            if (changelog.includes(marker)) {
+              const afterMarker = changelog.indexOf('\n', changelog.indexOf(marker)) + 1;
+              const rest = changelog.slice(afterMarker);
+              const nextSection = rest.search(/^## /m);
+              notes = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
+              changelog = changelog.replace(marker, '## v' + version);
+              fs.writeFileSync(changelogPath, changelog);
+            }
+
+            // Write multi-line output to GITHUB_ENV
+            const delimiter = 'NOTES_EOF_' + Date.now();
+            fs.appendFileSync(process.env.GITHUB_ENV, 'RELEASE_NOTES<<' + delimiter + '\n' + (notes || 'No changelog entries.') + '\n' + delimiter + '\n');
+          "
+
       - name: Bump package.json
         shell: bash
         run: node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
@@ -46,7 +74,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock CHANGELOG.md
           git commit -m "chore: bump version to $VERSION [skip ci]"
           git push origin HEAD:master
 
@@ -77,6 +105,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "SoundsBored ${{ env.VERSION }}"
+          releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
@@ -90,7 +119,13 @@ jobs:
           TAG: ${{ github.ref_name }}
           VERSION: ${{ env.VERSION }}
         run: |
-          gh release download "$TAG" --dir release-artifacts --repo zbaker94/sounds-bored
+          gh release download "$TAG" \
+            --dir release-artifacts \
+            --repo zbaker94/sounds-bored \
+            --pattern "*.exe" \
+            --pattern "*.msi" \
+            --pattern "*.sig" \
+            --pattern "*.json"
 
           node -e "
             const fs = require('fs');
@@ -102,7 +137,13 @@ jobs:
             fs.writeFileSync('release-artifacts/latest.json', JSON.stringify(json, null, 2) + '\n');
           "
 
-          GH_TOKEN="$RELEASES_TOKEN" gh release create "$TAG" release-artifacts/* \
+          printf '%s' "${{ env.RELEASE_NOTES }}" > release-notes.md
+
+          GH_TOKEN="$RELEASES_TOKEN" gh release create "$TAG" \
+            release-artifacts/*.exe \
+            release-artifacts/*.msi \
+            release-artifacts/*.sig \
+            release-artifacts/*.json \
             --repo zbaker94/sounds-bored-releases \
             --title "SoundsBored $VERSION" \
-            --notes ""
+            --notes-file release-notes.md

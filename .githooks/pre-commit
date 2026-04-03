@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Generates a changelog entry for staged changes using Claude and updates CHANGELOG.md.
+set -e
+
+CHANGELOG="CHANGELOG.md"
+
+# Write staged diff to a temp file, excluding files that don't need changelog entries
+TMPFILE=$(mktemp)
+trap "rm -f '$TMPFILE'" EXIT
+
+git diff --staged -- . \
+  ':(exclude)CHANGELOG.md' \
+  ':(exclude)package-lock.json' \
+  ':(exclude)src-tauri/Cargo.lock' \
+  > "$TMPFILE"
+
+# Nothing substantive staged — skip
+if [ ! -s "$TMPFILE" ]; then
+  exit 0
+fi
+
+# Skip if claude isn't available
+if ! command -v claude &>/dev/null; then
+  echo "[changelog] claude CLI not found — skipping CHANGELOG update"
+  exit 0
+fi
+
+echo "[changelog] Generating entry with Claude..."
+
+SUMMARY=$(claude -p "Summarize the following git diff as 1-5 concise bullet points for a changelog. Focus on what changed from a user or developer perspective. Output ONLY bullet points starting with '- ', no preamble or explanation." < "$TMPFILE") || {
+  echo "[changelog] Claude error — skipping CHANGELOG update"
+  exit 0
+}
+
+if [ -z "$SUMMARY" ]; then
+  echo "[changelog] Empty summary — skipping CHANGELOG update"
+  exit 0
+fi
+
+# Update CHANGELOG.md: insert bullets under '## Current Changes', creating the section if needed
+SUMMARY="$SUMMARY" node -e "
+const fs = require('fs');
+const changelogPath = 'CHANGELOG.md';
+const summary = process.env.SUMMARY;
+const marker = '## Current Changes';
+
+let changelog = fs.existsSync(changelogPath)
+  ? fs.readFileSync(changelogPath, 'utf8')
+  : '# Changelog\n';
+
+if (changelog.includes(marker)) {
+  changelog = changelog.replace(marker + '\n', marker + '\n' + summary + '\n');
+} else {
+  const firstNewline = changelog.indexOf('\n');
+  changelog = firstNewline !== -1
+    ? changelog.slice(0, firstNewline + 1) + '\n' + marker + '\n' + summary + '\n' + changelog.slice(firstNewline + 1)
+    : '# Changelog\n\n' + marker + '\n' + summary + '\n';
+}
+
+fs.writeFileSync(changelogPath, changelog);
+"
+
+git add "$CHANGELOG"
+echo "[changelog] CHANGELOG.md updated"
