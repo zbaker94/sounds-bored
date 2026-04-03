@@ -28,10 +28,12 @@ const changelog = fs.existsSync(changelogPath)
 const versionMarker = '## v' + version;
 const currentMarker = '## Current Changes';
 
-let sectionStart = changelog.indexOf(versionMarker);
+const versionMatch = changelog.match(new RegExp('^' + versionMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'm'));
+let sectionStart = versionMatch ? versionMatch.index : -1;
 let needsRename = false;
 if (sectionStart === -1) {
-  sectionStart = changelog.indexOf(currentMarker);
+  const currentMatch = changelog.match(/^## Current Changes$/m);
+  sectionStart = currentMatch ? currentMatch.index : -1;
   needsRename = true;
 }
 

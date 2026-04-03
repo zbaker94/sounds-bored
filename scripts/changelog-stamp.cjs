@@ -23,7 +23,8 @@ if (!fs.existsSync(changelogPath)) {
 }
 
 const changelog = fs.readFileSync(changelogPath, 'utf8').replace(/\r\n/g, '\n');
-const start = changelog.indexOf(marker);
+const match = changelog.match(/^## Current Changes$/m);
+const start = match ? match.index : -1;
 if (start === -1) {
   console.error('[changelog-stamp] ## Current Changes not found');
   process.exit(1);

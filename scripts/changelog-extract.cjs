@@ -11,7 +11,8 @@ const marker = '## Current Changes';
 if (!fs.existsSync(changelogPath)) process.exit(0);
 
 const changelog = fs.readFileSync(changelogPath, 'utf8').replace(/\r\n/g, '\n');
-const start = changelog.indexOf(marker);
+const match = changelog.match(/^## Current Changes$/m);
+const start = match ? match.index : -1;
 if (start === -1) process.exit(0);
 
 const afterMarker = changelog.indexOf('\n', start) + 1;
