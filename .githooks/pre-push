@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# On release tag push: summarizes Current Changes with Claude, stamps CHANGELOG.md
+# with the version heading + summary + full bullets, then commits and pushes to master
+# so the workflow sees the final state when it runs.
+set -e
+
+CHANGELOG="CHANGELOG.md"
+
+# Parse stdin for version tags being pushed
+# Format per line: <local-ref> <local-sha> <remote-ref> <remote-sha>
+VERSION_TAG=""
+while read -r local_ref _local_sha _remote_ref _remote_sha; do
+  if [[ "$local_ref" == refs/tags/v* ]]; then
+    VERSION_TAG="${local_ref#refs/tags/}"
+    break
+  fi
+done
+
+# Not a version tag push — nothing to do
+if [ -z "$VERSION_TAG" ]; then
+  exit 0
+fi
+
+VERSION="${VERSION_TAG#v}"
+
+# Already stamped (e.g. hook ran twice) — skip
+if grep -q "^## v${VERSION}$" "$CHANGELOG" 2>/dev/null; then
+  echo "[changelog] $VERSION_TAG already stamped — skipping"
+  exit 0
+fi
+
+# No Current Changes section — nothing to summarize
+if ! grep -q "^## Current Changes" "$CHANGELOG" 2>/dev/null; then
+  echo "[changelog] No '## Current Changes' section found — skipping"
+  exit 0
+fi
+
+# Extract the bullet points from Current Changes
+BULLETS=$(node -e "
+const fs = require('fs');
+const changelog = fs.readFileSync('$CHANGELOG', 'utf8');
+const marker = '## Current Changes';
+const start = changelog.indexOf(marker);
+const afterMarker = changelog.indexOf('\n', start) + 1;
+const rest = changelog.slice(afterMarker);
+const nextSection = rest.search(/^## /m);
+const content = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
+process.stdout.write(content);
+")
+
+if [ -z "$BULLETS" ]; then
+  echo "[changelog] Current Changes is empty — stamping version heading only"
+  SUMMARY=""
+else
+  if ! command -v claude &>/dev/null; then
+    echo "[changelog] claude CLI not found — stamping without summary"
+    SUMMARY=""
+  else
+    echo "[changelog] Generating summary for $VERSION_TAG with Claude..."
+    SUMMARY=$(printf '%s' "$BULLETS" | claude -p "Write a concise 1-2 sentence summary of these changelog entries for a release announcement. Focus on the most important user-facing improvements. Output ONLY the summary sentences, no bullet points, no preamble.") || {
+      echo "[changelog] Claude error — stamping without summary"
+      SUMMARY=""
+    }
+  fi
+fi
+
+# Stamp CHANGELOG.md: replace ## Current Changes with ## v{VERSION} + optional summary + bullets
+SUMMARY="$SUMMARY" BULLETS="$BULLETS" VERSION="$VERSION" node -e "
+const fs = require('fs');
+const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+const marker = '## Current Changes';
+const version = process.env.VERSION;
+const summary = process.env.SUMMARY;
+const bullets = process.env.BULLETS;
+
+const start = changelog.indexOf(marker);
+const afterMarker = changelog.indexOf('\n', start) + 1;
+const rest = changelog.slice(afterMarker);
+const nextSection = rest.search(/^## /m);
+const after = nextSection === -1 ? '' : rest.slice(nextSection);
+
+let section = '## v' + version + '\n';
+if (summary) section += '\n' + summary + '\n';
+if (bullets) section += '\n' + bullets + '\n';
+
+const updated = changelog.slice(0, start) + section + (after ? '\n' + after : '');
+fs.writeFileSync('CHANGELOG.md', updated);
+"
+
+# Commit and push so the workflow sees the stamped file when it checks out
+git add "$CHANGELOG"
+git commit --no-verify -m "chore: stamp changelog for $VERSION_TAG [skip ci]"
+git push --no-verify origin HEAD:master
+
+echo "[changelog] CHANGELOG.md stamped for $VERSION_TAG"
