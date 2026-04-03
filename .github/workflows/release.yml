@@ -24,57 +24,7 @@ jobs:
 
       - name: Extract release notes and stamp CHANGELOG.md
         shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const version = process.env.VERSION;
-            const changelogPath = 'CHANGELOG.md';
-
-            let changelog = (fs.existsSync(changelogPath)
-              ? fs.readFileSync(changelogPath, 'utf8')
-              : '# Changelog\n').replace(/\r\n/g, '\n');
-
-            // Prefer the version heading stamped by the pre-push hook;
-            // fall back to Current Changes if the hook didn't run.
-            const versionMarker = '## v' + version;
-            const currentMarker = '## Current Changes';
-            let sectionStart = changelog.indexOf(versionMarker);
-            let needsRename = false;
-
-            if (sectionStart === -1) {
-              sectionStart = changelog.indexOf(currentMarker);
-              needsRename = true;
-            }
-
-            let fullNotes = 'No changelog entries.';
-            let summary = '';
-
-            if (sectionStart !== -1) {
-              const afterMarker = changelog.indexOf('\n', sectionStart) + 1;
-              const rest = changelog.slice(afterMarker);
-              const nextSection = rest.search(/^## /m);
-              fullNotes = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim() || 'No changelog entries.';
-
-              if (needsRename) {
-                changelog = changelog.replace(currentMarker, versionMarker);
-                fs.writeFileSync(changelogPath, changelog);
-              }
-
-              // Summary = first paragraph before the bullet list (added by pre-push hook).
-              // Falls back to the full notes if no separate summary paragraph exists.
-              const bulletIndex = fullNotes.search(/^- /m);
-              summary = bulletIndex > 0
-                ? fullNotes.slice(0, bulletIndex).trim()
-                : fullNotes;
-            }
-
-            const appendEnv = (key, val) => {
-              const d = key + '_DELIM_' + Date.now();
-              fs.appendFileSync(process.env.GITHUB_ENV, key + '<<' + d + '\n' + val + '\n' + d + '\n');
-            };
-            appendEnv('RELEASE_NOTES_FULL', fullNotes);
-            appendEnv('RELEASE_NOTES_SUMMARY', summary || fullNotes);
-          "
+        run: node scripts/changelog-release-notes.cjs
 
       - name: Bump package.json
         shell: bash

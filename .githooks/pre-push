@@ -36,17 +36,7 @@ if ! grep -q "^## Current Changes" "$CHANGELOG" 2>/dev/null; then
 fi
 
 # Extract the bullet points from Current Changes
-BULLETS=$(node -e "
-const fs = require('fs');
-const changelog = fs.readFileSync('$CHANGELOG', 'utf8').replace(/\r\n/g, '\n');
-const marker = '## Current Changes';
-const start = changelog.indexOf(marker);
-const afterMarker = changelog.indexOf('\n', start) + 1;
-const rest = changelog.slice(afterMarker);
-const nextSection = rest.search(/^## /m);
-const content = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
-process.stdout.write(content);
-")
+BULLETS=$(node scripts/changelog-extract.cjs)
 
 if [ -z "$BULLETS" ]; then
   echo "[changelog] Current Changes is empty — stamping version heading only"
@@ -65,27 +55,7 @@ else
 fi
 
 # Stamp CHANGELOG.md: replace ## Current Changes with ## v{VERSION} + optional summary + bullets
-SUMMARY="$SUMMARY" BULLETS="$BULLETS" VERSION="$VERSION" node -e "
-const fs = require('fs');
-const changelog = fs.readFileSync('CHANGELOG.md', 'utf8').replace(/\r\n/g, '\n');
-const marker = '## Current Changes';
-const version = process.env.VERSION;
-const summary = process.env.SUMMARY;
-const bullets = process.env.BULLETS;
-
-const start = changelog.indexOf(marker);
-const afterMarker = changelog.indexOf('\n', start) + 1;
-const rest = changelog.slice(afterMarker);
-const nextSection = rest.search(/^## /m);
-const after = nextSection === -1 ? '' : rest.slice(nextSection);
-
-let section = '## v' + version + '\n';
-if (summary) section += '\n' + summary + '\n';
-if (bullets) section += '\n' + bullets + '\n';
-
-const updated = changelog.slice(0, start) + section + (after ? '\n' + after : '');
-fs.writeFileSync('CHANGELOG.md', updated);
-"
+SUMMARY="$SUMMARY" BULLETS="$BULLETS" VERSION="$VERSION" node scripts/changelog-stamp.cjs
 
 # Commit and push so the workflow sees the stamped file when it checks out
 git add "$CHANGELOG"

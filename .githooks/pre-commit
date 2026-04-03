@@ -38,27 +38,7 @@ if [ -z "$SUMMARY" ]; then
 fi
 
 # Update CHANGELOG.md: insert bullets under '## Current Changes', creating the section if needed
-SUMMARY="$SUMMARY" node -e "
-const fs = require('fs');
-const changelogPath = 'CHANGELOG.md';
-const summary = process.env.SUMMARY;
-const marker = '## Current Changes';
-
-let changelog = (fs.existsSync(changelogPath)
-  ? fs.readFileSync(changelogPath, 'utf8')
-  : '# Changelog\n').replace(/\r\n/g, '\n');
-
-if (changelog.includes(marker)) {
-  changelog = changelog.replace(marker + '\n', marker + '\n' + summary + '\n');
-} else {
-  const firstNewline = changelog.indexOf('\n');
-  changelog = firstNewline !== -1
-    ? changelog.slice(0, firstNewline + 1) + '\n' + marker + '\n' + summary + '\n' + changelog.slice(firstNewline + 1)
-    : '# Changelog\n\n' + marker + '\n' + summary + '\n';
-}
-
-fs.writeFileSync(changelogPath, changelog);
-"
+SUMMARY="$SUMMARY" node scripts/changelog-entry.cjs
 
 git add "$CHANGELOG"
 echo "[changelog] CHANGELOG.md updated"
