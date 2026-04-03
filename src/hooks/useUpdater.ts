@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { relaunch } from '@tauri-apps/plugin-process';
 import { toast } from 'sonner';
 import { useUpdaterStore } from '@/state/updaterStore';
 
