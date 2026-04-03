@@ -79,3 +79,5 @@ jobs:
           releaseName: "SoundsBored ${{ env.VERSION }}"
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
