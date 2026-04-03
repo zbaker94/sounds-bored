@@ -30,9 +30,9 @@ jobs:
             const version = process.env.VERSION;
             const changelogPath = 'CHANGELOG.md';
 
-            let changelog = fs.existsSync(changelogPath)
+            let changelog = (fs.existsSync(changelogPath)
               ? fs.readFileSync(changelogPath, 'utf8')
-              : '# Changelog\n';
+              : '# Changelog\n').replace(/\r\n/g, '\n');
 
             // Prefer the version heading stamped by the pre-push hook;
             // fall back to Current Changes if the hook didn't run.

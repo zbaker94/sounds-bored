@@ -38,7 +38,7 @@ fi
 # Extract the bullet points from Current Changes
 BULLETS=$(node -e "
 const fs = require('fs');
-const changelog = fs.readFileSync('$CHANGELOG', 'utf8');
+const changelog = fs.readFileSync('$CHANGELOG', 'utf8').replace(/\r\n/g, '\n');
 const marker = '## Current Changes';
 const start = changelog.indexOf(marker);
 const afterMarker = changelog.indexOf('\n', start) + 1;
@@ -67,7 +67,7 @@ fi
 # Stamp CHANGELOG.md: replace ## Current Changes with ## v{VERSION} + optional summary + bullets
 SUMMARY="$SUMMARY" BULLETS="$BULLETS" VERSION="$VERSION" node -e "
 const fs = require('fs');
-const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+const changelog = fs.readFileSync('CHANGELOG.md', 'utf8').replace(/\r\n/g, '\n');
 const marker = '## Current Changes';
 const version = process.env.VERSION;
 const summary = process.env.SUMMARY;

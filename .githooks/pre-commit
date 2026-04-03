@@ -44,9 +44,9 @@ const changelogPath = 'CHANGELOG.md';
 const summary = process.env.SUMMARY;
 const marker = '## Current Changes';
 
-let changelog = fs.existsSync(changelogPath)
+let changelog = (fs.existsSync(changelogPath)
   ? fs.readFileSync(changelogPath, 'utf8')
-  : '# Changelog\n';
+  : '# Changelog\n').replace(/\r\n/g, '\n');
 
 if (changelog.includes(marker)) {
   changelog = changelog.replace(marker + '\n', marker + '\n' + summary + '\n');
