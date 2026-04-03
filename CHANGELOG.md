@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- No user-facing changes in this release.
+
 ## v1.1.3
 
 Fixed release pipeline to pull the latest changelog from the master branch before extracting release notes, preventing stale or missing changelog entries in releases.

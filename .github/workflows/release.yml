@@ -28,6 +28,7 @@ jobs:
           git fetch origin master
           git show origin/master:CHANGELOG.md > CHANGELOG.md
           node scripts/changelog-release-notes.cjs
+          git restore CHANGELOG.md
 
       - name: Bump package.json
         shell: bash
