@@ -99,7 +99,7 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
         {/* Volume fill — normal mode only */}
         {!editMode && fillVolume !== null && (
           <div
-            className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
+            className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black transition-[height] duration-150 ease-out"
             style={{ height: `${fillVolume * 100}%` }}
           />
         )}

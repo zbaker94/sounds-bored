@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SoundsPanel } from "./SoundsPanel";
@@ -49,12 +49,12 @@ vi.mock("@/lib/appSettings.queries", () => ({
 
 // Mock the dialog components to avoid DrawerDialog/useIsMd dependency
 vi.mock("./AddSetDialog", () => ({
-  AddSetDialog: ({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) =>
+  AddSetDialog: ({ open, onOpenChange: _onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) =>
     open ? <div data-testid="add-set-dialog">AddSetDialog open</div> : null,
 }));
 
 vi.mock("./AddToSetDialog", () => ({
-  AddToSetDialog: ({ open, onOpenChange, soundIds }: { open: boolean; onOpenChange: (o: boolean) => void; soundIds: string[] }) =>
+  AddToSetDialog: ({ open, onOpenChange: _onOpenChange, soundIds }: { open: boolean; onOpenChange: (o: boolean) => void; soundIds: string[] }) =>
     open ? <div data-testid="add-to-set-dialog">AddToSetDialog open ({soundIds.length} sounds)</div> : null,
 }));
 
@@ -89,7 +89,7 @@ beforeEach(() => {
     data: createMockAppSettings(),
     isLoading: false,
     isError: false,
-  } as ReturnType<typeof useAppSettings>);
+  } as unknown as ReturnType<typeof useAppSettings>);
   mockOnFileDropEvent.mockClear();
   mockOnFileDropEvent.mockReturnValue(Promise.resolve(() => {}));
   vi.mocked(open).mockReset();
@@ -114,7 +114,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
     expect(screen.getAllByRole("button", { name: /add folder/i }).length).toBeGreaterThan(0);
@@ -127,7 +127,7 @@ describe("SoundsPanel", () => {
       data: settings,
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
     // The Item row (not a <button>) should contain "Add Folder" text
@@ -160,7 +160,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
     vi.mocked(open).mockResolvedValueOnce(null);
 
     renderPanel();
@@ -181,7 +181,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [existingFolder] },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
     vi.mocked(open).mockResolvedValueOnce("/music/sounds");
 
     renderPanel();
@@ -208,7 +208,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -222,7 +222,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -243,10 +243,10 @@ describe("SoundsPanel", () => {
     // Capture the callback passed to onDragDropEvent
     let fileDropCallback: ((event: { payload: { type: string; paths: string[] } }) => Promise<void>) | null = null;
 
-    mockOnFileDropEvent.mockImplementationOnce((cb: (event: { payload: { type: string; paths: string[] } }) => Promise<void>) => {
+    mockOnFileDropEvent.mockImplementationOnce(((cb: (event: { payload: { type: string; paths: string[] } }) => Promise<void>) => {
       fileDropCallback = cb;
       return Promise.resolve(() => {});
-    });
+    }) as any);
 
     renderPanel();
 
@@ -269,10 +269,10 @@ describe("SoundsPanel", () => {
   it("hides drag overlay when a file-drop 'leave' event fires", async () => {
     let fileDropCallback: ((event: { payload: { type: string; paths: string[] } }) => Promise<void>) | null = null;
 
-    mockOnFileDropEvent.mockImplementationOnce((cb: (event: { payload: { type: string; paths: string[] } }) => Promise<void>) => {
+    mockOnFileDropEvent.mockImplementationOnce(((cb: (event: { payload: { type: string; paths: string[] } }) => Promise<void>) => {
       fileDropCallback = cb;
       return Promise.resolve(() => {});
-    });
+    }) as any);
 
     renderPanel();
     await act(async () => { await Promise.resolve(); });
@@ -339,7 +339,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [folder] },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -361,7 +361,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -383,7 +383,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -403,7 +403,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -430,7 +430,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -457,7 +457,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -490,7 +490,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 
@@ -510,7 +510,7 @@ describe("SoundsPanel", () => {
       data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
       isLoading: false,
       isError: false,
-    } as ReturnType<typeof useAppSettings>);
+    } as unknown as ReturnType<typeof useAppSettings>);
 
     renderPanel();
 

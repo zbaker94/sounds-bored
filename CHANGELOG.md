@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Dragging the volume control on a pad no longer jumps unexpectedly when you hold the button still before dragging — mouse drift during the press-and-hold window is now ignored correctly.
+- Volume drag now uses a curved response, making small adjustments near the current volume easier and more precise while still covering the full range with a large drag.
+- The yellow volume fill bar now animates smoothly into view when you press and hold a pad, instead of popping in abruptly.
 - Fixed a bug where drag-and-drop pad reordering could crash or behave incorrectly in certain scenarios
 - Dragging scenes and pads to reorder them is now more reliable — drag now requires a small movement threshold before activating, preventing accidental drags on click
 - Pad drag-and-drop is now disabled when not in edit mode, matching existing scene tab behavior

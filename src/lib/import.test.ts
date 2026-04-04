@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mockFs, mockPath } from "@/test/tauri-mocks";
+import { mockFs } from "@/test/tauri-mocks";
 import { copyFilesToFolder } from "@/lib/import";
 
 // The global setup (src/test/setup.ts) already mocks @tauri-apps/plugin-fs and

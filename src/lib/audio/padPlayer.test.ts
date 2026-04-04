@@ -43,6 +43,7 @@ vi.mock("@/state/appSettingsStore", () => ({
 const mockAudioInstances: Array<{
   src: string;
   currentTime: number;
+  loop: boolean;
   pause: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
   onended: ((ev: Event) => any) | null;
@@ -119,12 +120,12 @@ beforeEach(async () => {
     tags: [],
     sets: [],
     isDirty: false,
-    missingSoundIds: [],
-    missingFolderIds: [],
-  } as Parameters<typeof useLibraryStore.setState>[0]);
+    missingSoundIds: new Set<string>(),
+    missingFolderIds: new Set<string>(),
+  } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
   mockAudioInstances.length = 0;
-  (global.Audio as ReturnType<typeof vi.fn>).mockClear();
+  (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mockClear();
   mockCtx.createMediaElementSource.mockClear();
   clearAllSizeCache();
 
@@ -147,7 +148,7 @@ async function tick() {
 function setSounds(sounds: ReturnType<typeof createMockSound>[]) {
   useLibraryStore.setState({
     sounds,
-  } as Parameters<typeof useLibraryStore.setState>[0]);
+  } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -669,7 +670,7 @@ describe("streaming path (large files)", () => {
     expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(1);
 
     // Simulate first audio ending naturally
-    const firstAudio = (global.Audio as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const firstAudio = (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
     firstAudio.onended?.(new Event("ended"));
     await tick();
 

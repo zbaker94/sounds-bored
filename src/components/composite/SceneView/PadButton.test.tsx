@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState } from "@/state/uiStore";
@@ -147,10 +147,11 @@ describe("PadButton", () => {
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
       act(() => { vi.advanceTimersByTime(150); });
 
-      // Drag 100 px up: startVolume=0, delta=100, range=200 → newVolume=0.5
+      // Drag 100 px up: startVolume=0, delta=100, range=200
+      // Eased (exponent 1.5): (100/200)^1.5 = 0.5^1.5 ≈ 0.354 → 35%
       fireEvent.pointerMove(button, { clientY: 100, pointerId: 1 });
 
-      expect(screen.getByText("50%")).toBeInTheDocument();
+      expect(screen.getByText("35%")).toBeInTheDocument();
     });
 
     it("restores pad name after drag ends", () => {

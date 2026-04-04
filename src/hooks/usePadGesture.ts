@@ -8,11 +8,13 @@ import { usePlaybackStore } from "@/state/playbackStore";
 const HOLD_MS = 150;        // time before a press becomes a "hold"
 const DRAG_PX = 4;          // vertical pixels before drag mode activates
 const DRAG_RANGE_PX = 200;  // pixels of travel for full 0→1 volume range
+const DRAG_EXPONENT = 1.5;  // power curve exponent — small drags produce smaller changes
 
 type Phase = "idle" | "down" | "hold" | "drag";
 
 interface GestureState {
   startY: number;
+  lastY: number;
   startTime: number;
   phase: Phase;
   wasPlayingAtStart: boolean;
@@ -25,6 +27,7 @@ export function usePadGesture(pad: Pad) {
 
   const state = useRef<GestureState>({
     startY: 0,
+    lastY: 0,
     startTime: 0,
     phase: "idle",
     wasPlayingAtStart: false,
@@ -48,6 +51,7 @@ export function usePadGesture(pad: Pad) {
 
     const s = state.current;
     s.startY = e.clientY;
+    s.lastY = e.clientY;
     s.startTime = Date.now();
     s.phase = "down";
     s.wasPlayingAtStart = usePlaybackStore.getState().isPadActive(pad.id);
@@ -62,6 +66,7 @@ export function usePadGesture(pad: Pad) {
       const s = state.current;
       if (s.phase !== "down") return;
       s.phase = "hold";
+      s.startY = s.lastY;
 
       const vol = hasHoldLayer
         ? (usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0)
@@ -76,6 +81,7 @@ export function usePadGesture(pad: Pad) {
 
   function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
     const s = state.current;
+    s.lastY = e.clientY;
     if (s.phase === "idle" || s.phase === "down") return;
 
     const deltaY = s.startY - e.clientY; // positive = dragged up
@@ -91,7 +97,9 @@ export function usePadGesture(pad: Pad) {
     }
 
     if (s.phase === "drag") {
-      const newVolume = Math.max(0, Math.min(1, s.startVolume + deltaY / DRAG_RANGE_PX));
+      const normalizedDelta = deltaY / DRAG_RANGE_PX;
+      const easedDelta = Math.sign(normalizedDelta) * Math.pow(Math.abs(normalizedDelta), DRAG_EXPONENT);
+      const newVolume = Math.max(0, Math.min(1, s.startVolume + easedDelta));
       s.currentVolume = newVolume;
 
       if (!justTriggered && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {

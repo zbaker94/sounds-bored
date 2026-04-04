@@ -33,7 +33,7 @@ function dirEntry(name: string) {
 
 describe("reconcileGlobalLibrary", () => {
   beforeEach(() => {
-    mockPath.join.mockImplementation((...paths: string[]) => Promise.resolve(paths.join("/")));
+    mockPath.join.mockImplementation((...paths: string[]) => Promise.resolve(paths.join("/")) as unknown as string);
 
     // Default: all paths exist (folders and files)
     mockFs.exists.mockResolvedValue(true);
