@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Dragging scenes and pads to reorder them is now more reliable — drag now requires a small movement threshold before activating, preventing accidental drags on click
+- Pad drag-and-drop is now disabled when not in edit mode, matching existing scene tab behavior
+- Fixed edge cases where reordering scenes or pads with invalid positions could corrupt order or mark the project as changed unexpectedly
 - Scenes can now be drag-and-dropped to reorder them in the tab bar (available in edit mode)
 - Pads can now be drag-and-dropped to reorder them within a scene (available in edit mode)
 

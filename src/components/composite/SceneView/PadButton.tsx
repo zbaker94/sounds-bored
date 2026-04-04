@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -35,12 +35,16 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
     transform,
     transition,
     isDragging: isSortableDragging,
-  } = useSortable({ id: pad.id });
+  } = useSortable({ id: pad.id, disabled: !editMode });
 
-  const sortableStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const combinedStyle = useMemo(
+    () => ({
+      ...(pad.color ? { backgroundColor: pad.color } : undefined),
+      transform: CSS.Transform.toString(transform),
+      transition,
+    }),
+    [pad.color, transform, transition],
+  );
 
   useEffect(() => {
     if (isPlaying) {
@@ -83,7 +87,7 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
                   : "border-black/20"
               )
         )}
-        style={{ ...(pad.color ? { backgroundColor: pad.color } : {}), ...sortableStyle }}
+        style={combinedStyle}
       >
         {/* Playback progress — normal mode only */}
         {!editMode && isPlaying && (

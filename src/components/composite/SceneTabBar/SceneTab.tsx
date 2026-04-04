@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
@@ -32,10 +32,13 @@ export function SceneTab({ scene }: SceneTabProps) {
     isDragging,
   } = useSortable({ id: scene.id, disabled: !editMode });
 
-  const sortableStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const sortableStyle = useMemo(
+    () => ({
+      transform: CSS.Transform.toString(transform),
+      transition,
+    }),
+    [transform, transition],
+  );
 
   useEffect(() => {
     if (isEditing && inputRef.current) {

@@ -36,8 +36,9 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 const PADS_PER_PAGE = 12;
 
 export function SceneView() {
-  const activeSceneId = useProjectStore((s) => s.activeSceneId);
-  const project = useProjectStore((s) => s.project);
+  const activeScene = useProjectStore((s) =>
+    s.project?.scenes.find((sc) => sc.id === s.activeSceneId) ?? null,
+  );
   const openOverlay = useUiStore((s) => s.openOverlay);
   const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
   const [editingPad, setEditingPad] = useState<Pad | null>(null);
@@ -51,11 +52,6 @@ export function SceneView() {
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
     }),
-  );
-
-  const activeScene = useMemo(
-    () => project?.scenes.find((s) => s.id === activeSceneId) ?? null,
-    [project, activeSceneId],
   );
 
   const page = activeScene ? (pageByScene[activeScene.id] ?? 0) : 0;
@@ -72,8 +68,6 @@ export function SceneView() {
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
   const safePage = Math.min(page, totalPages - 1);
   const isLastPage = safePage === totalPages - 1;
-
-  const sortableItems = pads.map((p) => p.id);
 
   function handleDragStart(_event: DragStartEvent) {
     setIsDraggingPad(true);
@@ -159,6 +153,7 @@ export function SceneView() {
     (safePage + 1) * PADS_PER_PAGE,
   );
 
+  const sortableItems = useMemo(() => pads.map((p) => p.id), [pads]);
   const displayPads = isDraggingPad ? pads : pagePads;
 
   return (

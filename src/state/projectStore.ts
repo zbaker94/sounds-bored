@@ -185,8 +185,11 @@ export const useProjectStore = create<ProjectStore>()(
     reorderScenes: (fromIndex, toIndex) =>
       set((draft) => {
         if (!draft.project) return;
-        const [moved] = draft.project.scenes.splice(fromIndex, 1);
-        draft.project.scenes.splice(toIndex, 0, moved);
+        const { scenes } = draft.project;
+        if (fromIndex < 0 || fromIndex >= scenes.length) return;
+        if (toIndex < 0 || toIndex >= scenes.length) return;
+        const [moved] = scenes.splice(fromIndex, 1);
+        scenes.splice(toIndex, 0, moved);
         draft.isDirty = true;
       }),
 
@@ -195,6 +198,8 @@ export const useProjectStore = create<ProjectStore>()(
         if (!draft.project) return;
         const scene = draft.project.scenes.find((s) => s.id === sceneId);
         if (!scene) return;
+        if (fromIndex < 0 || fromIndex >= scene.pads.length) return;
+        if (toIndex < 0 || toIndex >= scene.pads.length) return;
         const [moved] = scene.pads.splice(fromIndex, 1);
         scene.pads.splice(toIndex, 0, moved);
         draft.isDirty = true;

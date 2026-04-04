@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useProjectStore } from "@/state/projectStore";
 import { Tabs, TabsList } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { MenuDrawer } from "./MenuDrawer";
 import { useHotkeys } from "react-hotkeys-hook";
 import { modKey } from "@/lib/utils";
-import { DndContext, closestCenter } from "@dnd-kit/core";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 
@@ -26,6 +27,14 @@ export function SceneTabBar() {
   const setActiveSceneId = useProjectStore((s) => s.setActiveSceneId);
   const addScene = useProjectStore((s) => s.addScene);
   const reorderScenes = useProjectStore((s) => s.reorderScenes);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+  );
+
+  const sceneIds = useMemo(() => scenes.map((s) => s.id), [scenes]);
 
   useHotkeys("mod+n", () => addScene());
 
@@ -46,11 +55,12 @@ export function SceneTabBar() {
           <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
             <TabsList variant="line">
               <DndContext
+                sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={scenes.map((s) => s.id)}
+                  items={sceneIds}
                   strategy={horizontalListSortingStrategy}
                 >
                   {scenes.map((scene) => (
