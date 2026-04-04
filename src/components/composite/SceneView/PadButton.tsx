@@ -11,14 +11,17 @@ import { PencilEdit01Icon, Copy01Icon, Delete02Icon } from "@hugeicons/core-free
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { PadFadeVisual } from "@/hooks/useFadeMode";
 
 interface PadButtonProps {
   pad: Pad;
   sceneId: string;
   onEditClick?: () => void;
+  fadeVisual?: PadFadeVisual;
+  onFadeTap?: () => void;
 }
 
-export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
+export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.includes(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -65,11 +68,36 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
 
   const layerCount = pad.layers.length;
 
+  const fadeHandlers = {
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      onFadeTap?.();
+    },
+  };
+
+  const fadeVisualClass = (() => {
+    switch (fadeVisual) {
+      case "fade-selectable": return "border-white/60";
+      case "crossfade-out":   return "border-amber-400";
+      case "crossfade-in":    return "border-emerald-400";
+      case "selected-out":    return "border-amber-500 ring-2 ring-amber-500";
+      case "selected-in":     return "border-emerald-500 ring-2 ring-emerald-500";
+      case "invalid":         return "opacity-40 pointer-events-none";
+      default:                return null;
+    }
+  })();
+
   return (
     <>
       <button
         ref={setNodeRef}
-        {...(editMode ? { ...attributes, ...listeners } : gestureHandlers)}
+        {...(editMode
+          ? { ...attributes, ...listeners }
+          : fadeVisual !== null
+            ? fadeHandlers
+            : gestureHandlers
+        )}
         className={cn(
           "relative w-full h-full rounded-xl overflow-hidden",
           "flex items-center justify-center p-2",
@@ -79,24 +107,19 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
           isSortableDragging && "opacity-50",
           editMode
             ? "border-2 border-dashed border-foreground/50 cursor-default"
-            : cn(
-                "border-2 transition-all cursor-pointer",
-                "hover:brightness-110 active:scale-95 active:shadow-none",
-                isPlaying
-                  ? "border-black drop-shadow-[0_5px_0px_rgba(0,0,0,1)]"
-                  : "border-black/20"
-              )
+            : fadeVisual !== null
+              ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
+              : cn(
+                  "border-2 transition-all cursor-pointer",
+                  "hover:brightness-110 active:scale-95 active:shadow-none",
+                  isPlaying
+                    ? "border-black drop-shadow-[0_5px_0px_rgba(0,0,0,1)]"
+                    : "border-black/20"
+                )
         )}
         style={combinedStyle}
       >
-        {/* Playback progress — normal mode only */}
-        {!editMode && isPlaying && (
-          <div
-            className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
-            style={{ width: `${progress * 100}%` }}
-          />
-        )}
-        {/* Volume fill — normal mode only */}
+        {/* Volume fill — normal mode only; renders below progress bar */}
         {!editMode && fillVolume !== null && (
           <div
             className={cn(
@@ -104,6 +127,13 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
               !isDragging && "transition-[height] duration-150 ease-out"
             )}
             style={{ height: `${fillVolume * 100}%` }}
+          />
+        )}
+        {/* Playback progress — normal mode only; renders on top of fill bar, slightly transparent */}
+        {!editMode && isPlaying && (
+          <div
+            className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
+            style={{ width: `${progress * 100}%` }}
           />
         )}
 
@@ -147,11 +177,16 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
           </div>
         )}
 
-        {/* Pad name / volume percentage — normal mode */}
+        {/* Pad name + optional volume — normal mode */}
         {!editMode && (
-          <span className="relative z-10 line-clamp-3 break-words leading-tight">
-            {fillVolume !== null ? `${Math.round(fillVolume * 100)}%` : pad.name}
-          </span>
+          <div className="relative z-10 flex flex-col items-center gap-0.5">
+            <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
+            {fillVolume !== null && (
+              <span className="text-xs font-bold tabular-nums">
+                {Math.round(fillVolume * 100)}%
+              </span>
+            )}
+          </div>
         )}
       </button>
 

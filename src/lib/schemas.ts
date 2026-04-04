@@ -145,6 +145,7 @@ export const LayerConfigFormSchema = z.object({
 export const PadConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
   layers: z.array(LayerConfigFormSchema).min(1, "At least one layer is required"),
+  fadeDurationMs: z.number().min(100).max(10000).optional(),
 });
 
 export type LayerConfigForm = z.infer<typeof LayerConfigFormSchema>;
@@ -160,6 +161,7 @@ export const PadSchema = z.object({
   muteGroupId: z.string().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
+  fadeDurationMs: z.number().min(100).max(10000).optional(),
 });
 
 export type Pad = z.infer<typeof PadSchema>;
@@ -207,6 +209,7 @@ export const AppSettingsSchema = z.object({
   globalFolders: z.array(GlobalFolderSchema),
   downloadFolderId: z.string().uuid(),   // ID of the yt-dlp download destination folder
   importFolderId: z.string().uuid(),     // ID of the in-app import destination folder
+  globalFadeDurationMs: z.number().min(100).max(10000).default(2000),
 });
 
 export type AppSettings = z.infer<typeof AppSettingsSchema>;

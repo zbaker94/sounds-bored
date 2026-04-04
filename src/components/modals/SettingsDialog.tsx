@@ -20,6 +20,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { TruncatedPath } from "@/components/ui/truncated-path";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, FolderAddIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
@@ -47,10 +49,14 @@ export function SettingsDialog() {
         <Tabs defaultValue="folders">
           <TabsList>
             <TabsTrigger value="folders">Folders</TabsTrigger>
+            <TabsTrigger value="playback">Playback</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
           <TabsContent value="folders">
             <FoldersTab />
+          </TabsContent>
+          <TabsContent value="playback">
+            <PlaybackTab />
           </TabsContent>
           <TabsContent value="about">
             <AboutTab />
@@ -165,6 +171,46 @@ function FoldersTab() {
           <HugeiconsIcon icon={FolderAddIcon} size={16} />
           Add Folder
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function PlaybackTab() {
+  const settings = useAppSettingsStore((s) => s.settings);
+  const updateSettings = useAppSettingsStore((s) => s.updateSettings);
+  const { mutate: saveSettings } = useSaveAppSettings();
+
+  if (!settings) return null;
+
+  const fadeDurationMs = settings.globalFadeDurationMs ?? 2000;
+
+  function handleFadeDurationChange(value: number) {
+    updateSettings((draft) => {
+      draft.globalFadeDurationMs = value;
+    });
+    saveSettings(useAppSettingsStore.getState().settings!);
+  }
+
+  return (
+    <div className="space-y-4 py-2">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <Label>Default Fade Duration</Label>
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {(fadeDurationMs / 1000).toFixed(1)}s
+          </span>
+        </div>
+        <Slider
+          min={100}
+          max={10000}
+          step={100}
+          value={[fadeDurationMs]}
+          onValueChange={(vals) => handleFadeDurationChange(vals[0])}
+        />
+        <p className="text-xs text-muted-foreground">
+          Applied to all pads that do not have a custom fade duration set.
+        </p>
       </div>
     </div>
   );

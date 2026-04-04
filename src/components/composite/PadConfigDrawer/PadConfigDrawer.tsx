@@ -1,14 +1,16 @@
 import { useEffect, useRef } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, useFormContext, FormProvider, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { PadConfigSchema } from "@/lib/schemas";
 import type { PadConfigForm, PadConfig, LayerConfigForm } from "@/lib/schemas";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume } from "@/lib/audio/padPlayer";
 
@@ -23,6 +25,7 @@ const DEFAULT_LAYER: LayerConfigForm = {
 const DEFAULT_VALUES: PadConfigForm = {
   name: "",
   layers: [DEFAULT_LAYER],
+  fadeDurationMs: undefined,
 };
 
 interface PadConfigDrawerProps {
@@ -67,6 +70,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
           retriggerMode: l.retriggerMode,
           volume: l.volume,
         })),
+        fadeDurationMs: initialConfig.fadeDurationMs,
       });
     } else {
       layerIdsRef.current = [];
@@ -86,6 +90,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
       name: data.name,
       layers: data.layers.map((l, i) => ({ id: layerIdsRef.current[i] ?? crypto.randomUUID(), ...l })),
       muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
+      fadeDurationMs: data.fadeDurationMs,
     };
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);
@@ -106,7 +111,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         onOpenChange={(open) => { if (!open) handleClose(); }}
         title={isEditMode ? "Edit Pad" : "New Pad"}
         content={
-          <div className="flex flex-col gap-4 px-4 py-2">
+          <div className="flex flex-col gap-4 px-4 py-2 overflow-y-auto max-h-[65vh]">
             <div className="flex flex-col gap-1">
               <Label htmlFor="pad-name">Pad Name</Label>
               <Input
@@ -120,6 +125,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
               )}
             </div>
             <LayerAccordion />
+            <FadeDurationField />
           </div>
         }
         footer={
@@ -132,5 +138,56 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         }
       />
     </FormProvider>
+  );
+}
+
+function FadeDurationField() {
+  const { control, watch } = useFormContext<PadConfigForm>();
+  const globalDefault = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs ?? 2000);
+  const currentValue = watch("fadeDurationMs");
+  const displayValue = currentValue ?? globalDefault;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label>Fade Duration</Label>
+        <div className="flex items-center gap-2">
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {(displayValue / 1000).toFixed(1)}s
+          </span>
+          {currentValue !== undefined && (
+            <Controller
+              name="fadeDurationMs"
+              control={control}
+              render={({ field }) => (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => field.onChange(undefined)}
+                >
+                  Reset to default
+                </button>
+              )}
+            />
+          )}
+        </div>
+      </div>
+      <Controller
+        name="fadeDurationMs"
+        control={control}
+        render={({ field }) => (
+          <Slider
+            min={100}
+            max={10000}
+            step={100}
+            value={[field.value ?? globalDefault]}
+            onValueChange={(vals) => field.onChange(vals[0])}
+          />
+        )}
+      />
+      {currentValue === undefined && (
+        <p className="text-xs text-muted-foreground">Using global default ({(globalDefault / 1000).toFixed(1)}s)</p>
+      )}
+    </div>
   );
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## Current Changes
+- Pads can now be faded in or out individually using a new **Fade** button (or `F` hotkey) in the scene toolbar
+- A new **Crossfade** button (or `X` hotkey) lets you simultaneously fade out playing pads and fade in silent ones with a single gesture
+- Each pad now has a configurable **Fade Duration** slider in its config drawer, with a "Reset to default" option
+- A new **Playback** tab in App Settings lets you set a global default fade duration (0.1s–10s, default 2s)
+- Pad name and volume percentage are now shown together during volume adjustment instead of toggling between them
+
 ## v1.1.7
 
 Scenes and pads can now be drag-and-dropped to reorder them in edit mode, with a movement threshold that prevents accidental drags on click. Volume drag has been significantly improved — it now uses a smooth sensitivity ramp and curved response for more precise control, with visual jitter and unexpected jumps eliminated.

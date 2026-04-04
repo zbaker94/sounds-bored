@@ -136,7 +136,7 @@ describe("PadButton", () => {
       act(() => { vi.advanceTimersByTime(150); });
 
       expect(screen.getByText("0%")).toBeInTheDocument();
-      expect(screen.queryByText("Kick")).not.toBeInTheDocument();
+      expect(screen.getByText("Kick")).toBeInTheDocument();
     });
 
     it("updates percentage as volume changes while dragging", () => {
@@ -194,12 +194,85 @@ describe("PadButton", () => {
       // Drag 10 px up to enter drag phase
       fireEvent.pointerMove(button, { clientY: 190, pointerId: 1 });
 
-      expect(screen.queryByText("Kick")).not.toBeInTheDocument();
+      // Name always shown; volume % also shown during drag
+      expect(screen.getByText("Kick")).toBeInTheDocument();
+      expect(screen.queryByText(/\d+%/)).toBeInTheDocument();
 
       act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
 
+      // After release: name still shown, volume % gone
       expect(screen.getByText("Kick")).toBeInTheDocument();
       expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
     });
+  });
+});
+
+// ─── Fade mode visual states ──────────────────────────────────────────────────
+
+import type { PadFadeVisual } from "@/hooks/useFadeMode";
+
+function renderPadWithFadeVisual(fadeVisual: PadFadeVisual, onFadeTap = vi.fn()) {
+  const pad = loadPadInStore();
+  return render(
+    <PadButton
+      pad={pad}
+      sceneId="scene-1"
+      fadeVisual={fadeVisual}
+      onFadeTap={onFadeTap}
+    />
+  );
+}
+
+describe("PadButton — fade visual states", () => {
+  it("applies fade-selectable ring class when fadeVisual is 'fade-selectable'", () => {
+    renderPadWithFadeVisual("fade-selectable");
+    const btn = screen.getByRole("button", { name: "Kick" });
+    expect(btn.className).toMatch(/border-white/);
+  });
+
+  it("applies amber ring class when fadeVisual is 'crossfade-out'", () => {
+    renderPadWithFadeVisual("crossfade-out");
+    const btn = screen.getByRole("button", { name: "Kick" });
+    expect(btn.className).toMatch(/border-amber/);
+  });
+
+  it("applies green ring class when fadeVisual is 'crossfade-in'", () => {
+    renderPadWithFadeVisual("crossfade-in");
+    const btn = screen.getByRole("button", { name: "Kick" });
+    expect(btn.className).toMatch(/border-emerald/);
+  });
+
+  it("applies bold amber ring class when fadeVisual is 'selected-out'", () => {
+    renderPadWithFadeVisual("selected-out");
+    const btn = screen.getByRole("button", { name: "Kick" });
+    expect(btn.className).toMatch(/ring-amber/);
+  });
+
+  it("applies bold green ring class when fadeVisual is 'selected-in'", () => {
+    renderPadWithFadeVisual("selected-in");
+    const btn = screen.getByRole("button", { name: "Kick" });
+    expect(btn.className).toMatch(/ring-emerald/);
+  });
+
+  it("applies opacity-40 and pointer-events-none when fadeVisual is 'invalid'", () => {
+    renderPadWithFadeVisual("invalid");
+    const btn = screen.getByRole("button", { name: "Kick" });
+    expect(btn.className).toMatch(/opacity-40/);
+  });
+
+  it("calls onFadeTap on pointer down when fadeVisual is set", async () => {
+    const onFadeTap = vi.fn();
+    renderPadWithFadeVisual("fade-selectable", onFadeTap);
+    const btn = screen.getByRole("button", { name: "Kick" });
+    await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
+    expect(onFadeTap).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call onFadeTap when fadeVisual is null", async () => {
+    const onFadeTap = vi.fn();
+    renderPadWithFadeVisual(null, onFadeTap);
+    const btn = screen.getByRole("button", { name: "Kick" });
+    await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
+    expect(onFadeTap).not.toHaveBeenCalled();
   });
 });

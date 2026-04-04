@@ -32,6 +32,56 @@ const layerChainQueue = new Map<string, Sound[]>();
 // Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger.
 const layerPendingMap = new Set<string>();
 
+// Pending fade-out cleanup timeouts, keyed by pad ID. Cleared by stopAllPads.
+const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function clearFadePadTimeouts(): void {
+  for (const id of fadePadTimeouts.values()) clearTimeout(id);
+  fadePadTimeouts.clear();
+}
+
+export function resolveFadeDuration(pad: Pad): number {
+  return (
+    pad.fadeDurationMs ??
+    useAppSettingsStore.getState().settings?.globalFadeDurationMs ??
+    2000
+  );
+}
+
+export function fadePadOut(pad: Pad, durationMs: number): void {
+  const ctx = getAudioContext();
+  const gain = getPadGain(pad.id);
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + durationMs / 1000);
+  usePlaybackStore.getState().updatePadVolume(pad.id, 0);
+
+  const existing = fadePadTimeouts.get(pad.id);
+  if (existing !== undefined) clearTimeout(existing);
+
+  const timeoutId = setTimeout(() => {
+    fadePadTimeouts.delete(pad.id);
+    stopPad(pad);
+    resetPadGain(pad.id);
+  }, durationMs + 5);
+  fadePadTimeouts.set(pad.id, timeoutId);
+}
+
+export async function fadePadIn(pad: Pad, durationMs: number): Promise<void> {
+  await triggerPad(pad, 0);
+  const ctx = getAudioContext();
+  const gain = getPadGain(pad.id);
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + durationMs / 1000);
+  usePlaybackStore.getState().updatePadVolume(pad.id, 1.0);
+}
+
+export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[]): void {
+  fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad)));
+  fadingIn.forEach((pad) => fadePadIn(pad, resolveFadeDuration(pad)).catch(console.error));
+}
+
 export function getPadProgress(padId: string): number | null {
   const info = padProgressInfo.get(padId);
   if (info) {
@@ -126,6 +176,7 @@ export function stopPad(pad: Pad): void {
  * cleared first.
  */
 export function stopAllPads(): void {
+  clearFadePadTimeouts();
   clearAllLayerChains();
   // Null all onended callbacks — prevents loop restarts during ramp window
   usePlaybackStore.getState().nullAllOnEnded();

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
+import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
@@ -19,7 +20,10 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   LayersLogoIcon,
+  VolumeHighIcon,
+  ShuffleIcon,
 } from "@hugeicons/core-free-icons";
+import { useFadeMode } from "@/hooks/useFadeMode";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn, modKey } from "@/lib/utils";
 import {
@@ -65,6 +69,8 @@ export function SceneView() {
   }
 
   const pads = activeScene?.pads ?? [];
+  const fadeMode = useFadeMode(pads);
+  const playingPadIds = usePlaybackStore((s) => s.playingPadIds);
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
   const safePage = Math.min(page, totalPages - 1);
   const isLastPage = safePage === totalPages - 1;
@@ -159,6 +165,45 @@ export function SceneView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
+      {/* Fade toolbar — hidden in edit mode */}
+      {!editMode && (
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant={fadeMode.mode === "fade" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => fadeMode.mode === "fade" ? fadeMode.cancel() : fadeMode.enterFade()}
+            disabled={editMode}
+            aria-label="Fade pad"
+          >
+            <HugeiconsIcon icon={VolumeHighIcon} size={16} />
+            Fade
+            <Kbd className="ml-1">F</Kbd>
+          </Button>
+          <Button
+            variant={fadeMode.mode === "crossfade" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              if (fadeMode.mode === "crossfade") {
+                if (fadeMode.canExecute) fadeMode.execute();
+                else fadeMode.cancel();
+              } else {
+                fadeMode.enterCrossfade();
+              }
+            }}
+            disabled={editMode || (fadeMode.mode !== "crossfade" && playingPadIds.length === 0)}
+            aria-label="Crossfade pads"
+          >
+            <HugeiconsIcon icon={ShuffleIcon} size={16} />
+            Crossfade
+            <Kbd className="ml-1">X</Kbd>
+          </Button>
+          {fadeMode.statusLabel && (
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-black/50 text-white border border-white/20">
+              {fadeMode.statusLabel}
+            </span>
+          )}
+        </div>
+      )}
       <DndContext
         sensors={editMode ? sensors : []}
         collisionDetection={closestCenter}
@@ -180,6 +225,8 @@ export function SceneView() {
                   setEditingPad(pad);
                   openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
                 }}
+                fadeVisual={fadeMode.getPadFadeVisual(pad.id)}
+                onFadeTap={() => fadeMode.onPadTap(pad.id)}
               />
             ))}
             {isLastPage && !isDraggingPad && (

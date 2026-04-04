@@ -105,10 +105,11 @@ beforeEach(async () => {
   vi.clearAllMocks();
   createdSources.length = 0;
   // Clear chain queue before stopAll so old onended callbacks don't chain
-  const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains } = await import("./padPlayer");
+  const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains, clearFadePadTimeouts } = await import("./padPlayer");
   clearAllLayerChains();
   clearAllLayerGains();
   clearAllPadGains();
+  clearFadePadTimeouts();
   usePlaybackStore.getState().stopAll();
   usePlaybackStore.setState({
     masterVolume: 100,
@@ -935,5 +936,111 @@ describe("retrigger stop — ramped stop", () => {
     vi.advanceTimersByTime(35);
     expect(createdSources[0].stop).toHaveBeenCalledOnce();
     expect(createdSources[1].stop).toHaveBeenCalledOnce();
+  });
+});
+
+// ─── Fade functions ───────────────────────────────────────────────────────────
+
+describe("fadePadOut", () => {
+  it("schedules a gain ramp to 0 on the pad gain node", async () => {
+    const { fadePadOut, getPadGain, clearFadePadTimeouts } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-pad" });
+
+    fadePadOut(pad, 1000);
+
+    const gain = getPadGain(pad.id);
+    expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+    clearFadePadTimeouts();
+  });
+
+  it("calls stopPad and resetPadGain after the fade duration", async () => {
+    vi.useFakeTimers();
+    const { fadePadOut, clearFadePadTimeouts } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-timer-pad" });
+
+    usePlaybackStore.setState({ playingPadIds: [pad.id] });
+
+    fadePadOut(pad, 500);
+    vi.advanceTimersByTime(510);
+
+    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    clearFadePadTimeouts();
+    vi.useRealTimers();
+  });
+
+  it("updates padVolumes to 0 immediately", async () => {
+    const { fadePadOut, clearFadePadTimeouts } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-vol-pad" });
+
+    fadePadOut(pad, 1000);
+
+    expect(usePlaybackStore.getState().padVolumes[pad.id]).toBe(0);
+    clearFadePadTimeouts();
+  });
+});
+
+describe("fadePadIn", () => {
+  it("triggers the pad at volume 0 then ramps to 1", async () => {
+    const mockBuffer = { duration: 1.0, numberOfChannels: 1, sampleRate: 44100 };
+    mockLoadBuffer.mockResolvedValue(mockBuffer);
+
+    const source = makeMockSource();
+    mockCtx.createBufferSource.mockReturnValue(source);
+    const gain = makeMockGain();
+    mockCtx.createGain.mockReturnValue(gain);
+
+    const { fadePadIn } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fade-in-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await fadePadIn(pad, 1000);
+
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+    expect(usePlaybackStore.getState().padVolumes[pad.id]).toBe(1.0);
+  });
+});
+
+describe("crossfadePads", () => {
+  it("calls fadePadOut for each fading-out pad and fadePadIn for each fading-in pad", async () => {
+    const { crossfadePads, clearFadePadTimeouts } = await import("./padPlayer");
+    const padOut = createMockPad({ id: "xfade-out" });
+    const padIn = createMockPad({ id: "xfade-in", layers: [createMockLayer()] });
+
+    const mockBuffer = { duration: 1.0, numberOfChannels: 1, sampleRate: 44100 };
+    mockLoadBuffer.mockResolvedValue(mockBuffer);
+    const source = makeMockSource();
+    mockCtx.createBufferSource.mockReturnValue(source);
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+    useLibraryStore.setState({ sounds: [], tags: [], sets: [] } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    crossfadePads([padOut], [padIn]);
+
+    expect(usePlaybackStore.getState().padVolumes[padOut.id]).toBe(0);
+    clearFadePadTimeouts();
+  });
+});
+
+describe("stopAllPads clears fade timeouts", () => {
+  it("cancels pending fade timeouts so cleanup callbacks do not fire", async () => {
+    vi.useFakeTimers();
+    const { fadePadOut, stopAllPads, clearFadePadTimeouts } = await import("./padPlayer");
+    const pad = createMockPad({ id: "timeout-cancel-pad" });
+    usePlaybackStore.setState({ playingPadIds: [pad.id] });
+
+    fadePadOut(pad, 500);
+    stopAllPads();
+    vi.advanceTimersByTime(600);
+
+    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    clearFadePadTimeouts();
+    vi.useRealTimers();
   });
 });
