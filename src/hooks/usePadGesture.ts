@@ -8,7 +8,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 const HOLD_MS = 150;        // time before a press becomes a "hold"
 const DRAG_PX = 4;          // vertical pixels before drag mode activates
 const DRAG_RANGE_PX = 200;  // pixels of travel for full 0→1 volume range
-const DRAG_EXPONENT = 1.5;  // power curve exponent — small drags produce smaller changes
+export const DRAG_RAMP_MS = 150; // time-based linear sensitivity ramp (ms)
 
 type Phase = "idle" | "down" | "hold" | "drag";
 
@@ -16,6 +16,7 @@ interface GestureState {
   startY: number;
   lastY: number;
   startTime: number;
+  dragStartTime: number;
   phase: Phase;
   wasPlayingAtStart: boolean;
   startVolume: number;
@@ -29,6 +30,7 @@ export function usePadGesture(pad: Pad) {
     startY: 0,
     lastY: 0,
     startTime: 0,
+    dragStartTime: 0,
     phase: "idle",
     wasPlayingAtStart: false,
     startVolume: 1.0,
@@ -36,6 +38,7 @@ export function usePadGesture(pad: Pad) {
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fillVolume, setFillVolume] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   function clearHoldTimer() {
     if (holdTimer.current) {
@@ -89,6 +92,8 @@ export function usePadGesture(pad: Pad) {
 
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
+      s.dragStartTime = Date.now();
+      setIsDragging(true);
 
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
         triggerPad(pad, 0).catch(console.error);
@@ -97,9 +102,8 @@ export function usePadGesture(pad: Pad) {
     }
 
     if (s.phase === "drag") {
-      const normalizedDelta = deltaY / DRAG_RANGE_PX;
-      const easedDelta = Math.sign(normalizedDelta) * Math.pow(Math.abs(normalizedDelta), DRAG_EXPONENT);
-      const newVolume = Math.max(0, Math.min(1, s.startVolume + easedDelta));
+      const rampFactor = Math.min(1, (Date.now() - s.dragStartTime) / DRAG_RAMP_MS);
+      const newVolume = Math.max(0, Math.min(1, s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
       if (!justTriggered && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {
@@ -109,6 +113,17 @@ export function usePadGesture(pad: Pad) {
       setPadVolume(pad.id, newVolume);
       setFillVolume(newVolume);
     }
+  }
+
+  function resetGesture() {
+    const s = state.current;
+    if (hasHoldLayer) {
+      releasePadHoldLayers(pad);
+    }
+    setFillVolume(null);
+    setIsDragging(false);
+    s.dragStartTime = 0;
+    s.phase = "idle";
   }
 
   function onPointerUp(_e: React.PointerEvent<HTMLButtonElement>) {
@@ -133,13 +148,19 @@ export function usePadGesture(pad: Pad) {
       }
     }
 
-    // Release hold-mode layers on pointer up (regardless of gesture phase)
-    if (hasHoldLayer) {
-      releasePadHoldLayers(pad);
+    resetGesture();
+  }
+
+  function onPointerCancel(_e: React.PointerEvent<HTMLButtonElement>) {
+    clearHoldTimer();
+    const s = state.current;
+
+    if (s.phase === "drag" && s.currentVolume < 0.01 && !hasHoldLayer) {
+      stopPad(pad);
+      resetPadGain(pad.id);
     }
 
-    setFillVolume(null);
-    s.phase = "idle";
+    resetGesture();
   }
 
   function onContextMenu(e: React.MouseEvent<HTMLButtonElement>) {
@@ -147,7 +168,8 @@ export function usePadGesture(pad: Pad) {
   }
 
   return {
-    gestureHandlers: { onPointerDown, onPointerMove, onPointerUp, onContextMenu },
+    gestureHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu },
     fillVolume,
+    isDragging,
   };
 }

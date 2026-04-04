@@ -23,7 +23,7 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
   const deletePad = useProjectStore((s) => s.deletePad);
-  const { gestureHandlers, fillVolume } = usePadGesture(pad);
+  const { gestureHandlers, fillVolume, isDragging } = usePadGesture(pad);
   const [progress, setProgress] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
@@ -99,7 +99,10 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
         {/* Volume fill — normal mode only */}
         {!editMode && fillVolume !== null && (
           <div
-            className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black transition-[height] duration-150 ease-out"
+            className={cn(
+              "absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black",
+              !isDragging && "transition-[height] duration-150 ease-out"
+            )}
             style={{ height: `${fillVolume * 100}%` }}
           />
         )}

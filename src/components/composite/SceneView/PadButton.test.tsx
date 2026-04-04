@@ -11,6 +11,7 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
   setPadVolume: vi.fn(),
   resetPadGain: vi.fn(),
+  stopPad: vi.fn(),
   getPadProgress: vi.fn().mockReturnValue(null),
 }));
 
@@ -147,11 +148,38 @@ describe("PadButton", () => {
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
       act(() => { vi.advanceTimersByTime(150); });
 
-      // Drag 100 px up: startVolume=0, delta=100, range=200
-      // Eased (exponent 1.5): (100/200)^1.5 = 0.5^1.5 ≈ 0.354 → 35%
+      // Enter drag phase with a small initial move
+      fireEvent.pointerMove(button, { clientY: 195, pointerId: 1 });
+
+      // Advance past DRAG_RAMP_MS (150 ms) so rampFactor reaches 1.0
+      act(() => { vi.advanceTimersByTime(150); });
+
+      // Drag 100 px up: startVolume=0, rampFactor=1.0, delta=100, range=200 → 50%
       fireEvent.pointerMove(button, { clientY: 100, pointerId: 1 });
 
-      expect(screen.getByText("35%")).toBeInTheDocument();
+      expect(screen.getByText("50%")).toBeInTheDocument();
+    });
+
+    it("suppresses transition class on fill bar during drag and is absent after release", () => {
+      const pad = loadPadInStore();
+      render(<PadButton pad={pad} sceneId="scene-1" />);
+      const button = screen.getByRole("button");
+
+      fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
+      act(() => { vi.advanceTimersByTime(150); }); // hold activates, fill bar appears
+
+      // Hold phase — fill bar present, transition class applied
+      // eslint-disable-next-line testing-library/no-node-access
+      const fillBarDuringHold = button.querySelector(".bg-yellow-500");
+      expect(fillBarDuringHold).toBeInTheDocument();
+      expect(fillBarDuringHold?.className).toContain("transition-[height]");
+
+      // Enter drag phase — transition class should be suppressed
+      fireEvent.pointerMove(button, { clientY: 195, pointerId: 1 });
+      // eslint-disable-next-line testing-library/no-node-access
+      const fillBarDuringDrag = button.querySelector(".bg-yellow-500");
+      expect(fillBarDuringDrag).toBeInTheDocument();
+      expect(fillBarDuringDrag?.className).not.toContain("transition-[height]");
     });
 
     it("restores pad name after drag ends", () => {
@@ -168,7 +196,7 @@ describe("PadButton", () => {
 
       expect(screen.queryByText("Kick")).not.toBeInTheDocument();
 
-      fireEvent.pointerUp(button, { pointerId: 1 });
+      act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
 
       expect(screen.getByText("Kick")).toBeInTheDocument();
       expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();

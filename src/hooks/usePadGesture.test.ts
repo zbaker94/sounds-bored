@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { usePadGesture } from "@/hooks/usePadGesture";
+import { usePadGesture, DRAG_RAMP_MS } from "@/hooks/usePadGesture";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
 
@@ -349,6 +349,7 @@ describe("usePadGesture — drag phase", () => {
     usePlaybackStore.setState({
       playingPadIds: [oneShotPad.id],
       padVolumes: { [oneShotPad.id]: 1.0 },
+      isPadActive: (padId: string) => padId === oneShotPad.id,
     });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
@@ -430,7 +431,7 @@ describe("usePadGesture — hold-mode layer pad", () => {
 describe("usePadGesture — startY staleness fix", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {} });
+    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
     vi.mocked(setPadVolume).mockClear();
   });
 
@@ -485,24 +486,34 @@ describe("usePadGesture — startY staleness fix", () => {
       vi.advanceTimersByTime(150);
     });
 
-    // Drag 40px up from hold-start (320 → 280)
-    // startVolume = 0 (non-playing pad)
-    // Expected newVolume is based on deltaY = 320 - 280 = 40 from hold-start position
+    // Drag 40px up from hold-start (320 → 280) — this activates drag phase (dragStartTime = now)
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 280 }));
+    });
+
+    // Advance time to full ramp so rampFactor = 1.0
+    act(() => {
+      vi.advanceTimersByTime(DRAG_RAMP_MS);
+    });
+
+    // Fire move again at same position — now at full ramp, linear
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 280 }));
     });
 
     // Volume applied should reflect 40px drag from hold-start (Y=320), not from pointer-down (Y=300)
-    // With exponent 1.5 easing: normalizedDelta = 40/200 = 0.2; easedDelta = 0.2^1.5 ≈ 0.0894
+    // Linear at full ramp: 0 + 1.0 × (40/200) = 0.2
+    // If startY were wrong (300 instead of 320), deltaY = 300-280 = 20 → 20/200 = 0.1
     expect(setPadVolume).toHaveBeenCalledWith(oneShotPad.id, expect.any(Number));
-    const appliedVolume = vi.mocked(setPadVolume).mock.calls[0][1];
-    expect(appliedVolume).toBeCloseTo(0.0894, 3);
+    const calls = vi.mocked(setPadVolume).mock.calls;
+    const appliedVolume = calls[calls.length - 1][1];
+    expect(appliedVolume).toBeCloseTo(0.2, 5);
   });
 });
 
-// ─── Easing curve ─────────────────────────────────────────────────────────────
+// ─── Time-based sensitivity ramp ─────────────────────────────────────────────
 
-describe("usePadGesture — drag easing curve", () => {
+describe("usePadGesture — time-based sensitivity ramp", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
@@ -513,87 +524,187 @@ describe("usePadGesture — drag easing curve", () => {
     vi.useRealTimers();
   });
 
-  function dragFromHoldStart(clientYStart: number, clientYEnd: number) {
+  it("has zero sensitivity at drag start (rampFactor = 0)", () => {
     const { result } = renderHook(() => usePadGesture(oneShotPad));
-    act(() => {
-      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: clientYStart }));
-    });
-    act(() => { vi.advanceTimersByTime(150); });
-    act(() => {
-      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: clientYEnd }));
-    });
-    const calls = vi.mocked(setPadVolume).mock.calls;
-    vi.mocked(setPadVolume).mockClear();
-    return calls.length > 0 ? calls[calls.length - 1][1] : null;
-  }
 
-  it("small drag produces less volume change than linear mapping", () => {
-    // startVolume = 0 (non-playing). Drag 20px up from hold-start.
-    // Linear: 0 + 20/200 = 0.10
-    // Eased (exponent 1.5): 0 + (0.1)^1.5 ≈ 0.0316
-    const volume = dragFromHoldStart(300, 280);
-    expect(volume).not.toBeNull();
-    expect(volume!).toBeLessThan(0.10);
-    expect(volume!).toBeCloseTo(0.0316, 3);
-  });
-
-  it("full DRAG_RANGE_PX (200px) still reaches the full range boundary", () => {
-    // startVolume = 0. Drag 200px up → should reach 1.0 (clamped).
-    const volume = dragFromHoldStart(500, 300);
-    expect(volume).toBe(1.0);
-  });
-
-  it("full DRAG_RANGE_PX downward from startVolume=1.0 reaches 0", () => {
-    usePlaybackStore.setState({
-      playingPadIds: [oneShotPad.id],
-      padVolumes: { [oneShotPad.id]: 1.0 },
-    });
-    vi.mocked(setPadVolume).mockClear();
-
-    const { result } = renderHook(() => usePadGesture(oneShotPad));
     act(() => {
       result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
     });
-    act(() => { vi.advanceTimersByTime(150); }); // startVolume = 1.0
+    act(() => { vi.advanceTimersByTime(150); }); // hold activates, startVolume = 0
+
+    // First move crosses DRAG_PX threshold — drag activates at t=0
+    // rampFactor = 0, so newVolume should equal startVolume (0)
     act(() => {
-      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 500 }));
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
 
     const calls = vi.mocked(setPadVolume).mock.calls;
-    expect(calls[calls.length - 1][1]).toBe(0);
+    expect(calls.length).toBeGreaterThan(0);
+    const volumeAtDragStart = calls[calls.length - 1][1];
+    expect(volumeAtDragStart).toBe(0); // startVolume, no ramp applied yet
   });
 
-  it("easing is symmetric: equal distance up and down produces equal magnitude delta", () => {
-    usePlaybackStore.setState({
-      playingPadIds: [oneShotPad.id],
-      padVolumes: { [oneShotPad.id]: 0.5 },
-      isPadActive: (padId: string) => padId === oneShotPad.id,
+  it("has half sensitivity at half ramp duration", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
+    vi.mocked(setPadVolume).mockClear();
+
+    // Activate drag
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+    vi.mocked(setPadVolume).mockClear();
+
+    // Advance to half ramp
+    act(() => { vi.advanceTimersByTime(DRAG_RAMP_MS / 2); });
+
+    // Move to 50px up from hold-start (300 → 250)
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 250 }));
     });
 
-    // Drag 50px up from startVolume=0.5
-    vi.mocked(setPadVolume).mockClear();
-    const { result: r1 } = renderHook(() => usePadGesture(oneShotPad));
+    // deltaY = 300 - 250 = 50px from hold-start
+    // linear = 50/200 = 0.25; rampFactor = 0.5; newVolume = 0 + 0.5 × 0.25 = 0.125
+    const calls = vi.mocked(setPadVolume).mock.calls;
+    const vol = calls[calls.length - 1][1];
+    expect(vol).toBeCloseTo(0.125, 3);
+  });
+
+  it("has full sensitivity at full ramp duration", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
     act(() => {
-      r1.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
+
+    // Activate drag
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+    vi.mocked(setPadVolume).mockClear();
+
+    // Advance to full ramp
+    act(() => { vi.advanceTimersByTime(DRAG_RAMP_MS); });
+
+    // Move 40px up from hold-start
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 260 }));
+    });
+
+    // deltaY = 300 - 260 = 40; rampFactor = 1.0; newVolume = 0 + 1.0 × (40/200) = 0.2
+    const calls = vi.mocked(setPadVolume).mock.calls;
+    const vol = calls[calls.length - 1][1];
+    expect(vol).toBeCloseTo(0.2, 5);
+  });
+
+  it("full range still clamps at 1.0 after ramp completes", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 500 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
+
+    // Activate drag — 5px exceeds DRAG_PX (4) threshold
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 495 }));
+    });
+
+    act(() => { vi.advanceTimersByTime(DRAG_RAMP_MS); });
+
+    // Move 200px up (full DRAG_RANGE_PX) → should clamp to 1.0
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 300 }));
+    });
+
+    const calls = vi.mocked(setPadVolume).mock.calls;
+    const vol = calls[calls.length - 1][1];
+    expect(vol).toBe(1.0);
+  });
+});
+
+// ─── onPointerCancel ──────────────────────────────────────────────────────────
+
+describe("usePadGesture — onPointerCancel", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
+    vi.mocked(setPadVolume).mockClear();
+    vi.mocked(stopPad).mockClear();
+    vi.mocked(resetPadGain).mockClear();
+    vi.mocked(releasePadHoldLayers).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resets fill volume and isDragging when cancelled during drag", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // hold activates
+
+    // Enter drag
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+    expect(result.current.fillVolume).not.toBeNull();
+    expect(result.current.isDragging).toBe(true);
+
+    act(() => {
+      result.current.gestureHandlers.onPointerCancel(makePointerEvent({ clientY: 290 }));
+    });
+
+    expect(result.current.fillVolume).toBeNull();
+    expect(result.current.isDragging).toBe(false);
+  });
+
+  it("stops pad and resets gain when cancelled during drag at near-zero volume", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // hold activates, startVolume = 0
+
+    // Enter drag — volume stays near zero (rampFactor=0 at drag start)
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+
+    act(() => {
+      result.current.gestureHandlers.onPointerCancel(makePointerEvent({ clientY: 290 }));
+    });
+
+    expect(stopPad).toHaveBeenCalledWith(oneShotPad);
+    expect(resetPadGain).toHaveBeenCalledWith(oneShotPad.id);
+  });
+
+  it("releases hold layers when cancelled on a hold-mode pad", () => {
+    const holdPad: Pad = {
+      ...oneShotPad,
+      id: "hold-pad",
+      layers: [{ ...oneShotPad.layers[0], playbackMode: "hold" }],
+    };
+    const { result } = renderHook(() => usePadGesture(holdPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
     });
     act(() => { vi.advanceTimersByTime(150); });
-    act(() => {
-      r1.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 250 }));
-    });
-    const volumeUp = vi.mocked(setPadVolume).mock.calls.at(-1)![1];
 
-    // Drag 50px down from startVolume=0.5
-    vi.mocked(setPadVolume).mockClear();
-    const { result: r2 } = renderHook(() => usePadGesture(oneShotPad));
     act(() => {
-      r2.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+      result.current.gestureHandlers.onPointerCancel(makePointerEvent({ clientY: 300 }));
     });
-    act(() => { vi.advanceTimersByTime(150); });
-    act(() => {
-      r2.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 350 }));
-    });
-    const volumeDown = vi.mocked(setPadVolume).mock.calls.at(-1)![1];
 
-    expect(Math.abs(volumeUp - 0.5)).toBeCloseTo(Math.abs(0.5 - volumeDown), 5);
+    expect(releasePadHoldLayers).toHaveBeenCalledWith(holdPad);
   });
 });
