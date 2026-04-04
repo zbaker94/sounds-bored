@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved repository hygiene by excluding worktree directories from version control
 - Added a design spec for fixing pad volume drag behavior: sensitivity now ramps up over 150ms from drag start instead of using a distance-based power curve, making rapid gestures feel more responsive
 - Fixed a visual stutter issue where the volume fill bar would jerk during fast drags; the CSS transition is now disabled while actively dragging and re-enabled on release
 - Dragging the volume control on a pad no longer jumps unexpectedly when you hold the button still before dragging — mouse drift during the press-and-hold window is now ignored correctly.

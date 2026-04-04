@@ -26,3 +26,4 @@ src-tauri/binaries/ffmpeg-*
 *.njsproj
 *.sln
 *.sw?
+.worktrees/
