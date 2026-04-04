@@ -424,6 +424,20 @@ describe("usePadGesture — hold-mode layer pad", () => {
     // Only called once — at pointer down
     expect(triggerPad).toHaveBeenCalledTimes(1);
   });
+
+  it("resets pad gain to 1.0 on pointer up so next trigger always starts at full volume", () => {
+    vi.mocked(resetPadGain).mockClear();
+    const { result } = renderHook(() => usePadGesture(holdPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => {
+      result.current.gestureHandlers.onPointerUp(makePointerEvent({ clientY: 300 }));
+    });
+
+    expect(resetPadGain).toHaveBeenCalledWith(holdPad.id);
+  });
 });
 
 // ─── H1 fix: startY staleness ─────────────────────────────────────────────────
@@ -706,5 +720,26 @@ describe("usePadGesture — onPointerCancel", () => {
     });
 
     expect(releasePadHoldLayers).toHaveBeenCalledWith(holdPad);
+  });
+
+  it("resets pad gain to 1.0 on pointer cancel so next trigger always starts at full volume", () => {
+    const holdPad: Pad = {
+      ...oneShotPad,
+      id: "hold-pad",
+      layers: [{ ...oneShotPad.layers[0], playbackMode: "hold" }],
+    };
+    vi.mocked(resetPadGain).mockClear();
+    const { result } = renderHook(() => usePadGesture(holdPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); });
+
+    act(() => {
+      result.current.gestureHandlers.onPointerCancel(makePointerEvent({ clientY: 300 }));
+    });
+
+    expect(resetPadGain).toHaveBeenCalledWith(holdPad.id);
   });
 });

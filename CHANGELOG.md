@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where hold-mode pads could start at reduced volume after being released — gain now resets to full on pointer up or cancel.
+- Updated app to version 1.1.7
 - Pads can now be faded in or out individually using a new **Fade** button (or `F` hotkey) in the scene toolbar
 - A new **Crossfade** button (or `X` hotkey) lets you simultaneously fade out playing pads and fade in silent ones with a single gesture
 - Each pad now has a configurable **Fade Duration** slider in its config drawer, with a "Reset to default" option

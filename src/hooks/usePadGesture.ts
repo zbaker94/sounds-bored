@@ -119,6 +119,7 @@ export function usePadGesture(pad: Pad) {
     const s = state.current;
     if (hasHoldLayer) {
       releasePadHoldLayers(pad);
+      resetPadGain(pad.id);
     }
     setFillVolume(null);
     setIsDragging(false);
