@@ -3709,7 +3709,7 @@ dependencies = [
 
 [[package]]
 name = "sounds-bored"
-version = "1.1.5"
+version = "1.1.7"
 dependencies = [
  "serde",
  "serde_json",
