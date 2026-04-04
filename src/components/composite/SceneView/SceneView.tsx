@@ -85,6 +85,8 @@ export function SceneView() {
     }
   }
 
+  const sortableItems = useMemo(() => pads.map((p) => p.id), [pads]);
+
   // Hooks must be called unconditionally — before any early returns.
   useHotkeys(
     "shift+left",
@@ -153,7 +155,6 @@ export function SceneView() {
     (safePage + 1) * PADS_PER_PAGE,
   );
 
-  const sortableItems = useMemo(() => pads.map((p) => p.id), [pads]);
   const displayPads = isDraggingPad ? pads : pagePads;
 
   return (
