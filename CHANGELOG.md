@@ -2,7 +2,6 @@
 
 ## Current Changes
 - Updated Tauri dialog and file system plugins to latest versions
-
 - Volume drag now uses a smooth time-based sensitivity ramp instead of a power curve — sensitivity starts at zero when drag begins and reaches full within 150ms, preventing accidental jumps
 - The volume fill bar no longer animates with a CSS transition while actively dragging, eliminating visual jitter
 - Drag gestures are now properly cancelled (e.g. when the pointer leaves the window), cleaning up fill bar state and stopping sounds that were triggered at near-zero volume
