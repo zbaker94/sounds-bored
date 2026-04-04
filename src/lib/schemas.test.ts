@@ -427,6 +427,7 @@ describe("AppSettingsSchema", () => {
       ],
       downloadFolderId: dlId,
       importFolderId: impId,
+      globalFadeDurationMs: 2000,
     };
   };
 
