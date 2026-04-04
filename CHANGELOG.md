@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.1.8
+
+Version 1.1.7 introduces comprehensive fade controls, including individual pad fade-in/out (F key), one-click crossfade between pads (X key), per-pad configurable fade durations, and a global default fade duration setting in App Settings. This release also fixes audio issues where hold-mode pads could start at reduced volume after release, and improves the volume adjustment display to show pad name and volume simultaneously.
+
 - Added support for a global fade duration setting (in milliseconds) for audio playback control
 - Pad crossfade duration now correctly persists when editing pad settings
 - Fixed a bug where hold-mode pads could start at reduced volume after being released — gain now resets to full on pointer up or cancel.
