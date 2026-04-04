@@ -470,4 +470,96 @@ describe("projectStore", () => {
       expect(getState().project?.scenes[0].pads).toHaveLength(2);
     });
   });
+
+  describe("reorderScenes", () => {
+    function loadWithThreeScenes() {
+      const entry = createMockHistoryEntry();
+      const scenes = [
+        createMockScene({ id: "s1", name: "Scene A" }),
+        createMockScene({ id: "s2", name: "Scene B" }),
+        createMockScene({ id: "s3", name: "Scene C" }),
+      ];
+      getState().loadProject(entry, createMockProject({ scenes }), false);
+    }
+
+    it("should move a scene from one position to another", () => {
+      loadWithThreeScenes();
+      getState().reorderScenes(0, 2);
+      const ids = getState().project!.scenes.map((s) => s.id);
+      expect(ids).toEqual(["s2", "s3", "s1"]);
+    });
+
+    it("should preserve all scenes in correct order when moving forward", () => {
+      loadWithThreeScenes();
+      getState().reorderScenes(2, 0);
+      const ids = getState().project!.scenes.map((s) => s.id);
+      expect(ids).toEqual(["s3", "s1", "s2"]);
+    });
+
+    it("should be a no-op when fromIndex equals toIndex", () => {
+      loadWithThreeScenes();
+      getState().reorderScenes(1, 1);
+      const ids = getState().project!.scenes.map((s) => s.id);
+      expect(ids).toEqual(["s1", "s2", "s3"]);
+    });
+
+    it("should mark the project as dirty", () => {
+      loadWithThreeScenes();
+      expect(getState().isDirty).toBe(false);
+      getState().reorderScenes(0, 1);
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("should do nothing if no project is loaded", () => {
+      getState().reorderScenes(0, 1);
+      expect(getState().project).toBeNull();
+    });
+  });
+
+  describe("reorderPads", () => {
+    function loadWithThreePads() {
+      const entry = createMockHistoryEntry();
+      const pads = [
+        createMockPad({ id: "p1", name: "Kick" }),
+        createMockPad({ id: "p2", name: "Snare" }),
+        createMockPad({ id: "p3", name: "HiHat" }),
+      ];
+      const scene = createMockScene({ id: "scene-1", pads });
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+    }
+
+    it("should move a pad from one position to another", () => {
+      loadWithThreePads();
+      getState().reorderPads("scene-1", 0, 2);
+      const ids = getState().project!.scenes[0].pads.map((p) => p.id);
+      expect(ids).toEqual(["p2", "p3", "p1"]);
+    });
+
+    it("should preserve all pads in correct order when moving backward", () => {
+      loadWithThreePads();
+      getState().reorderPads("scene-1", 2, 0);
+      const ids = getState().project!.scenes[0].pads.map((p) => p.id);
+      expect(ids).toEqual(["p3", "p1", "p2"]);
+    });
+
+    it("should mark the project as dirty", () => {
+      loadWithThreePads();
+      expect(getState().isDirty).toBe(false);
+      getState().reorderPads("scene-1", 0, 1);
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("should be a no-op for an invalid sceneId", () => {
+      loadWithThreePads();
+      getState().reorderPads("nonexistent", 0, 1);
+      const ids = getState().project!.scenes[0].pads.map((p) => p.id);
+      expect(ids).toEqual(["p1", "p2", "p3"]);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("should do nothing if no project is loaded", () => {
+      getState().reorderPads("scene-1", 0, 1);
+      expect(getState().project).toBeNull();
+    });
+  });
 });

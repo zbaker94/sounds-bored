@@ -7,6 +7,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Tick01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import type { Scene } from "@/lib/schemas";
 import { ConfirmDeleteSceneDialog } from "@/components/modals/ConfirmDeleteSceneDialog";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface SceneTabProps {
   scene: Scene;
@@ -20,6 +22,20 @@ export function SceneTab({ scene }: SceneTabProps) {
   const [editValue, setEditValue] = useState(scene.name);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: scene.id, disabled: !editMode });
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -77,6 +93,8 @@ export function SceneTab({ scene }: SceneTabProps) {
       <>
         <TabsTrigger value={scene.id} className="group gap-1" asChild>
           <div
+            ref={setNodeRef}
+            style={sortableStyle}
             role="tab"
             data-testid={`scene-tab-${scene.id}`}
           >
@@ -118,7 +136,13 @@ export function SceneTab({ scene }: SceneTabProps) {
 
   return (
     <>
-      <TabsTrigger value={scene.id} className={cn("group gap-0", editMode ? "gap-1.5" : "hover:gap-1.5")}>
+      <TabsTrigger
+        ref={setNodeRef}
+        style={sortableStyle}
+        value={scene.id}
+        className={cn("group gap-0", editMode ? "gap-1.5" : "hover:gap-1.5", isDragging && "opacity-50")}
+        {...(editMode ? { ...attributes, ...listeners } : {})}
+      >
         {scene.name}
         <button
           type="button"

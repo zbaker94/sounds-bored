@@ -1,10 +1,45 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
-import { createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
+import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad } from "@/test/factories";
 import { SceneView } from "./SceneView";
+
+vi.mock("@/lib/audio/padPlayer", () => ({
+  triggerPad: vi.fn().mockResolvedValue(undefined),
+  setPadVolume: vi.fn(),
+  resetPadGain: vi.fn(),
+  getPadProgress: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock("@dnd-kit/sortable", () => ({
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  }),
+  SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  rectSortingStrategy: {},
+  verticalListSortingStrategy: {},
+}));
+
+vi.mock("@dnd-kit/core", () => ({
+  DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  closestCenter: vi.fn(),
+  PointerSensor: class {},
+  useSensor: () => ({}),
+  useSensors: () => [],
+}));
+
+vi.mock("@dnd-kit/utilities", () => ({
+  CSS: {
+    Transform: { toString: () => undefined },
+  },
+}));
 
 describe("SceneView", () => {
   beforeEach(() => {
@@ -36,5 +71,39 @@ describe("SceneView", () => {
 
     // No pad created yet — it's created by PadConfigDrawer on form submit
     expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(0);
+  });
+
+  describe("reorderPads", () => {
+    it("reorders pads in the store when reorderPads is called", () => {
+      const padA = createMockPad({ id: "pad-a", name: "Pad A" });
+      const padB = createMockPad({ id: "pad-b", name: "Pad B" });
+      const padC = createMockPad({ id: "pad-c", name: "Pad C" });
+      const scene = createMockScene({ id: "scene-1", pads: [padA, padB, padC] });
+      const entry = createMockHistoryEntry();
+      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+
+      useProjectStore.getState().reorderPads("scene-1", 0, 2);
+
+      const pads = useProjectStore.getState().project!.scenes[0].pads;
+      expect(pads[0].id).toBe("pad-b");
+      expect(pads[1].id).toBe("pad-c");
+      expect(pads[2].id).toBe("pad-a");
+    });
+
+    it("marks the project as dirty after reorder", () => {
+      const padA = createMockPad({ id: "pad-a", name: "Pad A" });
+      const padB = createMockPad({ id: "pad-b", name: "Pad B" });
+      const scene = createMockScene({ id: "scene-1", pads: [padA, padB] });
+      const entry = createMockHistoryEntry();
+      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+
+      // clearDirtyFlag to ensure we start clean
+      useProjectStore.getState().clearDirtyFlag();
+      expect(useProjectStore.getState().isDirty).toBe(false);
+
+      useProjectStore.getState().reorderPads("scene-1", 0, 1);
+
+      expect(useProjectStore.getState().isDirty).toBe(true);
+    });
   });
 });

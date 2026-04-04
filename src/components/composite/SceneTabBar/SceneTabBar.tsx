@@ -14,6 +14,9 @@ import { Kbd } from "@/components/ui/kbd";
 import { MenuDrawer } from "./MenuDrawer";
 import { useHotkeys } from "react-hotkeys-hook";
 import { modKey } from "@/lib/utils";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 
 const EMPTY_SCENES: Scene[] = [];
 
@@ -22,8 +25,17 @@ export function SceneTabBar() {
   const activeSceneId = useProjectStore((s) => s.activeSceneId);
   const setActiveSceneId = useProjectStore((s) => s.setActiveSceneId);
   const addScene = useProjectStore((s) => s.addScene);
+  const reorderScenes = useProjectStore((s) => s.reorderScenes);
 
   useHotkeys("mod+n", () => addScene());
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIndex = scenes.findIndex((s) => s.id === active.id);
+    const toIndex = scenes.findIndex((s) => s.id === over.id);
+    if (fromIndex !== -1 && toIndex !== -1) reorderScenes(fromIndex, toIndex);
+  }
 
   return (
     <div className="flex items-center gap-1 px-3 py-1 min-w-0">
@@ -33,9 +45,19 @@ export function SceneTabBar() {
         <div className="min-w-0 max-w-[940px] overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
           <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
             <TabsList variant="line">
-              {scenes.map((scene) => (
-                <SceneTab key={scene.id} scene={scene} />
-              ))}
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={scenes.map((s) => s.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {scenes.map((scene) => (
+                    <SceneTab key={scene.id} scene={scene} />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </TabsList>
           </Tabs>
         </div>

@@ -1,5 +1,9 @@
 # Changelog
 
+## Current Changes
+- Scenes can now be drag-and-dropped to reorder them in the tab bar (available in edit mode)
+- Pads can now be drag-and-dropped to reorder them within a scene (available in edit mode)
+
 ## v1.1.4
 
 No user-facing changes in this release.

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { useUiStore, initialUiState } from "@/state/uiStore";
 import { SceneTabBar } from "./SceneTabBar";
 import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
 
@@ -21,6 +22,7 @@ function renderWithTooltip(ui: React.ReactElement) {
 describe("SceneTabBar", () => {
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
+    useUiStore.setState({ ...initialUiState });
   });
 
   function loadProject(scenes = [createMockScene({ id: "s1", name: "Scene 1" })]) {
@@ -266,6 +268,78 @@ describe("SceneTabBar", () => {
 
       expect(useProjectStore.getState().project?.scenes).toHaveLength(1);
       expect(useProjectStore.getState().activeSceneId).toBe("s2");
+    });
+  });
+
+  describe("scene reorder", () => {
+    it("should reorder scenes when reorderScenes is called with valid indices", () => {
+      loadProject([
+        createMockScene({ id: "s1", name: "Scene 1" }),
+        createMockScene({ id: "s2", name: "Scene 2" }),
+        createMockScene({ id: "s3", name: "Scene 3" }),
+      ]);
+
+      renderWithTooltip(<SceneTabBar />);
+
+      // Simulate a drag that moves Scene 1 to the position of Scene 3
+      useProjectStore.getState().reorderScenes(0, 2);
+
+      const scenes = useProjectStore.getState().project?.scenes;
+      expect(scenes).toHaveLength(3);
+      expect(scenes![0].id).toBe("s2");
+      expect(scenes![1].id).toBe("s3");
+      expect(scenes![2].id).toBe("s1");
+    });
+
+    it("should reorder scenes when moving the last scene to the first position", () => {
+      loadProject([
+        createMockScene({ id: "s1", name: "Scene 1" }),
+        createMockScene({ id: "s2", name: "Scene 2" }),
+        createMockScene({ id: "s3", name: "Scene 3" }),
+      ]);
+
+      renderWithTooltip(<SceneTabBar />);
+
+      useProjectStore.getState().reorderScenes(2, 0);
+
+      const scenes = useProjectStore.getState().project?.scenes;
+      expect(scenes![0].id).toBe("s3");
+      expect(scenes![1].id).toBe("s1");
+      expect(scenes![2].id).toBe("s2");
+    });
+
+    it("should mark project as dirty after reorder", () => {
+      loadProject([
+        createMockScene({ id: "s1", name: "Scene 1" }),
+        createMockScene({ id: "s2", name: "Scene 2" }),
+      ]);
+
+      renderWithTooltip(<SceneTabBar />);
+
+      expect(useProjectStore.getState().isDirty).toBe(false);
+
+      useProjectStore.getState().reorderScenes(0, 1);
+
+      expect(useProjectStore.getState().isDirty).toBe(true);
+    });
+
+    it("should render tabs in the updated order after reorder", () => {
+      loadProject([
+        createMockScene({ id: "s1", name: "Scene 1" }),
+        createMockScene({ id: "s2", name: "Scene 2" }),
+        createMockScene({ id: "s3", name: "Scene 3" }),
+      ]);
+
+      const { rerender } = renderWithTooltip(<SceneTabBar />);
+
+      useProjectStore.getState().reorderScenes(0, 2);
+
+      rerender(<TooltipProvider><SceneTabBar /></TooltipProvider>);
+
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs[0]).toHaveTextContent("Scene 2");
+      expect(tabs[1]).toHaveTextContent("Scene 3");
+      expect(tabs[2]).toHaveTextContent("Scene 1");
     });
   });
 });

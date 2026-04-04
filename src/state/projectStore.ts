@@ -31,6 +31,8 @@ interface ProjectActions {
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
   deletePad: (sceneId: string, padId: string) => void;
   duplicatePad: (sceneId: string, padId: string) => void;
+  reorderScenes: (fromIndex: number, toIndex: number) => void;
+  reorderPads: (sceneId: string, fromIndex: number, toIndex: number) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -177,6 +179,24 @@ export const useProjectStore = create<ProjectStore>()(
           layers: source.layers.map((l) => ({ ...l, id: crypto.randomUUID() })),
         };
         scene.pads.splice(idx + 1, 0, duplicate);
+        draft.isDirty = true;
+      }),
+
+    reorderScenes: (fromIndex, toIndex) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const [moved] = draft.project.scenes.splice(fromIndex, 1);
+        draft.project.scenes.splice(toIndex, 0, moved);
+        draft.isDirty = true;
+      }),
+
+    reorderPads: (sceneId, fromIndex, toIndex) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const scene = draft.project.scenes.find((s) => s.id === sceneId);
+        if (!scene) return;
+        const [moved] = scene.pads.splice(fromIndex, 1);
+        scene.pads.splice(toIndex, 0, moved);
         draft.isDirty = true;
       }),
   }))

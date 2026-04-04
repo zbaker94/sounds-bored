@@ -9,6 +9,8 @@ import { getPadProgress } from "@/lib/audio/padPlayer";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Copy01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface PadButtonProps {
   pad: Pad;
@@ -25,6 +27,20 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
   const [progress, setProgress] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: pad.id });
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   useEffect(() => {
     if (isPlaying) {
@@ -48,13 +64,15 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
   return (
     <>
       <button
-        {...(editMode ? {} : gestureHandlers)}
+        ref={setNodeRef}
+        {...(editMode ? { ...attributes, ...listeners } : gestureHandlers)}
         className={cn(
           "relative w-full h-full rounded-xl overflow-hidden",
           "flex items-center justify-center p-2",
           "bg-card text-card-foreground",
           "shadow-[3px_3px_0px_rgba(0,0,0,0.25)]",
           "text-sm font-semibold text-center select-none",
+          isSortableDragging && "opacity-50",
           editMode
             ? "border-2 border-dashed border-foreground/50 cursor-default"
             : cn(
@@ -65,7 +83,7 @@ export function PadButton({ pad, sceneId, onEditClick }: PadButtonProps) {
                   : "border-black/20"
               )
         )}
-        style={pad.color ? { backgroundColor: pad.color } : undefined}
+        style={{ ...(pad.color ? { backgroundColor: pad.color } : {}), ...sortableStyle }}
       >
         {/* Playback progress — normal mode only */}
         {!editMode && isPlaying && (

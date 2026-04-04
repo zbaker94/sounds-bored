@@ -14,6 +14,18 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   getPadProgress: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock("@dnd-kit/sortable", () => ({
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  }),
+  verticalListSortingStrategy: {},
+}));
+
 function loadPadInStore(padOverrides = {}) {
   const layer = createMockLayer({ id: "layer-1" });
   const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer], ...padOverrides });
