@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.1.5
+
+Pad volume dragging is now significantly smoother and more precise — sensitivity ramps up naturally from drag start, the fill bar no longer jitters during fast gestures, and accidental jumps on initial press are eliminated. Scenes and pads can now be drag-and-dropped to reorder them (in edit mode), with a movement threshold preventing accidental drags on click.
+
 - Volume drag now uses a smooth time-based sensitivity ramp instead of a power curve — sensitivity starts at zero when drag begins and reaches full within 150ms, preventing accidental jumps
 - The volume fill bar no longer animates with a CSS transition while actively dragging, eliminating visual jitter
 - Drag gestures are now properly cancelled (e.g. when the pointer leaves the window), cleaning up fill bar state and stopping sounds that were triggered at near-zero volume
