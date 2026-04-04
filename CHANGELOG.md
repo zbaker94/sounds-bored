@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad crossfade duration now correctly persists when editing pad settings
 - Fixed a bug where hold-mode pads could start at reduced volume after being released — gain now resets to full on pointer up or cancel.
 - Updated app to version 1.1.7
 - Pads can now be faded in or out individually using a new **Fade** button (or `F` hotkey) in the scene toolbar

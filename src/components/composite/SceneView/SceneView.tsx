@@ -284,6 +284,7 @@ export function SceneView() {
                 muteGroupId: editingPad.muteGroupId,
                 color: editingPad.color,
                 icon: editingPad.icon,
+                fadeDurationMs: editingPad.fadeDurationMs,
               }
             : undefined
         }
