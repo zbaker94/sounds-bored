@@ -1,6 +1,10 @@
 # Changelog
 
-## Current Changes
+## v1.1.7
+
+Scenes and pads can now be drag-and-dropped to reorder them in edit mode, with a movement threshold that prevents accidental drags on click. Volume drag has been significantly improved — it now uses a smooth sensitivity ramp and curved response for more precise control, with visual jitter and unexpected jumps eliminated.
+
+- Version bumped to 1.1.5
 - Updated Tauri dialog and file system plugins to latest versions
 - Volume drag now uses a smooth time-based sensitivity ramp instead of a power curve — sensitivity starts at zero when drag begins and reaches full within 150ms, preventing accidental jumps
 - The volume fill bar no longer animates with a CSS transition while actively dragging, eliminating visual jitter
