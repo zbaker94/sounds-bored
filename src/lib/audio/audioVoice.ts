@@ -9,6 +9,9 @@ export interface AudioVoice {
   /** Set voiceGain directly (0–1). */
   setVolume(v: number): void;
   setOnEnded(cb: (() => void) | null): void;
+  /** Update the underlying source loop flag live. For buffer sources, takes effect at the
+   *  next loop boundary; for streaming elements, takes effect immediately. */
+  setLoop(v: boolean): void;
 }
 
 export function wrapBufferSource(
@@ -56,6 +59,9 @@ export function wrapBufferSource(
       source.onended = cb
         ? () => { endedCb = null; cb(); }
         : null;
+    },
+    setLoop(v) {
+      source.loop = v;
     },
   };
 }
@@ -107,6 +113,9 @@ export function wrapStreamingElement(
       audio.onended = cb
         ? () => { endedCb = null; cb(); }
         : null;
+    },
+    setLoop(v) {
+      audio.loop = v;
     },
   };
 }

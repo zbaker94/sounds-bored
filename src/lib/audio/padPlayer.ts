@@ -7,6 +7,7 @@ import { buildPlayOrder, isChained } from "./arrangement";
 import { filterSoundsByTags } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -294,6 +295,50 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
 }
 
+/** Read the current playbackMode for a layer from the live project store.
+ *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted)
+ *  or if no project is currently loaded (e.g. project cleared mid-playback). */
+function livePlaybackMode(padId: string, layerId: string, captured: Layer["playbackMode"]): Layer["playbackMode"] {
+  const project = useProjectStore.getState().project;
+  if (project) {
+    for (const scene of project.scenes) {
+      const pad = scene.pads.find((p) => p.id === padId);
+      if (pad) return pad.layers.find((l) => l.id === layerId)?.playbackMode ?? captured;
+    }
+  }
+  return captured;
+}
+
+/**
+ * Update the loop flag on any active voices for a layer.
+ *
+ * For non-chained arrangements: sets `source.loop` / `audio.loop` live so the
+ * current pass plays to natural completion instead of stopping immediately.
+ * For chained arrangements transitioning *away* from a looping mode: the loop
+ * flag is irrelevant (onended drives restart), so we clear the chain queue.
+ * When the current voice ends, `onended` sees `remaining === undefined` and
+ * skips the restart. Transitions *into* a looping mode on chained arrangements
+ * take effect at the next natural chain boundary — the onended closure reads
+ * playbackMode from the live store rather than the captured layer object.
+ *
+ * No-op if the layer has no active voices.
+ */
+export function syncLayerPlaybackMode(layer: Layer): void {
+  const voices = usePlaybackStore.getState().getLayerVoices(layer.id);
+  if (voices.length === 0) return;
+  const isLoopMode = layer.playbackMode === "loop" || layer.playbackMode === "hold";
+  // Update the loop flag on non-chained voices (chained arrangements don't use source.loop).
+  const shouldLoop = isLoopMode && !isChained(layer.arrangement);
+  for (const voice of voices) {
+    voice.setLoop(shouldLoop);
+  }
+  // For chained arrangements transitioning away from a looping mode, clear the chain
+  // queue so the onended callback sees remaining === undefined and skips the restart.
+  if (!isLoopMode && isChained(layer.arrangement)) {
+    layerChainQueue.delete(layer.id);
+  }
+}
+
 export function clearAllLayerChains(): void {
   layerChainQueue.clear();
 }
@@ -466,6 +511,7 @@ async function startLayerSound(
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
       // `remaining.length === 0` means the chain ran to completion naturally.
       const remaining = layerChainQueue.get(layer.id);
+      const liveMode = livePlaybackMode(pad.id, layer.id, layer.playbackMode);
       if (remaining === undefined) {
         // Queue was externally cleared (e.g. stopAll, retrigger restart) — do not chain.
       } else if (remaining.length > 0) {
@@ -473,10 +519,12 @@ async function startLayerSound(
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
       } else if (
-        (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
+        (liveMode === "loop" || liveMode === "hold") &&
         isChained(layer.arrangement)
       ) {
-        // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running)
+        // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running).
+        // liveMode reads from the store so mid-playback config changes take effect at the
+        // next chain boundary without requiring a retrigger.
         const newOrder = buildPlayOrder(layer.arrangement, allSounds);
         if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
         const [first, ...rest] = newOrder;
