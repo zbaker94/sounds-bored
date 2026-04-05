@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,39 +30,73 @@ export function ExportProgressDialog({
   status,
   onCancel,
 }: ExportProgressDialogProps) {
-  const showCancel = status !== "done" && status !== "error";
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+
   const showSpinner = status === "idle" || status === "copying" || status === "zipping";
+  const showCancel = status !== "done" && status !== "error";
+
+  const handleRequestCancel = () => setConfirmingCancel(true);
+  const handleConfirmCancel = () => { setConfirmingCancel(false); onCancel(); };
+  const handleDismissConfirm = () => setConfirmingCancel(false);
+
+  const handleEscapeOrOutside = (e: Event) => {
+    e.preventDefault();
+    if (showCancel) handleRequestCancel();
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => { /* non-dismissible */ }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={() => { /* non-dismissible — handled by onEscapeKeyDown / onInteractOutside */ }}
+    >
       <DialogContent
         showCloseButton={false}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        onEscapeKeyDown={handleEscapeOrOutside}
+        onInteractOutside={handleEscapeOrOutside}
       >
-        <DialogHeader>
-          <DialogTitle>Exporting Project</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col items-center gap-3 py-4">
-          {showSpinner && (
-            <HugeiconsIcon
-              icon={Loading03Icon}
-              size={32}
-              strokeWidth={2}
-              className="animate-spin text-muted-foreground"
-            />
-          )}
-          <DialogDescription className="text-center text-sm">
-            {STATUS_MESSAGE[status]}
-          </DialogDescription>
-        </div>
-
-        {showCancel && (
-          <DialogFooter>
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-          </DialogFooter>
+        {confirmingCancel ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="font-deathletter">Cancel Export?</DialogTitle>
+            </DialogHeader>
+            <DialogDescription className="text-sm">
+              The export is still in progress. Are you sure you want to cancel?
+            </DialogDescription>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={handleDismissConfirm}>
+                Keep Exporting
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmCancel}>
+                Cancel Export
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="font-deathletter">Exporting Project</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-3 py-4">
+              {showSpinner && (
+                <HugeiconsIcon
+                  icon={Loading03Icon}
+                  size={32}
+                  strokeWidth={2}
+                  className="animate-spin text-muted-foreground"
+                />
+              )}
+              <DialogDescription className="text-center text-sm">
+                {STATUS_MESSAGE[status]}
+              </DialogDescription>
+            </div>
+            {showCancel && (
+              <DialogFooter>
+                <Button variant="destructive" onClick={handleRequestCancel}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            )}
+          </>
         )}
       </DialogContent>
     </Dialog>

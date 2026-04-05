@@ -8,7 +8,7 @@ import { basename } from "@tauri-apps/api/path";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
-import { discardTemporaryProject } from "@/lib/project";
+import { discardTemporaryProject, saveProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
@@ -109,11 +109,17 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   }, [openOverlay]);
 
   const handleExportClick = useCallback(async () => {
+    // Read project data via getState() to avoid stale closure issues when triggered via hotkey.
+    // All other values used below (setExportStatus, openOverlay, closeOverlay, refs) are stable.
+    const { project, folderPath, clearDirtyFlag } = useProjectStore.getState();
+    const { sounds } = useLibraryStore.getState();
+
     if (!project || !folderPath) return;
 
-    // 1. Auto-save first
+    // 1. Auto-save directly — avoids TanStack Query mutation state in the closure
     try {
-      await saveProjectMutation.mutateAsync({ folderPath, project });
+      await saveProject(folderPath, project);
+      clearDirtyFlag();
     } catch {
       toast.error("Export failed: could not save project.");
       return;
@@ -229,7 +235,9 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       setExportStatus("idle");
       toast.error("Export failed. Please try again.");
     }
-  }, [project, folderPath, sounds, saveProjectMutation, openOverlay, closeOverlay]);
+  // openOverlay and closeOverlay are stable Zustand actions; setExportStatus is a stable React setter.
+  // All project data is read via getState() above, so no project/folderPath/sounds deps needed.
+  }, [openOverlay, closeOverlay]);
 
   const handleCancelExport = useCallback(async () => {
     if (!exportJobId.current) return;

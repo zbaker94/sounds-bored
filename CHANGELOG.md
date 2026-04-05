@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- The Export keyboard shortcut changed from `Ctrl+X` to `Ctrl+Shift+E`
+- Added `Ctrl+Shift+S` keyboard shortcut for Save As
+- Canceling an in-progress export now shows a confirmation prompt instead of canceling immediately
+- Pressing Escape or clicking outside the export dialog now triggers the cancel confirmation (instead of doing nothing)
 - Added a progress dialog for project export showing real-time status (preparing, zipping, complete, or error) with a cancel button
 - Export now runs asynchronously with cancellation support — you can cancel mid-export without leaving a partial zip file
 - Export now includes sounds referenced via tags and sets, not just directly assigned sounds

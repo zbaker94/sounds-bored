@@ -8,15 +8,17 @@ import { useProjectStore } from "@/state/projectStore";
  * Must be called inside ProjectActionsProvider.
  */
 export function useGlobalHotkeys() {
-  const { handleSaveClick } = useProjectActions();
+  const { handleSaveClick, handleSaveAsMenuClick, handleExportClick } = useProjectActions();
 
   // Esc: toggle the menu drawer when nothing is open, otherwise close the topmost overlay.
   // enableOnFormTags: the global Esc handler owns escape for all overlays, including dialogs
   // with focused inputs (e.g. PadConfigDrawer's name field).
+  // Exception: EXPORT_PROGRESS_DIALOG is non-dismissible — it owns its own Esc handling.
   useHotkeys("esc", () => {
     const { overlayStack, closeOverlay, toggleOverlay } = useUiStore.getState();
     const top = overlayStack[overlayStack.length - 1];
     if (top) {
+      if (top.id === OVERLAY_ID.EXPORT_PROGRESS_DIALOG) return;
       closeOverlay(top.id);
     } else {
       toggleOverlay(OVERLAY_ID.MENU_DRAWER, "drawer");
@@ -37,6 +39,20 @@ export function useGlobalHotkeys() {
       handleSaveClick();
     }
   });
+
+  // Ctrl+Shift+S: Save As.
+  useHotkeys("mod+shift+s", () => {
+    if (!useUiStore.getState().isOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG)) {
+      handleSaveAsMenuClick();
+    }
+  }, {}, [handleSaveAsMenuClick]);
+
+  // Ctrl+Shift+E: Export. No-op if export is already in progress.
+  useHotkeys("mod+shift+e", () => {
+    if (!useUiStore.getState().isOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG)) {
+      handleExportClick();
+    }
+  }, { preventDefault: true });
 
   // Mod+E: toggle edit mode.
   useHotkeys("mod+e", () => {
