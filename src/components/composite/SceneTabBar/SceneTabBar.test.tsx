@@ -5,6 +5,11 @@ import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { SceneTabBar } from "./SceneTabBar";
 import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
+import { stopScene } from "@/lib/audio/padPlayer";
+
+vi.mock("@/lib/audio/padPlayer", () => ({
+  stopScene: vi.fn(),
+}));
 
 vi.mock("@/contexts/ProjectActionsContext", () => ({
   useProjectActions: () => ({
@@ -207,6 +212,10 @@ describe("SceneTabBar", () => {
       loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
     }
 
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
     it("should have delete button with opacity-0 by default", () => {
       loadSingleScene();
       renderWithTooltip(<SceneTabBar />);
@@ -233,6 +242,17 @@ describe("SceneTabBar", () => {
       fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
 
       expect(useProjectStore.getState().project?.scenes).toHaveLength(0);
+    });
+
+    it("should call stopScene before deleting to stop any playing audio", () => {
+      const scene = createMockScene({ id: "s1", name: "Scene 1" });
+      loadProject([scene]);
+      renderWithTooltip(<SceneTabBar />);
+
+      fireEvent.click(screen.getByRole("button", { name: /delete scene/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+
+      expect(stopScene).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }));
     });
 
     it("should not delete the scene when Cancel is clicked in dialog", () => {
