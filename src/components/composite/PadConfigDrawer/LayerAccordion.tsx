@@ -16,17 +16,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import type { PadConfigForm, LayerConfigForm } from "@/lib/schemas";
+import type { PadConfigForm } from "@/lib/schemas";
 import { LayerConfigSection } from "./LayerConfigSection";
-
-// Default values for a newly added layer
-const DEFAULT_LAYER: LayerConfigForm = {
-  selection: { type: "assigned", instances: [] },
-  arrangement: "simultaneous",
-  playbackMode: "one-shot",
-  retriggerMode: "restart",
-  volume: 100,
-};
+import { DEFAULT_LAYER } from "./constants";
 
 interface SortableLayerItemProps {
   fieldId: string;

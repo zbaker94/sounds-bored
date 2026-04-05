@@ -15,14 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume } from "@/lib/audio/padPlayer";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
-
-const DEFAULT_LAYER: LayerConfigForm = {
-  selection: { type: "assigned", instances: [] },
-  arrangement: "simultaneous",
-  playbackMode: "one-shot",
-  retriggerMode: "restart",
-  volume: 100,
-};
+import { DEFAULT_LAYER } from "./constants";
 
 const DEFAULT_VALUES: PadConfigForm = {
   name: "",
