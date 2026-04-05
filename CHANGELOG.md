@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Folder nodes in the sound library tree now animate open and closed when expanded or collapsed.
 - Pad buttons now have a more subtle hover tilt effect (reduced from 8° to 4° rotation)
 - Clicking a fading-out pad now reverses the fade, smoothly bringing it back to full volume instead of stopping it
 - Pad buttons now have a subtle 3D tilt effect that responds to mouse movement

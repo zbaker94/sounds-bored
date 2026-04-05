@@ -72,7 +72,7 @@ function FolderNodeRow({
           {node.folder.name}
         </CollapsibleTrigger>
       </div>
-      <CollapsibleContent className="pl-5 flex flex-col gap-1 mt-1">
+      <CollapsibleContent animated isOpen={open} className="pl-5 flex flex-col gap-1 mt-1">
         {node.children.map((child) =>
           child.kind === "folder" ? (
             <FolderNodeRow
