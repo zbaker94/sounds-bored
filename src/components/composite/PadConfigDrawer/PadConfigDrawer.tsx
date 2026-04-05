@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useForm, useFormContext, FormProvider, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { PadConfigSchema } from "@/lib/schemas";
@@ -34,7 +34,7 @@ interface PadConfigDrawerProps {
 }
 
 export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadConfigDrawerProps) {
-  const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER));
+  const isOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER));
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const addPad = useProjectStore((s) => s.addPad);
   const updatePad = useProjectStore((s) => s.updatePad);

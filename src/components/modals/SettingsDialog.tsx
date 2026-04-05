@@ -1,4 +1,4 @@
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useUpdaterStore } from "@/state/updaterStore";
@@ -32,7 +32,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
 export function SettingsDialog() {
-  const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG));
+  const isOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG));
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 
   return (
