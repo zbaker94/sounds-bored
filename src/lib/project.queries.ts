@@ -5,11 +5,10 @@ import {
   saveProject,
   saveProjectAs,
   loadProjectFromPath,
-  exportProject,
   ProjectNotFoundError,
   ProjectValidationError,
 } from "./project";
-import type { Project, Sound } from "./schemas";
+import type { Project } from "./schemas";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
 import { addOrUpdateProjectInHistory, addSavedProjectToHistory, removeProjectFromHistory } from "./history.helpers";
@@ -173,16 +172,3 @@ export function useLoadProjectFromPath() {
   });
 }
 
-export function useExportProject() {
-  return useMutation({
-    mutationFn: ({
-      folderPath,
-      project,
-      referencedSounds,
-    }: {
-      folderPath: string;
-      project: Project;
-      referencedSounds: Sound[];
-    }) => exportProject(folderPath, project, referencedSounds),
-  });
-}

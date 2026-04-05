@@ -1,12 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
 import { join, appLocalDataDir } from "@tauri-apps/api/path";
-import { invoke } from "@tauri-apps/api/core";
 import { ZodError } from "zod";
-import { Project, ProjectSchema, Sound, hasFilePath } from "./schemas";
+import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
 import { migrateProject } from "./migrations";
-import { copyFilesToFolder } from "@/lib/import";
 
 export class ProjectNotFoundError extends Error {
   constructor() {
@@ -308,53 +306,3 @@ export async function discardTemporaryProject(folderPath: string): Promise<void>
   }
 }
 
-export class ExportCancelledError extends Error {
-  constructor() {
-    super("Export cancelled");
-    this.name = "ExportCancelledError";
-  }
-}
-
-/**
- * Exports the project as a self-contained zip archive.
- * 1. Consolidates all referenced sounds into the project's sounds/ subfolder.
- * 2. Opens a folder picker for the export destination.
- * 3. Produces {dest}/{project.name}-export.zip via the zip_folder Tauri command.
- *
- * @param folderPath - Absolute path to the project folder
- * @param project - Current project data (already saved before calling)
- * @param referencedSounds - Sounds referenced by the project (may have filePaths outside the project folder)
- * @throws {ExportCancelledError} if user cancels the folder picker
- */
-export async function exportProject(
-  folderPath: string,
-  project: Project,
-  referencedSounds: Sound[]
-): Promise<string> {
-  const selectedPath = await open({
-    directory: true,
-    multiple: false,
-    title: "Select Export Destination",
-  });
-
-  if (!selectedPath || Array.isArray(selectedPath)) {
-    throw new ExportCancelledError();
-  }
-
-  const soundFilePaths = referencedSounds
-    .filter(hasFilePath)
-    .map((s) => s.filePath);
-
-  const soundsFolder = await join(folderPath, SOUNDS_SUBFOLDER);
-  await copyFilesToFolder(soundFilePaths, soundsFolder);
-
-  const zipName = `${project.name.replace(/[^a-zA-Z0-9-_]/g, "_")}-export.zip`;
-
-  const zipFilePath = await invoke<string>("zip_folder", {
-    sourcePath: folderPath,
-    destPath: selectedPath,
-    zipName,
-  });
-
-  return zipFilePath;
-}

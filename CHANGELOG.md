@@ -1,14 +1,18 @@
 # Changelog
 
 ## Current Changes
-- No user-facing changes in this release (internal test improvements only)
+- Added a progress dialog for project export showing real-time status (preparing, zipping, complete, or error) with a cancel button
+- Export now runs asynchronously with cancellation support — you can cancel mid-export without leaving a partial zip file
+- Export now includes sounds referenced via tags and sets, not just directly assigned sounds
+- Export destination folder is selected upfront, and the resulting zip includes a `sound-map.json` for portability
+- No user-facing changes in this commit (internal test improvements only)
 - Added **Export to ZIP** — you can now export your project as a self-contained zip archive from the menu (saves first, then packages all referenced sounds and project files)
 - **Save As** menu button now works correctly, opening the Save As dialog
 - Export button is disabled while an export is in progress to prevent duplicate exports
 - Pressing a pad that is currently fading out now freezes the audio at its current volume instead of restarting playback, giving you a smoother way to cancel a fade mid-animation.
 - Folder nodes in the sound library tree now animate open and closed when expanded or collapsed.
 - Pad buttons now have a more subtle hover tilt effect (reduced from 8° to 4° rotation)
-- Clicking a fading-out pad now reverses the fade, smoothly bringing it back to full volume instead of stopping it
+- Starting a fad on a fading-out pad now reverses the fade, smoothly bringing it back to full volume instead of stopping it
 - Pad buttons now have a subtle 3D tilt effect that responds to mouse movement
 - Playing pads display an animated pulse ring indicator
 - Pads and layers animate in smoothly when added or when switching scenes

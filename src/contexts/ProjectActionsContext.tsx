@@ -1,13 +1,20 @@
 import { createContext, useContext, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+import { basename } from "@tauri-apps/api/path";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveProject, useSaveProjectAs, useExportProject } from "@/lib/project.queries";
-import { discardTemporaryProject, ExportCancelledError } from "@/lib/project";
+import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
+import { discardTemporaryProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
+import { ExportProgressDialog } from "@/components/modals/ExportProgressDialog";
+import type { Sound } from "@/lib/schemas";
+import { hasFilePath } from "@/lib/schemas";
 
 interface ProjectActionsContextValue {
   /** True when there is something to save (dirty or temporary). */
@@ -22,8 +29,6 @@ interface ProjectActionsContextValue {
   handleSaveAsMenuClick: () => void;
   /** Auto-saves then exports as a zip. Disabled when no project/folderPath. */
   handleExportClick: () => void;
-  /** True while export is in progress (use to disable the Export button). */
-  isExporting: boolean;
 }
 
 const ProjectActionsContext = createContext<ProjectActionsContextValue | null>(null);
@@ -41,10 +46,10 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
 
   const saveProjectMutation = useSaveProject();
   const saveProjectAsMutation = useSaveProjectAs();
-  const exportMutation = useExportProject();
 
   const showSaveDialog = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SAVE_PROJECT_DIALOG));
   const showNavigateConfirm = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG));
+  const showExportDialog = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 
@@ -52,6 +57,11 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
 
   // Callback to invoke after a successful save — set by requestSaveAndThen / navigate guard
   const onAfterSaveRef = useRef<(() => void) | null>(null);
+
+  // Export state
+  const [exportStatus, setExportStatus] = useState<"idle" | "copying" | "zipping" | "done" | "error">("idle");
+  const exportJobId = useRef<string | null>(null);
+  const exportUnlisten = useRef<(() => void) | null>(null);
 
   const canSave = isTemporary || isDirty;
 
@@ -98,34 +108,137 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     openOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG, "dialog");
   }, [openOverlay]);
 
-  const handleExportClick = useCallback(() => {
+  const handleExportClick = useCallback(async () => {
     if (!project || !folderPath) return;
-    saveProjectMutation.mutate({ folderPath, project }, {
-      onSuccess: () => {
-        const referencedSoundIds = new Set<string>();
-        for (const scene of project.scenes) {
-          for (const pad of scene.pads) {
-            for (const layer of pad.layers) {
-              if (layer.selection.type === "assigned") {
-                for (const instance of layer.selection.instances) {
-                  referencedSoundIds.add(instance.soundId);
-                }
+
+    // 1. Auto-save first
+    try {
+      await saveProjectMutation.mutateAsync({ folderPath, project });
+    } catch {
+      toast.error("Export failed: could not save project.");
+      return;
+    }
+
+    // 2. Collect ALL referenced sound IDs across all selection types
+    const referencedSoundIds = new Set<string>();
+    for (const scene of project.scenes) {
+      for (const pad of scene.pads) {
+        for (const layer of pad.layers) {
+          const sel = layer.selection;
+          if (sel.type === "assigned") {
+            for (const inst of sel.instances) {
+              referencedSoundIds.add(inst.soundId);
+            }
+          } else if (sel.type === "tag") {
+            for (const sound of sounds) {
+              const matches = sel.matchMode === "all"
+                ? sel.tagIds.every((t) => sound.tags.includes(t))
+                : sel.tagIds.some((t) => sound.tags.includes(t));
+              if (matches) referencedSoundIds.add(sound.id);
+            }
+          } else if (sel.type === "set") {
+            for (const sound of sounds) {
+              if (sound.sets.includes(sel.setId)) {
+                referencedSoundIds.add(sound.id);
               }
             }
           }
         }
-        const referencedSounds = sounds.filter((s) => referencedSoundIds.has(s.id));
-        toast.promise(
-          exportMutation.mutateAsync({ folderPath, project, referencedSounds }),
-          {
-            loading: "Exporting...",
-            success: (zipPath) => `Exported to ${zipPath}`,
-            error: (err) => err instanceof ExportCancelledError ? null : "Export failed. Please try again.",
-          },
-        );
-      },
+      }
+    }
+
+    const referencedSounds = sounds.filter((s) => referencedSoundIds.has(s.id) && hasFilePath(s)) as (Sound & { filePath: string })[];
+
+    // 3. Open folder picker
+    const destPath = await open({ directory: true, multiple: false, title: "Select Export Destination" });
+    if (!destPath || Array.isArray(destPath)) return; // user cancelled
+
+    // 4. Build sound map: { soundId: "sounds/filename" }
+    const soundMapEntries: Record<string, string> = {};
+    for (const sound of referencedSounds) {
+      const name = await basename(sound.filePath);
+      soundMapEntries[sound.id] = `sounds/${name}`;
+    }
+    const soundMapJson = JSON.stringify({ version: "1", soundMap: soundMapEntries }, null, 2);
+
+    // 5. Build zip name and job id
+    const zipName = `${project.name.replace(/[^a-zA-Z0-9-_]/g, "_")}-export.zip`;
+    const jobId = crypto.randomUUID();
+    exportJobId.current = jobId;
+
+    // 6. Show dialog
+    openOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG, "dialog");
+    setExportStatus("copying");
+
+    // 7. Start listening for progress events
+    const unlistenFn = await listen<{
+      jobId: string;
+      status: string;
+      zipPath?: string;
+      error?: string;
+    }>("export://progress", (event) => {
+      if (event.payload.jobId !== jobId) return;
+      const status = event.payload.status;
+      if (status === "copying") setExportStatus("copying");
+      else if (status === "zipping") setExportStatus("zipping");
+      else if (status === "done") {
+        setExportStatus("done");
+        unlistenFn();
+        exportUnlisten.current = null;
+        exportJobId.current = null;
+        setTimeout(() => {
+          closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
+          setExportStatus("idle");
+          toast.success(`Exported: ${event.payload.zipPath ?? zipName}`);
+        }, 1200);
+      } else if (status === "cancelled") {
+        unlistenFn();
+        exportUnlisten.current = null;
+        exportJobId.current = null;
+        closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
+        setExportStatus("idle");
+      } else if (status === "error") {
+        setExportStatus("error");
+        unlistenFn();
+        exportUnlisten.current = null;
+        exportJobId.current = null;
+        toast.error(`Export failed: ${event.payload.error ?? "unknown error"}`);
+        setTimeout(() => {
+          closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
+          setExportStatus("idle");
+        }, 2000);
+      }
     });
-  }, [project, folderPath, sounds, saveProjectMutation, exportMutation]);
+    exportUnlisten.current = unlistenFn;
+
+    // 8. Invoke the export command (returns immediately — progress via events)
+    try {
+      await invoke("export_project", {
+        sourcePath: folderPath,
+        extraSoundPaths: referencedSounds.map((s) => s.filePath),
+        destPath,
+        zipName,
+        soundMapJson,
+        jobId,
+      });
+    } catch {
+      unlistenFn();
+      exportUnlisten.current = null;
+      exportJobId.current = null;
+      closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
+      setExportStatus("idle");
+      toast.error("Export failed. Please try again.");
+    }
+  }, [project, folderPath, sounds, saveProjectMutation, openOverlay, closeOverlay]);
+
+  const handleCancelExport = useCallback(async () => {
+    if (!exportJobId.current) return;
+    try {
+      await invoke("cancel_export", { jobId: exportJobId.current });
+    } catch {
+      // best-effort cancel; the event listener will still clean up
+    }
+  }, []);
 
   // --- Save dialog handlers ---
 
@@ -191,7 +304,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   };
 
   return (
-    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick, isExporting: exportMutation.isPending }}>
+    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick }}>
       {children}
       <SaveProjectDialog
         isOpen={showSaveDialog}
@@ -206,6 +319,11 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
         onSave={handleNavigateSave}
         onDiscard={handleNavigateDiscard}
         onCancel={handleNavigateCancel}
+      />
+      <ExportProgressDialog
+        isOpen={showExportDialog}
+        status={exportStatus}
+        onCancel={handleCancelExport}
       />
     </ProjectActionsContext.Provider>
   );

@@ -19,11 +19,13 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(commands::DownloadJobs(Mutex::new(HashMap::new())))
+        .manage(commands::ExportJobs(Mutex::new(HashMap::new())))
         .invoke_handler(tauri::generate_handler![
             greet,
             commands::start_download,
             commands::cancel_download,
-            commands::zip_folder,
+            commands::export_project,
+            commands::cancel_export,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
