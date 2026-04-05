@@ -10,7 +10,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import type { Layer, Pad, Sound } from "@/lib/schemas";
+import type { Layer, Pad, Scene, Sound } from "@/lib/schemas";
 import { toast } from "sonner";
 
 // Per-pad GainNodes: source(s) → voiceGain → layerGain → padGain → masterGain → destination
@@ -304,6 +304,13 @@ export function stopPad(pad: Pad): void {
     layerChainQueue.delete(layer.id);
   }
   usePlaybackStore.getState().stopPad(pad.id);
+}
+
+/** Stop all pads in a scene, clearing their chain queues before stopping voices. */
+export function stopScene(scene: Scene): void {
+  for (const pad of scene.pads) {
+    stopPad(pad);
+  }
 }
 
 /**
