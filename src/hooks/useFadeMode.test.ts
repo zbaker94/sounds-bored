@@ -9,6 +9,8 @@ import type { Pad } from "@/lib/schemas";
 vi.mock("@/lib/audio/padPlayer", () => ({
   fadePadOut: vi.fn(),
   fadePadIn: vi.fn().mockResolvedValue(undefined),
+  fadePadInFromCurrent: vi.fn(),
+  isPadFadingOut: vi.fn().mockReturnValue(false),
   crossfadePads: vi.fn(),
   resolveFadeDuration: vi.fn().mockReturnValue(2000),
 }));

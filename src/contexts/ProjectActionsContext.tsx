@@ -2,8 +2,9 @@ import { createContext, useContext, useState, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
-import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
-import { discardTemporaryProject } from "@/lib/project";
+import { useLibraryStore } from "@/state/libraryStore";
+import { useSaveProject, useSaveProjectAs, useExportProject } from "@/lib/project.queries";
+import { discardTemporaryProject, ExportCancelledError } from "@/lib/project";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
@@ -17,6 +18,12 @@ interface ProjectActionsContextValue {
   requestNavigateAway: (path: string) => void;
   /** Save (showing dialog if temporary), then call onSaved on success. Used by the window close flow. */
   requestSaveAndThen: (onSaved: () => void) => void;
+  /** Opens the Save As dialog unconditionally (works for both temp and permanent projects). */
+  handleSaveAsMenuClick: () => void;
+  /** Auto-saves then exports as a zip. Disabled when no project/folderPath. */
+  handleExportClick: () => void;
+  /** True while export is in progress (use to disable the Export button). */
+  isExporting: boolean;
 }
 
 const ProjectActionsContext = createContext<ProjectActionsContextValue | null>(null);
@@ -30,8 +37,11 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const isDirty = useProjectStore((s) => s.isDirty);
   const markAsPermanent = useProjectStore((s) => s.markAsPermanent);
 
+  const sounds = useLibraryStore((s) => s.sounds);
+
   const saveProjectMutation = useSaveProject();
   const saveProjectAsMutation = useSaveProjectAs();
+  const exportMutation = useExportProject();
 
   const showSaveDialog = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SAVE_PROJECT_DIALOG));
   const showNavigateConfirm = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG));
@@ -83,6 +93,39 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     setPendingNavigatePath(path);
     openOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG, "dialog");
   }, [canSave, navigate, openOverlay]);
+
+  const handleSaveAsMenuClick = useCallback(() => {
+    openOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG, "dialog");
+  }, [openOverlay]);
+
+  const handleExportClick = useCallback(() => {
+    if (!project || !folderPath) return;
+    saveProjectMutation.mutate({ folderPath, project }, {
+      onSuccess: () => {
+        const referencedSoundIds = new Set<string>();
+        for (const scene of project.scenes) {
+          for (const pad of scene.pads) {
+            for (const layer of pad.layers) {
+              if (layer.selection.type === "assigned") {
+                for (const instance of layer.selection.instances) {
+                  referencedSoundIds.add(instance.soundId);
+                }
+              }
+            }
+          }
+        }
+        const referencedSounds = sounds.filter((s) => referencedSoundIds.has(s.id));
+        toast.promise(
+          exportMutation.mutateAsync({ folderPath, project, referencedSounds }),
+          {
+            loading: "Exporting...",
+            success: (zipPath) => `Exported to ${zipPath}`,
+            error: (err) => err instanceof ExportCancelledError ? null : "Export failed. Please try again.",
+          },
+        );
+      },
+    });
+  }, [project, folderPath, sounds, saveProjectMutation, exportMutation]);
 
   // --- Save dialog handlers ---
 
@@ -148,7 +191,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   };
 
   return (
-    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen }}>
+    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick, isExporting: exportMutation.isPending }}>
       {children}
       <SaveProjectDialog
         isOpen={showSaveDialog}

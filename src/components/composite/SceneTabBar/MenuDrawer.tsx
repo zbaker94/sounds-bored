@@ -14,7 +14,7 @@ export function MenuDrawer() {
   const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.MENU_DRAWER));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
-  const { canSave, handleSaveClick, requestNavigateAway } = useProjectActions();
+  const { canSave, handleSaveClick, requestNavigateAway, handleSaveAsMenuClick, handleExportClick, isExporting } = useProjectActions();
 
   return (
     <Drawer
@@ -53,14 +53,14 @@ export function MenuDrawer() {
               Save
               <Kbd className="ml-auto">{modKey} + S</Kbd>
             </Button>
-            <Button variant="secondary" className="w-full" onClick={() => null}>
+            <Button variant="secondary" className="w-full" onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); handleSaveAsMenuClick(); }}>
               <HugeiconsIcon icon={ClipboardIcon} size={16} />
               Save As
               <Kbd className="ml-auto">{modKey} + Shift + S</Kbd>
             </Button>
           </div>
           <Separator />
-          <Button variant="secondary" className="w-full" onClick={() => null}>
+          <Button variant="secondary" className="w-full" onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); handleExportClick(); }} disabled={isExporting}>
             <HugeiconsIcon icon={FolderExportIcon} size={16} />
             Export
             <Kbd className="ml-auto">{modKey} + X</Kbd>

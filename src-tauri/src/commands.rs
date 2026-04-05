@@ -267,6 +267,61 @@ pub fn cancel_download(
     Ok(())
 }
 
+/// Validates that a zip file name does not contain path traversal characters.
+fn validate_zip_name(zip_name: &str) -> Result<(), String> {
+    if zip_name.contains('/')
+        || zip_name.contains('\\')
+        || zip_name.contains("..")
+    {
+        return Err("Invalid zip name".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn zip_folder(source_path: String, dest_path: String, zip_name: String) -> Result<String, String> {
+    validate_zip_name(&zip_name)?;
+
+    let source = std::path::Path::new(&source_path);
+    let zip_file_path = std::path::Path::new(&dest_path).join(&zip_name);
+
+    let file = std::fs::File::create(&zip_file_path).map_err(|e| e.to_string())?;
+    let mut writer = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default();
+
+    for entry in walkdir::WalkDir::new(source) {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+
+        // Skip directories — zip entries are created implicitly
+        if path.is_dir() {
+            continue;
+        }
+
+        let relative_path = path
+            .strip_prefix(source)
+            .map_err(|e| e.to_string())?;
+
+        // Use forward slashes for zip entry names (cross-platform compatibility)
+        let entry_name = relative_path
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+
+        writer
+            .start_file(&entry_name, options)
+            .map_err(|e| e.to_string())?;
+
+        let mut source_file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+        std::io::copy(&mut source_file, &mut writer).map_err(|e| e.to_string())?;
+    }
+
+    writer.finish().map_err(|e| e.to_string())?;
+
+    Ok(zip_file_path.to_string_lossy().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,6 +383,36 @@ mod tests {
         let line = "[ffmpeg] Destination: \"/tmp/my_song.mp3\"";
         let result = parse_output_path(line);
         assert_eq!(result, Some("/tmp/my_song.mp3".to_string()));
+    }
+
+    #[test]
+    fn test_zip_name_rejects_forward_slash() {
+        let result = validate_zip_name("../evil.zip");
+        assert_eq!(result, Err("Invalid zip name".to_string()));
+    }
+
+    #[test]
+    fn test_zip_name_rejects_backslash() {
+        let result = validate_zip_name("sub\\evil.zip");
+        assert_eq!(result, Err("Invalid zip name".to_string()));
+    }
+
+    #[test]
+    fn test_zip_name_rejects_path_separators() {
+        let result = validate_zip_name("path/to/file.zip");
+        assert_eq!(result, Err("Invalid zip name".to_string()));
+
+        let result = validate_zip_name("path\\to\\file.zip");
+        assert_eq!(result, Err("Invalid zip name".to_string()));
+
+        let result = validate_zip_name("..\\escape.zip");
+        assert_eq!(result, Err("Invalid zip name".to_string()));
+    }
+
+    #[test]
+    fn test_zip_name_accepts_valid_name() {
+        let result = validate_zip_name("my-project_export.zip");
+        assert_eq!(result, Ok(()));
     }
 
     #[test]

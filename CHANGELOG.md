@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Added **Export to ZIP** — you can now export your project as a self-contained zip archive from the menu (saves first, then packages all referenced sounds and project files)
+- **Save As** menu button now works correctly, opening the Save As dialog
+- Export button is disabled while an export is in progress to prevent duplicate exports
 - Pressing a pad that is currently fading out now freezes the audio at its current volume instead of restarting playback, giving you a smoother way to cancel a fade mid-animation.
 - Folder nodes in the sound library tree now animate open and closed when expanded or collapsed.
 - Pad buttons now have a more subtle hover tilt effect (reduced from 8° to 4° rotation)

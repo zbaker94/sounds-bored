@@ -10,6 +10,8 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   resetPadGain: vi.fn(),
   releasePadHoldLayers: vi.fn(),
   stopPad: vi.fn(),
+  isPadFading: vi.fn().mockReturnValue(false),
+  freezePadAtCurrentVolume: vi.fn(),
 }));
 
 import {
