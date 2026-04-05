@@ -133,6 +133,66 @@ describe("PadConfigDrawer", () => {
     expect(screen.getByText(/layer 2/i)).toBeInTheDocument();
   });
 
+  describe("layer ID stability on save", () => {
+    async function renderEditDrawerWithLayers(layers: ReturnType<typeof createMockLayer>[]) {
+      const sound = createMockSound({ id: "s1", name: "FX Sound" });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      render(
+        <PadConfigDrawer
+          sceneId="scene-1"
+          padId="pad-1"
+          initialConfig={{ name: "FX", layers, muteTargetPadIds: [] }}
+        />,
+      );
+      openDrawer();
+    }
+
+    it("preserves remaining layer ID when first layer is deleted", async () => {
+      const layer1 = createMockLayer({ id: "layer-uuid-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const layer2 = createMockLayer({ id: "layer-uuid-2", selection: { type: "assigned", instances: [{ id: "inst-2", soundId: "s1", volume: 1 }] } });
+      await renderEditDrawerWithLayers([layer1, layer2]);
+
+      const removeButtons = await screen.findAllByRole("button", { name: /remove layer/i });
+      await userEvent.click(removeButtons[0]);
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        const layers = useProjectStore.getState().project?.scenes[0].pads[0].layers;
+        expect(layers).toHaveLength(1);
+        expect(layers![0].id).toBe("layer-uuid-2");
+      });
+    });
+
+    it("preserves surrounding layer IDs when middle layer is deleted", async () => {
+      const layer1 = createMockLayer({ id: "layer-uuid-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const layer2 = createMockLayer({ id: "layer-uuid-2", selection: { type: "assigned", instances: [{ id: "inst-2", soundId: "s1", volume: 1 }] } });
+      const layer3 = createMockLayer({ id: "layer-uuid-3", selection: { type: "assigned", instances: [{ id: "inst-3", soundId: "s1", volume: 1 }] } });
+      await renderEditDrawerWithLayers([layer1, layer2, layer3]);
+
+      const removeButtons = await screen.findAllByRole("button", { name: /remove layer/i });
+      await userEvent.click(removeButtons[1]);
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        const layers = useProjectStore.getState().project?.scenes[0].pads[0].layers;
+        expect(layers).toHaveLength(2);
+        expect(layers![0].id).toBe("layer-uuid-1");
+        expect(layers![1].id).toBe("layer-uuid-3");
+      });
+    });
+  });
+
   describe("syncLayerPlaybackMode on save", () => {
     async function renderEditDrawerWithLoopLayer() {
       const { syncLayerPlaybackMode } = await import("@/lib/audio/padPlayer");

@@ -516,6 +516,7 @@ describe("GlobalLibrarySchema", () => {
 describe("LayerConfigFormSchema", () => {
   it("accepts a valid assigned selection", () => {
     const result = LayerConfigFormSchema.safeParse({
+      id: "layer-1",
       selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",
@@ -527,6 +528,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("accepts a valid tag selection", () => {
     const result = LayerConfigFormSchema.safeParse({
+      id: "layer-2",
       selection: { type: "tag", tagIds: ["tag-1"], defaultVolume: 100 },
       arrangement: "sequential",
       playbackMode: "loop",
@@ -538,6 +540,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("accepts a valid set selection", () => {
     const result = LayerConfigFormSchema.safeParse({
+      id: "layer-3",
       selection: { type: "set", setId: "set-1", defaultVolume: 75 },
       arrangement: "shuffled",
       playbackMode: "hold",
@@ -549,6 +552,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("rejects volume below 0", () => {
     const result = LayerConfigFormSchema.safeParse({
+      id: "layer-1",
       selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",
@@ -560,6 +564,7 @@ describe("LayerConfigFormSchema", () => {
 
   it("rejects volume above 100", () => {
     const result = LayerConfigFormSchema.safeParse({
+      id: "layer-1",
       selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",
@@ -572,6 +577,7 @@ describe("LayerConfigFormSchema", () => {
 
 describe("PadConfigSchema", () => {
   const validLayer = {
+    id: "layer-1",
     selection: {
       type: "assigned",
       instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }],

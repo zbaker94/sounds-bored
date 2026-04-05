@@ -18,7 +18,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import type { PadConfigForm } from "@/lib/schemas";
 import { LayerConfigSection } from "./LayerConfigSection";
-import { DEFAULT_LAYER } from "./constants";
+import { createDefaultLayer } from "./constants";
 
 interface SortableLayerItemProps {
   fieldId: string;
@@ -134,12 +134,13 @@ export function LayerAccordion() {
   const { fields, append, remove, move } = useFieldArray({
     control,
     name: "layers",
+    keyName: "rhfId",
   });
 
   // Track which single item is open (accordion-style: one at a time).
-  // Initialize with first field id; sync when fields are replaced (e.g. after form reset).
+  // Initialize with first field rhfId; sync when fields are replaced (e.g. after form reset).
   const [openId, setOpenId] = useState<string | null>(
-    fields.length > 0 ? fields[0].id : null
+    fields.length > 0 ? fields[0].rhfId : null
   );
 
   // Track which newly-appended layer should scroll into view
@@ -153,19 +154,19 @@ export function LayerAccordion() {
       setOpenId(null);
       return;
     }
-    const stillExists = fields.some((f) => f.id === openId);
+    const stillExists = fields.some((f) => f.rhfId === openId);
     if (!stillExists) {
-      setOpenId(fields[0].id);
+      setOpenId(fields[0].rhfId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fields.map((f) => f.id).join(",")]);
+  }, [fields.map((f) => f.rhfId).join(",")]);
 
   // Detect newly appended layers — auto-open and mark for scroll
   useEffect(() => {
     if (fields.length > prevLengthRef.current && fields.length > 0) {
       const newField = fields[fields.length - 1];
-      setOpenId(newField.id);
-      setPendingScrollId(newField.id);
+      setOpenId(newField.rhfId);
+      setPendingScrollId(newField.rhfId);
     }
     prevLengthRef.current = fields.length;
   }, [fields.length, fields]);
@@ -177,8 +178,8 @@ export function LayerAccordion() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const from = fields.findIndex((f) => f.id === active.id);
-    const to = fields.findIndex((f) => f.id === over.id);
+    const from = fields.findIndex((f) => f.rhfId === active.id);
+    const to = fields.findIndex((f) => f.rhfId === over.id);
     if (from !== -1 && to !== -1) move(from, to);
   }
 
@@ -186,20 +187,20 @@ export function LayerAccordion() {
     <div className="flex flex-col gap-2">
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext
-          items={fields.map((f) => f.id)}
+          items={fields.map((f) => f.rhfId)}
           strategy={verticalListSortingStrategy}
         >
           <div className="w-full">
             {fields.map((field, i) => (
               <SortableLayerItem
-                key={field.id}
-                fieldId={field.id}
+                key={field.rhfId}
+                fieldId={field.rhfId}
                 index={i}
                 canRemove={fields.length > 1}
                 onRemove={() => remove(i)}
-                isOpen={openId === field.id}
-                onOpenChange={(open) => handleOpenChange(field.id, open)}
-                shouldScrollIntoView={pendingScrollId === field.id}
+                isOpen={openId === field.rhfId}
+                onOpenChange={(open) => handleOpenChange(field.rhfId, open)}
+                shouldScrollIntoView={pendingScrollId === field.rhfId}
                 onScrollComplete={() => setPendingScrollId(null)}
               />
             ))}
@@ -210,7 +211,7 @@ export function LayerAccordion() {
         type="button"
         variant="secondary"
         size="sm"
-        onClick={() => append(DEFAULT_LAYER)}
+        onClick={() => append(createDefaultLayer())}
         className="self-start"
       >
         + Add Layer

@@ -133,10 +133,11 @@ export const LayerSchema = z.object({
 export type Layer = z.infer<typeof LayerSchema>;
 
 // ─── Pad Config Form Schemas ──────────────────────────────────────────────────
-// These cover form-validated fields only. LayerConfigFormSchema intentionally
-// omits Layer.id — the store action generates it via crypto.randomUUID().
+// Layer.id is embedded so each layer carries its stable ID through
+// add/delete/reorder operations in useFieldArray — no positional ref needed.
 
 export const LayerConfigFormSchema = z.object({
+  id: z.string(),
   selection: LayerSelectionFormSchema,
   arrangement: ArrangementSchema,
   playbackMode: PlaybackModeSchema,

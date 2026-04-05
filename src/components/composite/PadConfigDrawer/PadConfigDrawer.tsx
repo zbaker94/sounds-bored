@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useForm, useFormContext, FormProvider, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
@@ -15,13 +15,15 @@ import { Slider } from "@/components/ui/slider";
 import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume, syncLayerPlaybackMode } from "@/lib/audio/padPlayer";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
-import { DEFAULT_LAYER } from "./constants";
+import { createDefaultLayer } from "./constants";
 
-const DEFAULT_VALUES: PadConfigForm = {
-  name: "",
-  layers: [DEFAULT_LAYER],
-  fadeDurationMs: undefined,
-};
+function defaultPadValues(): PadConfigForm {
+  return {
+    name: "",
+    layers: [createDefaultLayer()],
+    fadeDurationMs: undefined,
+  };
+}
 
 interface PadConfigDrawerProps {
   sceneId: string;
@@ -41,12 +43,9 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
 
   const isEditMode = padId !== undefined;
 
-  // Preserve layer IDs across edits so audio engine retrigger tracking (keyed by layer.id) stays valid.
-  const layerIdsRef = useRef<string[]>([]);
-
   const methods = useForm<PadConfigForm>({
     resolver: zodResolver(PadConfigSchema) as Resolver<PadConfigForm>,
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: defaultPadValues(),
   });
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = methods;
@@ -55,10 +54,10 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   useEffect(() => {
     if (!isOpen) return;
     if (isEditMode && initialConfig) {
-      layerIdsRef.current = (initialConfig.layers ?? []).map((l) => l.id);
       reset({
         name: initialConfig.name ?? "",
         layers: (initialConfig.layers ?? []).map((l) => ({
+          id: l.id,
           selection: l.selection as LayerConfigForm["selection"],
           arrangement: l.arrangement,
           playbackMode: l.playbackMode,
@@ -68,14 +67,13 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         fadeDurationMs: initialConfig.fadeDurationMs,
       });
     } else {
-      layerIdsRef.current = [];
-      reset(DEFAULT_VALUES);
+      reset(defaultPadValues());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, padId]);
 
   function handleClose() {
-    reset(DEFAULT_VALUES);
+    reset(defaultPadValues());
     closeOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER);
     onClose?.();
   }
@@ -109,7 +107,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
 
     const config: PadConfig = {
       name: data.name,
-      layers: data.layers.map((l, i) => ({ id: layerIdsRef.current[i] ?? crypto.randomUUID(), ...l })),
+      layers: data.layers.map((l) => ({ ...l })),
       muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
       fadeDurationMs: data.fadeDurationMs,
     };
