@@ -511,15 +511,11 @@ describe("discardTemporaryProject", () => {
     ).rejects.toThrow("Cannot discard");
   });
 
-  it("should not throw if remove fails (swallows and warns)", async () => {
+  it("should not throw if remove fails (swallows silently)", async () => {
     mockFs.remove.mockRejectedValue(new Error("Permission denied"));
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await expect(
       discardTemporaryProject("/app-local-data/SoundsBored/temp_Test_123")
     ).resolves.toBeUndefined();
-
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 });

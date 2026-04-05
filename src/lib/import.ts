@@ -35,8 +35,8 @@ export async function copyFilesToFolder(
     try {
       await copyFile(sourcePath, destPath);
       copied.push(destPath);
-    } catch (err) {
-      console.warn(`Failed to copy file "${sourcePath}" to "${destPath}":`, err);
+    } catch {
+      // Skip files that fail to copy; caller inspects the returned list
     }
   }
 

@@ -23,6 +23,8 @@ const MIGRATIONS: Migration[] = [
       const tagCount = Array.isArray(tags) ? tags.length : 0;
       const setCount = Array.isArray(sets) ? sets.length : 0;
 
+      // Deliberate diagnostic exception: migration console output helps trace data loss
+      // during version upgrades; this is not a user-facing message.
       if (soundCount > 0 || tagCount > 0 || setCount > 0) {
         console.warn(
           `Migration 1.0.0 → 1.1.0: discarding ${soundCount} sound(s), ` +
@@ -87,6 +89,8 @@ export function migrateProject(raw: RawProject): RawProject {
   }
 
   const finalVersion = version;
+  // Deliberate diagnostic exception: version mismatch is developer-facing info,
+  // not a user-facing error. No toast is appropriate here.
   if (finalVersion !== CURRENT_VERSION) {
     console.warn(
       `Project version "${finalVersion}" does not match app version "${CURRENT_VERSION}". ` +
