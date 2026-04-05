@@ -28,10 +28,44 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
   const deletePad = useProjectStore((s) => s.deletePad);
   const { gestureHandlers } = usePadGesture(pad);
   const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.includes(pad.id));
-  const displayVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
+  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
+  const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
+  const [frozenVolume, setFrozenVolume] = useState(liveVolume);
   const [progress, setProgress] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the last volume seen while transitioning; read by effect on transition end
+  const lastTransitionVolumeRef = useRef(liveVolume);
+
+  // Update during render while actively transitioning — before the store resets to 1.0
+  if (isVolumeTransitioning) {
+    lastTransitionVolumeRef.current = liveVolume;
+  }
+
+  // During transition show the live value; when transition ends, show the snapshot for the linger period
+  const displayVolume = isVolumeTransitioning ? liveVolume : frozenVolume;
+
+  useEffect(() => {
+    if (isVolumeTransitioning) {
+      if (volumeHideTimerRef.current !== null) {
+        clearTimeout(volumeHideTimerRef.current);
+        volumeHideTimerRef.current = null;
+      }
+      setShowVolumeDisplay(true);
+    } else {
+      setFrozenVolume(lastTransitionVolumeRef.current);
+      volumeHideTimerRef.current = setTimeout(() => {
+        setShowVolumeDisplay(false);
+        volumeHideTimerRef.current = null;
+      }, 670);
+    }
+    return () => {
+      if (volumeHideTimerRef.current !== null) {
+        clearTimeout(volumeHideTimerRef.current);
+      }
+    };
+  }, [isVolumeTransitioning]);
 
   const {
     attributes,
@@ -121,7 +155,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
         style={combinedStyle}
       >
         {/* Volume transition bar — shows for all automated and gesture-driven volume changes */}
-        {!editMode && isVolumeTransitioning && (
+        {!editMode && showVolumeDisplay && (
           <div
             className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
             style={{ height: `${displayVolume * 100}%` }}
@@ -179,7 +213,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
         {!editMode && (
           <div className="relative z-10 flex flex-col items-center gap-0.5">
             <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-            {isVolumeTransitioning && (
+            {showVolumeDisplay && (
               <span className="text-xs font-bold tabular-nums">
                 {Math.round(displayVolume * 100)}%
               </span>
