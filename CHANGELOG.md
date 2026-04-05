@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Pad buttons now have a subtle 3D tilt effect that responds to mouse movement
+- Playing pads display an animated pulse ring indicator
+- Pads and layers animate in smoothly when added or when switching scenes
+- Layer accordion sections now animate open/close with a smooth expand/collapse transition
+- Newly added layers automatically scroll into view and expand when created
 - Volume indicators on pads now linger briefly after a fade completes, so you can see the final volume level before the display disappears.
 - Pads now show color-coded visual states when entering fade mode: currently playing pads highlight in amber (fading out) and non-playing pads highlight in green (fading in), making it clearer which pads will be affected by a fade action.
 - Tag-based sound selection now supports an **Any/All toggle** — choose whether a sound must match any one tag (OR) or all selected tags (AND)

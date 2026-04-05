@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { motion } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -219,31 +220,45 @@ export function SceneView() {
             "flex-1 min-h-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr gap-3",
             isDraggingPad && "overflow-y-auto",
           )}>
-            {displayPads.map((pad) => (
-              <PadButton
+            {displayPads.map((pad, i) => (
+              <motion.div
                 key={pad.id}
-                pad={pad}
-                sceneId={activeScene.id}
-                onEditClick={() => {
-                  setEditingPad(pad);
-                  openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
-                }}
-                fadeVisual={fadeMode.getPadFadeVisual(pad.id)}
-                onFadeTap={() => fadeMode.onPadTap(pad.id)}
-              />
+                className="w-full h-full"
+                initial={isDraggingPad ? false : { opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.15, delay: isDraggingPad ? 0 : i * 0.03 }}
+              >
+                <PadButton
+                  pad={pad}
+                  sceneId={activeScene.id}
+                  onEditClick={() => {
+                    setEditingPad(pad);
+                    openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
+                  }}
+                  fadeVisual={fadeMode.getPadFadeVisual(pad.id)}
+                  onFadeTap={() => fadeMode.onPadTap(pad.id)}
+                />
+              </motion.div>
             ))}
             {isLastPage && !isDraggingPad && (
-              <button
-                onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
-                className={cn("w-full h-full", addPadButtonClass)}
-                aria-label="Add pad"
+              <motion.div
+                className="w-full h-full"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.15, delay: displayPads.length * 0.03 }}
               >
-                <HugeiconsIcon
-                  icon={Add02Icon}
-                  size={32}
-                  className="text-foreground/60"
-                />
-              </button>
+                <button
+                  onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
+                  className={cn("w-full h-full", addPadButtonClass)}
+                  aria-label="Add pad"
+                >
+                  <HugeiconsIcon
+                    icon={Add02Icon}
+                    size={32}
+                    className="text-foreground/60"
+                  />
+                </button>
+              </motion.div>
             )}
           </div>
         </SortableContext>

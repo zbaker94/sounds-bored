@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion } from "motion/react";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -34,6 +35,8 @@ interface SortableLayerItemProps {
   onRemove: () => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  shouldScrollIntoView?: boolean;
+  onScrollComplete?: () => void;
 }
 
 function SortableLayerItem({
@@ -43,6 +46,8 @@ function SortableLayerItem({
   onRemove,
   isOpen,
   onOpenChange,
+  shouldScrollIntoView,
+  onScrollComplete,
 }: SortableLayerItemProps) {
   const {
     attributes,
@@ -53,14 +58,38 @@ function SortableLayerItem({
     isDragging,
   } = useSortable({ id: fieldId });
 
+  const selfRef = useRef<HTMLDivElement>(null);
+
+  // Combine dnd-kit ref with local ref for scroll targeting
+  const setRefs = (el: HTMLDivElement | null) => {
+    setNodeRef(el);
+    (selfRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+  };
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Scroll into view after the entrance animation completes
+  useEffect(() => {
+    if (!shouldScrollIntoView || !isOpen) return;
+    const timer = setTimeout(() => {
+      selfRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      onScrollComplete?.();
+    }, 220); // slightly after the 200ms animation
+    return () => clearTimeout(timer);
+  }, [shouldScrollIntoView, isOpen, onScrollComplete]);
+
   return (
-    <div ref={setNodeRef} style={style}>
+    <motion.div
+      ref={setRefs}
+      style={style}
+      initial={isDragging ? false : { opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.15, delay: index * 0.04 }}
+    >
       <Collapsible
         open={isOpen}
         onOpenChange={onOpenChange}
@@ -100,11 +129,11 @@ function SortableLayerItem({
           </button>
         </div>
 
-        <CollapsibleContent className="pt-2 pb-3">
+        <CollapsibleContent animated isOpen={isOpen} className="pt-2 pb-3">
           <LayerConfigSection index={index} />
         </CollapsibleContent>
       </Collapsible>
-    </div>
+    </motion.div>
   );
 }
 
@@ -121,6 +150,10 @@ export function LayerAccordion() {
     fields.length > 0 ? fields[0].id : null
   );
 
+  // Track which newly-appended layer should scroll into view
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+  const prevLengthRef = useRef(fields.length);
+
   // Keep openId in sync when the field list is replaced by a form reset.
   // If the current openId is no longer in the list, open the first field instead.
   useEffect(() => {
@@ -134,6 +167,16 @@ export function LayerAccordion() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields.map((f) => f.id).join(",")]);
+
+  // Detect newly appended layers — auto-open and mark for scroll
+  useEffect(() => {
+    if (fields.length > prevLengthRef.current && fields.length > 0) {
+      const newField = fields[fields.length - 1];
+      setOpenId(newField.id);
+      setPendingScrollId(newField.id);
+    }
+    prevLengthRef.current = fields.length;
+  }, [fields.length, fields]);
 
   function handleOpenChange(id: string, open: boolean) {
     setOpenId(open ? id : null);
@@ -164,6 +207,8 @@ export function LayerAccordion() {
                 onRemove={() => remove(i)}
                 isOpen={openId === field.id}
                 onOpenChange={(open) => handleOpenChange(field.id, open)}
+                shouldScrollIntoView={pendingScrollId === field.id}
+                onScrollComplete={() => setPendingScrollId(null)}
               />
             ))}
           </div>
