@@ -220,11 +220,13 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
 
   return (
     <Combobox
-      value={value.setId}
-      onValueChange={(setId) => {
-        if (setId) onChange({ type: "set", setId, defaultVolume: value.defaultVolume });
+      value={sets.find((s) => s.id === value.setId) ?? null}
+      onValueChange={(set) => {
+        if (set) onChange({ type: "set", setId: set.id, defaultVolume: value.defaultVolume });
       }}
       items={sets}
+      isItemEqualToValue={(a, b) => a.id === b.id}
+      itemToStringLabel={(s) => s.name}
     >
       <ComboboxInput
         placeholder="Search sets..."
@@ -237,7 +239,7 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
           </ComboboxEmpty>
           <ComboboxCollection>
             {(s) => (
-              <ComboboxItem key={s.id} value={s.id}>
+              <ComboboxItem key={s.id} value={s}>
                 <span className="flex-1">{s.name}</span>
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {setCountMap[s.id] ?? 0} sounds

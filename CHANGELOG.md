@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed the set selector in pad configuration so the selected set name displays correctly instead of showing blank or the raw ID.
 - Improved visual consistency across dialogs, menus, and buttons with refined styling and spacing
 - Unused fonts (Dimitri Regular, Gladiator) removed, reducing app size
 - Tab controls in pad configuration now stretch to fill available width for a cleaner layout
