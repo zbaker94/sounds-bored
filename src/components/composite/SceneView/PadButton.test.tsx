@@ -13,8 +13,11 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
   setPadVolume: vi.fn(),
   resetPadGain: vi.fn(),
+  releasePadHoldLayers: vi.fn(),
   stopPad: vi.fn(),
   getPadProgress: vi.fn().mockReturnValue(null),
+  isPadFading: vi.fn().mockReturnValue(false),
+  freezePadAtCurrentVolume: vi.fn(),
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
@@ -179,6 +182,8 @@ describe("PadButton", () => {
       expect(button.querySelector(".bg-yellow-500")).toBeInTheDocument();
 
       act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
+      // Volume display lingers 670ms after transition ends before hiding
+      act(() => { vi.advanceTimersByTime(700); });
 
       // eslint-disable-next-line testing-library/no-node-access
       expect(button.querySelector(".bg-yellow-500")).not.toBeInTheDocument();
@@ -201,6 +206,8 @@ describe("PadButton", () => {
       expect(screen.queryByText(/\d+%/)).toBeInTheDocument();
 
       act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
+      // Volume display lingers 670ms after transition ends before hiding
+      act(() => { vi.advanceTimersByTime(700); });
 
       // After release: name still shown, volume % gone
       expect(screen.getByText("Kick")).toBeInTheDocument();

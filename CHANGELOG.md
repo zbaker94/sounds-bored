@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal test improvements only)
 - Added **Export to ZIP** — you can now export your project as a self-contained zip archive from the menu (saves first, then packages all referenced sounds and project files)
 - **Save As** menu button now works correctly, opening the Save As dialog
 - Export button is disabled while an export is in progress to prevent duplicate exports
