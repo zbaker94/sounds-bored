@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pressing a pad that is currently fading out now freezes the audio at its current volume instead of restarting playback, giving you a smoother way to cancel a fade mid-animation.
 - Folder nodes in the sound library tree now animate open and closed when expanded or collapsed.
 - Pad buttons now have a more subtle hover tilt effect (reduced from 8° to 4° rotation)
 - Clicking a fading-out pad now reverses the fade, smoothly bringing it back to full volume instead of stopping it

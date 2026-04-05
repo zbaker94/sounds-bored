@@ -65,6 +65,22 @@ export function isPadFadingOut(padId: string): boolean {
   return fadingOutPadIds.has(padId);
 }
 
+export function isPadFading(padId: string): boolean {
+  return fadePadTimeouts.has(padId);
+}
+
+export function freezePadAtCurrentVolume(padId: string): void {
+  const ctx = getAudioContext();
+  const gain = padGainMap.get(padId);
+  const currentValue = gain ? gain.gain.value : 1.0;
+  cancelPadFade(padId);
+  if (gain) {
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(currentValue, ctx.currentTime);
+  }
+  usePlaybackStore.getState().updatePadVolume(padId, currentValue);
+}
+
 /** Animate padVolumes via requestAnimationFrame for the duration of a fade. */
 function startFadeRaf(padId: string, fromVolume: number, toVolume: number, durationMs: number): void {
   const startTime = performance.now();

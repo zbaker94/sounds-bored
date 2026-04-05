@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
-import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio/padPlayer";
+import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 // Gesture thresholds
@@ -21,6 +21,7 @@ interface GestureState {
   wasPlayingAtStart: boolean;
   startVolume: number;
   currentVolume: number;
+  cancelledFadeAtStart: boolean;
 }
 
 export function usePadGesture(pad: Pad) {
@@ -35,6 +36,7 @@ export function usePadGesture(pad: Pad) {
     wasPlayingAtStart: false,
     startVolume: 1.0,
     currentVolume: 1.0,
+    cancelledFadeAtStart: false,
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -60,6 +62,9 @@ export function usePadGesture(pad: Pad) {
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return;
+    const fadeCancelled = isPadFading(pad.id);
+    if (fadeCancelled) freezePadAtCurrentVolume(pad.id);
+
     e.currentTarget.setPointerCapture(e.pointerId);
     clearHoldTimer();
 
@@ -68,10 +73,11 @@ export function usePadGesture(pad: Pad) {
     s.lastY = e.clientY;
     s.startTime = Date.now();
     s.phase = "down";
+    s.cancelledFadeAtStart = fadeCancelled;
     s.wasPlayingAtStart = usePlaybackStore.getState().isPadActive(pad.id);
 
-    // Hold-mode pads trigger immediately on press (not on release)
-    if (hasHoldLayer) {
+    // Hold-mode pads trigger immediately on press — skip if we just cancelled a fade
+    if (hasHoldLayer && !fadeCancelled) {
       triggerPad(pad, triggerVolume()).catch(console.error);
     }
 
@@ -142,6 +148,7 @@ export function usePadGesture(pad: Pad) {
     }
     s.dragStartTime = 0;
     s.phase = "idle";
+    s.cancelledFadeAtStart = false;
   }
 
   function onPointerUp(_e: React.PointerEvent<HTMLButtonElement>) {
@@ -149,12 +156,12 @@ export function usePadGesture(pad: Pad) {
     const s = state.current;
 
     if (s.phase === "down") {
-      // Normal tap — only trigger if not a hold-mode pad (those triggered on down)
-      if (!hasHoldLayer) {
+      // Normal tap — only trigger if not a hold-mode pad and fade wasn't just cancelled
+      if (!hasHoldLayer && !s.cancelledFadeAtStart) {
         triggerPad(pad, triggerVolume()).catch(console.error);
       }
     } else if (s.phase === "hold") {
-      if (!hasHoldLayer) {
+      if (!hasHoldLayer && !s.cancelledFadeAtStart) {
         triggerPad(pad, triggerVolume()).catch(console.error);
       }
     } else if (s.phase === "drag") {
