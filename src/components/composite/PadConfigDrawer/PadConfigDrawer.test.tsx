@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
@@ -6,6 +6,11 @@ import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSound } from "@/test/factories";
 import { PadConfigDrawer } from "./PadConfigDrawer";
+
+vi.mock("@/lib/audio/padPlayer", () => ({
+  syncLayerVolume: vi.fn(),
+  syncLayerPlaybackMode: vi.fn(),
+}));
 
 function renderDrawer(props: { sceneId?: string; padId?: string } = {}) {
   return render(<PadConfigDrawer sceneId={props.sceneId ?? "scene-1"} padId={props.padId} />);
@@ -19,6 +24,7 @@ function openDrawer() {
 
 describe("PadConfigDrawer", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useProjectStore.setState({ ...initialProjectState });
     useUiStore.setState({ ...initialUiState });
     useLibraryStore.setState({ ...initialLibraryState });
@@ -125,5 +131,61 @@ describe("PadConfigDrawer", () => {
     openDrawer();
     await userEvent.click(screen.getByRole("button", { name: /add layer/i }));
     expect(screen.getByText(/layer 2/i)).toBeInTheDocument();
+  });
+
+  describe("syncLayerPlaybackMode on save", () => {
+    async function renderEditDrawerWithLoopLayer() {
+      const { syncLayerPlaybackMode } = await import("@/lib/audio/padPlayer");
+      const layer = createMockLayer({
+        id: "layer-1",
+        playbackMode: "loop",
+        selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+      const sound = createMockSound({ id: "s1", name: "FX Sound" });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      render(
+        <PadConfigDrawer
+          sceneId="scene-1"
+          padId="pad-1"
+          initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+        />,
+      );
+      openDrawer();
+      return { layer, syncLayerPlaybackMode };
+    }
+
+    it("calls syncLayerPlaybackMode when playbackMode changes on save", async () => {
+      const { syncLayerPlaybackMode } = await renderEditDrawerWithLoopLayer();
+
+      // Click the "One-shot" tab to change playback mode from "loop"
+      await userEvent.click(screen.getByRole("tab", { name: /one-shot/i }));
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(syncLayerPlaybackMode).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "layer-1", playbackMode: "one-shot" }),
+        );
+      });
+    });
+
+    it("does not call syncLayerPlaybackMode when playbackMode is unchanged on save", async () => {
+      const { syncLayerPlaybackMode } = await renderEditDrawerWithLoopLayer();
+
+      // Save without changing the playback mode
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].name).toBe("FX");
+      });
+      expect(syncLayerPlaybackMode).not.toHaveBeenCalled();
+    });
   });
 });

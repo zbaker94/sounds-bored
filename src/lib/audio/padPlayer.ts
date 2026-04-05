@@ -294,6 +294,43 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
 }
 
+/**
+ * Update the loop flag on any active voices for a layer.
+ *
+ * For non-chained arrangements: sets `source.loop` / `audio.loop` live so the
+ * current pass plays to natural completion instead of stopping immediately.
+ * `hold → one-shot` transitions also drain naturally; `releasePadHoldLayers`
+ * skips the layer on pointer-up because `playbackMode` is already "one-shot"
+ * in the store, so the current pass plays to its natural end.
+ *
+ * For chained arrangements transitioning *away* from a looping mode: the loop
+ * flag is irrelevant (onended drives restart), so we clear the chain queue.
+ * When the current voice ends, `onended` sees `remaining === undefined` and
+ * skips the restart.
+ *
+ * Limitation: transitions *into* a looping mode on chained arrangements are not
+ * applied to active voices — the `onended` closure captured at voice creation
+ * still holds the original playbackMode and will not restart the chain. The new
+ * mode takes effect on the next retrigger.
+ *
+ * No-op if the layer has no active voices.
+ */
+export function syncLayerPlaybackMode(layer: Layer): void {
+  const voices = usePlaybackStore.getState().getLayerVoices(layer.id);
+  if (voices.length === 0) return;
+  const isLoopMode = layer.playbackMode === "loop" || layer.playbackMode === "hold";
+  // Update the loop flag on non-chained voices (chained arrangements don't use source.loop).
+  const shouldLoop = isLoopMode && !isChained(layer.arrangement);
+  for (const voice of voices) {
+    voice.setLoop(shouldLoop);
+  }
+  // For chained arrangements transitioning away from a looping mode, clear the chain
+  // queue so the onended callback sees remaining === undefined and skips the restart.
+  if (!isLoopMode && isChained(layer.arrangement)) {
+    layerChainQueue.delete(layer.id);
+  }
+}
+
 export function clearAllLayerChains(): void {
   layerChainQueue.clear();
 }
