@@ -80,7 +80,6 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
 
   const fadeVisualClass = (() => {
     switch (fadeVisual) {
-      case "fade-selectable": return "border-white/60";
       case "crossfade-out":   return "border-amber-400";
       case "crossfade-in":    return "border-emerald-400";
       case "selected-out":    return "border-amber-500 ring-2 ring-amber-500";

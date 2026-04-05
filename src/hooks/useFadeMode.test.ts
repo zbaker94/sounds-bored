@@ -203,10 +203,18 @@ describe("useFadeMode — getPadFadeVisual", () => {
     expect(result.current.getPadFadeVisual(padEmpty.id)).toBe("invalid");
   });
 
-  it("returns 'fade-selectable' for valid pads in fade mode", () => {
+  it("returns 'crossfade-out' for playing pads in fade mode", () => {
+    usePlaybackStore.setState({ playingPadIds: [padA.id] });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
-    expect(result.current.getPadFadeVisual(padA.id)).toBe("fade-selectable");
+    expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-out");
+  });
+
+  it("returns 'crossfade-in' for non-playing pads in fade mode", () => {
+    usePlaybackStore.setState({ playingPadIds: [] });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-in");
   });
 
   it("returns 'crossfade-out' for playing unselected pads in crossfade mode", () => {

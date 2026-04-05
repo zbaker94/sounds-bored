@@ -13,7 +13,6 @@ import type { Pad } from "@/lib/schemas";
 export type FadeMode = "fade" | "crossfade" | null;
 
 export type PadFadeVisual =
-  | "fade-selectable"
   | "crossfade-out"
   | "crossfade-in"
   | "selected-out"
@@ -136,7 +135,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     (padId: string): PadFadeVisual => {
       if (mode === null) return null;
       if (!isValidPad(padId)) return "invalid";
-      if (mode === "fade") return "fade-selectable";
+      if (mode === "fade") return playingPadIds.includes(padId) ? "crossfade-out" : "crossfade-in";
 
       const isSelected = selectedPadIds.has(padId);
       const isPlaying = playingPadIds.includes(padId);

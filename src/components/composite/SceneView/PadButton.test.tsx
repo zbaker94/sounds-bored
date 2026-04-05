@@ -226,12 +226,6 @@ function renderPadWithFadeVisual(fadeVisual: PadFadeVisual, onFadeTap = vi.fn())
 }
 
 describe("PadButton — fade visual states", () => {
-  it("applies fade-selectable ring class when fadeVisual is 'fade-selectable'", () => {
-    renderPadWithFadeVisual("fade-selectable");
-    const btn = screen.getByRole("button", { name: "Kick" });
-    expect(btn.className).toMatch(/border-white/);
-  });
-
   it("applies amber ring class when fadeVisual is 'crossfade-out'", () => {
     renderPadWithFadeVisual("crossfade-out");
     const btn = screen.getByRole("button", { name: "Kick" });
@@ -264,7 +258,7 @@ describe("PadButton — fade visual states", () => {
 
   it("calls onFadeTap on pointer down when fadeVisual is set", async () => {
     const onFadeTap = vi.fn();
-    renderPadWithFadeVisual("fade-selectable", onFadeTap);
+    renderPadWithFadeVisual("crossfade-in", onFadeTap);
     const btn = screen.getByRole("button", { name: "Kick" });
     await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
     expect(onFadeTap).toHaveBeenCalledTimes(1);
