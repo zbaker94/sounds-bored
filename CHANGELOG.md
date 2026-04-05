@@ -1,8 +1,7 @@
 # Changelog
 
 ## Current Changes
-- Dialogs no longer close when clicking outside (fixes accidental dismissal)
-
+- Export dialog no longer close when clicking outside (fixes accidental dismissal)
 - The Export keyboard shortcut changed from `Ctrl+X` to `Ctrl+Shift+E`
 - Added `Ctrl+Shift+S` keyboard shortcut for Save As
 - Canceling an in-progress export now shows a confirmation prompt instead of canceling immediately
