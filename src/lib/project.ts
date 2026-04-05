@@ -301,8 +301,8 @@ export async function discardTemporaryProject(folderPath: string): Promise<void>
 
   try {
     await remove(folderPath, { recursive: true });
-  } catch (error) {
-    console.warn("Failed to remove temporary folder:", error);
+  } catch {
+    // Silently swallow — temp folder cleanup failure is non-critical
   }
 }
 

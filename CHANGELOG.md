@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Temporary project folder cleanup failures are now handled silently instead of logging a warning
+- Failed sound file copies during import are silently skipped; callers determine success by inspecting the returned file list
+- Added inline comments clarifying why migration-related `console.warn` calls are intentional diagnostic output, not bugs
 - Refactored internal pad configuration code to eliminate duplicate default layer definitions (no user-facing behavior change)
 - No user-facing changes in this release.
 
