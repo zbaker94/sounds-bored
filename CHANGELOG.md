@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Volume fill bar on pads now animates smoothly during fades and drag-to-adjust gestures, accurately reflecting real-time volume changes
+- Focus outlines have been removed from buttons and interactive elements for a cleaner visual appearance
+- Fade-in and fade-out transitions now animate the volume bar from start to finish rather than jumping immediately to the target value
+- The volume bar correctly disappears after a gesture or fade completes, and no longer briefly flickers when quickly tapping a pad
 - Fixed the set selector in pad configuration so the selected set name displays correctly instead of showing blank or the raw ID.
 - Improved visual consistency across dialogs, menus, and buttons with refined styling and spacing
 - Unused fonts (Dimitri Regular, Gladiator) removed, reducing app size

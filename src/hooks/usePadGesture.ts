@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio/padPlayer";
@@ -37,14 +37,25 @@ export function usePadGesture(pad: Pad) {
     currentVolume: 1.0,
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [fillVolume, setFillVolume] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   function clearHoldTimer() {
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
     }
+  }
+
+  /**
+   * Resolve the volume to use when triggering a tap or hold-release.
+   * If the pad is active (already playing), honour its current padVolumes entry.
+   * If it's not active, always start at 1.0 — padVolumes may be 0 from the hold
+   * phase display update and must not corrupt the trigger.
+   */
+  function triggerVolume(): number {
+    const store = usePlaybackStore.getState();
+    return store.isPadActive(pad.id)
+      ? (store.padVolumes[pad.id] ?? 1.0)
+      : 1.0;
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
@@ -61,8 +72,7 @@ export function usePadGesture(pad: Pad) {
 
     // Hold-mode pads trigger immediately on press (not on release)
     if (hasHoldLayer) {
-      const vol = usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0;
-      triggerPad(pad, vol).catch(console.error);
+      triggerPad(pad, triggerVolume()).catch(console.error);
     }
 
     holdTimer.current = setTimeout(() => {
@@ -78,7 +88,10 @@ export function usePadGesture(pad: Pad) {
           : 0;
       s.startVolume = vol;
       s.currentVolume = vol;
-      setFillVolume(vol);
+      // Write to padVolumes so the display bar shows the correct starting height.
+      // Triggers never read this for non-playing pads — triggerVolume() guards that.
+      usePlaybackStore.getState().updatePadVolume(pad.id, vol);
+      usePlaybackStore.getState().startVolumeTransition(pad.id);
     }, HOLD_MS);
   }
 
@@ -93,7 +106,7 @@ export function usePadGesture(pad: Pad) {
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
       s.dragStartTime = Date.now();
-      setIsDragging(true);
+      usePlaybackStore.getState().startVolumeTransition(pad.id);
 
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
         triggerPad(pad, 0).catch(console.error);
@@ -111,18 +124,22 @@ export function usePadGesture(pad: Pad) {
       }
 
       setPadVolume(pad.id, newVolume);
-      setFillVolume(newVolume);
     }
   }
 
   function resetGesture() {
     const s = state.current;
+    const wasActive = s.phase !== "idle";
     if (hasHoldLayer) {
       releasePadHoldLayers(pad);
-      resetPadGain(pad.id);
+      resetPadGain(pad.id); // → cancelPadFade → clearVolumeTransition
     }
-    setFillVolume(null);
-    setIsDragging(false);
+    // Only clear the transition if this gesture hook actually started one.
+    // Guarding on wasActive prevents a stale pointerup (e.g. from a fade-mode tap that
+    // switched handlers mid-gesture) from wiping out a fade-triggered transition.
+    if (wasActive) {
+      usePlaybackStore.getState().clearVolumeTransition(pad.id);
+    }
     s.dragStartTime = 0;
     s.phase = "idle";
   }
@@ -134,13 +151,11 @@ export function usePadGesture(pad: Pad) {
     if (s.phase === "down") {
       // Normal tap — only trigger if not a hold-mode pad (those triggered on down)
       if (!hasHoldLayer) {
-        const vol = usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0;
-        triggerPad(pad, vol).catch(console.error);
+        triggerPad(pad, triggerVolume()).catch(console.error);
       }
     } else if (s.phase === "hold") {
       if (!hasHoldLayer) {
-        const vol = usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0;
-        triggerPad(pad, vol).catch(console.error);
+        triggerPad(pad, triggerVolume()).catch(console.error);
       }
     } else if (s.phase === "drag") {
       if (s.currentVolume < 0.01 && !hasHoldLayer) {
@@ -170,7 +185,5 @@ export function usePadGesture(pad: Pad) {
 
   return {
     gestureHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu },
-    fillVolume,
-    isDragging,
   };
 }

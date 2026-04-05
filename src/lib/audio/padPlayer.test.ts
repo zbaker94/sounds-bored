@@ -105,16 +105,17 @@ beforeEach(async () => {
   vi.clearAllMocks();
   createdSources.length = 0;
   // Clear chain queue before stopAll so old onended callbacks don't chain
-  const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains, clearFadePadTimeouts } = await import("./padPlayer");
+  const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains, clearAllFadeTracking } = await import("./padPlayer");
   clearAllLayerChains();
   clearAllLayerGains();
   clearAllPadGains();
-  clearFadePadTimeouts();
+  clearAllFadeTracking();
   usePlaybackStore.getState().stopAll();
   usePlaybackStore.setState({
     masterVolume: 100,
     playingPadIds: [],
     padVolumes: {},
+    volumeTransitioningPadIds: [],
   });
   useLibraryStore.setState({
     sounds: [],
@@ -943,7 +944,7 @@ describe("retrigger stop — ramped stop", () => {
 
 describe("fadePadOut", () => {
   it("schedules a gain ramp to 0 on the pad gain node", async () => {
-    const { fadePadOut, getPadGain, clearFadePadTimeouts } = await import("./padPlayer");
+    const { fadePadOut, getPadGain, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-pad" });
 
     fadePadOut(pad, 1000);
@@ -951,12 +952,12 @@ describe("fadePadOut", () => {
     const gain = getPadGain(pad.id);
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
-    clearFadePadTimeouts();
+    clearAllFadeTracking();
   });
 
   it("calls stopPad and resetPadGain after the fade duration", async () => {
     vi.useFakeTimers();
-    const { fadePadOut, clearFadePadTimeouts } = await import("./padPlayer");
+    const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-timer-pad" });
 
     usePlaybackStore.setState({ playingPadIds: [pad.id] });
@@ -965,23 +966,37 @@ describe("fadePadOut", () => {
     vi.advanceTimersByTime(510);
 
     expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
-    clearFadePadTimeouts();
+    clearAllFadeTracking();
     vi.useRealTimers();
   });
 
-  it("updates padVolumes to 0 immediately", async () => {
-    const { fadePadOut, clearFadePadTimeouts } = await import("./padPlayer");
+  it("adds pad to volumeTransitioningPadIds when fade starts", async () => {
+    const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-vol-pad" });
 
     fadePadOut(pad, 1000);
 
-    expect(usePlaybackStore.getState().padVolumes[pad.id]).toBe(0);
-    clearFadePadTimeouts();
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+    clearAllFadeTracking();
+  });
+
+  it("clears volumeTransitioningPadIds after the fade duration", async () => {
+    vi.useFakeTimers();
+    const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-clear-pad" });
+
+    fadePadOut(pad, 500);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+
+    vi.advanceTimersByTime(510);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(pad.id);
+    clearAllFadeTracking();
+    vi.useRealTimers();
   });
 });
 
 describe("fadePadIn", () => {
-  it("triggers the pad at volume 0 then ramps to 1", async () => {
+  it("triggers the pad at volume 0, ramps to 1, and shows volume transition", async () => {
     const mockBuffer = { duration: 1.0, numberOfChannels: 1, sampleRate: 44100 };
     mockLoadBuffer.mockResolvedValue(mockBuffer);
 
@@ -990,7 +1005,7 @@ describe("fadePadIn", () => {
     const gain = makeMockGain();
     mockCtx.createGain.mockReturnValue(gain);
 
-    const { fadePadIn } = await import("./padPlayer");
+    const { fadePadIn, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fade-in-pad",
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
@@ -1004,13 +1019,14 @@ describe("fadePadIn", () => {
     await fadePadIn(pad, 1000);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    expect(usePlaybackStore.getState().padVolumes[pad.id]).toBe(1.0);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+    clearAllFadeTracking();
   });
 });
 
 describe("crossfadePads", () => {
-  it("calls fadePadOut for each fading-out pad and fadePadIn for each fading-in pad", async () => {
-    const { crossfadePads, clearFadePadTimeouts } = await import("./padPlayer");
+  it("starts volume transitions on fading-out and fading-in pads", async () => {
+    const { crossfadePads, clearAllFadeTracking } = await import("./padPlayer");
     const padOut = createMockPad({ id: "xfade-out" });
     const padIn = createMockPad({ id: "xfade-in", layers: [createMockLayer()] });
 
@@ -1023,15 +1039,15 @@ describe("crossfadePads", () => {
 
     crossfadePads([padOut], [padIn]);
 
-    expect(usePlaybackStore.getState().padVolumes[padOut.id]).toBe(0);
-    clearFadePadTimeouts();
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(padOut.id);
+    clearAllFadeTracking();
   });
 });
 
-describe("stopAllPads clears fade timeouts", () => {
+describe("stopAllPads clears fade tracking", () => {
   it("cancels pending fade timeouts so cleanup callbacks do not fire", async () => {
     vi.useFakeTimers();
-    const { fadePadOut, stopAllPads, clearFadePadTimeouts } = await import("./padPlayer");
+    const { fadePadOut, stopAllPads, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "timeout-cancel-pad" });
     usePlaybackStore.setState({ playingPadIds: [pad.id] });
 
@@ -1040,7 +1056,22 @@ describe("stopAllPads clears fade timeouts", () => {
     vi.advanceTimersByTime(600);
 
     expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
-    clearFadePadTimeouts();
+    clearAllFadeTracking();
+    vi.useRealTimers();
+  });
+
+  it("clears volumeTransitioningPadIds when stopAllPads is called mid-fade", async () => {
+    vi.useFakeTimers();
+    const { fadePadOut, stopAllPads, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({ id: "stop-mid-fade-pad" });
+
+    fadePadOut(pad, 500);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+
+    stopAllPads();
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(pad.id);
+
+    clearAllFadeTracking();
     vi.useRealTimers();
   });
 });

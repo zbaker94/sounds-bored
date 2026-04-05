@@ -32,13 +32,60 @@ const layerChainQueue = new Map<string, Sound[]>();
 // Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger.
 const layerPendingMap = new Set<string>();
 
-// Pending fade-out cleanup timeouts, keyed by pad ID. Cleared by stopAllPads.
+// Pending fade cleanup timeouts, keyed by pad ID. Used by both fadePadOut and fadePadIn.
 const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function clearFadePadTimeouts(): void {
+// RAF IDs for animated volume lerp loops during fades, keyed by pad ID.
+const padFadeRafs = new Map<string, number>();
+
+/**
+ * Cancel all fade-related resources for a pad: RAF loop, pending timeout, and store signal.
+ * Safe to call even if no fade is registered — all operations are idempotent.
+ */
+function cancelPadFade(padId: string): void {
+  const rafId = padFadeRafs.get(padId);
+  if (rafId !== undefined) {
+    cancelAnimationFrame(rafId);
+    padFadeRafs.delete(padId);
+  }
+  const tId = fadePadTimeouts.get(padId);
+  if (tId !== undefined) {
+    clearTimeout(tId);
+    fadePadTimeouts.delete(padId);
+  }
+  usePlaybackStore.getState().clearVolumeTransition(padId);
+}
+
+/** Animate padVolumes via requestAnimationFrame for the duration of a fade. */
+function startFadeRaf(padId: string, fromVolume: number, toVolume: number, durationMs: number): void {
+  const startTime = performance.now();
+
+  function frame() {
+    const elapsed = performance.now() - startTime;
+    const t = Math.min(1, elapsed / durationMs);
+    usePlaybackStore.getState().updatePadVolume(padId, fromVolume + (toVolume - fromVolume) * t);
+    if (t < 1) {
+      padFadeRafs.set(padId, requestAnimationFrame(frame));
+    } else {
+      padFadeRafs.delete(padId);
+    }
+  }
+
+  padFadeRafs.set(padId, requestAnimationFrame(frame));
+}
+
+export function clearAllFadeTracking(): void {
   for (const id of fadePadTimeouts.values()) clearTimeout(id);
   fadePadTimeouts.clear();
+  for (const id of padFadeRafs.values()) cancelAnimationFrame(id);
+  padFadeRafs.clear();
+  const store = usePlaybackStore.getState();
+  store.clearAllVolumeTransitions();
+  store.resetAllPadVolumes();
 }
+
+/** @deprecated Use clearAllFadeTracking instead. */
+export const clearFadePadTimeouts = clearAllFadeTracking;
 
 export function resolveFadeDuration(pad: Pad): number {
   return (
@@ -49,16 +96,25 @@ export function resolveFadeDuration(pad: Pad): number {
 }
 
 export function fadePadOut(pad: Pad, durationMs: number): void {
+  // 1. Cancel any prior fade for this pad (RAF, timeout, store signal)
+  cancelPadFade(pad.id);
+
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
+  const fromVolume = gain.gain.value;
+
+  // 2. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+  gain.gain.setValueAtTime(fromVolume, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(0, ctx.currentTime + durationMs / 1000);
-  usePlaybackStore.getState().updatePadVolume(pad.id, 0);
 
-  const existing = fadePadTimeouts.get(pad.id);
-  if (existing !== undefined) clearTimeout(existing);
+  // 3. Show the visual bar
+  usePlaybackStore.getState().startVolumeTransition(pad.id);
 
+  // 4. Animate padVolumes via RAF
+  startFadeRaf(pad.id, fromVolume, 0, durationMs);
+
+  // 5. Schedule cleanup (stored in fadePadTimeouts so cancelPadFade can cancel it)
   const timeoutId = setTimeout(() => {
     fadePadTimeouts.delete(pad.id);
     stopPad(pad);
@@ -68,13 +124,32 @@ export function fadePadOut(pad: Pad, durationMs: number): void {
 }
 
 export async function fadePadIn(pad: Pad, durationMs: number): Promise<void> {
+  // 1. Cancel any prior fade for this pad
+  cancelPadFade(pad.id);
+
+  // 2. Start pad at gain 0 (triggerPad also calls updatePadVolume(pad.id, 0))
   await triggerPad(pad, 0);
+
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
+
+  // 3. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(0, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + durationMs / 1000);
-  usePlaybackStore.getState().updatePadVolume(pad.id, 1.0);
+
+  // 4. Show the visual bar
+  usePlaybackStore.getState().startVolumeTransition(pad.id);
+
+  // 5. Animate padVolumes via RAF
+  startFadeRaf(pad.id, 0, 1.0, durationMs);
+
+  // 6. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
+  const timeoutId = setTimeout(() => {
+    fadePadTimeouts.delete(pad.id);
+    cancelPadFade(pad.id); // clears RAF (already done) + clears store signal
+  }, durationMs + 5);
+  fadePadTimeouts.set(pad.id, timeoutId);
 }
 
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[]): void {
@@ -130,6 +205,8 @@ export function setPadVolume(padId: string, volume: number): void {
 }
 
 export function resetPadGain(padId: string): void {
+  // Unified teardown: cancels RAF, pending fade timeout, and clears the store visual signal
+  cancelPadFade(padId);
   const gain = padGainMap.get(padId);
   if (gain) {
     const ctx = getAudioContext();
@@ -176,7 +253,7 @@ export function stopPad(pad: Pad): void {
  * cleared first.
  */
 export function stopAllPads(): void {
-  clearFadePadTimeouts();
+  clearAllFadeTracking();
   clearAllLayerChains();
   // Null all onended callbacks — prevents loop restarts during ramp window
   usePlaybackStore.getState().nullAllOnEnded();

@@ -3,9 +3,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { usePlaybackStore } from "@/state/playbackStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
+import { setPadVolume } from "@/lib/audio/padPlayer";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
@@ -40,6 +42,11 @@ describe("PadButton", () => {
   beforeEach(() => {
     useUiStore.setState({ ...initialUiState });
     useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    // Make setPadVolume mock update the store, matching real padPlayer behaviour
+    vi.mocked(setPadVolume).mockImplementation((padId: string, volume: number) => {
+      usePlaybackStore.getState().updatePadVolume(padId, Math.max(0, Math.min(1, volume)));
+    });
   });
 
   describe("normal mode (editMode false)", () => {
@@ -160,26 +167,21 @@ describe("PadButton", () => {
       expect(screen.getByText("50%")).toBeInTheDocument();
     });
 
-    it("suppresses transition class on fill bar during drag and is absent after release", () => {
+    it("shows volume transition bar during hold phase and hides it after release", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
       const button = screen.getByRole("button");
 
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
-      act(() => { vi.advanceTimersByTime(150); }); // hold activates, fill bar appears
+      act(() => { vi.advanceTimersByTime(150); }); // hold activates
 
-      // Hold phase — fill bar present, transition class applied
       // eslint-disable-next-line testing-library/no-node-access
-      const fillBarDuringHold = button.querySelector(".bg-yellow-500");
-      expect(fillBarDuringHold).toBeInTheDocument();
-      expect(fillBarDuringHold?.className).toContain("transition-[height]");
+      expect(button.querySelector(".bg-yellow-500")).toBeInTheDocument();
 
-      // Enter drag phase — transition class should be suppressed
-      fireEvent.pointerMove(button, { clientY: 195, pointerId: 1 });
+      act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
+
       // eslint-disable-next-line testing-library/no-node-access
-      const fillBarDuringDrag = button.querySelector(".bg-yellow-500");
-      expect(fillBarDuringDrag).toBeInTheDocument();
-      expect(fillBarDuringDrag?.className).not.toContain("transition-[height]");
+      expect(button.querySelector(".bg-yellow-500")).not.toBeInTheDocument();
     });
 
     it("restores pad name after drag ends", () => {

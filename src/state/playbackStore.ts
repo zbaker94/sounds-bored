@@ -17,6 +17,14 @@ interface PlaybackState {
   padVolumes: Record<string, number>;
   updatePadVolume: (padId: string, volume: number) => void;
 
+  // Which pad IDs currently have an active automated or gesture-driven volume transition (drives the fill bar)
+  volumeTransitioningPadIds: string[];
+  startVolumeTransition: (padId: string) => void;
+  clearVolumeTransition: (padId: string) => void;
+  clearAllVolumeTransitions: () => void;
+  /** Reset padVolumes to {} so stale values don't persist as the initial height on the next transition. */
+  resetAllPadVolumes: () => void;
+
   // ── Pad-level voice tracking ──────────────────────────────────────────────
   isPadActive: (padId: string) => boolean;
   recordVoice: (padId: string, voice: AudioVoice) => void;
@@ -47,6 +55,18 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
 
   updatePadVolume: (padId, volume) =>
     set((s) => ({ padVolumes: { ...s.padVolumes, [padId]: volume } })),
+
+  volumeTransitioningPadIds: [],
+  startVolumeTransition: (padId) =>
+    set((s) =>
+      s.volumeTransitioningPadIds.includes(padId)
+        ? s
+        : { volumeTransitioningPadIds: [...s.volumeTransitioningPadIds, padId] }
+    ),
+  clearVolumeTransition: (padId) =>
+    set((s) => ({ volumeTransitioningPadIds: s.volumeTransitioningPadIds.filter((id) => id !== padId) })),
+  clearAllVolumeTransitions: () => set({ volumeTransitioningPadIds: [] }),
+  resetAllPadVolumes: () => set({ padVolumes: {} }),
 
   // ── Pad-level ─────────────────────────────────────────────────────────────
 

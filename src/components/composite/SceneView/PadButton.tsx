@@ -26,7 +26,9 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
   const deletePad = useProjectStore((s) => s.deletePad);
-  const { gestureHandlers, fillVolume, isDragging } = usePadGesture(pad);
+  const { gestureHandlers } = usePadGesture(pad);
+  const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.includes(pad.id));
+  const displayVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const [progress, setProgress] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
@@ -119,14 +121,11 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
         )}
         style={combinedStyle}
       >
-        {/* Volume fill — normal mode only; renders below progress bar */}
-        {!editMode && fillVolume !== null && (
+        {/* Volume transition bar — shows for all automated and gesture-driven volume changes */}
+        {!editMode && isVolumeTransitioning && (
           <div
-            className={cn(
-              "absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black",
-              !isDragging && "transition-[height] duration-150 ease-out"
-            )}
-            style={{ height: `${fillVolume * 100}%` }}
+            className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
+            style={{ height: `${displayVolume * 100}%` }}
           />
         )}
         {/* Playback progress — normal mode only; renders on top of fill bar, slightly transparent */}
@@ -181,9 +180,9 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
         {!editMode && (
           <div className="relative z-10 flex flex-col items-center gap-0.5">
             <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-            {fillVolume !== null && (
+            {isVolumeTransitioning && (
               <span className="text-xs font-bold tabular-nums">
-                {Math.round(fillVolume * 100)}%
+                {Math.round(displayVolume * 100)}%
               </span>
             )}
           </div>

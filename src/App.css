@@ -159,6 +159,11 @@
 
   button {
     cursor: pointer;
+    outline: none;
+  }
+
+  *:focus-visible {
+    outline: none;
   }
 
   .logo {
