@@ -3,9 +3,11 @@ import { useShallow } from "zustand/react/shallow";
 import Fuse from "fuse.js";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 import type { LayerSelection, Sound, SoundInstance } from "@/lib/schemas";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Combobox,
   ComboboxChips,
@@ -180,39 +182,14 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
 
   if (value.type === "tag") {
     return (
-      <Combobox
-        value={value.tagIds}
-        onValueChange={(tagIds) =>
-          onChange({ type: "tag", tagIds, defaultVolume: value.defaultVolume })
-        }
-        items={tags}
-        multiple
-      >
-        <ComboboxChips ref={tagAnchorRef}>
-          {value.tagIds.map((id) => {
-            const tag = tags.find((t) => t.id === id);
-            return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
-          })}
-          <ComboboxChipsInput placeholder="Search tags..." />
-        </ComboboxChips>
-        <ComboboxContent anchor={tagAnchorRef}>
-          <ComboboxList>
-            <ComboboxEmpty>
-              {tags.length === 0 ? "No tags in library yet." : "No tags found."}
-            </ComboboxEmpty>
-            <ComboboxCollection>
-              {(t) => (
-                <ComboboxItem key={t.id} value={t.id}>
-                  <span className="flex-1">{t.name}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {tagCountMap[t.id] ?? 0} sounds
-                  </span>
-                </ComboboxItem>
-              )}
-            </ComboboxCollection>
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
+      <TagModeSection
+        value={value}
+        onChange={onChange}
+        tags={tags}
+        sounds={sounds}
+        tagCountMap={tagCountMap}
+        tagAnchorRef={tagAnchorRef}
+      />
     );
   }
 
@@ -250,5 +227,75 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
         </ComboboxList>
       </ComboboxContent>
     </Combobox>
+  );
+}
+
+// ── Tag mode extracted component ─────────────────────────────────────────────
+
+interface TagModeSectionProps {
+  value: Extract<LayerSelection, { type: "tag" }>;
+  onChange: (value: LayerSelection) => void;
+  tags: { id: string; name: string }[];
+  sounds: Sound[];
+  tagCountMap: Record<string, number>;
+  tagAnchorRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function TagModeSection({ value, onChange, tags, sounds, tagCountMap, tagAnchorRef }: TagModeSectionProps) {
+  const matchCount = useMemo(() => {
+    if (value.tagIds.length === 0) return null;
+    return filterSoundsByTags(sounds, value.tagIds, value.matchMode).length;
+  }, [sounds, value.tagIds, value.matchMode]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Tabs
+        value={value.matchMode}
+        onValueChange={(mode) =>
+          onChange({ ...value, matchMode: mode as "any" | "all" })
+        }
+      >
+        <TabsList stretch>
+          <TabsTrigger value="any">Any</TabsTrigger>
+          <TabsTrigger value="all">All</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <Combobox
+        value={value.tagIds}
+        onValueChange={(tagIds) =>
+          onChange({ type: "tag", tagIds, matchMode: value.matchMode, defaultVolume: value.defaultVolume })
+        }
+        items={tags}
+        multiple
+      >
+        <ComboboxChips ref={tagAnchorRef}>
+          {value.tagIds.map((id) => {
+            const tag = tags.find((t) => t.id === id);
+            return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
+          })}
+          <ComboboxChipsInput placeholder="Search tags..." />
+        </ComboboxChips>
+        <ComboboxContent anchor={tagAnchorRef}>
+          <ComboboxList>
+            <ComboboxEmpty>
+              {tags.length === 0 ? "No tags in library yet." : "No tags found."}
+            </ComboboxEmpty>
+            <ComboboxCollection>
+              {(t) => (
+                <ComboboxItem key={t.id} value={t.id}>
+                  <span className="flex-1">{t.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {tagCountMap[t.id] ?? 0} sounds
+                  </span>
+                </ComboboxItem>
+              )}
+            </ComboboxCollection>
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      {matchCount !== null && (
+        <p className="text-xs text-muted-foreground">{matchCount} sounds match</p>
+      )}
+    </div>
   );
 }

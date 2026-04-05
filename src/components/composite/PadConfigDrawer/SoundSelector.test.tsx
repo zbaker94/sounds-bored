@@ -35,7 +35,7 @@ describe("SoundSelector", () => {
 
     render(
       <SoundSelector
-        value={{ type: "tag", tagIds: [], defaultVolume: 100 }}
+        value={{ type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 }}
         onChange={noopChange}
       />
     );
@@ -49,7 +49,7 @@ describe("SoundSelector", () => {
 
     render(
       <SoundSelector
-        value={{ type: "tag", tagIds: ["t1"], defaultVolume: 100 }}
+        value={{ type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 }}
         onChange={noopChange}
       />
     );
@@ -203,7 +203,7 @@ describe("SoundSelector — tag mode", () => {
     useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
     render(
       <SoundSelector
-        value={{ type: "tag", tagIds: [], defaultVolume: 100 }}
+        value={{ type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 }}
         onChange={vi.fn()}
       />
     );
@@ -214,13 +214,103 @@ describe("SoundSelector — tag mode", () => {
     useLibraryStore.setState({ sounds: [], tags: [], sets: [], isDirty: false });
     render(
       <SoundSelector
-        value={{ type: "tag", tagIds: [], defaultVolume: 100 }}
+        value={{ type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 }}
         onChange={vi.fn()}
       />
     );
     // Combobox empty state is rendered inside a portal — only visible after opening
     // We verify the chips input renders (the combobox is present)
     expect(screen.getByPlaceholderText(/search tags/i)).toBeInTheDocument();
+  });
+
+  it("renders AND/OR toggle in tag mode", () => {
+    const tag = createMockTag({ name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("tab", { name: /any/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /all/i })).toBeInTheDocument();
+  });
+
+  it("AND/OR toggle defaults to Any selected", () => {
+    const tag = createMockTag({ name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    const anyTab = screen.getByRole("tab", { name: /any/i });
+    expect(anyTab).toHaveAttribute("data-state", "active");
+  });
+
+  it("clicking All calls onChange with matchMode all", async () => {
+    const onChange = vi.fn();
+    const tag = createMockTag({ name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 }}
+        onChange={onChange}
+      />
+    );
+    await userEvent.click(screen.getByRole("tab", { name: /all/i }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tag", matchMode: "all" })
+    );
+  });
+
+  it("shows match count when tags are selected", () => {
+    const tag = createMockTag({ id: "t1", name: "Percussion" });
+    const kick = createMockSound({ name: "Kick", tags: ["t1"], filePath: "sounds/kick.wav" });
+    const snare = createMockSound({ name: "Snare", tags: ["t1"], filePath: "sounds/snare.wav" });
+    useLibraryStore.setState({ sounds: [kick, snare], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByText("2 sounds match")).toBeInTheDocument();
+  });
+
+  it("hides match count when no tags are selected", () => {
+    const tag = createMockTag({ id: "t1", name: "Percussion" });
+    const kick = createMockSound({ name: "Kick", tags: ["t1"], filePath: "sounds/kick.wav" });
+    useLibraryStore.setState({ sounds: [kick], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByText(/sounds match/)).not.toBeInTheDocument();
+  });
+
+  it("onChange preserves matchMode when tags are added", async () => {
+    const onChange = vi.fn();
+    const tag = createMockTag({ id: "t1", name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    render(
+      <SoundSelector
+        value={{ type: "tag", tagIds: [], matchMode: "all", defaultVolume: 100 }}
+        onChange={onChange}
+      />
+    );
+
+    // Open the combobox and select a tag
+    await userEvent.click(screen.getByPlaceholderText(/search tags/i));
+    const option = await screen.findByRole("option", { name: /percussion/i });
+    await userEvent.click(option);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tag", matchMode: "all" })
+    );
   });
 });
 

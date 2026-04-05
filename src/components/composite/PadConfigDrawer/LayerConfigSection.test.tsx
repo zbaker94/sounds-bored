@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PadConfigSchema } from "@/lib/schemas";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
@@ -23,7 +23,7 @@ const defaultValues: PadConfigForm = {
 
 function Wrapper({ index = 0, onSubmit = () => {} }: { index?: number; onSubmit?: (data: PadConfigForm) => void }) {
   const methods = useForm<PadConfigForm>({
-    resolver: zodResolver(PadConfigSchema),
+    resolver: zodResolver(PadConfigSchema) as Resolver<PadConfigForm>,
     defaultValues,
   });
   return (

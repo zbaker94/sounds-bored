@@ -7,7 +7,7 @@ import type { PadConfigForm, LayerSelection, Arrangement, PlaybackMode, Retrigge
 
 const SELECTION_TYPE_DEFAULTS: Record<LayerSelection["type"], LayerSelection> = {
   assigned: { type: "assigned", instances: [] },
-  tag: { type: "tag", tagIds: [], defaultVolume: 100 },
+  tag: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
   set: { type: "set", setId: "", defaultVolume: 100 },
 };
 

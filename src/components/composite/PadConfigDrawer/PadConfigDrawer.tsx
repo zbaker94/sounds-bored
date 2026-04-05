@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
-import { useForm, useFormContext, FormProvider, Controller } from "react-hook-form";
+import { useForm, useFormContext, FormProvider, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useLibraryStore } from "@/state/libraryStore";
 import { PadConfigSchema } from "@/lib/schemas";
 import type { PadConfigForm, PadConfig, LayerConfigForm } from "@/lib/schemas";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume } from "@/lib/audio/padPlayer";
+import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 
 const DEFAULT_LAYER: LayerConfigForm = {
   selection: { type: "assigned", instances: [] },
@@ -50,11 +52,11 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   const layerIdsRef = useRef<string[]>([]);
 
   const methods = useForm<PadConfigForm>({
-    resolver: zodResolver(PadConfigSchema),
+    resolver: zodResolver(PadConfigSchema) as Resolver<PadConfigForm>,
     defaultValues: DEFAULT_VALUES,
   });
 
-  const { register, handleSubmit, reset, formState: { errors } } = methods;
+  const { register, handleSubmit, reset, setError, formState: { errors } } = methods;
 
   // Reset form with correct values whenever the drawer opens.
   useEffect(() => {
@@ -86,6 +88,32 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   }
 
   function onSubmit(data: PadConfigForm) {
+    const sounds = useLibraryStore.getState().sounds;
+    let hasError = false;
+    data.layers.forEach((layer, i) => {
+      const sel = layer.selection;
+      if (sel.type === "tag") {
+        if (filterSoundsByTags(sounds, sel.tagIds, sel.matchMode).length === 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setError(`layers.${i}.selection.tagIds` as any, {
+            type: "manual",
+            message: "No sounds in library match these tags",
+          });
+          hasError = true;
+        }
+      } else if (sel.type === "set") {
+        if (sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath).length === 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setError(`layers.${i}.selection.setId` as any, {
+            type: "manual",
+            message: "No sounds in library match this set",
+          });
+          hasError = true;
+        }
+      }
+    });
+    if (hasError) return;
+
     const config: PadConfig = {
       name: data.name,
       layers: data.layers.map((l, i) => ({ id: layerIdsRef.current[i] ?? crypto.randomUUID(), ...l })),

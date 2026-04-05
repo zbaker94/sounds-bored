@@ -4,6 +4,7 @@ import { checkIsLargeFile } from "./streamingCache";
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
 import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
+import { filterSoundsByTags } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
@@ -325,9 +326,7 @@ function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
         .map((inst) => soundById.get(inst.soundId))
         .filter((s): s is Sound => !!s && !!s.filePath);
     case "tag":
-      return sounds.filter(
-        (s) => sel.tagIds.some((tid) => s.tags.includes(tid)) && !!s.filePath
-      );
+      return filterSoundsByTags(sounds, sel.tagIds, sel.matchMode);
     case "set":
       return sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath);
   }

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Tag-based sound selection now supports an **Any/All toggle** — choose whether a sound must match any one tag (OR) or all selected tags (AND)
+- The sound selector now shows a **live match count** (e.g. "2 sounds match") when tags are selected in tag mode
+- Saving a pad config now **validates tag and set selections** upfront — shows an error if no sounds in the library match the chosen tags or set
 - Updated README with comprehensive documentation covering architecture, setup, development workflow, and contributing guidelines
 - Added a new user-facing guide (`README.user.md`) with instructions for installation, scene/pad management, sound library, fade/crossfade, and keyboard shortcuts
 - Volume fill bar on pads now animates smoothly during fades and drag-to-adjust gestures, accurately reflecting real-time volume changes

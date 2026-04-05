@@ -272,6 +272,27 @@ describe("ProjectSchema — domain model fields", () => {
     expect(result.success).toBe(true);
   });
 
+  it("should default matchMode to 'any' when not provided in tag selection", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "tag", tagIds: ["t1"], defaultVolume: 0.8 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toHaveProperty("matchMode", "any");
+    }
+  });
+
+  it("should accept explicit matchMode 'all' in tag selection", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "tag", tagIds: ["t1"], matchMode: "all", defaultVolume: 0.8 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toHaveProperty("matchMode", "all");
+    }
+  });
+
+  it("should reject invalid matchMode value in tag selection", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "tag", tagIds: ["t1"], matchMode: "none", defaultVolume: 0.8 });
+    expect(result.success).toBe(false);
+  });
+
   it("should reject invalid PlaybackMode value", () => {
     const result = PlaybackModeSchema.safeParse("invalid");
     expect(result.success).toBe(false);
