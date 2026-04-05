@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Updated README with comprehensive documentation covering architecture, setup, development workflow, and contributing guidelines
+- Added a new user-facing guide (`README.user.md`) with instructions for installation, scene/pad management, sound library, fade/crossfade, and keyboard shortcuts
 - Volume fill bar on pads now animates smoothly during fades and drag-to-adjust gestures, accurately reflecting real-time volume changes
 - Focus outlines have been removed from buttons and interactive elements for a cleaner visual appearance
 - Fade-in and fade-out transitions now animate the volume bar from start to finish rather than jumping immediately to the target value
