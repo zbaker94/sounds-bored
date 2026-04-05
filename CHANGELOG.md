@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Improved visual consistency across dialogs, menus, and buttons with refined styling and spacing
+- Unused fonts (Dimitri Regular, Gladiator) removed, reducing app size
+- Tab controls in pad configuration now stretch to fill available width for a cleaner layout
+- Save Project dialog now uses the standard styled input and label components
+- Download queue cancel button and status icons updated with improved styling
 - Added a loading screen that displays while critical background images preload, preventing layout flashes on startup
 - Preloads all background and decorative images in the background for smoother visual transitions
 

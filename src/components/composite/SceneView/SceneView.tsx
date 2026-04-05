@@ -39,6 +39,9 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 
 const PADS_PER_PAGE = 12;
 
+const addPadButtonClass =
+  "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
+
 export function SceneView() {
   const activeScene = useProjectStore((s) =>
     s.project?.scenes.find((sc) => sc.id === s.activeSceneId) ?? null,
@@ -142,7 +145,7 @@ export function SceneView() {
       <div className="flex-1 flex items-center justify-center p-8">
         <button
           onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
-          className="aspect-square w-40 rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]"
+          className={cn("aspect-square w-40", addPadButtonClass)}
           aria-label="Add pad"
         >
           <HugeiconsIcon
@@ -232,7 +235,7 @@ export function SceneView() {
             {isLastPage && !isDraggingPad && (
               <button
                 onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
-                className="w-full h-full rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]"
+                className={cn("w-full h-full", addPadButtonClass)}
                 aria-label="Add pad"
               >
                 <HugeiconsIcon
@@ -257,7 +260,7 @@ export function SceneView() {
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
           </Button>
-          <span className="text-white tabular-nums [font-family:DeathLetter]">
+          <span className="text-white tabular-nums font-deathletter">
             {safePage + 1} / {totalPages}
           </span>
           <Button

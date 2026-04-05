@@ -102,7 +102,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
           "relative w-full h-full rounded-xl overflow-hidden",
           "flex items-center justify-center p-2",
           "bg-card text-card-foreground",
-          "shadow-[3px_3px_0px_rgba(0,0,0,0.25)]",
+          "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
           "text-sm font-semibold text-center select-none",
           isSortableDragging && "opacity-50",
           editMode

@@ -77,7 +77,7 @@ export function StartScreen() {
         <HugeiconsIcon icon={Settings01Icon} size={16} />
       </Button>
       <img src={logo} alt="Sounds Bored Logo" className="mb-8 w-48" style={{filter: "drop-shadow(6px 8px 0px #000000)"}} />
-      <h1 className="text-center mb-8 logo tracking-widest text-4xl" style={{color: "var(--secondary)", filter: "drop-shadow(6px 8px 0px #000000)"}}>
+      <h1 className="text-center mb-8 tracking-widest text-4xl text-secondary" style={{filter: "drop-shadow(6px 8px 0px #000000)"}}>
         SOUNDS BORED
       </h1>
       <Card className="w-full max-w-md shadowed">
@@ -108,7 +108,7 @@ export function StartScreen() {
         </CardHeader>
         <CardContent>
               {isLoading && <div>Loading...</div>}
-              {error && <div className="text-red-500">{error.message}</div>}
+              {error && <div className="text-destructive">{error.message}</div>}
               {recentProjects.length === 0 && !isLoading && <div>No recent projects found.</div>}
               <ul className="space-y-2">
                 {recentProjects.map((entry) => (

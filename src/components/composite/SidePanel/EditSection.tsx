@@ -32,10 +32,10 @@ export function EditSection() {
         footer={null}
         classNames={{
           content: "!max-w-[98vw] h-[95vh] grid-rows-[auto_1fr]",
-          title: "[font-family:DeathLetter] tracking-wider text-2xl text-white",
+          title: "text-white",
         }}
         styles={{
-          title: {color: "white", backdropFilter: "blur(18px)"},
+          title: { backdropFilter: "blur(18px)" },
           content: { backgroundImage: `url(${gibbering})`, backgroundRepeat: "repeat" },
         }}
       />
@@ -43,8 +43,7 @@ export function EditSection() {
         <TooltipTrigger asChild>
           <Button
             variant="default"
-            size="icon"
-            className="size-11 md:size-9"
+            size="sidebar"
             onClick={() => openOverlay(OVERLAY_ID.SOUNDS_PANEL, "dialog")}
           >
             <HugeiconsIcon icon={FolderMusicIcon} />
@@ -59,8 +58,7 @@ export function EditSection() {
         <TooltipTrigger asChild>
           <Button
             variant={editMode ? "secondary" : "default"}
-            size="icon"
-            className="size-11 md:size-9"
+            size="sidebar"
             onClick={toggleEditMode}
           >
             <HugeiconsIcon icon={PencilEdit01Icon} />

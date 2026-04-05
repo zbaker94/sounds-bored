@@ -10,7 +10,7 @@ export function PlaySection() {
 
   return (
     <div className="flex items-center p-1 md:pb-2">
-      <Button disabled={!isPlaying} variant={"destructive"} size="icon-lg" className="size-11 md:size-9 p-0" onClick={() => stopAll()}>
+      <Button disabled={!isPlaying} variant="destructive" size="sidebar" onClick={() => stopAll()}>
         <HugeiconsIcon  icon={SmileDizzyIcon} />
       </Button>
     </div>

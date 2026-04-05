@@ -8,6 +8,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface SaveProjectDialogProps {
   isOpen: boolean;
@@ -53,17 +55,13 @@ export function SaveProjectDialog({
             Enter a name for your project. You'll be prompted to choose a save location next.
           </DialogDescription>
         </DialogHeader>
-        <div>
-          <label htmlFor="project-name" className="block text-sm font-medium mb-2">
-            Project Name
-          </label>
-          <input
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="project-name">Project Name</Label>
+          <Input
             id="project-name"
-            type="text"
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="My Awesome Project"
             autoFocus
             disabled={isPending}

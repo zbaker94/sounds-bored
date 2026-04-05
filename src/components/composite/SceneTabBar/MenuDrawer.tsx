@@ -46,41 +46,45 @@ export function MenuDrawer() {
         <DrawerHeader>
           <h1 className="text-lg font-semibold text-white">Menu</h1>
         </DrawerHeader>
-        <Button disabled={!canSave} variant="secondary" className="w-full mb-2" onClick={handleSaveClick}>
-          <HugeiconsIcon icon={SaveIcon} size={16} />
-          Save
-          <Kbd className="ml-auto">{modKey} + S</Kbd>
-        </Button>
-        <Button variant="secondary" className="w-full" onClick={() => null}>
-          <HugeiconsIcon icon={ClipboardIcon} size={16} />
-          Save As
-          <Kbd className="ml-auto">{modKey} + Shift + S</Kbd>
-        </Button>
-        <Separator />
-        <Button variant="secondary" className="w-full mt-2" onClick={() => null}>
-          <HugeiconsIcon icon={FolderExportIcon} size={16} />
-          Export
-          <Kbd className="ml-auto">{modKey} + X</Kbd>
-        </Button>
-        <Separator />
-        <Button
-          variant="secondary"
-          className="w-full mt-2"
-          onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); openOverlay(OVERLAY_ID.SETTINGS_DIALOG, "dialog"); }}
-          aria-label="Settings"
-        >
-          <HugeiconsIcon icon={Settings01Icon} size={16} />
-          Settings
-        </Button>
-        <Separator />
-        <Button
-          variant="default"
-          className="w-full mt-2"
-          onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); requestNavigateAway("/"); }}
-        >
-          <HugeiconsIcon icon={HomeIcon} size={16} />
-          Return to Main Menu
-        </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
+            <Button disabled={!canSave} variant="secondary" className="w-full" onClick={handleSaveClick}>
+              <HugeiconsIcon icon={SaveIcon} size={16} />
+              Save
+              <Kbd className="ml-auto">{modKey} + S</Kbd>
+            </Button>
+            <Button variant="secondary" className="w-full" onClick={() => null}>
+              <HugeiconsIcon icon={ClipboardIcon} size={16} />
+              Save As
+              <Kbd className="ml-auto">{modKey} + Shift + S</Kbd>
+            </Button>
+          </div>
+          <Separator />
+          <Button variant="secondary" className="w-full" onClick={() => null}>
+            <HugeiconsIcon icon={FolderExportIcon} size={16} />
+            Export
+            <Kbd className="ml-auto">{modKey} + X</Kbd>
+          </Button>
+          <Separator />
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); openOverlay(OVERLAY_ID.SETTINGS_DIALOG, "dialog"); }}
+            aria-label="Settings"
+          >
+            <HugeiconsIcon icon={Settings01Icon} size={16} />
+            Settings
+          </Button>
+          <Separator />
+          <Button
+            variant="default"
+            className="w-full"
+            onClick={() => { closeOverlay(OVERLAY_ID.MENU_DRAWER); requestNavigateAway("/"); }}
+          >
+            <HugeiconsIcon icon={HomeIcon} size={16} />
+            Return to Main Menu
+          </Button>
+        </div>
         <img
           src={handsigil}
           alt=""

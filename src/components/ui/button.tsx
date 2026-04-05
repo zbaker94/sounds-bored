@@ -9,7 +9,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80 drop-shadow-[0_5px_0px_rgba(194,67,113,1)] border-[rgba(194,67,113,1)]",
+        default: "bg-primary text-primary-foreground hover:bg-primary/80 drop-shadow-[0_5px_0px_var(--color-primary-accent)] border-primary-accent",
         outline:
           "border-border bg-input/30 hover:bg-input/50 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
@@ -30,6 +30,7 @@ const buttonVariants = cva(
         "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8",
         "icon-lg": "size-10",
+        sidebar: "size-11 md:size-9",
       },
     },
     defaultVariants: {

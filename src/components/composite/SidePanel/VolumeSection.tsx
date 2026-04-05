@@ -52,8 +52,7 @@ export function VolumeSection() {
         <TooltipTrigger asChild>
           <Button
             variant="default"
-            size="icon"
-            className="size-11 md:size-9"
+            size="sidebar"
             onClick={handleMuteToggle}
           >
             {masterVolume > 0 ? (

@@ -11,6 +11,7 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { buildTree, getSoundsInSubtree, type TreeNode } from "./soundTreeUtils";
 import type { Sound } from "@/lib/schemas";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 interface SoundFolderTreeProps {
   sounds: Sound[];
@@ -66,7 +67,7 @@ function FolderNodeRow({
           <HugeiconsIcon
             icon={ArrowRight01Icon}
             size={12}
-            className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+            className={cn("transition-transform duration-150", open && "rotate-90")}
           />
           {node.folder.name}
         </CollapsibleTrigger>

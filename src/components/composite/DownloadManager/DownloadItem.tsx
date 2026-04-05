@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCancelDownload } from "@/lib/ytdlp.queries";
+import { cn } from "@/lib/utils";
 import type { DownloadJob } from "@/lib/schemas";
 
 interface DownloadItemProps {
@@ -90,7 +91,7 @@ export function DownloadItem({ job }: DownloadItemProps) {
           <HugeiconsIcon
             icon={CheckmarkCircle01Icon}
             size={14}
-            className="text-green-400"
+            className="text-green-500"
           />
         )}
         {job.status === "failed" && (
@@ -111,11 +112,12 @@ export function DownloadItem({ job }: DownloadItemProps) {
 
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <span
-          className={`truncate ${
+          className={cn(
+            "truncate",
             job.status === "cancelled" || job.status === "failed"
               ? "text-white/40"
               : "text-white/70"
-          }`}
+          )}
         >
           {displayName}
         </span>
@@ -150,7 +152,7 @@ export function DownloadItem({ job }: DownloadItemProps) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon-xs"
               className="shrink-0 text-white/40 hover:text-white"
               onClick={() => cancelDownload(job.id)}

@@ -69,6 +69,7 @@ import {
 } from "@/components/ui/tooltip";
 import { TruncatedPath } from "@/components/ui/truncated-path";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
+import { cn } from "@/lib/utils";
 import guyWithTorch from "@/assets/guywithtorch.gif";
 
 const EMPTY_FOLDERS: GlobalFolder[] = [];
@@ -107,7 +108,7 @@ const SoundListItemTags = memo(function SoundListItemTags({
       {userTags.map((tag) => (
         <span
           key={tag.id}
-          className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-[rgba(194,67,113,1)] drop-shadow-[0_2px_0px_rgba(194,67,113,1)] px-1.5 py-0 text-[10px] leading-4"
+          className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-primary-accent drop-shadow-[0_2px_0px_var(--color-primary-accent)] px-1.5 py-0 text-[10px] leading-4"
         >
           {tag.name}
         </span>
@@ -459,7 +460,7 @@ export function SoundsPanel() {
       <div className="flex flex-1 min-h-0 gap-2">
         <div className="flex flex-col w-1/2 gap-2">
           <div
-            className={`${panelClass} flex-1 border border-white overflow-y-auto flex flex-col`}
+            className={cn(panelClass, "flex-1 border border-white overflow-y-auto flex flex-col")}
           >
             {sets.length > 0 && (
               <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
@@ -486,10 +487,8 @@ export function SoundsPanel() {
             {sets.map((set) => (
               <Item
                 key={set.id}
-                variant="outline"
-                className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
-                  selectedId === set.id ? "bg-white/20" : ""
-                }`}
+                variant="panel"
+                className={cn(selectedId === set.id && "bg-white/20")}
                 onClick={() => handleSelect(set.id)}
               >
                 <ItemMedia>
@@ -542,7 +541,7 @@ export function SoundsPanel() {
             )}
           </div>
           <div
-            className={`${panelClass} flex-1 border border-white overflow-y-auto flex flex-col`}
+            className={cn(panelClass, "flex-1 border border-white overflow-y-auto flex flex-col")}
           >
             {folders.length > 0 && (
               <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
@@ -584,10 +583,8 @@ export function SoundsPanel() {
                 return (
                   <Item
                     key={folder.id}
-                    variant="outline"
-                    className={`text-white/70 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg ${
-                      selectedId === folder.id ? "bg-white/20" : ""
-                    }`}
+                    variant="panel"
+                    className={cn(selectedId === folder.id && "bg-white/20")}
                     onClick={() => {
                       if (isFolderMissing) {
                         setFolderDialogQueue([folder]);
@@ -653,7 +650,7 @@ export function SoundsPanel() {
           </div>
         </div>
         <div
-          className={`${panelClass} w-1/2 border border-white flex flex-col overflow-hidden`}
+          className={cn(panelClass, "w-1/2 border border-white flex flex-col overflow-hidden")}
         >
           <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
             <Button
@@ -723,8 +720,8 @@ export function SoundsPanel() {
               return (
                 <Item
                   key={sound.id}
-                  variant="muted"
-                  className={`text-white/70 bg-black/5 hover:bg-white/20 cursor-pointer hover:backdrop-blur-lg`}
+                  variant="panel"
+                  className="bg-black/5"
                   onClick={() => {
                     if (isSoundMissing) {
                       setSoundDialogQueue([sound]);

@@ -104,9 +104,6 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   return (
     <FormProvider {...methods}>
       <DrawerDialog
-        classNames={{
-          title: "[font-family:DeathLetter] tracking-wider text-2xl",
-        }}
         open={isOpen}
         onOpenChange={(open) => { if (!open) handleClose(); }}
         title={isEditMode ? "Edit Pad" : "New Pad"}

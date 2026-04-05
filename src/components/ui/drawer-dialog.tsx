@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/drawer";
 
 import { useIsMd } from "@/hooks/useBreakpoint";
+import { cn } from "@/lib/utils";
 
 export interface ClassNames {
   trigger?: string;
@@ -52,7 +53,11 @@ export interface DrawerDialogProps {
   close?: React.ReactNode;
   classNames?: ClassNames;
   styles?: Styles;
+  /** Apply the DeathLetter themed title style. Defaults to true. */
+  themed?: boolean;
 }
+
+const THEMED_TITLE_CLASS = "font-deathletter tracking-wider text-2xl";
 
 const StandardDialog = ({
   open,
@@ -65,6 +70,7 @@ const StandardDialog = ({
   close,
   classNames,
   styles,
+  themed = true,
 }: DrawerDialogProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,7 +86,7 @@ const StandardDialog = ({
       <DialogContent className={classNames?.content} style={styles?.content} onEscapeKeyDown={(e) => e.preventDefault()}>
         {(title || description) && (
           <DialogHeader style={styles?.header}>
-            {title && <DialogTitle className={classNames?.title} style={styles?.title}>{title}</DialogTitle>}
+            {title && <DialogTitle className={cn(themed && THEMED_TITLE_CLASS, classNames?.title)} style={styles?.title}>{title}</DialogTitle>}
             {description && (
               <DialogDescription style={styles?.description}>
                 {description}
@@ -117,6 +123,7 @@ const StandardDrawer = ({
   close,
   classNames,
   styles,
+  themed = true,
 }: DrawerDialogProps) => {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -132,7 +139,7 @@ const StandardDrawer = ({
       <DrawerContent className={classNames?.content} style={styles?.content} onEscapeKeyDown={(e) => e.preventDefault()}>
         {(title || description) && (
           <DrawerHeader className="text-left" style={styles?.header}>
-            {title && <DrawerTitle className={classNames?.title} style={styles?.title}>{title}</DrawerTitle>}
+            {title && <DrawerTitle className={cn(themed && THEMED_TITLE_CLASS, classNames?.title)} style={styles?.title}>{title}</DrawerTitle>}
           {description && (
             <DrawerDescription
               className={classNames?.description}
@@ -174,6 +181,7 @@ export const DrawerDialog = ({
   close,
   classNames,
   styles,
+  themed = true,
 }: DrawerDialogProps) => {
 
   const isDesktop = useIsMd();
@@ -190,6 +198,7 @@ export const DrawerDialog = ({
         close={close}
         classNames={classNames}
         styles={styles}
+        themed={themed}
       />
     );
   } else {
@@ -205,6 +214,7 @@ export const DrawerDialog = ({
         close={close}
         classNames={classNames}
         styles={styles}
+        themed={themed}
       />
     );
   }

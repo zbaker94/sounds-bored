@@ -71,17 +71,15 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
     <div className="flex flex-col gap-4">
       {/* Selection Type */}
       <div className="flex flex-col gap-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Sound Selection
-        </Label>
+        <Label variant="section">Sound Selection</Label>
         <Tabs value={selectionType} onValueChange={(v) => {
           if (v === "assigned" || v === "tag" || v === "set")
             handleSelectionTypeChange(v);
         }}>
-          <TabsList className="w-full">
-            <TabsTrigger value="assigned" className="flex-1">Assigned</TabsTrigger>
-            <TabsTrigger value="tag" className="flex-1">Tag</TabsTrigger>
-            <TabsTrigger value="set" className="flex-1">Set</TabsTrigger>
+          <TabsList stretch>
+            <TabsTrigger value="assigned">Assigned</TabsTrigger>
+            <TabsTrigger value="tag">Tag</TabsTrigger>
+            <TabsTrigger value="set">Set</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -106,9 +104,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
 
       {/* Arrangement */}
       <div className="flex flex-col gap-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Arrangement
-        </Label>
+        <Label variant="section">Arrangement</Label>
         <Tabs
           value={arrangement}
           onValueChange={(v) => {
@@ -116,9 +112,9 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
               handleArrangementChange(v as Arrangement);
           }}
         >
-          <TabsList className="w-full">
+          <TabsList stretch>
             {ARRANGEMENT_OPTIONS.map((opt) => (
-              <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+              <TabsTrigger key={opt.value} value={opt.value}>
                 {opt.label}
               </TabsTrigger>
             ))}
@@ -128,9 +124,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
 
       {/* Playback Mode */}
       <div className="flex flex-col gap-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Playback Mode
-        </Label>
+        <Label variant="section">Playback Mode</Label>
         <Tabs
           value={playbackMode}
           onValueChange={(v) => {
@@ -138,9 +132,9 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
               setValue(pbPath, v as PlaybackMode, { shouldDirty: true });
           }}
         >
-          <TabsList className="w-full">
+          <TabsList stretch>
             {PLAYBACK_MODE_OPTIONS.map((opt) => (
-              <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+              <TabsTrigger key={opt.value} value={opt.value}>
                 {opt.label}
               </TabsTrigger>
             ))}
@@ -150,9 +144,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
 
       {/* Retrigger Mode */}
       <div className="flex flex-col gap-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Retrigger Mode
-        </Label>
+        <Label variant="section">Retrigger Mode</Label>
         <Tabs
           value={retriggerMode}
           onValueChange={(v) => {
@@ -160,11 +152,11 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
               setValue(rtPath, v as RetriggerMode, { shouldDirty: true });
           }}
         >
-          <TabsList className="w-full">
+          <TabsList stretch>
             {RETRIGGER_MODE_OPTIONS
               .filter((opt) => !opt.arrangements || opt.arrangements.includes(arrangement))
               .map((opt) => (
-                <TabsTrigger key={opt.value} value={opt.value} className="flex-1">
+                <TabsTrigger key={opt.value} value={opt.value}>
                   {opt.label}
                 </TabsTrigger>
               ))}
@@ -175,9 +167,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
       {/* Volume */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Volume
-          </Label>
+          <Label variant="section">Volume</Label>
           <span className="text-xs text-muted-foreground tabular-nums">
             {layer?.volume ?? 100}%
           </span>
