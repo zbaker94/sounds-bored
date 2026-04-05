@@ -6,7 +6,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
-import { getPadProgress } from "@/lib/audio/padPlayer";
+import { getPadProgress, stopPad } from "@/lib/audio/padPlayer";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Copy01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
@@ -286,6 +286,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
         padName={pad.name}
         onConfirm={() => {
           setConfirmingDelete(false);
+          stopPad(pad);
           deletePad(sceneId, pad.id);
         }}
         onCancel={() => setConfirmingDelete(false)}
