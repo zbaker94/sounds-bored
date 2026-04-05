@@ -1,8 +1,7 @@
 # Changelog
 
-## v1.2.0
-
-This release introduces **Export to ZIP**, letting you package your entire project — including all referenced sounds — into a portable archive with cancellation support and a real-time progress dialog. It also brings significant polish across the board: smoother fade interactions, richer pad animations, tag-based sound matching with an Any/All toggle, and a new `Ctrl+Shift+S` Save As shortcut.
+## Current Changes
+- Dialogs no longer close when clicking outside (fixes accidental dismissal)
 
 - The Export keyboard shortcut changed from `Ctrl+X` to `Ctrl+Shift+E`
 - Added `Ctrl+Shift+S` keyboard shortcut for Save As

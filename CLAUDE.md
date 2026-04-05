@@ -339,6 +339,14 @@ npm run test:coverage    # Generate coverage report
 npm run test:rust        # Run Rust tests
 ```
 
+### Releasing
+
+Releases are triggered by pushing a `vX.X.X` git tag. Steps:
+
+1. Bump `"version"` in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
+2. Commit: `git commit -m "chore: bump version to vX.X.X"`
+3. Tag and push: `git tag vX.X.X && git push && git push origin vX.X.X`
+
 ### Project Operations (via Tauri APIs)
 
 ```typescript

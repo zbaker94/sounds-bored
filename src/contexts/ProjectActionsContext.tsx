@@ -42,8 +42,6 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const isDirty = useProjectStore((s) => s.isDirty);
   const markAsPermanent = useProjectStore((s) => s.markAsPermanent);
 
-  const sounds = useLibraryStore((s) => s.sounds);
-
   const saveProjectMutation = useSaveProject();
   const saveProjectAsMutation = useSaveProjectAs();
 
