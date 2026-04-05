@@ -1,5 +1,9 @@
 # Changelog
 
+## Current Changes
+- Added a loading screen that displays while critical background images preload, preventing layout flashes on startup
+- Preloads all background and decorative images in the background for smoother visual transitions
+
 ## v1.1.8
 
 Version 1.1.7 introduces comprehensive fade controls, including individual pad fade-in/out (F key), one-click crossfade between pads (X key), per-pad configurable fade durations, and a global default fade duration setting in App Settings. This release also fixes audio issues where hold-mode pads could start at reduced volume after release, and improves the volume adjustment display to show pad name and volume simultaneously.

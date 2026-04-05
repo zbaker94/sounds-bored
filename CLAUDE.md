@@ -60,48 +60,133 @@ Audio file paths are **relative to project folder**, stored as `Sound.filePath`.
 src/
 ├── components/
 │   ├── composite/
-│   │   └── MenuBar/               # TODO: rename to SceneTabBar/
+│   │   ├── DownloadManager/
+│   │   │   ├── DownloadItem.tsx       # Single yt-dlp download row
+│   │   │   └── DownloadManager.tsx    # Download queue panel
+│   │   ├── PadConfigDrawer/
+│   │   │   ├── LayerAccordion.tsx     # Collapsible layer list within pad config
+│   │   │   ├── LayerConfigSection.tsx # Per-layer settings (playback, retrigger, etc.)
+│   │   │   ├── PadConfigDrawer.tsx    # Drawer for editing a pad's layers/settings
+│   │   │   ├── SoundFolderTree.tsx    # File-tree view of sound library
+│   │   │   ├── SoundSelector.tsx      # Sound picker (search + tree)
+│   │   │   └── soundTreeUtils.ts      # Helpers for building the folder tree
+│   │   ├── SceneTabBar/
+│   │   │   ├── MenuDrawer.tsx         # Hamburger menu drawer (project actions)
+│   │   │   ├── SceneTab.tsx           # Individual scene tab button
+│   │   │   └── SceneTabBar.tsx        # Tab bar + add/delete scene actions
+│   │   ├── SceneView/
+│   │   │   ├── PadButton.tsx          # Triggerable pad button
+│   │   │   └── SceneView.tsx          # CSS grid of pads for the active scene
+│   │   └── SidePanel/
+│   │       ├── AddSetDialog.tsx        # Dialog: create a new set
+│   │       ├── AddTagsDialog.tsx       # Dialog: add tags to a sound
+│   │       ├── AddToSetDialog.tsx      # Dialog: add sound to an existing set
+│   │       ├── EditSection.tsx         # Sound metadata edit controls
+│   │       ├── PlaySection.tsx         # Sound preview playback controls
+│   │       ├── SidePanel.tsx           # Right-side panel shell
+│   │       ├── SoundsPanel.tsx         # Sound library list + filter
+│   │       └── VolumeSection.tsx       # Volume/gain slider
 │   ├── modals/
-│   │   ├── ConfirmCloseDialog.tsx
-│   │   └── SaveProjectDialog.tsx
+│   │   ├── ConfirmCloseDialog.tsx      # Unsaved-changes close confirmation
+│   │   ├── ConfirmDeletePadDialog.tsx  # Delete pad confirmation
+│   │   ├── ConfirmDeleteSceneDialog.tsx
+│   │   ├── DownloadDialog.tsx          # yt-dlp URL input dialog
+│   │   ├── ResolveMissingDialog.tsx    # Locate a single missing sound file
+│   │   ├── ResolveMissingFolderDialog.tsx # Re-point entire sounds folder
+│   │   ├── SaveProjectDialog.tsx       # Save As dialog
+│   │   └── SettingsDialog.tsx          # App settings (fade, etc.)
 │   ├── screens/
-│   │   ├── main/MainPage.tsx      # Main editor (currently empty shell — Phase 3)
-│   │   └── start/StartScreen.tsx  # New/Load project screen
-│   ├── ui/                        # shadcn/ui components
-│   └── ErrorBoundary.tsx          # AppErrorBoundary + RouteErrorElement
+│   │   ├── main/MainPage.tsx           # Main editor (toolbar + SceneTabBar + SceneView + SidePanel)
+│   │   └── start/StartScreen.tsx       # New/Load project screen
+│   ├── ui/                             # shadcn/ui primitives
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── checkbox.tsx
+│   │   ├── collapsible.tsx
+│   │   ├── combobox.tsx
+│   │   ├── dialog.tsx
+│   │   ├── drawer.tsx
+│   │   ├── drawer-dialog.tsx           # Responsive drawer-or-dialog component
+│   │   ├── empty.tsx                   # Empty state placeholder
+│   │   ├── input.tsx
+│   │   ├── input-group.tsx
+│   │   ├── item.tsx                    # Generic list item
+│   │   ├── kbd.tsx                     # Keyboard shortcut badge
+│   │   ├── label.tsx
+│   │   ├── progress.tsx
+│   │   ├── select.tsx
+│   │   ├── separator.tsx
+│   │   ├── slider.tsx
+│   │   ├── sonner.tsx                  # Toast (Sonner wrapper) — only toast impl
+│   │   ├── tabs.tsx
+│   │   ├── textarea.tsx
+│   │   ├── tooltip.tsx
+│   │   └── truncated-path.tsx          # Path display that truncates middle segments
+│   └── ErrorBoundary.tsx               # AppErrorBoundary + RouteErrorElement
+├── contexts/
+│   └── ProjectActionsContext.tsx       # Context for project-level actions (save, close, etc.)
 ├── hooks/
-│   ├── useAutoSave.ts             # Auto-save logic (uses projectStore)
-│   └── useWindowCloseHandler.ts
+│   ├── useAutoSave.ts                  # Auto-save logic (uses projectStore)
+│   ├── useBootLoader.ts                # App startup: load settings, history, library
+│   ├── useBreakpoint.ts                # Responsive breakpoint detection
+│   ├── useFadeMode.ts                  # Compute active fade duration from settings + pad config
+│   ├── useGlobalHotkeys.ts             # Global keyboard shortcut registration
+│   ├── useImportSounds.ts              # Drag-and-drop / file-picker sound import
+│   ├── usePadGesture.ts                # Pointer events for press/hold/release on pads
+│   ├── usePreloadImages.ts             # Preload background/asset images
+│   ├── useProjectLifecycle.ts          # New/open/save/close project orchestration
+│   ├── useSoundPreview.ts              # Preview playback for sound library
+│   ├── useUpdater.ts                   # Tauri updater integration
+│   └── useWindowCloseHandler.ts        # Intercept OS window close
 ├── lib/
-│   ├── audio/                     # PLANNED: audioEngine, soundLoader, padPlayer, muteManager
-│   ├── constants.ts               # APP_FOLDER, PROJECT_FILE_NAME, SOUNDS_SUBFOLDER, AUDIO_EXTENSIONS, etc.
-│   ├── history.ts                 # Manages recent projects file
-│   ├── history.queries.ts         # TanStack Query hooks
-│   ├── history.helpers.ts
-│   ├── migrations.ts              # Versioned project migration registry
-│   ├── project.ts                 # Project CRUD operations
-│   ├── project.queries.ts         # TanStack Query hooks
-│   ├── schemas.ts                 # Zod schemas — full domain model
-│   ├── queryClient.ts
-│   └── utils.ts                   # cn() helper
+│   ├── audio/
+│   │   ├── arrangement.ts              # LayerArrangement logic (simultaneous/sequential/shuffled)
+│   │   ├── audioContext.ts             # Singleton Web Audio AudioContext
+│   │   ├── audioVoice.ts               # Single playing voice (gain node, source, fade)
+│   │   ├── bufferCache.ts              # AudioBuffer cache keyed by Sound.id
+│   │   ├── padPlayer.ts                # Trigger/stop a pad (coordinates layers + muting)
+│   │   ├── preview.ts                  # One-shot preview playback (sound library)
+│   │   └── streamingCache.ts           # Streaming audio cache for yt-dlp downloads
+│   ├── appSettings.ts                  # Read/write app settings file
+│   ├── appSettings.queries.ts          # TanStack Query hooks for app settings
+│   ├── constants.ts                    # APP_FOLDER, PROJECT_FILE_NAME, SOUNDS_SUBFOLDER, AUDIO_EXTENSIONS, etc.
+│   ├── history.ts                      # Manages recent projects file (history.json)
+│   ├── history.queries.ts              # TanStack Query hooks for history
+│   ├── history.helpers.ts              # History entry helpers
+│   ├── import.ts                       # Sound file import logic (copy to sounds/, reconcile)
+│   ├── library.ts                      # Library CRUD (read/write library.json)
+│   ├── library.queries.ts              # TanStack Query hooks for library
+│   ├── library.reconcile.ts            # Auto-discover sounds/ folder, merge with stored library
+│   ├── migrations.ts                   # Versioned project migration registry
+│   ├── project.ts                      # Project CRUD operations
+│   ├── project.queries.ts              # TanStack Query hooks for project
+│   ├── queryClient.ts                  # TanStack Query client singleton
+│   ├── schemas.ts                      # Zod schemas — full domain model
+│   ├── utils.ts                        # cn() helper + misc utils
+│   ├── ytdlp.ts                        # yt-dlp sidecar integration
+│   └── ytdlp.queries.ts                # TanStack Query hooks for yt-dlp
 ├── state/
-│   ├── projectStore.ts            # Zustand + Immer — current project (scenes, pads)
-│   ├── libraryStore.ts            # Zustand + Immer — global library (sounds, tags, sets)
-│   ├── appSettingsStore.ts        # Zustand — app-level settings
-│   └── playbackStore.ts           # Zustand — runtime-only (empty shell)
+│   ├── appSettingsStore.ts             # Zustand — app-level settings (fade, etc.)
+│   ├── downloadStore.ts                # Zustand — yt-dlp download queue (runtime-only)
+│   ├── libraryStore.ts                 # Zustand + Immer — global library (sounds, tags, sets)
+│   ├── playbackStore.ts                # Zustand — active voices, AudioBuffers (runtime-only)
+│   ├── projectStore.ts                 # Zustand + Immer — current project (scenes, pads)
+│   ├── uiStore.ts                      # Zustand — UI state (selected pad, open drawers, etc.)
+│   └── updaterStore.ts                 # Zustand — Tauri updater state
 ├── test/
-│   ├── factories.ts               # Test data factories (createMockProject, createMockHistoryEntry, etc.)
-│   ├── setup.ts                   # Vitest config
-│   └── tauri-mocks.ts             # Mock Tauri APIs
-├── App.tsx                        # Router setup (no Provider needed — Zustand is module-level)
-└── main.tsx                       # React entry point
+│   ├── factories.ts                    # Test data factories (createMockProject, etc.)
+│   ├── setup.ts                        # Vitest global setup
+│   └── tauri-mocks.ts                  # Mock Tauri APIs
+├── App.tsx                             # Router setup
+└── main.tsx                            # React entry point
 
 src-tauri/
 ├── src/
-│   ├── lib.rs                     # Tauri app setup + plugins
-│   └── main.rs                    # Entry point
+│   ├── commands.rs                     # Tauri IPC commands
+│   ├── lib.rs                          # Tauri app setup + plugins
+│   └── main.rs                         # Entry point
 ├── capabilities/
-│   └── default.json               # Tauri permissions
+│   └── default.json                    # Tauri permissions
 └── Cargo.toml
 ```
 
@@ -312,12 +397,11 @@ describe('projectStore', () => {
 
 ## Planned Features (Not Yet Implemented)
 
-- [ ] Phase 3: MainPage UI shell (toolbar, scene tab bar, pad grid placeholder)
-- [ ] Phase 4: Sound import UI, sound library panel, pad assignment
-- [ ] Phase 5: Audio engine (`src/lib/audio/`: audioEngine, soundLoader, padPlayer, muteManager)
-- [ ] Phase 5: `playbackStore.ts` — AudioBuffers, active voices, master volume
-- [ ] Phase 6: yt-dlp integration (Tauri sidecar), `downloadStore.ts`
-- [ ] Phase 6: Web audio import with stream-while-downloading
+- [x] Phase 3: MainPage UI shell (toolbar, scene tab bar, pad grid)
+- [x] Phase 4: Sound import UI, sound library panel, pad assignment
+- [x] Phase 5: Audio engine (`src/lib/audio/`: padPlayer, audioVoice, bufferCache, arrangement, preview)
+- [x] Phase 5: `playbackStore.ts` — active voices, AudioBuffers
+- [x] Phase 6 (partial): yt-dlp integration (Tauri sidecar), `downloadStore.ts`, `streamingCache.ts`
 - [ ] Phase 6: Undo/redo (Zustand + Immer middleware)
 - [ ] Phase 6: Auto-save failure warning toast + "last saved at" indicator
 
@@ -360,7 +444,7 @@ Web Audio API first. No Rust plugins needed initially. AudioBuffer caching is cr
 
 ---
 
-**Last Updated**: 2026-03-14
+**Last Updated**: 2026-04-04
 **Current Git Branch**: master
-**Phase Complete**: Phase 2 (Data Model + Zustand migration)
-**Next Phase**: Phase 3 — UI Shell (MainPage layout, scene tab bar, pad grid)
+**Phase Complete**: Phase 5 + partial Phase 6 (audio engine, yt-dlp sidecar, full UI)
+**Next Phase**: Phase 6 — Undo/redo, auto-save failure UX
