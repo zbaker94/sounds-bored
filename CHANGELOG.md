@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When you switch a pad's playback mode to **loop** while it's already playing a sequential chain, the change now takes effect at the next natural sound boundary — no need to retrigger the pad.
 - Changing a pad layer's playback mode (e.g., loop → one-shot) while audio is playing now takes effect immediately without requiring a retrigger.
 - Looping sounds correctly stop looping when playback mode is switched to one-shot or hold mid-playback.
 - Sequential looping chains are cancelled when switching away from a looping mode, preventing sounds from restarting unexpectedly after the current playback ends.

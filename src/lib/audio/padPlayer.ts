@@ -7,6 +7,7 @@ import { buildPlayOrder, isChained } from "./arrangement";
 import { filterSoundsByTags } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -294,24 +295,30 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
 }
 
+/** Read the current playbackMode for a layer from the live project store.
+ *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted). */
+function livePlaybackMode(padId: string, layerId: string, captured: Layer["playbackMode"]): Layer["playbackMode"] {
+  const project = useProjectStore.getState().project;
+  if (project) {
+    for (const scene of project.scenes) {
+      const pad = scene.pads.find((p) => p.id === padId);
+      if (pad) return pad.layers.find((l) => l.id === layerId)?.playbackMode ?? captured;
+    }
+  }
+  return captured;
+}
+
 /**
  * Update the loop flag on any active voices for a layer.
  *
  * For non-chained arrangements: sets `source.loop` / `audio.loop` live so the
  * current pass plays to natural completion instead of stopping immediately.
- * `hold → one-shot` transitions also drain naturally; `releasePadHoldLayers`
- * skips the layer on pointer-up because `playbackMode` is already "one-shot"
- * in the store, so the current pass plays to its natural end.
- *
  * For chained arrangements transitioning *away* from a looping mode: the loop
  * flag is irrelevant (onended drives restart), so we clear the chain queue.
  * When the current voice ends, `onended` sees `remaining === undefined` and
- * skips the restart.
- *
- * Limitation: transitions *into* a looping mode on chained arrangements are not
- * applied to active voices — the `onended` closure captured at voice creation
- * still holds the original playbackMode and will not restart the chain. The new
- * mode takes effect on the next retrigger.
+ * skips the restart. Transitions *into* a looping mode on chained arrangements
+ * take effect at the next natural chain boundary — the onended closure reads
+ * playbackMode from the live store rather than the captured layer object.
  *
  * No-op if the layer has no active voices.
  */
@@ -510,10 +517,12 @@ async function startLayerSound(
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
       } else if (
-        (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
+        (() => { const m = livePlaybackMode(pad.id, layer.id, layer.playbackMode); return m === "loop" || m === "hold"; })() &&
         isChained(layer.arrangement)
       ) {
-        // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running)
+        // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running).
+        // playbackMode is read from the live store so mid-playback config changes take effect
+        // at the next chain boundary without requiring a retrigger.
         const newOrder = buildPlayOrder(layer.arrangement, allSounds);
         if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
         const [first, ...rest] = newOrder;

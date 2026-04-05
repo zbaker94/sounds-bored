@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createMockLayer, createMockPad, createMockSound } from "@/test/factories";
+import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { useProjectStore, initialProjectState } from "@/state/projectStore";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ beforeEach(async () => {
     padVolumes: {},
     volumeTransitioningPadIds: [],
   });
+  useProjectStore.setState({ ...initialProjectState });
   useLibraryStore.setState({
     sounds: [],
     tags: [],
@@ -1170,6 +1172,44 @@ describe("syncLayerPlaybackMode", () => {
     await tick();
 
     expect(createdSources).toHaveLength(2);
+  });
+
+  it("sequential+one-shot → loop: chain restarts after all sounds play through", async () => {
+    const { triggerPad, syncLayerPlaybackMode } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Simulate updatePad: store now reflects the new playbackMode
+    const updatedLayer = { ...layer, playbackMode: "loop" as const };
+    const scene = createMockScene({ pads: [{ ...pad, layers: [updatedLayer] }] });
+    useProjectStore.getState().loadProject(
+      createMockHistoryEntry(),
+      createMockProject({ scenes: [scene] }),
+      false,
+    );
+    syncLayerPlaybackMode(updatedLayer);
+
+    // Sound A ends → advances to B (remaining was non-empty)
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(2);
+
+    // Sound B ends → chain exhausted → live lookup returns "loop" → restarts
+    createdSources[1].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(3);
   });
 });
 
