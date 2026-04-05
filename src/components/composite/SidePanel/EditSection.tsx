@@ -9,12 +9,12 @@ import { modKey } from "@/lib/utils";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import gibbering from "@/assets/gibbering.gif";
 import { SoundsPanel } from "./SoundsPanel";
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 
 export function EditSection() {
   const isMd = useIsMd();
   const tooltipSide = useMemo(() => (isMd ? "left" : "top"), [isMd]);
-  const soundsOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SOUNDS_PANEL));
+  const soundsOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.SOUNDS_PANEL));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const editMode = useUiStore((s) => s.editMode);

@@ -87,3 +87,15 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   toggleEditMode: () =>
     set((state) => ({ editMode: !state.editMode })),
 }));
+
+// Standalone selector factories for reactive subscriptions via useUiStore().
+// Use these instead of `(s) => s.isOverlayOpen(id)` to avoid creating a new
+// function reference on every state change, which would cause unnecessary re-renders.
+export const selectIsOverlayOpen = (id: string) => (s: UiStore) =>
+  s.overlayStack.some((entry) => entry.id === id);
+
+export const selectIsTopOverlay = (id: string) => (s: UiStore) =>
+  s.overlayStack.at(-1)?.id === id;
+
+export const selectHasOpenOverlay = (s: UiStore) =>
+  s.overlayStack.length > 0;

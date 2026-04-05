@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { useUiStore, initialUiState } from "./uiStore";
+import { useUiStore, initialUiState, selectIsOverlayOpen, selectIsTopOverlay, selectHasOpenOverlay } from "./uiStore";
 
 describe("uiStore", () => {
   beforeEach(() => {
@@ -131,6 +131,55 @@ describe("uiStore", () => {
         { id: "confirm-close", type: "dialog" },
       ]);
       expect(useUiStore.getState().isTopOverlay("confirm-close")).toBe(true);
+    });
+  });
+
+  describe("selectIsOverlayOpen", () => {
+    it("returns true when overlay is in the stack", () => {
+      useUiStore.getState().openOverlay("menu-drawer", "drawer");
+      expect(selectIsOverlayOpen("menu-drawer")(useUiStore.getState())).toBe(true);
+    });
+
+    it("returns false when overlay is not in the stack", () => {
+      expect(selectIsOverlayOpen("menu-drawer")(useUiStore.getState())).toBe(false);
+    });
+
+    it("returns true for a mid-stack overlay", () => {
+      const { openOverlay } = useUiStore.getState();
+      openOverlay("menu-drawer", "drawer");
+      openOverlay("save-dialog", "dialog");
+      expect(selectIsOverlayOpen("menu-drawer")(useUiStore.getState())).toBe(true);
+    });
+  });
+
+  describe("selectIsTopOverlay", () => {
+    it("returns true for the topmost overlay", () => {
+      const { openOverlay } = useUiStore.getState();
+      openOverlay("menu-drawer", "drawer");
+      openOverlay("save-dialog", "dialog");
+      expect(selectIsTopOverlay("save-dialog")(useUiStore.getState())).toBe(true);
+    });
+
+    it("returns false for a non-top overlay", () => {
+      const { openOverlay } = useUiStore.getState();
+      openOverlay("menu-drawer", "drawer");
+      openOverlay("save-dialog", "dialog");
+      expect(selectIsTopOverlay("menu-drawer")(useUiStore.getState())).toBe(false);
+    });
+
+    it("returns false when stack is empty", () => {
+      expect(selectIsTopOverlay("menu-drawer")(useUiStore.getState())).toBe(false);
+    });
+  });
+
+  describe("selectHasOpenOverlay", () => {
+    it("returns true when overlays are open", () => {
+      useUiStore.getState().openOverlay("menu-drawer", "drawer");
+      expect(selectHasOpenOverlay(useUiStore.getState())).toBe(true);
+    });
+
+    it("returns false when stack is empty", () => {
+      expect(selectHasOpenOverlay(useUiStore.getState())).toBe(false);
     });
   });
 

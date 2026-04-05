@@ -1,4 +1,4 @@
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ClipboardIcon, FolderExportIcon, Hamburger01Icon, HomeIcon, SaveIcon, Settings01Icon } from "@hugeicons/core-free-icons";
@@ -11,7 +11,7 @@ import handsigil from "@/assets/handsigil.png";
 import brickOverlay from "@/assets/brick-overlay.png";
 
 export function MenuDrawer() {
-  const isOpen = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.MENU_DRAWER));
+  const isOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.MENU_DRAWER));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const { canSave, handleSaveClick, requestNavigateAway, handleSaveAsMenuClick, handleExportClick } = useProjectActions();

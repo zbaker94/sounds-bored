@@ -9,7 +9,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
 import { discardTemporaryProject, saveProject } from "@/lib/project";
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { ExportProgressDialog } from "@/components/modals/ExportProgressDialog";
@@ -45,9 +45,9 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const saveProjectMutation = useSaveProject();
   const saveProjectAsMutation = useSaveProjectAs();
 
-  const showSaveDialog = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.SAVE_PROJECT_DIALOG));
-  const showNavigateConfirm = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG));
-  const showExportDialog = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG));
+  const showSaveDialog = useUiStore(selectIsOverlayOpen(OVERLAY_ID.SAVE_PROJECT_DIALOG));
+  const showNavigateConfirm = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG));
+  const showExportDialog = useUiStore(selectIsOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 

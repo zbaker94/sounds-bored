@@ -6,7 +6,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { discardTemporaryProject } from "@/lib/project";
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
 
@@ -27,7 +27,7 @@ export function useProjectLifecycle() {
 
   const { requestSaveAndThen } = useProjectActions();
 
-  const showConfirmClose = useUiStore((s) => s.isOverlayOpen(OVERLAY_ID.CONFIRM_CLOSE_DIALOG));
+  const showConfirmClose = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_CLOSE_DIALOG));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 
