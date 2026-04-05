@@ -7,7 +7,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
-import { setPadVolume } from "@/lib/audio/padPlayer";
+import { setPadVolume, stopPad } from "@/lib/audio/padPlayer";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
@@ -119,6 +119,15 @@ describe("PadButton", () => {
       const confirmBtn = await screen.findByRole("button", { name: /^delete$/i });
       await userEvent.click(confirmBtn);
       expect(useProjectStore.getState().project!.scenes[0].pads).toHaveLength(0);
+    });
+
+    it("confirming delete calls stopPad before removing the pad", async () => {
+      const pad = loadPadInStore();
+      render(<PadButton pad={pad} sceneId="scene-1" />);
+      await userEvent.click(screen.getByRole("button", { name: /delete pad/i }));
+      const confirmBtn = await screen.findByRole("button", { name: /^delete$/i });
+      await userEvent.click(confirmBtn);
+      expect(stopPad).toHaveBeenCalledWith(pad);
     });
   });
 

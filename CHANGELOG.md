@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Deleting a pad now stops any audio it is playing before removing it, preventing sounds from continuing after a pad is deleted.
 - Fixed the Stop All button to properly stop all playing sounds through the audio engine instead of only updating store state
 - Fixed an internal audio ordering issue where simultaneous and sequential playback modes now correctly share the same sound ordering logic, improving consistency when triggering pads.
 - Improved UI rendering performance by replacing inline overlay state selectors with stable selector factories, preventing unnecessary re-renders when overlay state changes
