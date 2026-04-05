@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Refactored internal pad configuration code to eliminate duplicate default layer definitions (no user-facing behavior change)
 - No user-facing changes in this release.
 
 ## v1.2.1
