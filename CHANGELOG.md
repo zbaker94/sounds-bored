@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Clicking a fading-out pad now reverses the fade, smoothly bringing it back to full volume instead of stopping it
 - Pad buttons now have a subtle 3D tilt effect that responds to mouse movement
 - Playing pads display an animated pulse ring indicator
 - Pads and layers animate in smoothly when added or when switching scenes

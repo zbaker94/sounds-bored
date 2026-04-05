@@ -5,6 +5,8 @@ import { useUiStore } from "@/state/uiStore";
 import {
   fadePadOut,
   fadePadIn,
+  fadePadInFromCurrent,
+  isPadFadingOut,
   crossfadePads,
   resolveFadeDuration,
 } from "@/lib/audio/padPlayer";
@@ -88,7 +90,11 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
         const pad = pads.find((p) => p.id === padId)!;
         const duration = resolveFadeDuration(pad);
         if (playingPadIds.includes(padId)) {
-          fadePadOut(pad, duration);
+          if (isPadFadingOut(padId)) {
+            fadePadInFromCurrent(pad, duration);
+          } else {
+            fadePadOut(pad, duration);
+          }
         } else {
           fadePadIn(pad, duration).catch(console.error);
         }
