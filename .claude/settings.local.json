@@ -17,7 +17,8 @@
       "Bash(node -e \"const icons = require\\('@hugeicons/core-free-icons'\\); const settingsKeys = Object.keys\\(icons\\).filter\\(k => k.toLowerCase\\(\\).includes\\('setting'\\) || k.toLowerCase\\(\\).includes\\('gear'\\) || k.toLowerCase\\(\\).includes\\('cog'\\)\\); console.log\\(settingsKeys.join\\('\\\\n'\\)\\);\")",
       "Read(//tmp/**)",
       "Bash(gh issue:*)",
-      "mcp___hypothesi_tauri-mcp-server__driver_session"
+      "mcp___hypothesi_tauri-mcp-server__driver_session",
+      "Bash(gh label:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

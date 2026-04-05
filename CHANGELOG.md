@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- No user-facing changes in this release.
+
 ## v1.2.1
 
 This release introduces **Export to ZIP** — a fully async export that packages your project and all referenced sounds into a portable archive with cancellation support and a real-time progress dialog. It also brings significant pad interaction polish (3D tilt effects, animated pulse rings, smarter fade-freeze and fade-reversal behavior, color-coded fade states), a new Any/All tag filter toggle with live match counts, and the `Ctrl+Shift+E` / `Ctrl+Shift+S` keyboard shortcuts for Export and Save As.
