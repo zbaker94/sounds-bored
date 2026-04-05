@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an internal audio ordering issue where simultaneous and sequential playback modes now correctly share the same sound ordering logic, improving consistency when triggering pads.
 - Improved UI rendering performance by replacing inline overlay state selectors with stable selector factories, preventing unnecessary re-renders when overlay state changes
 - Temporary project folder cleanup failures are now handled silently instead of logging a warning
 - Failed sound file copies during import are silently skipped; callers determine success by inspecting the returned file list

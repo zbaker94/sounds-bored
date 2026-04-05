@@ -19,8 +19,10 @@ export function shuffleArray<T>(arr: T[]): T[] {
 export function buildPlayOrder(arrangement: Arrangement, sounds: Sound[]): Sound[] {
   switch (arrangement) {
     case "simultaneous":
-      return [...sounds];
     case "sequential":
+      // Both return sounds in their defined order — the distinction between
+      // firing all at once vs. chaining one after another is handled by
+      // isChained() at the call site in padPlayer.ts.
       return [...sounds];
     case "shuffled":
       return shuffleArray(sounds);
