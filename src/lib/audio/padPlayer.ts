@@ -296,7 +296,8 @@ export function syncLayerVolume(layerId: string, volume: number): void {
 }
 
 /** Read the current playbackMode for a layer from the live project store.
- *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted). */
+ *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted)
+ *  or if no project is currently loaded (e.g. project cleared mid-playback). */
 function livePlaybackMode(padId: string, layerId: string, captured: Layer["playbackMode"]): Layer["playbackMode"] {
   const project = useProjectStore.getState().project;
   if (project) {
@@ -510,6 +511,7 @@ async function startLayerSound(
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
       // `remaining.length === 0` means the chain ran to completion naturally.
       const remaining = layerChainQueue.get(layer.id);
+      const liveMode = livePlaybackMode(pad.id, layer.id, layer.playbackMode);
       if (remaining === undefined) {
         // Queue was externally cleared (e.g. stopAll, retrigger restart) — do not chain.
       } else if (remaining.length > 0) {
@@ -517,12 +519,12 @@ async function startLayerSound(
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
       } else if (
-        (() => { const m = livePlaybackMode(pad.id, layer.id, layer.playbackMode); return m === "loop" || m === "hold"; })() &&
+        (liveMode === "loop" || liveMode === "hold") &&
         isChained(layer.arrangement)
       ) {
         // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running).
-        // playbackMode is read from the live store so mid-playback config changes take effect
-        // at the next chain boundary without requiring a retrigger.
+        // liveMode reads from the store so mid-playback config changes take effect at the
+        // next chain boundary without requiring a retrigger.
         const newOrder = buildPlayOrder(layer.arrangement, allSounds);
         if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
         const [first, ...rest] = newOrder;

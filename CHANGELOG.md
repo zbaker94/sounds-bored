@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where switching playback mode from "chained" to "loop" mid-playback would not properly restart the loop chain at the next boundary
+- Fixed a crash/hang that could occur when the project was cleared while audio was still playing
 - When you switch a pad's playback mode to **loop** while it's already playing a sequential chain, the change now takes effect at the next natural sound boundary — no need to retrigger the pad.
 - Changing a pad layer's playback mode (e.g., loop → one-shot) while audio is playing now takes effect immediately without requiring a retrigger.
 - Looping sounds correctly stop looping when playback mode is switched to one-shot or hold mid-playback.

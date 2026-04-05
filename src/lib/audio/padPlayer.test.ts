@@ -1098,6 +1098,26 @@ describe("syncLayerPlaybackMode", () => {
     expect(createdSources[0].loop).toBe(true);
   });
 
+  it("sets source.loop = true on active buffer voices when new playbackMode is hold → loop", async () => {
+    const { triggerPad, syncLayerPlaybackMode } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      playbackMode: "hold",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // hold already sets loop=true; verify setLoop(true) is a safe no-op
+    expect(createdSources[0].loop).toBe(true);
+    syncLayerPlaybackMode({ ...layer, playbackMode: "loop" });
+    expect(createdSources[0].loop).toBe(true);
+  });
+
   it("sets source.loop = false on active buffer voices when new playbackMode is hold → one-shot", async () => {
     const { triggerPad, syncLayerPlaybackMode } = await import("./padPlayer");
     const sound = createMockSound({ filePath: "a.wav" });
