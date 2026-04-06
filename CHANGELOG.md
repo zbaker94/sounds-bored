@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Improved stability of the layer list in pad configuration — newly added layers now open automatically and scroll into view more reliably
+- Fixed an edge case where the open layer could become desynced after a form reset
+- Drag-to-reorder layers in pad configuration is more efficient and less prone to unnecessary re-renders
 - Pad colors are now validated to require a proper 6-digit hex format (e.g. `#FF5500`), preventing invalid color values from being saved to a project.
 - Improved internal performance: pad volume transition tracking now uses a Set for O(1) lookups instead of an array, reducing redundant state updates during fade/crossfade operations
 - Improved internal playback tracking to use a more efficient data structure, resulting in more reliable pad state detection and faster "is playing" lookups across the app.
