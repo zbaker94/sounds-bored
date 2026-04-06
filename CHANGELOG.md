@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pad buttons now re-render less often during playback, improving performance when many sounds are playing simultaneously
+- The crossfade button now correctly enables/disables based on whether any pads are currently playing
+- Opening the pad edit drawer is more reliable due to internal callback stability improvements
 - No user-facing changes; internal test infrastructure updated to support new pad activity state tracking.
 - No user-facing changes in this release (internal code cleanup only).
 - Fixed a subtle timing bug in pad volume drag gesture where time-based sensitivity ramping could behave incorrectly in certain conditions

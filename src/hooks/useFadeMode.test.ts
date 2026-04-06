@@ -126,6 +126,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
   });
 
   it("deselects a pad on second tap", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padB.id]) }); // need ≥1 playing to enter crossfade
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -135,6 +136,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
   });
 
   it("exits mode when selection drops to 0", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padB.id]) }); // need ≥1 playing to enter crossfade
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -247,6 +249,69 @@ describe("useFadeMode — getPadFadeVisual", () => {
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
     expect(result.current.getPadFadeVisual(padA.id)).toBe("selected-in");
+  });
+});
+
+describe("useFadeMode — subscription optimization", () => {
+  it("does not re-render when playingPadIds changes and mode is null", () => {
+    // Render count tracking
+    let renderCount = 0;
+    const { result: counted } = renderHook(() => {
+      renderCount++;
+      return useFadeMode(allPads);
+    });
+    const baseRenderCount = renderCount;
+
+    // Simulate pad start/stop events by replacing the playingPadIds Set
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set(["pad-a"]) });
+    });
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set() });
+    });
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set(["pad-b"]) });
+    });
+
+    // Hook should NOT have re-rendered for these changes (mode is still null)
+    // The mode is null, so full playingPadIds changes should not cause re-renders
+    // Only hasPlayingPads (boolean) changes should trigger re-renders
+    // pad-a start: hasPlayingPads false->true = 1 render, pad-a stop: true->false = 1 render, pad-b start: false->true = 1 render
+    // Exactly 3 extra renders (for the boolean transitions), not 6+ (for each Set reference change)
+    expect(renderCount - baseRenderCount).toBe(3);
+    expect(counted.current.mode).toBeNull();
+  });
+
+  it("reflects playingPadIds changes while mode is active", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set() });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    expect(result.current.mode).toBe("fade");
+
+    // Initially no pads playing
+    expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-in");
+
+    // Start playing padA after entering mode — full subscription should be active
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    });
+
+    // Should now reflect the playing state
+    expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-out");
+  });
+
+  it("enterCrossfade uses hasPlayingPads check correctly", () => {
+    // No playing pads — should not enter crossfade
+    usePlaybackStore.setState({ playingPadIds: new Set() });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    expect(result.current.mode).toBeNull();
+
+    // With playing pads — should enter crossfade
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result: result2 } = renderHook(() => useFadeMode(allPads));
+    act(() => result2.current.enterCrossfade());
+    expect(result2.current.mode).toBe("crossfade");
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -17,12 +17,12 @@ import type { PadFadeVisual } from "@/hooks/useFadeMode";
 interface PadButtonProps {
   pad: Pad;
   sceneId: string;
-  onEditClick?: () => void;
+  onEditClick?: (pad: Pad) => void;
   fadeVisual?: PadFadeVisual;
-  onFadeTap?: () => void;
+  onFadeTap?: (padId: string) => void;
 }
 
-export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -134,7 +134,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.currentTarget.setPointerCapture(e.pointerId);
-      onFadeTap?.();
+      onFadeTap?.(pad.id);
     },
   };
 
@@ -241,7 +241,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
                 <button
                   type="button"
                   aria-label="Edit pad"
-                  onClick={(e) => { e.stopPropagation(); onEditClick?.(); }}
+                  onClick={(e) => { e.stopPropagation(); onEditClick?.(pad); }}
                   className="p-1 rounded bg-white/20 hover:bg-white/40 transition-colors"
                 >
                   <HugeiconsIcon icon={PencilEdit01Icon} size={14} className="text-white" />
@@ -293,4 +293,4 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
       />
     </>
   );
-}
+});
