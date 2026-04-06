@@ -23,7 +23,8 @@
       "Bash(gh pr create --title 'fix: padStreamingAudio tracks all streaming voices per pad as a Set \\(#7\\)' --body ':*)",
       "Bash(git checkout:*)",
       "Bash(git pull:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(gh pr:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

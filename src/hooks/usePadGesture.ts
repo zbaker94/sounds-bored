@@ -24,7 +24,7 @@ interface GestureState {
   cancelledFadeAtStart: boolean;
 }
 
-export function usePadGesture(pad: Pad) {
+export function usePadGesture(pad: Pad, now = Date.now) {
   const hasHoldLayer = pad.layers.some((l) => l.playbackMode === "hold");
 
   const state = useRef<GestureState>({
@@ -84,7 +84,7 @@ export function usePadGesture(pad: Pad) {
     const s = state.current;
     s.startY = e.clientY;
     s.lastY = e.clientY;
-    s.startTime = Date.now();
+    s.startTime = now();
     s.phase = "down";
     s.cancelledFadeAtStart = fadeCancelled;
     const store = usePlaybackStore.getState();
@@ -131,7 +131,7 @@ export function usePadGesture(pad: Pad) {
 
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
-      s.dragStartTime = Date.now();
+      s.dragStartTime = now();
       usePlaybackStore.getState().startVolumeTransition(pad.id);
 
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
@@ -141,7 +141,7 @@ export function usePadGesture(pad: Pad) {
     }
 
     if (s.phase === "drag") {
-      const rampFactor = Math.min(1, (Date.now() - s.dragStartTime) / DRAG_RAMP_MS);
+      const rampFactor = Math.min(1, (now() - s.dragStartTime) / DRAG_RAMP_MS);
       const newVolume = Math.max(0, Math.min(1, s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
