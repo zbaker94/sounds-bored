@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.3.0
+
+This release delivers a wave of audio engine reliability fixes: mid-playback changes to sound selection, playback mode, and arrangement now take effect correctly without retriggering, and deleting a pad or scene immediately stops its audio. Volume accuracy for mixed hold/one-shot pads, playback progress tracking for multi-layer and streaming audio, and Stop All behavior (now including sound previews) are all corrected.
+
 - Fixed a bug where holding a pad with mixed playback modes would use the wrong starting volume for some layers
 - Added a comprehensive manual test suite (`docs/manual-tests/`) covering 18 scenarios including audio playback, pad/scene deletion, sound import, yt-dlp downloads, mute groups, and retrigger modes
 - Test docs confirm fixes for issues #1–#10, including Stop All chain-queue clearing, audio cleanup on pad/scene deletion, loop/mode changes mid-playback, and hold-volume accuracy on mixed pads
