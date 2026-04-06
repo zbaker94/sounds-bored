@@ -629,7 +629,7 @@ describe("usePadGesture — startY staleness fix", () => {
 
 describe("usePadGesture — time-based sensitivity ramp", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers(); // needed for hold timer (setTimeout)
     usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, isPadActive: () => false });
     vi.mocked(setPadVolume).mockClear();
   });
@@ -639,15 +639,16 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
   });
 
   it("has zero sensitivity at drag start (rampFactor = 0)", () => {
-    const { result } = renderHook(() => usePadGesture(oneShotPad));
+    let nowMs = 0;
+    const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
 
     act(() => {
       result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
     });
     act(() => { vi.advanceTimersByTime(150); }); // hold activates, startVolume = 0
 
-    // First move crosses DRAG_PX threshold — drag activates at t=0
-    // rampFactor = 0, so newVolume should equal startVolume (0)
+    // First move crosses DRAG_PX threshold — drag activates; dragStartTime = nowMs = 0
+    // rampFactor = (0 - 0) / 150 = 0, so newVolume should equal startVolume (0)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
@@ -659,7 +660,8 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
   });
 
   it("has half sensitivity at half ramp duration", () => {
-    const { result } = renderHook(() => usePadGesture(oneShotPad));
+    let nowMs = 0;
+    const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
 
     act(() => {
       result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
@@ -667,14 +669,14 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
     vi.mocked(setPadVolume).mockClear();
 
-    // Activate drag
+    // Activate drag at nowMs=0; dragStartTime = 0
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
     vi.mocked(setPadVolume).mockClear();
 
-    // Advance to half ramp
-    act(() => { vi.advanceTimersByTime(DRAG_RAMP_MS / 2); });
+    // Advance clock to half ramp duration
+    nowMs = DRAG_RAMP_MS / 2; // 75ms
 
     // Move to 50px up from hold-start (300 → 250)
     act(() => {
@@ -689,21 +691,22 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
   });
 
   it("has full sensitivity at full ramp duration", () => {
-    const { result } = renderHook(() => usePadGesture(oneShotPad));
+    let nowMs = 0;
+    const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
 
     act(() => {
       result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
     });
     act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
 
-    // Activate drag
+    // Activate drag at nowMs=0; dragStartTime = 0
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
     vi.mocked(setPadVolume).mockClear();
 
-    // Advance to full ramp
-    act(() => { vi.advanceTimersByTime(DRAG_RAMP_MS); });
+    // Advance clock to full ramp duration
+    nowMs = DRAG_RAMP_MS; // 150ms
 
     // Move 40px up from hold-start
     act(() => {
@@ -717,19 +720,21 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
   });
 
   it("full range still clamps at 1.0 after ramp completes", () => {
-    const { result } = renderHook(() => usePadGesture(oneShotPad));
+    let nowMs = 0;
+    const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
 
     act(() => {
       result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 500 }));
     });
     act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
 
-    // Activate drag — 5px exceeds DRAG_PX (4) threshold
+    // Activate drag at nowMs=0 — 5px exceeds DRAG_PX (4) threshold
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 495 }));
     });
 
-    act(() => { vi.advanceTimersByTime(DRAG_RAMP_MS); });
+    // Advance clock past full ramp
+    nowMs = DRAG_RAMP_MS; // 150ms
 
     // Move 200px up (full DRAG_RANGE_PX) → should clamp to 1.0
     act(() => {
