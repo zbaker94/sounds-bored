@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a performance issue where the active scene was being recalculated on every auto-save; it now only re-evaluates when the scene list or active scene actually changes.
 - Fixed a bug where dragging a scene or pad to the last position in the list would fail silently, leaving the order unchanged.
 - Improved internal code quality in layer reordering tests (no user-facing behavior changes)
 - Improved stability of the layer list in pad configuration — newly added layers now open automatically and scroll into view more reliably

@@ -44,8 +44,15 @@ const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
 
 export function SceneView() {
-  const activeScene = useProjectStore((s) =>
-    s.project?.scenes.find((sc) => sc.id === s.activeSceneId) ?? null,
+  // Split into two selectors + useMemo so the O(n) .find() scan only runs when
+  // scenes or activeSceneId actually changes. Notably, isDirty (toggled on every
+  // auto-save) lives outside project, so it does not produce a new scenes reference
+  // and won't trigger the scan — unlike a single inline selector which always scans.
+  const scenes = useProjectStore((s) => s.project?.scenes ?? []);
+  const activeSceneId = useProjectStore((s) => s.activeSceneId);
+  const activeScene = useMemo(
+    () => scenes.find((sc) => sc.id === activeSceneId) ?? null,
+    [scenes, activeSceneId],
   );
   const openOverlay = useUiStore((s) => s.openOverlay);
   const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
