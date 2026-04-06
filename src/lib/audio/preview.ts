@@ -2,6 +2,7 @@ import { ensureResumed, getMasterGain } from "./audioContext";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile } from "./streamingCache";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { usePlaybackStore } from "@/state/playbackStore";
 import type { Sound } from "@/lib/schemas";
 
 let currentSource: AudioBufferSourceNode | null = null;
@@ -18,11 +19,13 @@ export function stopPreview(): void {
     currentStreamingAudio.currentTime = 0;
     currentStreamingAudio = null;
   }
+  usePlaybackStore.getState().setIsPreviewPlaying(false);
 }
 
 export async function playPreview(sound: Sound, onEnded?: () => void): Promise<void> {
   stopPreview();
   const ctx = await ensureResumed();
+  usePlaybackStore.getState().setIsPreviewPlaying(true);
 
   if (await checkIsLargeFile(sound)) {
     // -- Streaming path -------------------------------------------------------
@@ -35,7 +38,10 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
     sourceNode.connect(getMasterGain());
     currentStreamingAudio = audio;
     audio.onended = () => {
-      if (currentStreamingAudio === audio) currentStreamingAudio = null;
+      if (currentStreamingAudio === audio) {
+        currentStreamingAudio = null;
+        usePlaybackStore.getState().setIsPreviewPlaying(false);
+      }
       onEnded?.();
     };
     await audio.play();
@@ -46,7 +52,10 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
     source.buffer = buffer;
     source.connect(getMasterGain());
     source.onended = () => {
-      if (currentSource === source) currentSource = null;
+      if (currentSource === source) {
+        currentSource = null;
+        usePlaybackStore.getState().setIsPreviewPlaying(false);
+      }
       onEnded?.();
     };
     source.start();
