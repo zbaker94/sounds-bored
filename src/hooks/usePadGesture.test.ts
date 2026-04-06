@@ -83,7 +83,7 @@ function makeMouseEvent(): React.MouseEvent<HTMLButtonElement> {
 describe("usePadGesture — normal tap", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set(), isPadActive: () => false });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(setPadVolume).mockClear();
   });
@@ -253,7 +253,7 @@ describe("usePadGesture — hold phase", () => {
 describe("usePadGesture — drag phase", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set(), isPadActive: () => false });
     vi.mocked(setPadVolume).mockClear();
     vi.mocked(stopPad).mockClear();
     vi.mocked(resetPadGain).mockClear();
@@ -377,7 +377,7 @@ describe("usePadGesture — drag phase", () => {
 describe("usePadGesture — hold-mode layer pad", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set(), isPadActive: () => false });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(releasePadHoldLayers).mockClear();
   });
@@ -469,6 +469,7 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set(), isPadActive: () => false });
     vi.mocked(triggerPad).mockClear();
   });
 

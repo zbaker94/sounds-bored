@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; internal test infrastructure updated to support new pad activity state tracking.
 - No user-facing changes in this release (internal code cleanup only).
 - Fixed a subtle timing bug in pad volume drag gesture where time-based sensitivity ramping could behave incorrectly in certain conditions
 - No user-facing changes in this commit.
