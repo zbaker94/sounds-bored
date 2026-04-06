@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+This diff is purely internal test infrastructure — wrapping renders in a `TooltipProvider`. No user-facing changes occurred.
+
+There are no customer-facing changelog entries to write for this diff.
 - Fade and crossfade controls now correctly detect whether a pad is playing or stopped internally, eliminating edge cases where the wrong action (fade in vs. fade out) could be triggered
 - Tapping a pad that is already fading out now reverses the fade instead of ignoring the tap
 - Crossfade mode no longer requires the UI to track which pads are playing — the audio engine handles this automatically for more reliable behavior

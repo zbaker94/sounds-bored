@@ -4,7 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad } from "@/test/factories";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { SceneView } from "./SceneView";
+
+function renderSceneView() {
+  return render(<TooltipProvider><SceneView /></TooltipProvider>);
+}
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
@@ -52,12 +57,12 @@ describe("SceneView", () => {
   });
 
   it("renders the Add Pad button when scene has no pads", () => {
-    render(<SceneView />);
+    renderSceneView();
     expect(screen.getByRole("button", { name: /add pad/i })).toBeInTheDocument();
   });
 
   it("clicking Add Pad opens the PAD_CONFIG_DRAWER overlay", async () => {
-    render(<SceneView />);
+    renderSceneView();
 
     await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
 
@@ -65,7 +70,7 @@ describe("SceneView", () => {
   });
 
   it("does NOT call addPad directly when Add Pad is clicked (overlay opens first)", async () => {
-    render(<SceneView />);
+    renderSceneView();
 
     await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
 
@@ -81,7 +86,7 @@ describe("SceneView", () => {
       useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
       useProjectStore.getState().setActiveSceneId("scene-1");
 
-      render(<SceneView />);
+      renderSceneView();
 
       expect(screen.queryByText(/no scenes yet/i)).not.toBeInTheDocument();
     });
@@ -93,7 +98,7 @@ describe("SceneView", () => {
       // Bypass setActiveSceneId validation to test the defensive fallback in SceneView
       useProjectStore.setState({ activeSceneId: "non-existent-id" });
 
-      render(<SceneView />);
+      renderSceneView();
 
       expect(screen.getByText(/no scenes yet/i)).toBeInTheDocument();
     });
