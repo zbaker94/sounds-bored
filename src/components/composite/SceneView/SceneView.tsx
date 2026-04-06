@@ -1,8 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
-import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
@@ -81,7 +80,12 @@ export function SceneView() {
 
   const pads = activeScene?.pads ?? [];
   const fadeMode = useFadeMode(pads);
-  const hasPlayingPads = usePlaybackStore((s) => s.playingPadIds.size > 0);
+
+  const handleEditClick = useCallback((pad: Pad) => {
+    setEditingPad(pad);
+    openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
+  }, [openOverlay]);
+
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
   const safePage = Math.min(page, totalPages - 1);
   const isLastPage = safePage === totalPages - 1;
@@ -201,7 +205,7 @@ export function SceneView() {
                 fadeMode.enterCrossfade();
               }
             }}
-            disabled={editMode || (fadeMode.mode !== "crossfade" && !hasPlayingPads)}
+            disabled={editMode || (fadeMode.mode !== "crossfade" && !fadeMode.hasPlayingPads)}
             aria-label="Crossfade pads"
           >
             <HugeiconsIcon icon={ShuffleIcon} size={16} />
@@ -238,12 +242,9 @@ export function SceneView() {
                 <PadButton
                   pad={pad}
                   sceneId={activeScene.id}
-                  onEditClick={() => {
-                    setEditingPad(pad);
-                    openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
-                  }}
+                  onEditClick={handleEditClick}
                   fadeVisual={fadeMode.getPadFadeVisual(pad.id)}
-                  onFadeTap={() => fadeMode.onPadTap(pad.id)}
+                  onFadeTap={fadeMode.onPadTap}
                 />
               </motion.div>
             ))}

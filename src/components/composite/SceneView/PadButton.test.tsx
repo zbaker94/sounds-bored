@@ -87,12 +87,13 @@ describe("PadButton", () => {
       expect(screen.getByText(/1 layer/i)).toBeInTheDocument();
     });
 
-    it("clicking edit button calls onEditClick", async () => {
+    it("clicking edit button calls onEditClick with the pad", async () => {
       const pad = loadPadInStore();
       const onEditClick = vi.fn();
       render(<PadButton pad={pad} sceneId="scene-1" onEditClick={onEditClick} />);
       await userEvent.click(screen.getByRole("button", { name: /edit pad/i }));
       expect(onEditClick).toHaveBeenCalledTimes(1);
+      expect(onEditClick).toHaveBeenCalledWith(pad);
     });
 
     it("clicking duplicate button calls duplicatePad", async () => {
@@ -272,12 +273,13 @@ describe("PadButton — fade visual states", () => {
     expect(btn.className).toMatch(/opacity-40/);
   });
 
-  it("calls onFadeTap on pointer down when fadeVisual is set", async () => {
+  it("calls onFadeTap with pad.id on pointer down when fadeVisual is set", async () => {
     const onFadeTap = vi.fn();
     renderPadWithFadeVisual("crossfade-in", onFadeTap);
     const btn = screen.getByRole("button", { name: "Kick" });
     await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
     expect(onFadeTap).toHaveBeenCalledTimes(1);
+    expect(onFadeTap).toHaveBeenCalledWith("pad-1");
   });
 
   it("does not call onFadeTap when fadeVisual is null", async () => {
@@ -286,5 +288,16 @@ describe("PadButton — fade visual states", () => {
     const btn = screen.getByRole("button", { name: "Kick" });
     await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
     expect(onFadeTap).not.toHaveBeenCalled();
+  });
+});
+
+describe("PadButton — React.memo", () => {
+  // NOTE: $$typeof is a React internal — not part of the public API.
+  // Pragmatic approach: directly verifying memo wrapping is cleaner than a render-count test.
+  // If this breaks on a React upgrade, replace with a render-count integration test.
+  it("is wrapped in React.memo", () => {
+    expect((PadButton as unknown as { $$typeof: symbol }).$$typeof).toBe(
+      Symbol.for("react.memo")
+    );
   });
 });

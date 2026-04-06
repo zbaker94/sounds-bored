@@ -24,6 +24,7 @@ export type PadFadeVisual =
 
 export interface UseFadeModeReturn {
   mode: FadeMode;
+  hasPlayingPads: boolean;
   canExecute: boolean;
   statusLabel: string | null;
   getPadFadeVisual: (padId: string) => PadFadeVisual;
@@ -34,11 +35,20 @@ export interface UseFadeModeReturn {
   cancel: () => void;
 }
 
+const EMPTY_PAD_IDS = Object.freeze(new Set<string>()) as ReadonlySet<string>;
+
 export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const [mode, setMode] = useState<FadeMode>(null);
   const [selectedPadIds, setSelectedPadIds] = useState<Set<string>>(new Set());
 
-  const playingPadIds = usePlaybackStore((s) => s.playingPadIds);
+  // Primitive subscription — always active, for entry guards and hotkey checks
+  const hasPlayingPads = usePlaybackStore((s) => s.playingPadIds.size > 0);
+
+  // Full-Set subscription — only active when mode is non-null
+  // Returns stable empty set reference when mode === null to avoid re-renders on every pad start/stop
+  const playingPadIds = usePlaybackStore(
+    (s) => mode !== null ? s.playingPadIds : (EMPTY_PAD_IDS as Set<string>)
+  );
   const editMode = useUiStore((s) => s.editMode);
   const overlayStack = useUiStore((s) => s.overlayStack);
 
@@ -77,10 +87,10 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
   const enterCrossfade = useCallback(() => {
     if (editMode || overlayStack.length > 0) return;
-    if (playingPadIds.size === 0) return;
+    if (!hasPlayingPads) return;
     setMode("crossfade");
     setSelectedPadIds(new Set());
-  }, [editMode, overlayStack.length, playingPadIds]);
+  }, [editMode, overlayStack.length, hasPlayingPads]);
 
   const onPadTap = useCallback(
     (padId: string) => {
@@ -169,7 +179,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     if (mode === "crossfade") {
       if (canExecute) execute();
       else cancel();
-    } else if (playingPadIds.size > 0) {
+    } else if (hasPlayingPads) {
       enterCrossfade();
     }
   }, { enabled: !editMode, preventDefault: true });
@@ -184,6 +194,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
   return {
     mode,
+    hasPlayingPads,
     canExecute,
     statusLabel,
     getPadFadeVisual,
