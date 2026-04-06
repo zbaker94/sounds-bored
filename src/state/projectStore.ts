@@ -187,7 +187,9 @@ export const useProjectStore = create<ProjectStore>()(
         if (!draft.project) return;
         const { scenes } = draft.project;
         if (fromIndex < 0 || fromIndex >= scenes.length) return;
-        if (toIndex < 0 || toIndex >= scenes.length) return;
+        // Validate toIndex against post-splice length (array shrinks by 1 after removal)
+        const postSpliceLength = scenes.length - 1;
+        if (toIndex < 0 || toIndex > postSpliceLength) return;
         const [moved] = scenes.splice(fromIndex, 1);
         scenes.splice(toIndex, 0, moved);
         draft.isDirty = true;
@@ -199,7 +201,9 @@ export const useProjectStore = create<ProjectStore>()(
         const scene = draft.project.scenes.find((s) => s.id === sceneId);
         if (!scene) return;
         if (fromIndex < 0 || fromIndex >= scene.pads.length) return;
-        if (toIndex < 0 || toIndex >= scene.pads.length) return;
+        // Validate toIndex against post-splice length (array shrinks by 1 after removal)
+        const postSpliceLength = scene.pads.length - 1;
+        if (toIndex < 0 || toIndex > postSpliceLength) return;
         const [moved] = scene.pads.splice(fromIndex, 1);
         scene.pads.splice(toIndex, 0, moved);
         draft.isDirty = true;
