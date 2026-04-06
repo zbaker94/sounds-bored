@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.3.1
+
+This release adds Cycle Mode for sequential and shuffled layers — letting each pad trigger advance through sounds one at a time instead of all at once — along with rich tooltips and context-sensitive helper text throughout the pad configuration drawer to make every setting self-explanatory. Under the hood, significant reliability and performance improvements land as well: drag-to-reorder and layer auto-open work more consistently, pad volume dragging feels more responsive, and the audio engine is more stable with fixes for edge cases that could cause sounds to incorrectly restart or fail to stop.
+
 - Added informational tooltips to all layer config controls (Sound Selection, Arrangement, Playback Mode, Retrigger Mode, Fade Duration) so hovering the info icon explains what each setting does
 - Added context-sensitive helper text below each control that updates dynamically based on your current settings combination (e.g. "All 3 assigned sounds play together on each trigger")
 - Improved tag mode helper text: now shows a prompt to select tags when none are chosen, a no-match warning when tags don't match any sounds, and a count with mode context when sounds do match
