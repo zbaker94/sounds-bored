@@ -5,7 +5,9 @@ import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
-import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSound } from "@/test/factories";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSound, createMockAppSettings } from "@/test/factories";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { PadConfigDrawer } from "./PadConfigDrawer";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -14,7 +16,11 @@ vi.mock("@/lib/audio/padPlayer", () => ({
 }));
 
 function renderDrawer(props: { sceneId?: string; padId?: string } = {}) {
-  return render(<PadConfigDrawer sceneId={props.sceneId ?? "scene-1"} padId={props.padId} />);
+  return render(
+    <TooltipProvider>
+      <PadConfigDrawer sceneId={props.sceneId ?? "scene-1"} padId={props.padId} />
+    </TooltipProvider>
+  );
 }
 
 function openDrawer() {
@@ -73,7 +79,7 @@ describe("PadConfigDrawer", () => {
       useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
       usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
 
-      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      render(<TooltipProvider><PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} /></TooltipProvider>);
       openDrawer();
 
       expect(screen.getByText(/sound selection changes will apply on the next trigger/i)).toBeInTheDocument();
@@ -85,7 +91,7 @@ describe("PadConfigDrawer", () => {
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
       useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
 
-      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      render(<TooltipProvider><PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} /></TooltipProvider>);
       openDrawer();
 
       expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
@@ -107,7 +113,7 @@ describe("PadConfigDrawer", () => {
       useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
       usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-999"]) });
 
-      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      render(<TooltipProvider><PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} /></TooltipProvider>);
       openDrawer();
 
       expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
@@ -120,7 +126,7 @@ describe("PadConfigDrawer", () => {
       useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
       usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
 
-      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      render(<TooltipProvider><PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} /></TooltipProvider>);
       openDrawer();
 
       expect(screen.getByText(/sound selection changes will apply on the next trigger/i)).toBeInTheDocument();
@@ -138,7 +144,7 @@ describe("PadConfigDrawer", () => {
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
       useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
 
-      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      render(<TooltipProvider><PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} /></TooltipProvider>);
       openDrawer();
 
       expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
@@ -190,7 +196,7 @@ describe("PadConfigDrawer", () => {
     const entry = createMockHistoryEntry();
     useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
 
-    render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Original", layers: [layer], muteTargetPadIds: [] }} />);
+    render(<TooltipProvider><PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Original", layers: [layer], muteTargetPadIds: [] }} /></TooltipProvider>);
     openDrawer();
 
     const nameInput = screen.getByLabelText(/pad name/i);
@@ -235,11 +241,13 @@ describe("PadConfigDrawer", () => {
       );
 
       render(
-        <PadConfigDrawer
-          sceneId="scene-1"
-          padId="pad-1"
-          initialConfig={{ name: "FX", layers, muteTargetPadIds: [] }}
-        />,
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers, muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
       );
       openDrawer();
     }
@@ -300,11 +308,13 @@ describe("PadConfigDrawer", () => {
       useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
 
       render(
-        <PadConfigDrawer
-          sceneId="scene-1"
-          padId="pad-1"
-          initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
-        />,
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
       );
       openDrawer();
       return { layer, syncLayerConfig };
@@ -355,6 +365,45 @@ describe("PadConfigDrawer", () => {
       const [newLayer, origLayer] = (syncLayerConfig as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(newLayer.playbackMode).toBe(origLayer.playbackMode);
       expect(newLayer.arrangement).toBe(origLayer.arrangement);
+    });
+  });
+
+  describe("FadeDurationField", () => {
+    it("renders a Fade Duration info icon tooltip", () => {
+      renderDrawer();
+      openDrawer();
+      expect(screen.getByText("Fade Duration")).toBeInTheDocument();
+      // The info icon button is adjacent to the label
+      const fadeLabel = screen.getByText("Fade Duration");
+      const infoButton = fadeLabel.parentElement?.querySelector("button[tabindex='-1']");
+      expect(infoButton).toBeInTheDocument();
+    });
+
+    it("shows global default helper text when no custom fade is set", () => {
+      useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+      renderDrawer();
+      openDrawer();
+      expect(screen.getByText(/Using the global default \(2\.0s\)/)).toBeInTheDocument();
+    });
+
+    it("shows custom fade helper text when a pad-specific fade is set", () => {
+      useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+      const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [], fadeDurationMs: 3000 }}
+          />
+        </TooltipProvider>
+      );
+      openDrawer();
+      expect(screen.getByText(/Custom fade for this pad/)).toBeInTheDocument();
     });
   });
 });

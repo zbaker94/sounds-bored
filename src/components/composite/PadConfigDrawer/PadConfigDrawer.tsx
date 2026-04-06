@@ -13,6 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
@@ -192,7 +195,18 @@ function FadeDurationField() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label>Fade Duration</Label>
+        <div className="flex items-center gap-1">
+          <Label>Fade Duration</Label>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" tabIndex={-1}
+                className="inline-flex items-center text-muted-foreground hover:text-foreground cursor-help">
+                <HugeiconsIcon icon={InformationCircleIcon} size={14} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">How long this pad takes to fade in or out during mute group operations. Overrides the global setting for this pad only.</TooltipContent>
+          </Tooltip>
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm tabular-nums text-muted-foreground">
             {(displayValue / 1000).toFixed(1)}s
@@ -227,8 +241,10 @@ function FadeDurationField() {
           />
         )}
       />
-      {currentValue === undefined && (
-        <p className="text-xs text-muted-foreground">Using global default ({(globalDefault / 1000).toFixed(1)}s)</p>
+      {currentValue === undefined ? (
+        <p className="text-xs text-muted-foreground">Using the global default ({(globalDefault / 1000).toFixed(1)}s). Drag the slider to set a pad-specific value.</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">Custom fade for this pad. The global default is {(globalDefault / 1000).toFixed(1)}s.</p>
       )}
     </div>
   );

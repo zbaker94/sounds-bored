@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Added informational tooltips to all layer config controls (Sound Selection, Arrangement, Playback Mode, Retrigger Mode, Fade Duration) so hovering the info icon explains what each setting does
+- Added context-sensitive helper text below each control that updates dynamically based on your current settings combination (e.g. "All 3 assigned sounds play together on each trigger")
+- Improved tag mode helper text: now shows a prompt to select tags when none are chosen, a no-match warning when tags don't match any sounds, and a count with mode context when sounds do match
+- Added a helper note in Set mode explaining that sounds are drawn at trigger time and membership is managed in the Library panel
+- Fade Duration now shows distinct helper text for global default vs. pad-specific override
 - Added **Cycle Mode** for sequential and shuffled layers: each pad trigger now plays one sound at a time, advancing through the sequence step-by-step instead of playing the full chain at once
 - In Cycle Mode, loop and hold playback modes loop the current sound in the sequence rather than chaining through all sounds
 - Switching a layer's arrangement back to simultaneous automatically disables Cycle Mode

@@ -6,8 +6,12 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 import type { LayerSelection, Sound, SoundInstance } from "@/lib/schemas";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import {
   Combobox,
   ComboboxChips,
@@ -196,37 +200,40 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
   // ── Set mode — single-select Combobox ────────────────────────────────────────
 
   return (
-    <Combobox
-      value={sets.find((s) => s.id === value.setId) ?? null}
-      onValueChange={(set) => {
-        if (set) onChange({ type: "set", setId: set.id, defaultVolume: value.defaultVolume });
-      }}
-      items={sets}
-      isItemEqualToValue={(a, b) => a.id === b.id}
-      itemToStringLabel={(s) => s.name}
-    >
-      <ComboboxInput
-        placeholder="Search sets..."
-        showClear={!!value.setId}
-      />
-      <ComboboxContent>
-        <ComboboxList>
-          <ComboboxEmpty>
-            {sets.length === 0 ? "No sets in library yet." : "No sets found."}
-          </ComboboxEmpty>
-          <ComboboxCollection>
-            {(s) => (
-              <ComboboxItem key={s.id} value={s}>
-                <span className="flex-1">{s.name}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {setCountMap[s.id] ?? 0} sounds
-                </span>
-              </ComboboxItem>
-            )}
-          </ComboboxCollection>
-        </ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+    <div className="flex flex-col gap-2">
+      <Combobox
+        value={sets.find((s) => s.id === value.setId) ?? null}
+        onValueChange={(set) => {
+          if (set) onChange({ type: "set", setId: set.id, defaultVolume: value.defaultVolume });
+        }}
+        items={sets}
+        isItemEqualToValue={(a, b) => a.id === b.id}
+        itemToStringLabel={(s) => s.name}
+      >
+        <ComboboxInput
+          placeholder="Search sets..."
+          showClear={!!value.setId}
+        />
+        <ComboboxContent>
+          <ComboboxList>
+            <ComboboxEmpty>
+              {sets.length === 0 ? "No sets in library yet." : "No sets found."}
+            </ComboboxEmpty>
+            <ComboboxCollection>
+              {(s) => (
+                <ComboboxItem key={s.id} value={s}>
+                  <span className="flex-1">{s.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {setCountMap[s.id] ?? 0} sounds
+                  </span>
+                </ComboboxItem>
+              )}
+            </ComboboxCollection>
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      <p className="text-xs text-muted-foreground">Sounds are drawn from this set at trigger time. Manage set membership in the Library panel.</p>
+    </div>
   );
 }
 
@@ -247,8 +254,26 @@ function TagModeSection({ value, onChange, tags, sounds, tagCountMap, tagAnchorR
     return filterSoundsByTags(sounds, value.tagIds, value.matchMode).length;
   }, [sounds, value.tagIds, value.matchMode]);
 
+  const helperText = value.tagIds.length === 0
+    ? "Select tags above to filter which sounds are eligible."
+    : matchCount === 0
+      ? "No sounds match — adjust your tags or add matching sounds to the library."
+      : `${matchCount} sound(s) match ${value.matchMode === "any" ? "any" : "all"} of these tags.`;
+
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
+        <Label variant="section">Match Mode</Label>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" tabIndex={-1}
+              className="inline-flex items-center text-muted-foreground hover:text-foreground cursor-help">
+              <HugeiconsIcon icon={InformationCircleIcon} size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Controls how sounds are filtered when multiple tags are selected.</TooltipContent>
+        </Tooltip>
+      </div>
       <Tabs
         value={value.matchMode}
         onValueChange={(mode) =>
@@ -256,8 +281,22 @@ function TagModeSection({ value, onChange, tags, sounds, tagCountMap, tagAnchorR
         }
       >
         <TabsList stretch>
-          <TabsTrigger value="any">Any</TabsTrigger>
-          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="any">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>Any</span>
+              </TooltipTrigger>
+              <TooltipContent side="top">Eligible if the sound has at least one of the selected tags.</TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
+          <TabsTrigger value="all">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>All</span>
+              </TooltipTrigger>
+              <TooltipContent side="top">Eligible only if the sound has every one of the selected tags.</TooltipContent>
+            </Tooltip>
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       <Combobox
@@ -293,9 +332,7 @@ function TagModeSection({ value, onChange, tags, sounds, tagCountMap, tagAnchorR
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      {matchCount !== null && (
-        <p className="text-xs text-muted-foreground">{matchCount} sounds match</p>
-      )}
+      <p className="text-xs text-muted-foreground">{helperText}</p>
     </div>
   );
 }
