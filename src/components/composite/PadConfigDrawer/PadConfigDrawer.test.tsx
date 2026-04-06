@@ -339,7 +339,7 @@ describe("PadConfigDrawer", () => {
     });
 
     it("calls syncLayerConfig with matching new and original layer when nothing changes on save", async () => {
-      const { layer, syncLayerConfig } = await renderEditDrawerWithLayer();
+      const { syncLayerConfig } = await renderEditDrawerWithLayer();
 
       await userEvent.click(screen.getByRole("button", { name: /save/i }));
 

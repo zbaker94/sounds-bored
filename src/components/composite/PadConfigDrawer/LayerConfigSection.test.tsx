@@ -12,6 +12,7 @@ const defaultValues: PadConfigForm = {
   name: "",
   layers: [
     {
+      id: "layer-1",
       selection: { type: "assigned", instances: [] },
       arrangement: "simultaneous",
       playbackMode: "one-shot",

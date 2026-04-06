@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { migrateProject } from "./migrations";
 import { ProjectSchema } from "./schemas";
 import {

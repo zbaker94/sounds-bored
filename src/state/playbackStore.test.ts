@@ -14,6 +14,7 @@ function makeVoice(opts: { onStop?: () => void } = {}): AudioVoice {
     stop: opts.onStop ?? (() => {}),
     stopWithRamp: () => {},
     setVolume: () => {},
+    setLoop: () => {},
     setOnEnded: () => {},
   };
 }
