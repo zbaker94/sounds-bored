@@ -73,6 +73,32 @@ describe("SceneView", () => {
     expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(0);
   });
 
+  describe("activeScene derivation", () => {
+    it("renders scene content when activeSceneId matches a scene", () => {
+      const pad = createMockPad({ id: "pad-1", name: "Pad 1" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      const entry = createMockHistoryEntry();
+      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      useProjectStore.getState().setActiveSceneId("scene-1");
+
+      render(<SceneView />);
+
+      expect(screen.queryByText(/no scenes yet/i)).not.toBeInTheDocument();
+    });
+
+    it("renders empty state when activeSceneId does not match any scene", () => {
+      const scene = createMockScene({ id: "scene-1" });
+      const entry = createMockHistoryEntry();
+      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      // Bypass setActiveSceneId validation to test the defensive fallback in SceneView
+      useProjectStore.setState({ activeSceneId: "non-existent-id" });
+
+      render(<SceneView />);
+
+      expect(screen.getByText(/no scenes yet/i)).toBeInTheDocument();
+    });
+  });
+
   describe("reorderPads", () => {
     it("reorders pads in the store when reorderPads is called", () => {
       const padA = createMockPad({ id: "pad-a", name: "Pad A" });
