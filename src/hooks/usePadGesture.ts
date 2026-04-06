@@ -48,6 +48,18 @@ export function usePadGesture(pad: Pad) {
   }
 
   /**
+   * Returns true if at least one hold-mode layer on this pad is currently playing.
+   * Used instead of the pad-level isPadActive when the pad has hold layers — a
+   * fading one-shot voice must not make the hold layer inherit a stale padVolume.
+   */
+  function checkHoldLayerActive(): boolean {
+    const store = usePlaybackStore.getState();
+    return pad.layers.some(
+      (l) => l.playbackMode === "hold" && store.isLayerActive(l.id)
+    );
+  }
+
+  /**
    * Resolve the volume to use when triggering a tap or hold-release.
    * If the pad is active (already playing), honour its current padVolumes entry.
    * If it's not active, always start at 1.0 — padVolumes may be 0 from the hold
@@ -55,9 +67,10 @@ export function usePadGesture(pad: Pad) {
    */
   function triggerVolume(): number {
     const store = usePlaybackStore.getState();
-    return store.isPadActive(pad.id)
-      ? (store.padVolumes[pad.id] ?? 1.0)
-      : 1.0;
+    if (hasHoldLayer) {
+      return checkHoldLayerActive() ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
+    }
+    return store.isPadActive(pad.id) ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
@@ -74,7 +87,10 @@ export function usePadGesture(pad: Pad) {
     s.startTime = Date.now();
     s.phase = "down";
     s.cancelledFadeAtStart = fadeCancelled;
-    s.wasPlayingAtStart = usePlaybackStore.getState().isPadActive(pad.id);
+    const store = usePlaybackStore.getState();
+    s.wasPlayingAtStart = hasHoldLayer
+      ? checkHoldLayerActive()
+      : store.isPadActive(pad.id);
 
     // Hold-mode pads trigger immediately on press — skip if we just cancelled a fade
     if (hasHoldLayer && !fadeCancelled) {
@@ -87,17 +103,21 @@ export function usePadGesture(pad: Pad) {
       s.phase = "hold";
       s.startY = s.lastY;
 
-      const vol = hasHoldLayer
-        ? (usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0)
-        : s.wasPlayingAtStart
-          ? (usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0)
-          : 0;
+      // Use wasPlayingAtStart (which now correctly tracks hold-layer activity) to
+      // determine whether to resume from the current padVolume or start fresh.
+      // For hold pads: resume at current volume if re-triggering while active,
+      //   otherwise start at 1.0 (triggered at pointer-down, padVolumes may be stale).
+      // For one-shot pads: resume at current volume if already playing, else start at 0.
+      const timerStore = usePlaybackStore.getState();
+      const vol = s.wasPlayingAtStart
+        ? (timerStore.padVolumes[pad.id] ?? 1.0)
+        : hasHoldLayer ? 1.0 : 0;
       s.startVolume = vol;
       s.currentVolume = vol;
       // Write to padVolumes so the display bar shows the correct starting height.
       // Triggers never read this for non-playing pads — triggerVolume() guards that.
-      usePlaybackStore.getState().updatePadVolume(pad.id, vol);
-      usePlaybackStore.getState().startVolumeTransition(pad.id);
+      timerStore.updatePadVolume(pad.id, vol);
+      timerStore.startVolumeTransition(pad.id);
     }, HOLD_MS);
   }
 
