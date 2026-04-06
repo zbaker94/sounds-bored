@@ -397,13 +397,60 @@ export function syncLayerArrangement(layer: Layer): void {
 }
 
 /**
+ * Called when the sound selection for a layer changes while playback is active.
+ *
+ * For chained arrangements (sequential/shuffled): rebuilds the chain queue with
+ * the new resolved sounds so the current sound plays to completion and the updated
+ * selection follows at the next chain step.
+ *
+ * For non-chained arrangements (simultaneous): no-op here — the onended closure
+ * re-resolves sounds from the live store at each loop restart boundary.
+ *
+ * No-op if the layer has no active voices.
+ */
+export function syncLayerSelection(layer: Layer): void {
+  const voices = usePlaybackStore.getState().getLayerVoices(layer.id);
+  if (voices.length === 0) return;
+
+  if (isChained(layer.arrangement)) {
+    const allSounds = resolveSounds(layer, useLibraryStore.getState().sounds);
+    const newOrder = buildPlayOrder(layer.arrangement, allSounds);
+    if (newOrder.length === 0) {
+      layerChainQueue.delete(layer.id);
+    } else {
+      layerChainQueue.set(layer.id, newOrder);
+    }
+  }
+  // Non-chained (simultaneous) with source.loop=true: voices loop internally
+  // at the Web Audio level and onended never fires, so there is no loop boundary
+  // at which to re-resolve sounds. Selection changes for simultaneous+loop layers
+  // are not applied until the pad is stopped and retriggered — a known limitation
+  // of native source.loop behaviour.
+}
+
+/**
  * Sync all live-playback state for a layer after a pad config save.
- * Calls syncLayerPlaybackMode and/or syncLayerArrangement only for the fields
- * that actually changed, keeping the audio engine consistent with the updated store.
+ * Calls syncLayerPlaybackMode, syncLayerArrangement, and/or syncLayerSelection
+ * only for the fields that actually changed. When arrangement changes,
+ * syncLayerSelection is skipped because syncLayerArrangement already rebuilds
+ * the queue using the updated layer (which carries the new selection).
  */
 export function syncLayerConfig(layer: Layer, original: Layer): void {
   if (original.playbackMode !== layer.playbackMode) syncLayerPlaybackMode(layer);
-  if (original.arrangement  !== layer.arrangement)  syncLayerArrangement(layer);
+  const arrangementChanged = original.arrangement !== layer.arrangement;
+  if (arrangementChanged) syncLayerArrangement(layer);
+  // syncLayerArrangement already calls resolveSounds with the updated layer (which
+  // carries the new selection), so skip syncLayerSelection to avoid a redundant
+  // rebuild — especially important for shuffled, where a second call would produce
+  // a different random order, discarding the one set by syncLayerArrangement.
+  //
+  // When arrangement is stable, use JSON.stringify to detect actual selection
+  // content changes (reference equality is unreliable since the form always
+  // creates new objects). This prevents the queue from being rebuilt — and the
+  // currently-playing sound from being replayed — when only playbackMode changes.
+  if (!arrangementChanged && JSON.stringify(original.selection) !== JSON.stringify(layer.selection)) {
+    syncLayerSelection(layer);
+  }
 }
 
 export function clearAllLayerChains(): void {
@@ -615,24 +662,26 @@ async function startLayerSound(
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
       } else if (liveMode === "loop" || liveMode === "hold") {
-        // Chain exhausted naturally — restart according to the current live arrangement.
-        // Both liveMode and liveArr read from the store so mid-playback config changes
-        // (e.g. switching arrangement while a chain is playing) take effect here.
+        // Chain exhausted naturally — restart using the current live arrangement,
+        // playback mode, and selection. All fields read from the store so mid-playback
+        // config changes (arrangement, playback mode, or sound selection) take effect
+        // at each loop boundary.
         const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
+        const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
+        const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
+        const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
         if (isChained(liveArr)) {
-          const newOrder = buildPlayOrder(liveArr, allSounds);
+          const newOrder = buildPlayOrder(liveArr, liveSounds);
           if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
           const [first, ...rest] = newOrder;
           layerChainQueue.set(layer.id, rest);
-          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), allSounds);
+          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds);
         } else {
-          // Non-chained loop: start all sounds simultaneously. The new voices will
-          // have source.loop=true and loop independently until the pad is stopped.
+          // Non-chained loop: start all sounds simultaneously using the current live
+          // selection so mid-playback sound changes take effect at each loop boundary.
           layerChainQueue.delete(layer.id);
-          const liveLayer = { ...layer, arrangement: liveArr, playbackMode: liveMode };
-          for (const sound of allSounds) {
-            // getVoiceVolume reads layer.selection.instances — unchanged by arrangement/mode edits
-            startLayerSound(pad, liveLayer, sound, ctx, layerGain, getVoiceVolume(layer, sound), allSounds);
+          for (const sound of liveSounds) {
+            startLayerSound(pad, liveLayerSnap, sound, ctx, layerGain, getVoiceVolume(liveLayerSnap, sound), liveSounds);
           }
         }
       } else {

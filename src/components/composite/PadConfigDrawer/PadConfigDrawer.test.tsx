@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSound } from "@/test/factories";
 import { PadConfigDrawer } from "./PadConfigDrawer";
 
@@ -28,6 +29,7 @@ describe("PadConfigDrawer", () => {
     useProjectStore.setState({ ...initialProjectState });
     useUiStore.setState({ ...initialUiState });
     useLibraryStore.setState({ ...initialLibraryState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
 
     const entry = createMockHistoryEntry();
     const scene = createMockScene({ id: "scene-1" });
@@ -61,6 +63,92 @@ describe("PadConfigDrawer", () => {
     renderDrawer();
     openDrawer();
     expect(screen.getByRole("button", { name: /add layer/i })).toBeInTheDocument();
+  });
+
+  describe("playing pad notice", () => {
+    it("shows notice when editing a currently playing pad", () => {
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: ["pad-1"] });
+
+      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      openDrawer();
+
+      expect(screen.getByText(/sound selection changes will apply on the next trigger/i)).toBeInTheDocument();
+    });
+
+    it("does not show notice when the pad is not playing", () => {
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      openDrawer();
+
+      expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
+    });
+
+    it("does not show notice in create mode even if other pads are playing", () => {
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: ["some-other-pad"] });
+
+      renderDrawer();
+      openDrawer();
+
+      expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
+    });
+
+    it("does not show notice in edit mode when a different pad is playing", () => {
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: ["pad-999"] });
+
+      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      openDrawer();
+
+      expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
+    });
+
+    it("hides notice dynamically when pad stops playing while drawer is open", () => {
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: ["pad-1"] });
+
+      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      openDrawer();
+
+      expect(screen.getByText(/sound selection changes will apply on the next trigger/i)).toBeInTheDocument();
+
+      act(() => {
+        usePlaybackStore.setState({ playingPadIds: [] });
+      });
+
+      expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
+    });
+
+    it("shows notice dynamically when pad starts playing while drawer is open", () => {
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(<PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "Kick", layers: [layer], muteTargetPadIds: [] }} />);
+      openDrawer();
+
+      expect(screen.queryByText(/sound selection changes will apply on the next trigger/i)).not.toBeInTheDocument();
+
+      act(() => {
+        usePlaybackStore.setState({ playingPadIds: ["pad-1"] });
+      });
+
+      expect(screen.getByText(/sound selection changes will apply on the next trigger/i)).toBeInTheDocument();
+    });
   });
 
   it("shows a validation error when name is empty and Save is clicked", async () => {

@@ -1463,6 +1463,297 @@ describe("syncLayerArrangement", () => {
   });
 });
 
+describe("syncLayerSelection", () => {
+  it("is a no-op when the layer has no active voices", async () => {
+    const { syncLayerSelection } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: [{ id: "inst-1", soundId: sound.id, volume: 100 }] },
+    });
+    expect(() => syncLayerSelection(layer)).not.toThrow();
+    expect(createdSources).toHaveLength(0);
+  });
+
+  it("sequential: rebuilds chain queue so new sounds play instead of stale queued sounds", async () => {
+    const { triggerPad, syncLayerSelection } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
+    setSounds([soundA, soundB, soundC]);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // A is playing; B is stale in queue. Replace selection with [C].
+    const newLayer = {
+      ...layer,
+      selection: {
+        type: "assigned" as const,
+        instances: [{ id: "inst-c", soundId: soundC.id, volume: 100 }],
+      },
+    };
+    syncLayerSelection(newLayer);
+
+    // Current voice (A) must not be interrupted
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // C should play — B was replaced in the queue
+    expect(createdSources).toHaveLength(2);
+    const loadedIds = mockLoadBuffer.mock.calls.map((c: unknown[]) => (c[0] as { id: string }).id);
+    expect(loadedIds[1]).toBe(soundC.id);
+  });
+
+  it("shuffled: rebuilds chain queue with new sounds so stale queued sounds are replaced", async () => {
+    const { triggerPad, syncLayerSelection } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
+    setSounds([soundA, soundB, soundC]);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "shuffled",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // One of A/B is playing; the other is in the stale queue. Replace selection with [C].
+    const newLayer = {
+      ...layer,
+      selection: {
+        type: "assigned" as const,
+        instances: [{ id: "inst-c", soundId: soundC.id, volume: 100 }],
+      },
+    };
+    syncLayerSelection(newLayer);
+
+    // Current voice must not be interrupted
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // C should play (from rebuilt shuffled queue), B is gone
+    expect(createdSources).toHaveLength(2);
+    const loadedIds = mockLoadBuffer.mock.calls.map((c: unknown[]) => (c[0] as { id: string }).id);
+    expect(loadedIds[1]).toBe(soundC.id);
+  });
+
+  it("sequential: deletes chain queue when new selection resolves to empty, current voice plays out cleanly", async () => {
+    const { triggerPad, syncLayerSelection } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    setSounds([soundA, soundB]);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // A is playing, B is in queue. Remove all sounds from selection.
+    const emptyLayer = {
+      ...layer,
+      selection: { type: "assigned" as const, instances: [] },
+    };
+    syncLayerSelection(emptyLayer);
+
+    // A must not be interrupted
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+
+    // A ends — chain queue was deleted, so nothing more should play
+    createdSources[0].simulateEnd();
+    await tick();
+
+    expect(createdSources).toHaveLength(1);
+    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+  });
+
+  it("sequential + loop: loop restart reads live selection from store when chain exhausts", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    setSounds([soundA, soundB]);
+
+    const layer = createMockLayer({
+      id: "layer-sel-loop",
+      playbackMode: "loop",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [{ id: "inst-a", soundId: soundA.id, volume: 100 }],
+      },
+    });
+    const pad = createMockPad({ id: "pad-sel-loop", layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // A is playing, queue is empty (only one sound). Change selection to [B] in the store.
+    const newLayer = {
+      ...layer,
+      selection: {
+        type: "assigned" as const,
+        instances: [{ id: "inst-b", soundId: soundB.id, volume: 100 }],
+      },
+    };
+    const scene = createMockScene({ pads: [{ ...pad, layers: [newLayer] }] });
+    useProjectStore.getState().loadProject(
+      createMockHistoryEntry(),
+      createMockProject({ scenes: [scene] }),
+      false,
+    );
+
+    // A ends → chain exhausted → loop restart re-resolves from store → B plays
+    createdSources[0].simulateEnd();
+    await tick();
+
+    expect(createdSources).toHaveLength(2);
+    const loadedIds = mockLoadBuffer.mock.calls.map((c: unknown[]) => (c[0] as { id: string }).id);
+    expect(loadedIds[1]).toBe(soundB.id);
+  });
+});
+
+describe("syncLayerConfig", () => {
+  it("only playbackMode changes: selection queue not rebuilt, B still plays after A", async () => {
+    const { triggerPad, syncLayerConfig } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    setSounds([soundA, soundB]);
+
+    // Start in one-shot so playbackMode change to "loop" does not clear the queue.
+    // (loop → one-shot clears via syncLayerPlaybackMode; one-shot → loop does not.)
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Change only playbackMode: one-shot → loop. syncLayerSelection must NOT run —
+    // if it did, A would be placed back in the queue and play a second time (3 sources).
+    const updated = { ...layer, playbackMode: "loop" as const };
+    syncLayerConfig(updated, layer);
+
+    // B is still in the queue — A ends → B plays (exactly 2 sources, not 3)
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(2);
+  });
+
+  it("only arrangement changes: rebuilds queue with new arrangement, skips redundant selection sync", async () => {
+    const { triggerPad, syncLayerConfig } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    setSounds([soundA, soundB]);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Change only arrangement: sequential → simultaneous (clears chain queue)
+    const updated = { ...layer, arrangement: "simultaneous" as const };
+    syncLayerConfig(updated, layer);
+
+    // Queue cleared by syncLayerArrangement — A ends, no chain → stops cleanly
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(1);
+  });
+
+  it("arrangement + selection both change: new sounds are used (no double-rebuild corruption)", async () => {
+    const { triggerPad, syncLayerConfig } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
+    setSounds([soundA, soundB, soundC]);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "shuffled",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Change both arrangement (→ sequential) and selection (→ [C])
+    const updated = {
+      ...layer,
+      arrangement: "sequential" as const,
+      selection: {
+        type: "assigned" as const,
+        instances: [{ id: "inst-c", soundId: soundC.id, volume: 100 }],
+      },
+    };
+    syncLayerConfig(updated, layer);
+
+    // Current voice plays out, then C plays from rebuilt queue
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(2);
+    const loadedIds = mockLoadBuffer.mock.calls.map((c: unknown[]) => (c[0] as { id: string }).id);
+    expect(loadedIds[1]).toBe(soundC.id);
+  });
+});
+
 describe("stopAllPads clears fade tracking", () => {
   it("cancels pending fade timeouts so cleanup callbacks do not fire", async () => {
     vi.useFakeTimers();
