@@ -22,7 +22,7 @@ interface PlaybackState {
   updatePadVolume: (padId: string, volume: number) => void;
 
   // Which pad IDs currently have an active automated or gesture-driven volume transition (drives the fill bar)
-  volumeTransitioningPadIds: string[];
+  volumeTransitioningPadIds: Set<string>;
   startVolumeTransition: (padId: string) => void;
   clearVolumeTransition: (padId: string) => void;
   clearAllVolumeTransitions: () => void;
@@ -50,11 +50,12 @@ interface PlaybackState {
   nullAllOnEnded: () => void;
 }
 
+// Factory ensures each spread gets fresh Set/object instances — prevents tests from sharing mutable state.
 export const initialPlaybackState = {
   masterVolume: 100,
-  playingPadIds: new Set<string>(),
-  padVolumes: {} as Record<string, number>,
-  volumeTransitioningPadIds: [] as string[],
+  get playingPadIds() { return new Set<string>(); },
+  get padVolumes() { return {} as Record<string, number>; },
+  get volumeTransitioningPadIds() { return new Set<string>(); },
   isPreviewPlaying: false,
 };
 
@@ -70,16 +71,22 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
   updatePadVolume: (padId, volume) =>
     set((s) => ({ padVolumes: { ...s.padVolumes, [padId]: volume } })),
 
-  volumeTransitioningPadIds: [],
+  volumeTransitioningPadIds: new Set<string>(),
   startVolumeTransition: (padId) =>
-    set((s) =>
-      s.volumeTransitioningPadIds.includes(padId)
-        ? s
-        : { volumeTransitioningPadIds: [...s.volumeTransitioningPadIds, padId] }
-    ),
+    set((s) => {
+      if (s.volumeTransitioningPadIds.has(padId)) return s;
+      const next = new Set(s.volumeTransitioningPadIds);
+      next.add(padId);
+      return { volumeTransitioningPadIds: next };
+    }),
   clearVolumeTransition: (padId) =>
-    set((s) => ({ volumeTransitioningPadIds: s.volumeTransitioningPadIds.filter((id) => id !== padId) })),
-  clearAllVolumeTransitions: () => set({ volumeTransitioningPadIds: [] }),
+    set((s) => {
+      if (!s.volumeTransitioningPadIds.has(padId)) return s;
+      const next = new Set(s.volumeTransitioningPadIds);
+      next.delete(padId);
+      return { volumeTransitioningPadIds: next };
+    }),
+  clearAllVolumeTransitions: () => set({ volumeTransitioningPadIds: new Set() }),
   resetAllPadVolumes: () => set({ padVolumes: {} }),
 
   // ── Pad-level ─────────────────────────────────────────────────────────────

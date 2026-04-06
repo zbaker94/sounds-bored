@@ -28,7 +28,7 @@ export function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFade
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
   const deletePad = useProjectStore((s) => s.deletePad);
   const { gestureHandlers } = usePadGesture(pad);
-  const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.includes(pad.id));
+  const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.has(pad.id));
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
   const [frozenVolume, setFrozenVolume] = useState(liveVolume);

@@ -80,7 +80,7 @@ function makeMouseEvent(): React.MouseEvent<HTMLButtonElement> {
 describe("usePadGesture — normal tap", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(setPadVolume).mockClear();
   });
@@ -108,7 +108,7 @@ describe("usePadGesture — normal tap", () => {
     renderHook(() => usePadGesture(oneShotPad));
 
     // No transition should be started for a quick tap (hold timer never fires)
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(false);
   });
 
   it("ignores non-primary button presses (right-click, middle-click)", () => {
@@ -122,7 +122,7 @@ describe("usePadGesture — normal tap", () => {
     });
 
     expect(triggerPad).not.toHaveBeenCalled();
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(false);
   });
 
   it("cancels hold timer if pointer is released quickly", () => {
@@ -140,7 +140,7 @@ describe("usePadGesture — normal tap", () => {
       vi.advanceTimersByTime(200);
     });
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(false);
     // triggerPad called once on up, not again from the (cancelled) timer path
     expect(triggerPad).toHaveBeenCalledTimes(1);
   });
@@ -172,7 +172,7 @@ describe("usePadGesture — hold phase", () => {
   });
 
   it("starts volume transition at 0 for non-playing pad after 150ms", () => {
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
     act(() => {
@@ -182,7 +182,7 @@ describe("usePadGesture — hold phase", () => {
       vi.advanceTimersByTime(150);
     });
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(true);
     expect(usePlaybackStore.getState().padVolumes[oneShotPad.id]).toBe(0);
   });
 
@@ -201,12 +201,12 @@ describe("usePadGesture — hold phase", () => {
       vi.advanceTimersByTime(150);
     });
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(true);
     expect(usePlaybackStore.getState().padVolumes[oneShotPad.id]).toBe(0.7);
   });
 
   it("triggers pad on pointer up after hold (when no drag occurred)", () => {
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
     act(() => {
@@ -226,7 +226,7 @@ describe("usePadGesture — hold phase", () => {
   });
 
   it("clears volume transition on pointer up", () => {
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
     act(() => {
@@ -235,13 +235,13 @@ describe("usePadGesture — hold phase", () => {
     act(() => {
       vi.advanceTimersByTime(150);
     });
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(true);
 
     act(() => {
       result.current.gestureHandlers.onPointerUp(makePointerEvent({ clientY: 300 }));
     });
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(false);
   });
 });
 
@@ -250,7 +250,7 @@ describe("usePadGesture — hold phase", () => {
 describe("usePadGesture — drag phase", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     vi.mocked(setPadVolume).mockClear();
     vi.mocked(stopPad).mockClear();
     vi.mocked(resetPadGain).mockClear();
@@ -313,7 +313,7 @@ describe("usePadGesture — drag phase", () => {
       result.current.gestureHandlers.onPointerUp(makePointerEvent({ clientY: 290 }));
     });
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(false);
   });
 
   it("calls stopPad and resetPadGain when dragged to near-zero volume", () => {
@@ -374,7 +374,7 @@ describe("usePadGesture — drag phase", () => {
 describe("usePadGesture — hold-mode layer pad", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(releasePadHoldLayers).mockClear();
   });
@@ -770,13 +770,13 @@ describe("usePadGesture — onPointerCancel", () => {
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(true);
 
     act(() => {
       result.current.gestureHandlers.onPointerCancel(makePointerEvent({ clientY: 290 }));
     });
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(oneShotPad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(oneShotPad.id)).toBe(false);
   });
 
   it("stops pad and resets gain when cancelled during drag at near-zero volume", () => {

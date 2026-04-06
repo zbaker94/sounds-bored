@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal performance: pad volume transition tracking now uses a Set for O(1) lookups instead of an array, reducing redundant state updates during fade/crossfade operations
 - Improved internal playback tracking to use a more efficient data structure, resulting in more reliable pad state detection and faster "is playing" lookups across the app.
 - Fixed a bug where holding a pad with mixed playback modes would use the wrong starting volume for some layers
 - Added a comprehensive manual test suite (`docs/manual-tests/`) covering 18 scenarios including audio playback, pad/scene deletion, sound import, yt-dlp downloads, mute groups, and retrigger modes

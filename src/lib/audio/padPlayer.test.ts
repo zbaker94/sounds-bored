@@ -116,7 +116,7 @@ beforeEach(async () => {
     masterVolume: 100,
     playingPadIds: new Set<string>(),
     padVolumes: {},
-    volumeTransitioningPadIds: [],
+    volumeTransitioningPadIds: new Set<string>(),
   });
   useProjectStore.setState({ ...initialProjectState });
   useLibraryStore.setState({
@@ -1064,7 +1064,7 @@ describe("fadePadOut", () => {
 
     fadePadOut(pad, 1000);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 
@@ -1074,10 +1074,10 @@ describe("fadePadOut", () => {
     const pad = createMockPad({ id: "fade-out-clear-pad" });
 
     fadePadOut(pad, 500);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
 
     vi.advanceTimersByTime(510);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(false);
     clearAllFadeTracking();
     vi.useRealTimers();
   });
@@ -1107,7 +1107,7 @@ describe("fadePadIn", () => {
     await fadePadIn(pad, 1000);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 });
@@ -1127,7 +1127,7 @@ describe("crossfadePads", () => {
 
     crossfadePads([padOut], [padIn]);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(padOut.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padOut.id)).toBe(true);
     clearAllFadeTracking();
   });
 });
@@ -1776,10 +1776,10 @@ describe("stopAllPads clears fade tracking", () => {
     const pad = createMockPad({ id: "stop-mid-fade-pad" });
 
     fadePadOut(pad, 500);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).toContain(pad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
 
     stopAllPads();
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(false);
 
     clearAllFadeTracking();
     vi.useRealTimers();
