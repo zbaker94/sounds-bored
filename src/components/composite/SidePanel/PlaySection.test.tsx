@@ -42,7 +42,7 @@ describe("PlaySection", () => {
     expect(screen.getByRole("button")).not.toBeDisabled();
   });
 
-  it("calls stopAllPads (not stopAll) when clicked", () => {
+  it("calls stopAllPads when clicked", () => {
     usePlaybackStore.setState({ playingPadIds: new Set(["pad-1"]) });
     render(<PlaySection />);
     fireEvent.click(screen.getByRole("button"));
@@ -62,15 +62,5 @@ describe("PlaySection", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(stopAllPads).toHaveBeenCalledTimes(1);
     expect(stopPreview).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not call the store stopAll directly", () => {
-    const storeSpy = vi.spyOn(usePlaybackStore.getState(), "stopAll");
-    usePlaybackStore.setState({ playingPadIds: new Set(["pad-1"]) });
-    render(<PlaySection />);
-    fireEvent.click(screen.getByRole("button"));
-    // stopAll should not be called directly — only via stopAllPads internals
-    expect(storeSpy).not.toHaveBeenCalled();
-    storeSpy.mockRestore();
   });
 });

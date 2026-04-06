@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved audio engine reliability by consolidating all voice tracking into a single module, preventing edge cases where sounds could incorrectly restart after being stopped
+- The "Stop All" button now more reliably halts all active sounds and previews
 - Internal audio engine refactored for better reliability: runtime state (gain nodes, fade tracking, chain queues) is now isolated in a dedicated module, reducing the risk of edge-case bugs during complex playback scenarios.
 - Fixed an edge case where rapidly stopping all pads while a layer trigger was in-flight could cause sounds to restart unexpectedly.
 - Pad volume drag now pre-accumulates sensitivity during the hold phase, so dragging immediately after a long press responds with full (or near-full) sensitivity instead of starting sluggish.

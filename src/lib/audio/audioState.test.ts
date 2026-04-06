@@ -16,6 +16,9 @@ const mockPlaybackState = {
   clearVolumeTransition: vi.fn(),
   clearAllVolumeTransitions: vi.fn(),
   resetAllPadVolumes: vi.fn(),
+  addPlayingPad: vi.fn(),
+  removePlayingPad: vi.fn(),
+  clearAllPlayingPads: vi.fn(),
 };
 
 vi.mock("@/state/playbackStore", () => ({
@@ -49,13 +52,26 @@ import {
   clearAllStreamingAudio,
   clearAllPadProgressInfo,
   clearAllLayerPending,
+  clearAllVoices,
   setPadProgressInfo,
   registerStreamingAudio,
   isPadFadingOut,
   isPadFading,
   addFadingOutPad,
   setFadePadTimeout,
+  recordVoice,
+  clearVoice,
+  recordLayerVoice,
+  clearLayerVoice,
+  stopPadVoices,
+  stopAllVoices,
+  stopLayerVoices,
+  getLayerVoices,
+  nullAllOnEnded,
+  isPadActive,
+  isLayerActive,
 } from "./audioState";
+import type { AudioVoice } from "./audioVoice";
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +86,7 @@ beforeEach(() => {
   clearAllPadProgressInfo();
   clearAllLayerPending();
   clearAllFadeTracking();
+  clearAllVoices();
 });
 
 // ── getPadProgress ───────────────────────────────────────────────────────────
@@ -201,5 +218,101 @@ describe("clearAllFadeTracking", () => {
     // Verify playbackStore bulk resets were called
     expect(usePlaybackStore.getState().clearAllVolumeTransitions).toHaveBeenCalled();
     expect(usePlaybackStore.getState().resetAllPadVolumes).toHaveBeenCalled();
+  });
+});
+
+// ── Voice tracking ──────────────────────────────────────────────────────────
+
+function makeVoice(opts: { onStop?: () => void } = {}): AudioVoice {
+  return {
+    start: async () => {},
+    stop: () => { opts.onStop?.(); },
+    stopWithRamp: () => {},
+    setVolume: () => {},
+    setLoop: () => {},
+    setOnEnded: vi.fn(),
+  };
+}
+
+describe("voice tracking", () => {
+  it("recordVoice tracks a voice and marks pad as active", () => {
+    const voice = makeVoice();
+    recordVoice("pad-1", voice);
+    expect(isPadActive("pad-1")).toBe(true);
+    expect(mockPlaybackState.addPlayingPad).toHaveBeenCalledWith("pad-1");
+  });
+
+  it("clearVoice removes voice and deactivates pad when empty", () => {
+    const voice = makeVoice();
+    recordVoice("pad-1", voice);
+    clearVoice("pad-1", voice);
+    expect(isPadActive("pad-1")).toBe(false);
+    expect(mockPlaybackState.removePlayingPad).toHaveBeenCalledWith("pad-1");
+  });
+
+  it("stopPadVoices stops all voices and clears layer entries for that pad", () => {
+    const stopped: boolean[] = [];
+    const v1 = makeVoice({ onStop: () => stopped.push(true) });
+    const v2 = makeVoice({ onStop: () => stopped.push(true) });
+    recordLayerVoice("pad-1", "layer-1", v1);
+    recordLayerVoice("pad-1", "layer-2", v2);
+    stopPadVoices("pad-1");
+    expect(stopped).toHaveLength(2);
+    expect(isPadActive("pad-1")).toBe(false);
+    expect(isLayerActive("layer-1")).toBe(false);
+    expect(isLayerActive("layer-2")).toBe(false);
+  });
+
+  it("stopAllVoices stops everything", () => {
+    const stopped: boolean[] = [];
+    recordLayerVoice("pad-1", "layer-1", makeVoice({ onStop: () => stopped.push(true) }));
+    recordLayerVoice("pad-2", "layer-2", makeVoice({ onStop: () => stopped.push(true) }));
+    stopAllVoices();
+    expect(stopped).toHaveLength(2);
+    expect(isPadActive("pad-1")).toBe(false);
+    expect(isPadActive("pad-2")).toBe(false);
+    expect(mockPlaybackState.clearAllPlayingPads).toHaveBeenCalled();
+  });
+
+  it("recordLayerVoice tracks in both voiceMap and layerVoiceMap", () => {
+    const voice = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", voice);
+    expect(isPadActive("pad-1")).toBe(true);
+    expect(isLayerActive("layer-1")).toBe(true);
+    expect(getLayerVoices("layer-1")).toHaveLength(1);
+  });
+
+  it("clearLayerVoice removes from both maps", () => {
+    const voice = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", voice);
+    clearLayerVoice("pad-1", "layer-1", voice);
+    expect(isLayerActive("layer-1")).toBe(false);
+    expect(isPadActive("pad-1")).toBe(false);
+  });
+
+  it("stopLayerVoices cleans up layer and pad maps correctly", () => {
+    const stopped: boolean[] = [];
+    const v1 = makeVoice({ onStop: () => stopped.push(true) });
+    const v2 = makeVoice({ onStop: () => stopped.push(true) });
+    recordLayerVoice("pad-1", "layer-1", v1);
+    recordLayerVoice("pad-1", "layer-1", v2);
+    stopLayerVoices("pad-1", "layer-1");
+    expect(stopped).toHaveLength(2);
+    expect(isLayerActive("layer-1")).toBe(false);
+    expect(isPadActive("pad-1")).toBe(false);
+  });
+
+  it("getLayerVoices returns empty array when layer not active", () => {
+    expect(getLayerVoices("no-such-layer")).toEqual([]);
+  });
+
+  it("nullAllOnEnded nulls all onended callbacks", () => {
+    const v1 = makeVoice();
+    const v2 = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", v1);
+    recordLayerVoice("pad-2", "layer-2", v2);
+    nullAllOnEnded();
+    expect(v1.setOnEnded).toHaveBeenCalledWith(null);
+    expect(v2.setOnEnded).toHaveBeenCalledWith(null);
   });
 });

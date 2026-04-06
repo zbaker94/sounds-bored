@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
+import { isLayerActive } from "./audioState";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
@@ -107,7 +108,7 @@ beforeEach(async () => {
   createdSources.length = 0;
   // Clear chain queue before stopAll so old onended callbacks don't chain
   const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains, clearAllFadeTracking } = await import("./padPlayer");
-  const { clearAllStreamingAudio, clearAllPadProgressInfo, clearAllLayerPending } = await import("./audioState");
+  const { clearAllStreamingAudio, clearAllPadProgressInfo, clearAllLayerPending, clearAllVoices } = await import("./audioState");
   clearAllLayerChains();
   clearAllLayerGains();
   clearAllPadGains();
@@ -115,7 +116,7 @@ beforeEach(async () => {
   clearAllStreamingAudio();
   clearAllPadProgressInfo();
   clearAllLayerPending();
-  usePlaybackStore.getState().stopAll();
+  clearAllVoices();
   usePlaybackStore.setState({
     masterVolume: 100,
     playingPadIds: new Set<string>(),
@@ -359,7 +360,7 @@ describe("retrigger modes", () => {
     // Layer is cleaned up after ramp completes
     vi.advanceTimersByTime(35);
     vi.useRealTimers();
-    expect(usePlaybackStore.getState().isLayerActive(layer.id)).toBe(false);
+    expect(isLayerActive(layer.id)).toBe(false);
   });
 
   it("restart: stops the current chain and restarts from the beginning", async () => {
@@ -468,7 +469,7 @@ describe("stopAllPads", () => {
 
     // sound[1] must NOT have started
     expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
-    expect(usePlaybackStore.getState().isLayerActive(layer.id)).toBe(false);
+    expect(isLayerActive(layer.id)).toBe(false);
   });
 });
 
@@ -636,7 +637,7 @@ describe("streaming path (large files)", () => {
 
     await triggerPad(pad);
 
-    expect(usePlaybackStore.getState().isLayerActive(layer.id)).toBe(true);
+    expect(isLayerActive(layer.id)).toBe(true);
   });
 
   it("streaming retrigger restart: stops old audio and starts a new one", async () => {
@@ -919,8 +920,8 @@ describe("releasePadHoldLayers", () => {
     vi.advanceTimersByTime(35);
 
     // playbackStore should have cleared the hold layer's voice but not the one-shot's
-    expect(usePlaybackStore.getState().isLayerActive(oneShotLayer.id)).toBe(true);
-    expect(usePlaybackStore.getState().isLayerActive(holdLayer.id)).toBe(false);
+    expect(isLayerActive(oneShotLayer.id)).toBe(true);
+    expect(isLayerActive(holdLayer.id)).toBe(false);
   });
 
   it("clears the chain queue for hold layers on release", async () => {

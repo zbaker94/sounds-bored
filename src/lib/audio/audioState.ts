@@ -10,20 +10,26 @@
  * COORDINATION WITH playbackStore
  * ============================================================================
  *
- * Two parallel sources of runtime state exist:
- *   1. This module (audioState) — GainNodes, HTMLAudioElements, fade timers, chain queues
- *   2. playbackStore (Zustand) — voiceMap, layerVoiceMap, padVolumes, volumeTransitions
+ * This module is the SINGLE owner of ALL non-serializable audio engine runtime state.
+ * playbackStore (Zustand) holds only reactive UI signals (playingPadIds, padVolumes,
+ * volumeTransitioningPadIds). Voice tracking functions in this module call
+ * playbackStore's simple addPlayingPad/removePlayingPad/clearAllPlayingPads actions
+ * to keep the reactive UI layer in sync.
  *
- * INVARIANT: Never call playbackStore.stopAll() without first clearing audioState.
- *   Reason: stopAll() fires voice.stop() synchronously, which triggers onended
- *   callbacks that read layerChainQueue. If the queue is not cleared first,
- *   onended will advance the chain and restart sounds.
+ * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
+ *   fade tracking. Reason: voice.stop() fires onended synchronously, which reads
+ *   layerChainQueue. If the queue is not cleared first, onended will advance the
+ *   chain and restart sounds.
  *
  * INVARIANT: Always use padPlayer.stopAllPads() as the single stop entry point.
- *   It clears audioState first, then calls playbackStore.stopAll().
+ *   It clears fade tracking and chain queues first, nulls onended callbacks,
+ *   ramps gain nodes to zero, then calls stopAllVoices().
  *
  * INVARIANT: padGainMap lifecycle mirrors voiceMap lifecycle — a pad entry in one
  *   implies an entry in the other. Both are cleared together in stopAllPads().
+ *
+ * INVARIANT: stopAllVoices() calls clearAllPlayingPads() on playbackStore to
+ *   reset the reactive UI state after all voices are stopped.
  *
  * ============================================================================
  * STATE INVENTORY
@@ -33,6 +39,8 @@
  * -------------------|------------|-------------------------------------------|-------------------------------------------------|-----------------------------------
  * padGainMap         | pad ID     | GainNode                                  | Per-pad gain node in audio graph                | clearAllPadGains(), stopAllPads()
  * layerGainMap       | layer ID   | GainNode                                  | Per-layer gain node, connects to padGain        | clearAllLayerGains(), stopAllPads()
+ * voiceMap           | pad ID     | AudioVoice[]                              | Active voices per pad (UI + stop tracking)      | clearAllVoices(), stopAllVoices()
+ * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
  * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
  * padStreamingAudio  | pad ID     | Map<layerId, Set<HTMLAudioElement>>        | Active streaming elements for progress/cleanup  | clearLayerStreamingAudio(), stopAllPads()
  * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
@@ -44,14 +52,21 @@
 
 import { getAudioContext, getMasterGain } from "./audioContext";
 import { usePlaybackStore } from "@/state/playbackStore";
+import type { AudioVoice } from "./audioVoice";
 import type { Sound } from "@/lib/schemas";
 
 // ---------------------------------------------------------------------------
-// Private state — all 9 Maps/Sets
+// Private state — all 11 Maps/Sets
 // ---------------------------------------------------------------------------
 
 /** Per-pad GainNodes: source(s) -> voiceGain -> layerGain -> padGain -> masterGain -> destination */
 const padGainMap = new Map<string, GainNode>();
+
+/** Active voices per pad. Every layer voice is also in voiceMap — see recordLayerVoice invariant. */
+const voiceMap = new Map<string, AudioVoice[]>();
+
+/** Active voices per layer. */
+const layerVoiceMap = new Map<string, AudioVoice[]>();
 
 /** Keyed by layer ID. One GainNode per active layer, connects to its padGain. */
 const layerGainMap = new Map<string, GainNode>();
@@ -171,6 +186,11 @@ export function clearAllLayerGains(): void {
 
 export function clearAllLayerChains(): void {
   layerChainQueue.clear();
+}
+
+export function clearAllVoices(): void {
+  voiceMap.clear();
+  layerVoiceMap.clear();
 }
 
 export function clearAllFadeTracking(): void {
@@ -370,4 +390,110 @@ export function setLayerChain(layerId: string, chain: Sound[]): void {
 
 export function deleteLayerChain(layerId: string): void {
   layerChainQueue.delete(layerId);
+}
+
+// ---------------------------------------------------------------------------
+// Voice tracking
+// ---------------------------------------------------------------------------
+
+export function isPadActive(padId: string): boolean {
+  return (voiceMap.get(padId)?.length ?? 0) > 0;
+}
+
+export function isLayerActive(layerId: string): boolean {
+  return (layerVoiceMap.get(layerId)?.length ?? 0) > 0;
+}
+
+export function recordVoice(padId: string, voice: AudioVoice): void {
+  voiceMap.set(padId, [...(voiceMap.get(padId) ?? []), voice]);
+  usePlaybackStore.getState().addPlayingPad(padId);
+}
+
+export function clearVoice(padId: string, voice: AudioVoice): void {
+  const updated = (voiceMap.get(padId) ?? []).filter((v) => v !== voice);
+  if (updated.length === 0) {
+    voiceMap.delete(padId);
+    usePlaybackStore.getState().removePlayingPad(padId);
+  } else {
+    voiceMap.set(padId, updated);
+  }
+}
+
+export function stopPadVoices(padId: string): void {
+  const voices = voiceMap.get(padId) ?? [];
+  const stoppedSet = new Set(voices);
+  voiceMap.delete(padId);
+  usePlaybackStore.getState().removePlayingPad(padId);
+  // Also clean layerVoiceMap for layers on this pad
+  for (const [layerId, layerVoices] of layerVoiceMap) {
+    const remaining = layerVoices.filter((v) => !stoppedSet.has(v));
+    if (remaining.length === 0) {
+      layerVoiceMap.delete(layerId);
+    } else {
+      layerVoiceMap.set(layerId, remaining);
+    }
+  }
+  for (const voice of voices) {
+    try { voice.stop(); } catch { /* already ended */ }
+  }
+}
+
+export function stopAllVoices(): void {
+  // NOTE: Always call padPlayer.stopAllPads() instead of this directly.
+  // stopAllPads() ensures chain queues, fade tracking, and gain ramps are
+  // handled before voices are stopped.
+  const allVoices = [...voiceMap.values()].flat();
+  voiceMap.clear();
+  layerVoiceMap.clear();
+  usePlaybackStore.getState().clearAllPlayingPads();
+  for (const voice of allVoices) {
+    try { voice.stop(); } catch { /* already ended */ }
+  }
+}
+
+export function recordLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
+  layerVoiceMap.set(layerId, [...(layerVoiceMap.get(layerId) ?? []), voice]);
+  recordVoice(padId, voice);
+}
+
+export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
+  const updated = (layerVoiceMap.get(layerId) ?? []).filter((v) => v !== voice);
+  if (updated.length === 0) {
+    layerVoiceMap.delete(layerId);
+  } else {
+    layerVoiceMap.set(layerId, updated);
+  }
+  clearVoice(padId, voice);
+}
+
+export function stopLayerVoices(padId: string, layerId: string): void {
+  const voices = layerVoiceMap.get(layerId) ?? [];
+  const stoppedSet = new Set(voices);
+
+  // Clean up maps BEFORE calling stop() — wrapStreamingElement.stop()
+  // fires onended synchronously, so clearing first makes clearLayerVoice a safe no-op.
+  layerVoiceMap.delete(layerId);
+  const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
+  if (padVoices.length === 0) {
+    voiceMap.delete(padId);
+    usePlaybackStore.getState().removePlayingPad(padId);
+  } else {
+    voiceMap.set(padId, padVoices);
+  }
+
+  for (const voice of voices) {
+    try { voice.stop(); } catch { /* already ended */ }
+  }
+}
+
+export function getLayerVoices(layerId: string): readonly AudioVoice[] {
+  return layerVoiceMap.get(layerId) ?? [];
+}
+
+export function nullAllOnEnded(): void {
+  for (const voices of voiceMap.values()) {
+    for (const voice of voices) {
+      voice.setOnEnded(null);
+    }
+  }
 }
