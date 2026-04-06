@@ -6,7 +6,7 @@ import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { PadConfigSchema } from "@/lib/schemas";
-import type { PadConfigForm, PadConfig, LayerConfigForm } from "@/lib/schemas";
+import type { PadConfigForm, PadConfig, LayerConfigForm, Layer } from "@/lib/schemas";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,17 @@ import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume, syncLayerPlaybackMode } from "@/lib/audio/padPlayer";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 import { createDefaultLayer } from "./constants";
+
+function toLayer(form: LayerConfigForm): Layer {
+  return {
+    id: form.id,
+    selection: form.selection,
+    arrangement: form.arrangement,
+    playbackMode: form.playbackMode,
+    retriggerMode: form.retriggerMode,
+    volume: form.volume,
+  };
+}
 
 function defaultPadValues(): PadConfigForm {
   return {
@@ -107,7 +118,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
 
     const config: PadConfig = {
       name: data.name,
-      layers: data.layers.map((l) => ({ ...l })),
+      layers: data.layers.map(toLayer),
       muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
       fadeDurationMs: data.fadeDurationMs,
     };
