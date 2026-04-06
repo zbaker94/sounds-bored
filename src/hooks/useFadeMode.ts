@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
@@ -129,11 +129,14 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     [mode, pads, playingPadIds, selectedPadIds, isValidPad, cancel],
   );
 
-  const selectedArray = [...selectedPadIds];
-  const canExecute =
-    mode === "crossfade" &&
-    selectedArray.some((id) => playingPadIds.has(id)) &&
-    selectedArray.some((id) => !playingPadIds.has(id));
+  const canExecute = useMemo(() => {
+    const arr = [...selectedPadIds];
+    return (
+      mode === "crossfade" &&
+      arr.some((id) => playingPadIds.has(id)) &&
+      arr.some((id) => !playingPadIds.has(id))
+    );
+  }, [mode, selectedPadIds, playingPadIds]);
 
   const execute = useCallback(() => {
     if (!canExecute) return;
@@ -161,14 +164,17 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     [mode, isValidPad, selectedPadIds, playingPadIds],
   );
 
-  const statusLabel: string | null =
-    mode === "fade"
-      ? "Select a pad"
-      : mode === "crossfade"
-        ? canExecute
-          ? "Ready — press X or Enter to execute"
-          : "Select pads to crossfade"
-        : null;
+  const statusLabel = useMemo<string | null>(
+    () =>
+      mode === "fade"
+        ? "Select a pad"
+        : mode === "crossfade"
+          ? canExecute
+            ? "Ready — press X or Enter to execute"
+            : "Select pads to crossfade"
+          : null,
+    [mode, canExecute],
+  );
 
   useHotkeys("f", () => {
     if (mode === "fade") cancel();

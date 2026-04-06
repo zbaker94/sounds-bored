@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved performance of crossfade mode: the "can execute" check and status label now update only when relevant state changes, reducing unnecessary re-renders.
 - Pad buttons now re-render less often during playback, improving performance when many sounds are playing simultaneously
 - The crossfade button now correctly enables/disables based on whether any pads are currently playing
 - Opening the pad edit drawer is more reliable due to internal callback stability improvements
