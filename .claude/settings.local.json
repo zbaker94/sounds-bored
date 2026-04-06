@@ -18,7 +18,12 @@
       "Read(//tmp/**)",
       "Bash(gh issue:*)",
       "mcp___hypothesi_tauri-mcp-server__driver_session",
-      "Bash(gh label:*)"
+      "Bash(gh label:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create --title 'fix: padStreamingAudio tracks all streaming voices per pad as a Set \\(#7\\)' --body ':*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(xargs grep:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
