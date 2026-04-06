@@ -148,6 +148,7 @@ export const LayerConfigFormSchema = z.object({
 export const PadConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
   layers: z.array(LayerConfigFormSchema).min(1, "At least one layer is required"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   fadeDurationMs: z.number().min(100).max(10000).optional(),
 });
 
@@ -162,7 +163,7 @@ export const PadSchema = z.object({
   layers: z.array(LayerSchema),
   muteTargetPadIds: z.array(z.string()),
   muteGroupId: z.string().optional(),
-  color: z.string().optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   icon: z.string().optional(),
   fadeDurationMs: z.number().min(100).max(10000).optional(),
 });

@@ -13,6 +13,7 @@ import {
   hasFilePath,
   LayerConfigFormSchema,
   PadConfigSchema,
+  PadSchema,
   TagSchema,
   type ProjectHistoryEntry,
   type ProjectHistory,
@@ -600,6 +601,144 @@ describe("PadConfigSchema", () => {
 
   it("rejects missing name", () => {
     const result = PadConfigSchema.safeParse({ layer: validLayer });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("PadSchema — color field", () => {
+  const basePad = {
+    id: "pad-1",
+    name: "Kick",
+    layers: [],
+    muteTargetPadIds: [],
+  };
+
+  it("accepts a valid 6-digit hex color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "#a1b2c3" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts uppercase hex color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "#FF0000" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a pad with no color", () => {
+    const result = PadSchema.safeParse(basePad);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a 3-digit shorthand hex color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "#fff" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a CSS named color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "red" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an rgb() value", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "rgb(255,0,0)" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an 8-digit hex (with alpha)", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "#FF0000FF" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a hex color without # prefix", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "FF0000" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an empty string color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects null color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: null });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts mixed-case hex color", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "#aAbBcC" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts #000000", () => {
+    const result = PadSchema.safeParse({ ...basePad, color: "#000000" });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("PadSchema — color field round-trip via ProjectSchema", () => {
+  it("round-trips a project with a pad color through ProjectSchema", () => {
+    const raw = {
+      name: "Color Project",
+      scenes: [
+        {
+          id: "scene-1",
+          name: "Scene 1",
+          pads: [
+            {
+              id: "pad-1",
+              name: "Kick",
+              color: "#FF5500",
+              layers: [],
+              muteTargetPadIds: [],
+            },
+          ],
+        },
+      ],
+    };
+    const result = ProjectSchema.safeParse(raw);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scenes[0].pads[0].color).toBe("#FF5500");
+    }
+  });
+
+  it("round-trips a project with a pad that has no color", () => {
+    const raw = {
+      name: "No Color Project",
+      scenes: [
+        {
+          id: "scene-1",
+          name: "Scene 1",
+          pads: [{ id: "pad-1", name: "Kick", layers: [], muteTargetPadIds: [] }],
+        },
+      ],
+    };
+    const result = ProjectSchema.safeParse(raw);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scenes[0].pads[0].color).toBeUndefined();
+    }
+  });
+
+  it("rejects a project with an invalid pad color through ProjectSchema", () => {
+    const raw = {
+      name: "Bad Color Project",
+      scenes: [
+        {
+          id: "scene-1",
+          name: "Scene 1",
+          pads: [
+            {
+              id: "pad-1",
+              name: "Kick",
+              color: "red",
+              layers: [],
+              muteTargetPadIds: [],
+            },
+          ],
+        },
+      ],
+    };
+    const result = ProjectSchema.safeParse(raw);
     expect(result.success).toBe(false);
   });
 });

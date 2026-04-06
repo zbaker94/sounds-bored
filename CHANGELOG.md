@@ -1,8 +1,12 @@
 # Changelog
 
 ## Current Changes
+- Pad colors are now validated to require a proper 6-digit hex format (e.g. `#FF5500`), preventing invalid color values from being saved to a project.
 - Improved internal performance: pad volume transition tracking now uses a Set for O(1) lookups instead of an array, reducing redundant state updates during fade/crossfade operations
 - Improved internal playback tracking to use a more efficient data structure, resulting in more reliable pad state detection and faster "is playing" lookups across the app.
+
+## v1.3.0
+
 - Fixed a bug where holding a pad with mixed playback modes would use the wrong starting volume for some layers
 - Added a comprehensive manual test suite (`docs/manual-tests/`) covering 18 scenarios including audio playback, pad/scene deletion, sound import, yt-dlp downloads, mute groups, and retrigger modes
 - Test docs confirm fixes for issues #1–#10, including Stop All chain-queue clearing, audio cleanup on pad/scene deletion, loop/mode changes mid-playback, and hold-volume accuracy on mixed pads
