@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import {
@@ -147,6 +147,9 @@ export function LayerAccordion() {
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
   const prevLengthRef = useRef(fields.length);
 
+  // Stable derived key — used by both the sync effect and the memoized items array
+  const fieldIdKey = fields.map((f) => f.rhfId).join(",");
+
   // Keep openId in sync when the field list is replaced by a form reset.
   // If the current openId is no longer in the list, open the first field instead.
   useEffect(() => {
@@ -159,7 +162,7 @@ export function LayerAccordion() {
       setOpenId(fields[0].rhfId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fields.map((f) => f.rhfId).join(",")]);
+  }, [fieldIdKey]);
 
   // Detect newly appended layers — auto-open and mark for scroll
   useEffect(() => {
@@ -169,7 +172,7 @@ export function LayerAccordion() {
       setPendingScrollId(newField.rhfId);
     }
     prevLengthRef.current = fields.length;
-  }, [fields.length, fields]);
+  }, [fields.length]);
 
   function handleOpenChange(id: string, open: boolean) {
     setOpenId(open ? id : null);
@@ -183,11 +186,13 @@ export function LayerAccordion() {
     if (from !== -1 && to !== -1) move(from, to);
   }
 
+  const layerIds = useMemo(() => fieldIdKey.split(",").filter(Boolean), [fieldIdKey]);
+
   return (
     <div className="flex flex-col gap-2">
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext
-          items={fields.map((f) => f.rhfId)}
+          items={layerIds}
           strategy={verticalListSortingStrategy}
         >
           <div className="w-full">
