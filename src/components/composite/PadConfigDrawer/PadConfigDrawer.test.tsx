@@ -10,6 +10,7 @@ import { PadConfigDrawer } from "./PadConfigDrawer";
 vi.mock("@/lib/audio/padPlayer", () => ({
   syncLayerVolume: vi.fn(),
   syncLayerPlaybackMode: vi.fn(),
+  syncLayerArrangement: vi.fn(),
 }));
 
 function renderDrawer(props: { sceneId?: string; padId?: string } = {}) {
@@ -246,6 +247,62 @@ describe("PadConfigDrawer", () => {
         expect(useProjectStore.getState().project?.scenes[0].pads[0].name).toBe("FX");
       });
       expect(syncLayerPlaybackMode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("syncLayerArrangement on save", () => {
+    async function renderEditDrawerWithSequentialLayer() {
+      const { syncLayerArrangement } = await import("@/lib/audio/padPlayer");
+      const layer = createMockLayer({
+        id: "layer-1",
+        arrangement: "sequential",
+        selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+      const sound = createMockSound({ id: "s1", name: "FX Sound" });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      render(
+        <PadConfigDrawer
+          sceneId="scene-1"
+          padId="pad-1"
+          initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+        />,
+      );
+      openDrawer();
+      return { layer, syncLayerArrangement };
+    }
+
+    it("calls syncLayerArrangement when arrangement changes on save", async () => {
+      const { syncLayerArrangement } = await renderEditDrawerWithSequentialLayer();
+
+      // Click the "Simultaneous" tab to change arrangement from "sequential"
+      await userEvent.click(screen.getByRole("tab", { name: /simultaneous/i }));
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(syncLayerArrangement).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "layer-1", arrangement: "simultaneous" }),
+        );
+      });
+    });
+
+    it("does not call syncLayerArrangement when arrangement is unchanged on save", async () => {
+      const { syncLayerArrangement } = await renderEditDrawerWithSequentialLayer();
+
+      // Save without changing the arrangement
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].name).toBe("FX");
+      });
+      expect(syncLayerArrangement).not.toHaveBeenCalled();
     });
   });
 });

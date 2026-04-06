@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Changing a layer's arrangement type (e.g. sequential → simultaneous) while a pad is actively playing now takes effect correctly without requiring a retrigger.
+- Switching between chained arrangements (sequential ↔ shuffled) mid-playback rebuilds the playback queue so the current sound plays out and the new sequence follows.
+- Switching from a chained arrangement to simultaneous mid-playback lets the current sound finish, then resumes with all sounds playing together as expected.
+- Looping behavior after arrangement changes is now consistent — the engine reads the live arrangement from the project when a chain exhausts, so loop restarts reflect the updated config.
 - Fixed an issue where saving pad configuration could include unexpected extra fields in layer data
 - Added internal design spec and implementation plan for the `fix-github-issue` skill, which automates researching and fixing GitHub issues using parallel AI agents with a built-in code review cycle.
 - Fixed a bug where deleting or reordering layers in the pad config drawer could reassign layer IDs, causing incorrect playback behavior for loops and retrigger tracking.

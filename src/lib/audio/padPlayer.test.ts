@@ -1233,6 +1233,150 @@ describe("syncLayerPlaybackMode", () => {
   });
 });
 
+describe("syncLayerArrangement", () => {
+  it("is a no-op when the layer has no active voices", async () => {
+    const { syncLayerArrangement } = await import("./padPlayer");
+    const layer = createMockLayer({ id: "inactive-layer", arrangement: "sequential" });
+    expect(() => syncLayerArrangement(layer)).not.toThrow();
+    expect(createdSources).toHaveLength(0);
+  });
+
+  it("sequential → simultaneous: clears chain so onended does not chain", async () => {
+    const { triggerPad, syncLayerArrangement } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    syncLayerArrangement({ ...layer, arrangement: "simultaneous" });
+
+    createdSources[0].simulateEnd();
+    await tick();
+
+    expect(createdSources).toHaveLength(1);
+  });
+
+  it("sequential → simultaneous + loop: current voice plays out, then all sounds restart simultaneously with loop", async () => {
+    const { triggerPad, syncLayerArrangement } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      playbackMode: "loop",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Simulate updatePad: store reflects the new simultaneous+loop arrangement
+    const updatedLayer = { ...layer, arrangement: "simultaneous" as const };
+    const scene = createMockScene({ pads: [{ ...pad, layers: [updatedLayer] }] });
+    useProjectStore.getState().loadProject(
+      createMockHistoryEntry(),
+      createMockProject({ scenes: [scene] }),
+      false,
+    );
+
+    await triggerPad(pad);
+    await tick();
+
+    // Chained loop — source.loop stays false (chain handles looping)
+    expect(createdSources[0].loop).toBe(false);
+
+    syncLayerArrangement(updatedLayer);
+
+    // source.loop is still false — current voice plays out naturally, not looping
+    expect(createdSources[0].loop).toBe(false);
+
+    // Current voice ends — onended reads liveArrangement="simultaneous", liveMode="loop"
+    // and starts all sounds simultaneously with source.loop=true
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // Both sounds started simultaneously (2 new sources)
+    expect(createdSources).toHaveLength(3);
+    expect(createdSources[1].loop).toBe(true);
+    expect(createdSources[2].loop).toBe(true);
+  });
+
+  it("shuffled → sequential: rebuilds chain with new arrangement so onended continues", async () => {
+    const { triggerPad, syncLayerArrangement } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "shuffled",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Rebuild queue with sequential arrangement
+    syncLayerArrangement({ ...layer, arrangement: "sequential" });
+
+    // Current voice ends — onended should advance to the next sound in the new queue
+    createdSources[0].simulateEnd();
+    await tick();
+
+    expect(createdSources).toHaveLength(2);
+  });
+
+  it("sequential → shuffled + loop: chain rebuilds after exhaustion using live livePlaybackMode", async () => {
+    const { triggerPad, syncLayerArrangement } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      playbackMode: "loop",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Simulate updatePad: store now reflects the new arrangement
+    const updatedLayer = { ...layer, arrangement: "shuffled" as const };
+    const scene = createMockScene({ pads: [{ ...pad, layers: [updatedLayer] }] });
+    useProjectStore.getState().loadProject(
+      createMockHistoryEntry(),
+      createMockProject({ scenes: [scene] }),
+      false,
+    );
+
+    syncLayerArrangement(updatedLayer);
+
+    // First voice ends → advances into the rebuilt queue
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(2);
+
+    // Second voice ends → chain exhausted → loop restarts
+    createdSources[1].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(3);
+  });
+});
+
 describe("stopAllPads clears fade tracking", () => {
   it("cancels pending fade timeouts so cleanup callbacks do not fire", async () => {
     vi.useFakeTimers();
