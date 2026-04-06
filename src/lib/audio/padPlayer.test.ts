@@ -114,7 +114,7 @@ beforeEach(async () => {
   usePlaybackStore.getState().stopAll();
   usePlaybackStore.setState({
     masterVolume: 100,
-    playingPadIds: [],
+    playingPadIds: new Set<string>(),
     padVolumes: {},
     volumeTransitioningPadIds: [],
   });
@@ -851,7 +851,7 @@ describe("retrigger next", () => {
     await triggerPad(pad); // B→exhaust (one-shot: stop, don't restart)
     await tick();
 
-    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
   });
 });
@@ -880,7 +880,7 @@ describe("stopAllPads — ramped", () => {
     expect(padGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
 
     vi.advanceTimersByTime(35);
-    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     expect(createdSources[0].stop).toHaveBeenCalledOnce();
   });
 });
@@ -995,7 +995,7 @@ describe("retrigger stop — ramped stop", () => {
     await triggerPad(pad);
     vi.advanceTimersByTime(35);
 
-    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
   });
 
   it("retrigger stop: ramps all voices when layer has multiple simultaneous sounds", async () => {
@@ -1048,12 +1048,12 @@ describe("fadePadOut", () => {
     const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-timer-pad" });
 
-    usePlaybackStore.setState({ playingPadIds: [pad.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([pad.id]) });
 
     fadePadOut(pad, 500);
     vi.advanceTimersByTime(510);
 
-    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     clearAllFadeTracking();
     vi.useRealTimers();
   });
@@ -1599,7 +1599,7 @@ describe("syncLayerSelection", () => {
     await tick();
 
     expect(createdSources).toHaveLength(1);
-    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
   });
 
   it("sequential + loop: loop restart reads live selection from store when chain exhausts", async () => {
@@ -1759,13 +1759,13 @@ describe("stopAllPads clears fade tracking", () => {
     vi.useFakeTimers();
     const { fadePadOut, stopAllPads, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "timeout-cancel-pad" });
-    usePlaybackStore.setState({ playingPadIds: [pad.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([pad.id]) });
 
     fadePadOut(pad, 500);
     stopAllPads();
     vi.advanceTimersByTime(600);
 
-    expect(usePlaybackStore.getState().playingPadIds).not.toContain(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     clearAllFadeTracking();
     vi.useRealTimers();
   });

@@ -74,7 +74,7 @@ export function SceneView() {
 
   const pads = activeScene?.pads ?? [];
   const fadeMode = useFadeMode(pads);
-  const playingPadIds = usePlaybackStore((s) => s.playingPadIds);
+  const hasPlayingPads = usePlaybackStore((s) => s.playingPadIds.size > 0);
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
   const safePage = Math.min(page, totalPages - 1);
   const isLastPage = safePage === totalPages - 1;
@@ -194,7 +194,7 @@ export function SceneView() {
                 fadeMode.enterCrossfade();
               }
             }}
-            disabled={editMode || (fadeMode.mode !== "crossfade" && playingPadIds.length === 0)}
+            disabled={editMode || (fadeMode.mode !== "crossfade" && !hasPlayingPads)}
             aria-label="Crossfade pads"
           >
             <HugeiconsIcon icon={ShuffleIcon} size={16} />

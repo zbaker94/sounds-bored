@@ -80,7 +80,7 @@ function makeMouseEvent(): React.MouseEvent<HTMLButtonElement> {
 describe("usePadGesture — normal tap", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(setPadVolume).mockClear();
   });
@@ -162,7 +162,7 @@ describe("usePadGesture — normal tap", () => {
 describe("usePadGesture — hold phase", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, isPadActive: () => false });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(setPadVolume).mockClear();
   });
@@ -172,7 +172,7 @@ describe("usePadGesture — hold phase", () => {
   });
 
   it("starts volume transition at 0 for non-playing pad after 150ms", () => {
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
     act(() => {
@@ -188,7 +188,7 @@ describe("usePadGesture — hold phase", () => {
 
   it("starts volume transition at stored volume for already-playing pad after 150ms", () => {
     usePlaybackStore.setState({
-      playingPadIds: [oneShotPad.id],
+      playingPadIds: new Set([oneShotPad.id]),
       padVolumes: { [oneShotPad.id]: 0.7 },
       isPadActive: (padId: string) => padId === oneShotPad.id,
     });
@@ -206,7 +206,7 @@ describe("usePadGesture — hold phase", () => {
   });
 
   it("triggers pad on pointer up after hold (when no drag occurred)", () => {
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
     act(() => {
@@ -226,7 +226,7 @@ describe("usePadGesture — hold phase", () => {
   });
 
   it("clears volume transition on pointer up", () => {
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
 
     act(() => {
@@ -250,7 +250,7 @@ describe("usePadGesture — hold phase", () => {
 describe("usePadGesture — drag phase", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
     vi.mocked(setPadVolume).mockClear();
     vi.mocked(stopPad).mockClear();
     vi.mocked(resetPadGain).mockClear();
@@ -318,7 +318,7 @@ describe("usePadGesture — drag phase", () => {
 
   it("calls stopPad and resetPadGain when dragged to near-zero volume", () => {
     usePlaybackStore.setState({
-      playingPadIds: [oneShotPad.id],
+      playingPadIds: new Set([oneShotPad.id]),
       padVolumes: { [oneShotPad.id]: 1.0 },
     });
     const { result } = renderHook(() => usePadGesture(oneShotPad));
@@ -344,7 +344,7 @@ describe("usePadGesture — drag phase", () => {
 
   it("does not call stopPad when dragged to non-zero volume", () => {
     usePlaybackStore.setState({
-      playingPadIds: [oneShotPad.id],
+      playingPadIds: new Set([oneShotPad.id]),
       padVolumes: { [oneShotPad.id]: 1.0 },
       isPadActive: (padId: string) => padId === oneShotPad.id,
     });
@@ -374,7 +374,7 @@ describe("usePadGesture — drag phase", () => {
 describe("usePadGesture — hold-mode layer pad", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: [] });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(releasePadHoldLayers).mockClear();
   });
@@ -478,7 +478,7 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
     // padVolumes may be near 0 from a previous drag. triggerVolume() must return
     // 1.0, not the stale near-zero padVolume.
     usePlaybackStore.setState({
-      playingPadIds: [mixedPad.id],
+      playingPadIds: new Set([mixedPad.id]),
       padVolumes: { [mixedPad.id]: 0.02 },
       isPadActive: (padId: string) => padId === mixedPad.id,
       isLayerActive: (layerId: string) => layerId === "layer-oneshot",
@@ -499,7 +499,7 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
     // Simulate: hold layer is actively playing at volume 0.7.
     // triggerVolume() should honour the current padVolume.
     usePlaybackStore.setState({
-      playingPadIds: [mixedPad.id],
+      playingPadIds: new Set([mixedPad.id]),
       padVolumes: { [mixedPad.id]: 0.7 },
       isPadActive: (padId: string) => padId === mixedPad.id,
       isLayerActive: (layerId: string) => layerId === "layer-hold",
@@ -520,7 +520,7 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
     // The hold timer must use 1.0, not the stale 0.02 padVolume, so the display bar
     // starts at full height matching the actual trigger volume.
     usePlaybackStore.setState({
-      playingPadIds: [mixedPad.id],
+      playingPadIds: new Set([mixedPad.id]),
       padVolumes: { [mixedPad.id]: 0.02 },
       isPadActive: (padId: string) => padId === mixedPad.id,
       isLayerActive: (layerId: string) => layerId === "layer-oneshot",
@@ -545,7 +545,7 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
 describe("usePadGesture — startY staleness fix", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, isPadActive: () => false });
     vi.mocked(setPadVolume).mockClear();
   });
 
@@ -630,7 +630,7 @@ describe("usePadGesture — startY staleness fix", () => {
 describe("usePadGesture — time-based sensitivity ramp", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, isPadActive: () => false });
     vi.mocked(setPadVolume).mockClear();
   });
 
@@ -747,7 +747,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
 describe("usePadGesture — onPointerCancel", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, isPadActive: () => false });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, isPadActive: () => false });
     vi.mocked(setPadVolume).mockClear();
     vi.mocked(stopPad).mockClear();
     vi.mocked(resetPadGain).mockClear();

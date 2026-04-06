@@ -77,7 +77,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
   const enterCrossfade = useCallback(() => {
     if (editMode || overlayStack.length > 0) return;
-    if (playingPadIds.length === 0) return;
+    if (playingPadIds.size === 0) return;
     setMode("crossfade");
     setSelectedPadIds(new Set());
   }, [editMode, overlayStack.length, playingPadIds]);
@@ -89,7 +89,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
       if (mode === "fade") {
         const pad = pads.find((p) => p.id === padId)!;
         const duration = resolveFadeDuration(pad);
-        if (playingPadIds.includes(padId)) {
+        if (playingPadIds.has(padId)) {
           if (isPadFadingOut(padId)) {
             fadePadInFromCurrent(pad, duration);
           } else {
@@ -122,16 +122,16 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const selectedArray = [...selectedPadIds];
   const canExecute =
     mode === "crossfade" &&
-    selectedArray.some((id) => playingPadIds.includes(id)) &&
-    selectedArray.some((id) => !playingPadIds.includes(id));
+    selectedArray.some((id) => playingPadIds.has(id)) &&
+    selectedArray.some((id) => !playingPadIds.has(id));
 
   const execute = useCallback(() => {
     if (!canExecute) return;
     const fadingOut = pads.filter(
-      (p) => selectedPadIds.has(p.id) && playingPadIds.includes(p.id),
+      (p) => selectedPadIds.has(p.id) && playingPadIds.has(p.id),
     );
     const fadingIn = pads.filter(
-      (p) => selectedPadIds.has(p.id) && !playingPadIds.includes(p.id),
+      (p) => selectedPadIds.has(p.id) && !playingPadIds.has(p.id),
     );
     crossfadePads(fadingOut, fadingIn);
     cancel();
@@ -141,10 +141,10 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     (padId: string): PadFadeVisual => {
       if (mode === null) return null;
       if (!isValidPad(padId)) return "invalid";
-      if (mode === "fade") return playingPadIds.includes(padId) ? "crossfade-out" : "crossfade-in";
+      if (mode === "fade") return playingPadIds.has(padId) ? "crossfade-out" : "crossfade-in";
 
       const isSelected = selectedPadIds.has(padId);
-      const isPlaying = playingPadIds.includes(padId);
+      const isPlaying = playingPadIds.has(padId);
       if (isSelected) return isPlaying ? "selected-out" : "selected-in";
       return isPlaying ? "crossfade-out" : "crossfade-in";
     },
@@ -169,7 +169,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     if (mode === "crossfade") {
       if (canExecute) execute();
       else cancel();
-    } else if (playingPadIds.length > 0) {
+    } else if (playingPadIds.size > 0) {
       enterCrossfade();
     }
   }, { enabled: !editMode, preventDefault: true });
