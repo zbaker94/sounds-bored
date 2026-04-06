@@ -9,7 +9,7 @@ import { PadConfigDrawer } from "./PadConfigDrawer";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   syncLayerVolume: vi.fn(),
-  syncLayerPlaybackMode: vi.fn(),
+  syncLayerConfig: vi.fn(),
 }));
 
 function renderDrawer(props: { sceneId?: string; padId?: string } = {}) {
@@ -193,13 +193,13 @@ describe("PadConfigDrawer", () => {
     });
   });
 
-  describe("syncLayerPlaybackMode on save", () => {
-    async function renderEditDrawerWithLoopLayer() {
-      const { syncLayerPlaybackMode } = await import("@/lib/audio/padPlayer");
+  describe("syncLayerConfig on save", () => {
+    async function renderEditDrawerWithLayer(layerOverrides: Parameters<typeof createMockLayer>[0] = {}) {
+      const { syncLayerConfig } = await import("@/lib/audio/padPlayer");
       const layer = createMockLayer({
         id: "layer-1",
-        playbackMode: "loop",
         selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] },
+        ...layerOverrides,
       });
       const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
@@ -219,33 +219,54 @@ describe("PadConfigDrawer", () => {
         />,
       );
       openDrawer();
-      return { layer, syncLayerPlaybackMode };
+      return { layer, syncLayerConfig };
     }
 
-    it("calls syncLayerPlaybackMode when playbackMode changes on save", async () => {
-      const { syncLayerPlaybackMode } = await renderEditDrawerWithLoopLayer();
+    it("calls syncLayerConfig with the updated and original layer when playbackMode changes", async () => {
+      const { syncLayerConfig } = await renderEditDrawerWithLayer({ playbackMode: "loop" });
 
-      // Click the "One-shot" tab to change playback mode from "loop"
       await userEvent.click(screen.getByRole("tab", { name: /one-shot/i }));
       await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
       await waitFor(() => {
-        expect(syncLayerPlaybackMode).toHaveBeenCalledWith(
+        expect(syncLayerConfig).toHaveBeenCalledWith(
           expect.objectContaining({ id: "layer-1", playbackMode: "one-shot" }),
+          expect.objectContaining({ id: "layer-1", playbackMode: "loop" }),
         );
       });
     });
 
-    it("does not call syncLayerPlaybackMode when playbackMode is unchanged on save", async () => {
-      const { syncLayerPlaybackMode } = await renderEditDrawerWithLoopLayer();
+    it("calls syncLayerConfig with the updated and original layer when arrangement changes", async () => {
+      const { syncLayerConfig } = await renderEditDrawerWithLayer({ arrangement: "sequential" });
 
-      // Save without changing the playback mode
+      await userEvent.click(screen.getByRole("tab", { name: /simultaneous/i }));
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(syncLayerConfig).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "layer-1", arrangement: "simultaneous" }),
+          expect.objectContaining({ id: "layer-1", arrangement: "sequential" }),
+        );
+      });
+    });
+
+    it("calls syncLayerConfig with matching new and original layer when nothing changes on save", async () => {
+      const { layer, syncLayerConfig } = await renderEditDrawerWithLayer();
+
       await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
       await waitFor(() => {
         expect(useProjectStore.getState().project?.scenes[0].pads[0].name).toBe("FX");
       });
-      expect(syncLayerPlaybackMode).not.toHaveBeenCalled();
+      // syncLayerConfig is always called for existing layers; it's a no-op internally
+      // when playbackMode and arrangement are unchanged.
+      expect(syncLayerConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "layer-1" }),
+        expect.objectContaining({ id: "layer-1" }),
+      );
+      const [newLayer, origLayer] = (syncLayerConfig as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(newLayer.playbackMode).toBe(origLayer.playbackMode);
+      expect(newLayer.arrangement).toBe(origLayer.arrangement);
     });
   });
 });

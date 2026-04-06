@@ -295,15 +295,20 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
 }
 
-/** Read the current playbackMode for a layer from the live project store.
- *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted)
+/** Read a single field from a layer in the live project store.
+ *  Falls back to `captured` if the pad or layer is no longer found (e.g. deleted)
  *  or if no project is currently loaded (e.g. project cleared mid-playback). */
-function livePlaybackMode(padId: string, layerId: string, captured: Layer["playbackMode"]): Layer["playbackMode"] {
+function liveLayerField<K extends keyof Layer>(
+  padId: string,
+  layerId: string,
+  field: K,
+  captured: Layer[K],
+): Layer[K] {
   const project = useProjectStore.getState().project;
   if (project) {
     for (const scene of project.scenes) {
       const pad = scene.pads.find((p) => p.id === padId);
-      if (pad) return pad.layers.find((l) => l.id === layerId)?.playbackMode ?? captured;
+      if (pad) return pad.layers.find((l) => l.id === layerId)?.[field] ?? captured;
     }
   }
   return captured;
@@ -337,6 +342,54 @@ export function syncLayerPlaybackMode(layer: Layer): void {
   if (!isLoopMode && isChained(layer.arrangement)) {
     layerChainQueue.delete(layer.id);
   }
+}
+
+/**
+ * Called when the arrangement type for a layer changes while playback is active.
+ *
+ * - Chained → chained (sequential ↔ shuffled): rebuilds the chain queue with the
+ *   new arrangement so the current sound plays out and the updated sequence follows.
+ *   Looping is handled naturally — onended reads livePlaybackMode from the store
+ *   when the rebuilt chain exhausts.
+ *
+ * - Chained → non-chained (sequential/shuffled → simultaneous): clears the queue
+ *   so onended does not advance the stale chain. The current sound plays to
+ *   completion, then stops (or loops, if playbackMode is loop/hold — the loop flag
+ *   on active voices is synced here since non-chained looping uses source.loop).
+ *
+ * No-op if the layer has no active voices.
+ */
+export function syncLayerArrangement(layer: Layer): void {
+  const voices = usePlaybackStore.getState().getLayerVoices(layer.id);
+  if (voices.length === 0) return;
+
+  if (isChained(layer.arrangement)) {
+    // Switching between chained arrangements: rebuild the queue with the new
+    // arrangement. The current sound plays out; onended picks up the new sequence.
+    const allSounds = resolveSounds(layer, useLibraryStore.getState().sounds);
+    const newOrder = buildPlayOrder(layer.arrangement, allSounds);
+    if (newOrder.length === 0) {
+      layerChainQueue.delete(layer.id);
+    } else {
+      layerChainQueue.set(layer.id, newOrder);
+    }
+  } else {
+    // Switching to non-chained (simultaneous): replace the stale chain with an empty
+    // array so onended treats it as natural exhaustion rather than an external stop.
+    // The current sound plays to completion; when it ends, onended checks liveMode and
+    // liveArrangement from the store and starts all sounds simultaneously if looping.
+    layerChainQueue.set(layer.id, []);
+  }
+}
+
+/**
+ * Sync all live-playback state for a layer after a pad config save.
+ * Calls syncLayerPlaybackMode and/or syncLayerArrangement only for the fields
+ * that actually changed, keeping the audio engine consistent with the updated store.
+ */
+export function syncLayerConfig(layer: Layer, original: Layer): void {
+  if (original.playbackMode !== layer.playbackMode) syncLayerPlaybackMode(layer);
+  if (original.arrangement  !== layer.arrangement)  syncLayerArrangement(layer);
 }
 
 export function clearAllLayerChains(): void {
@@ -511,25 +564,34 @@ async function startLayerSound(
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
       // `remaining.length === 0` means the chain ran to completion naturally.
       const remaining = layerChainQueue.get(layer.id);
-      const liveMode = livePlaybackMode(pad.id, layer.id, layer.playbackMode);
+      const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
       if (remaining === undefined) {
         // Queue was externally cleared (e.g. stopAll, retrigger restart) — do not chain.
       } else if (remaining.length > 0) {
         const [next, ...rest] = remaining;
         layerChainQueue.set(layer.id, rest);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
-      } else if (
-        (liveMode === "loop" || liveMode === "hold") &&
-        isChained(layer.arrangement)
-      ) {
-        // Chain exhausted naturally — rebuild and restart (loop/hold both loop while running).
-        // liveMode reads from the store so mid-playback config changes take effect at the
-        // next chain boundary without requiring a retrigger.
-        const newOrder = buildPlayOrder(layer.arrangement, allSounds);
-        if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
-        const [first, ...rest] = newOrder;
-        layerChainQueue.set(layer.id, rest);
-        startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), allSounds);
+      } else if (liveMode === "loop" || liveMode === "hold") {
+        // Chain exhausted naturally — restart according to the current live arrangement.
+        // Both liveMode and liveArr read from the store so mid-playback config changes
+        // (e.g. switching arrangement while a chain is playing) take effect here.
+        const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
+        if (isChained(liveArr)) {
+          const newOrder = buildPlayOrder(liveArr, allSounds);
+          if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
+          const [first, ...rest] = newOrder;
+          layerChainQueue.set(layer.id, rest);
+          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), allSounds);
+        } else {
+          // Non-chained loop: start all sounds simultaneously. The new voices will
+          // have source.loop=true and loop independently until the pad is stopped.
+          layerChainQueue.delete(layer.id);
+          const liveLayer = { ...layer, arrangement: liveArr, playbackMode: liveMode };
+          for (const sound of allSounds) {
+            // getVoiceVolume reads layer.selection.instances — unchanged by arrangement/mode edits
+            startLayerSound(pad, liveLayer, sound, ctx, layerGain, getVoiceVolume(layer, sound), allSounds);
+          }
+        }
       } else {
         layerChainQueue.delete(layer.id);
       }
