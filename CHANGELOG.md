@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where retriggering a pad in "continue" mode could cause the playback progress bar to disappear for streaming (large-file) audio.
 - Fixed a bug where triggering a pad with multiple simultaneous layers using large audio files could cause only the most recently started element to be tracked, leading to incorrect playback progress and potential audio element leaks
 - Playback progress bar for multi-layer pads now correctly reflects the longest-duration active audio element rather than whichever started last
 - Pad config saves now sync all layer audio settings (playback mode and arrangement) in a single unified update, replacing two separate sync calls.

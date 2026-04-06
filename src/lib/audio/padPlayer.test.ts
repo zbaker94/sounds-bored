@@ -747,6 +747,26 @@ describe("streaming path (large files)", () => {
     // Progress should reflect the longest-duration element (20 s) = 5/20 = 0.25
     expect(getPadProgress(pad.id)).toBeCloseTo(0.25);
   });
+
+  it("continue-mode retrigger preserves streaming progress tracking", async () => {
+    const { triggerPad, isPadStreaming } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "ambient.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "continue",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    expect(isPadStreaming(pad.id)).toBe(true);
+
+    // Retrigger with continue — the layer skips (already playing), tracking must survive
+    await triggerPad(pad);
+    expect(isPadStreaming(pad.id)).toBe(true);
+  });
 });
 
 describe("retrigger next", () => {

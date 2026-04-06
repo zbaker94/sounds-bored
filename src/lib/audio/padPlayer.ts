@@ -23,10 +23,11 @@ const layerGainMap = new Map<string, GainNode>();
 // Tracks the longest-duration voice per pad for playback progress display (buffer path).
 const padProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
 
-// Tracks all active streaming elements per pad for progress display and cleanup.
+// Tracks all active streaming elements per pad per layer for progress display and cleanup.
+// pad ID → layer ID → Set<HTMLAudioElement>. Per-layer keying ensures 'continue'-mode
+// retriggers preserve progress tracking for layers that do not restart.
 // HTMLAudioElement exposes currentTime/duration after loadedmetadata fires.
-// A Set is used so multi-layer pads with simultaneous large files track all voices.
-const padStreamingAudio = new Map<string, Set<HTMLAudioElement>>();
+const padStreamingAudio = new Map<string, Map<string, Set<HTMLAudioElement>>>();
 
 // Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
 // Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted.
@@ -229,31 +230,33 @@ export function getPadProgress(padId: string): number | null {
     }
     return Math.min(1, Math.max(0, elapsed / info.duration));
   }
-  const streamSet = padStreamingAudio.get(padId);
-  if (streamSet && streamSet.size > 0) {
-    // Pick the element with the longest duration, matching how padProgressInfo
-    // picks the longest-duration buffer voice for simultaneous arrangements.
+  const layerMap = padStreamingAudio.get(padId);
+  if (layerMap && layerMap.size > 0) {
+    // Pick the element with the longest duration across all streaming layers,
+    // matching how padProgressInfo picks the longest-duration buffer voice.
+    // layerMap.size > 0 and empty Sets are never kept, so best is always assigned.
     let best: HTMLAudioElement | null = null;
-    for (const audio of streamSet) {
-      if (!best || (isFinite(audio.duration) && audio.duration > (best.duration || 0))) {
-        best = audio;
+    for (const audioSet of layerMap.values()) {
+      for (const audio of audioSet) {
+        if (!best || (isFinite(audio.duration) && audio.duration > (best.duration || 0))) {
+          best = audio;
+        }
       }
     }
-    if (best) {
-      const d = best.duration;
-      if (d > 0 && isFinite(d)) {
-        return Math.min(1, Math.max(0, best.currentTime / d));
-      }
-      // duration not yet known (loadedmetadata hasn't fired) — return 0 to show bar started
-      return 0;
+    const d = best!.duration;
+    if (d > 0 && isFinite(d)) {
+      return Math.min(1, Math.max(0, best!.currentTime / d));
     }
+    // duration not yet known (loadedmetadata hasn't fired) — return 0 to show bar started
+    return 0;
   }
   return null;
 }
 
 /** True while a streaming (large-file) voice is active for this pad. */
 export function isPadStreaming(padId: string): boolean {
-  return padStreamingAudio.has(padId);
+  const layerMap = padStreamingAudio.get(padId);
+  return !!layerMap && layerMap.size > 0;
 }
 
 export function getPadGain(padId: string): GainNode {
@@ -407,6 +410,15 @@ export function clearAllLayerChains(): void {
   layerChainQueue.clear();
 }
 
+/** Remove a single layer's streaming audio entry. Called when retrigger modes null
+ *  the onended callback before stopping, preventing the normal cleanup path. */
+function clearLayerStreamingAudio(padId: string, layerId: string): void {
+  const padLayerMap = padStreamingAudio.get(padId);
+  if (!padLayerMap) return;
+  padLayerMap.delete(layerId);
+  if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
+}
+
 /** Stop a single pad, clearing its layer chain queues first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
   for (const layer of pad.layers) {
@@ -460,6 +472,9 @@ export function releasePadHoldLayers(pad: Pad): void {
     const voices = [...usePlaybackStore.getState().getLayerVoices(layer.id)];
     if (voices.length === 0) continue;
 
+    // rampStopLayerVoices nulls onended before stopping, so the cleanup callback
+    // won't fire — delete the layer's streaming entry explicitly.
+    clearLayerStreamingAudio(pad.id, layer.id);
     rampStopLayerVoices(pad.id, layer, voices);
   }
 }
@@ -546,9 +561,14 @@ async function startLayerSound(
       }
       const sourceNode = ctx.createMediaElementSource(audio);
       voice = wrapStreamingElement(audio, sourceNode, ctx, layerGain, voiceVolume);
-      const streamSet = padStreamingAudio.get(pad.id) ?? new Set<HTMLAudioElement>();
-      streamSet.add(audio);
-      padStreamingAudio.set(pad.id, streamSet);
+      let padLayerMap = padStreamingAudio.get(pad.id);
+      if (!padLayerMap) {
+        padLayerMap = new Map();
+        padStreamingAudio.set(pad.id, padLayerMap);
+      }
+      const audioSet = padLayerMap.get(layer.id) ?? new Set<HTMLAudioElement>();
+      audioSet.add(audio);
+      padLayerMap.set(layer.id, audioSet);
     } else {
       // ── Buffer path (short files) ──────────────────────────────────────────
       // Fully decoded AudioBuffer: instant retrigger, simultaneous instances.
@@ -572,10 +592,14 @@ async function startLayerSound(
       // endedCb is nulled on first fire — prevents double-call if the source
       // ends naturally while a stopWithRamp timeout is pending.
       if (audio) {
-        const streamSet = padStreamingAudio.get(pad.id);
-        if (streamSet) {
-          streamSet.delete(audio);
-          if (streamSet.size === 0) padStreamingAudio.delete(pad.id);
+        const padLayerMap = padStreamingAudio.get(pad.id);
+        if (padLayerMap) {
+          const audioSet = padLayerMap.get(layer.id);
+          if (audioSet) {
+            audioSet.delete(audio);
+            if (audioSet.size === 0) padLayerMap.delete(layer.id);
+            if (padLayerMap.size === 0) padStreamingAudio.delete(pad.id);
+          }
         }
       }
       usePlaybackStore.getState().clearLayerVoice(pad.id, layer.id, voice);
@@ -671,7 +695,8 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
   padProgressInfo.delete(pad.id);
-  padStreamingAudio.delete(pad.id); // clear Set; audio elements are stopped via playbackStore
+  // padStreamingAudio is NOT cleared here — per-layer tracking is managed by each retrigger
+  // mode so that 'continue'-mode layers preserve their streaming progress across retriggers.
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   usePlaybackStore.getState().updatePadVolume(pad.id, startVolume);
@@ -692,6 +717,9 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
       case "stop":
         if (isLayerPlaying) {
           layerChainQueue.delete(layer.id);
+          // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
+          // callback won't fire — delete the layer's streaming entry explicitly.
+          clearLayerStreamingAudio(pad.id, layer.id);
           stopLayerWithRamp(pad, layer);
           continue;
         }
@@ -716,6 +744,8 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           // fires onended synchronously; nulling first prevents the chain-advance callback from re-firing.
           for (const v of store.getLayerVoices(layer.id)) v.setOnEnded(null);
           layerChainQueue.delete(layer.id);
+          // setOnEnded(null) nulled the cleanup callback — delete streaming entry explicitly.
+          clearLayerStreamingAudio(pad.id, layer.id);
           store.stopLayer(pad.id, layer.id);
 
           if (remaining.length > 0) {
