@@ -681,6 +681,92 @@ describe("streaming path (large files)", () => {
     // Second Audio created for the chained sound
     expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(2);
   });
+
+  it("multi-layer simultaneous streaming: both elements tracked, neither leaked", async () => {
+    const { triggerPad, isPadStreaming } = await import("./padPlayer");
+    const soundA = createMockSound({ filePath: "a.wav" });
+    const soundB = createMockSound({ filePath: "b.wav" });
+    setSounds([soundA, soundB]);
+
+    const layer1 = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: soundA.id, soundId: soundA.id, volume: 1 }] },
+    });
+    const layer2 = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: soundB.id, soundId: soundB.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer1, layer2] });
+
+    await triggerPad(pad);
+
+    expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(2);
+    expect(isPadStreaming(pad.id)).toBe(true);
+
+    // First element ends — second is still active, pad still streaming
+    mockAudioInstances[0].onended?.(new Event("ended"));
+    await tick();
+    expect(isPadStreaming(pad.id)).toBe(true);
+
+    // Second element ends — both gone, pad no longer streaming
+    mockAudioInstances[1].onended?.(new Event("ended"));
+    await tick();
+    expect(isPadStreaming(pad.id)).toBe(false);
+  });
+
+  it("getPadProgress picks the element with the longest duration", async () => {
+    const { triggerPad, getPadProgress } = await import("./padPlayer");
+    const soundA = createMockSound({ filePath: "a.wav" });
+    const soundB = createMockSound({ filePath: "b.wav" });
+    setSounds([soundA, soundB]);
+
+    const layer1 = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: soundA.id, soundId: soundA.id, volume: 1 }] },
+    });
+    const layer2 = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: soundB.id, soundId: soundB.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer1, layer2] });
+
+    await triggerPad(pad);
+
+    // short sound: 10 s, 5 s elapsed → 0.5 progress
+    Object.defineProperty(mockAudioInstances[0], "duration", { value: 10, configurable: true });
+    mockAudioInstances[0].currentTime = 5;
+
+    // long sound: 20 s, 5 s elapsed → 0.25 progress
+    Object.defineProperty(mockAudioInstances[1], "duration", { value: 20, configurable: true });
+    mockAudioInstances[1].currentTime = 5;
+
+    // Progress should reflect the longest-duration element (20 s) = 5/20 = 0.25
+    expect(getPadProgress(pad.id)).toBeCloseTo(0.25);
+  });
+
+  it("continue-mode retrigger preserves streaming progress tracking", async () => {
+    const { triggerPad, isPadStreaming } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "ambient.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "continue",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    expect(isPadStreaming(pad.id)).toBe(true);
+
+    // Retrigger with continue — the layer skips (already playing), tracking must survive
+    await triggerPad(pad);
+    expect(isPadStreaming(pad.id)).toBe(true);
+  });
 });
 
 describe("retrigger next", () => {

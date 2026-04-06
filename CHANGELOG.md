@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where retriggering a pad in "continue" mode could cause the playback progress bar to disappear for streaming (large-file) audio.
+- Fixed a bug where triggering a pad with multiple simultaneous layers using large audio files could cause only the most recently started element to be tracked, leading to incorrect playback progress and potential audio element leaks
+- Playback progress bar for multi-layer pads now correctly reflects the longest-duration active audio element rather than whichever started last
 - Pad config saves now sync all layer audio settings (playback mode and arrangement) in a single unified update, replacing two separate sync calls.
 - Internal audio engine code was simplified by consolidating `liveArrangement` and `livePlaybackMode` helper functions into one generic helper.
 - Changing a layer's arrangement type (e.g. sequential → simultaneous) while a pad is actively playing now takes effect correctly without requiring a retrigger.
