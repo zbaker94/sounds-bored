@@ -2,6 +2,7 @@ import { useRef } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
+import { isLayerActive } from "@/lib/audio/audioState";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 // Gesture thresholds
@@ -54,9 +55,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
    * fading one-shot voice must not make the hold layer inherit a stale padVolume.
    */
   function checkHoldLayerActive(): boolean {
-    const store = usePlaybackStore.getState();
     return pad.layers.some(
-      (l) => l.playbackMode === "hold" && store.isLayerActive(l.id)
+      (l) => l.playbackMode === "hold" && isLayerActive(l.id)
     );
   }
 
@@ -71,7 +71,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     if (hasHoldLayer) {
       return checkHoldLayerActive() ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
     }
-    return store.isPadActive(pad.id) ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
+    return store.playingPadIds.has(pad.id) ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
@@ -91,7 +91,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     const store = usePlaybackStore.getState();
     s.wasPlayingAtStart = hasHoldLayer
       ? checkHoldLayerActive()
-      : store.isPadActive(pad.id);
+      : store.playingPadIds.has(pad.id);
 
     // Hold-mode pads trigger immediately on press — skip if we just cancelled a fade
     if (hasHoldLayer && !fadeCancelled) {
@@ -145,7 +145,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       const newVolume = Math.max(0, Math.min(1, s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
-      if (!justTriggered && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().isPadActive(pad.id)) {
+      if (!justTriggered && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
         triggerPad(pad, 0).catch(console.error);
       }
 
