@@ -29,7 +29,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function SettingsDialog() {
   const isOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG));
@@ -180,6 +180,16 @@ function PlaybackTab() {
   const settings = useAppSettingsStore((s) => s.settings);
   const updateSettings = useAppSettingsStore((s) => s.updateSettings);
   const { mutate: saveSettings } = useSaveAppSettings();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        clearTimeout(saveTimerRef.current);
+        saveSettings(useAppSettingsStore.getState().settings!);
+      }
+    };
+  }, [saveSettings]);
 
   if (!settings) return null;
 
@@ -189,7 +199,11 @@ function PlaybackTab() {
     updateSettings((draft) => {
       draft.globalFadeDurationMs = value;
     });
-    saveSettings(useAppSettingsStore.getState().settings!);
+    if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveSettings(useAppSettingsStore.getState().settings!);
+      saveTimerRef.current = null;
+    }, 300);
   }
 
   return (
