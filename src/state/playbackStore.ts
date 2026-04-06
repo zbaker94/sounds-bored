@@ -6,6 +6,13 @@ import type { AudioVoice } from "@/lib/audio/audioVoice";
 const voiceMap = new Map<string, AudioVoice[]>();
 const layerVoiceMap = new Map<string, AudioVoice[]>();
 
+// NOTE: voiceMap and layerVoiceMap are the playbackStore half of the audio runtime state.
+// The other half lives in src/lib/audio/audioState.ts (padGainMap, layerGainMap,
+// padProgressInfo, padStreamingAudio, layerChainQueue, fadePadTimeouts, padFadeRafs,
+// fadingOutPadIds, layerPendingMap). Both halves must always be cleared together.
+// Use padPlayer.stopAllPads() as the single entry point — never call stopAll() directly
+// from application code.
+
 interface PlaybackState {
   masterVolume: number; // 0–100
   setMasterVolume: (volume: number) => void;
@@ -144,9 +151,18 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
   },
 
   stopAll: () => {
-    // NOTE: layerChainQueue lives in padPlayer.ts (can't import here — circular dep).
-    // Always call padPlayer.stopAllPads() instead of stopAll() directly to ensure
-    // chains are cleared before voices are stopped.
+    // NOTE: This clears only the playbackStore half of audio runtime state (voiceMap, layerVoiceMap).
+    // The padPlayer half (gain nodes, streaming audio, chain queues, fade tracking) lives in
+    // src/lib/audio/audioState.ts and must be cleared separately.
+    //
+    // INVARIANT: Always call padPlayer.stopAllPads() instead of this method directly.
+    // stopAllPads() ensures:
+    //   1. Fade tracking is cancelled (clearAllFadeTracking)
+    //   2. Chain queues are cleared (clearAllLayerChains) — prevents onended from advancing chains
+    //   3. onended callbacks are nulled — prevents loop restarts during the gain ramp window
+    //   4. Gain nodes are ramped to 0 (STOP_RAMP_S) before voices are stopped
+    //   5. audioState Maps are cleared (padStreamingAudio, padProgressInfo, layer/pad gains)
+    //   6. This method is called last to stop voices and clear reactive UI state
 
     // Collect from voiceMap only — every layer voice is also in voiceMap
     // by the recordLayerVoice → recordVoice invariant, so no voices are missed.

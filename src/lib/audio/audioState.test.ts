@@ -1,0 +1,205 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
+const mockCtx = {
+  currentTime: 0,
+  createGain: vi.fn(),
+};
+
+vi.mock("./audioContext", () => ({
+  getAudioContext: vi.fn(() => mockCtx),
+  getMasterGain: vi.fn(() => ({ connect: vi.fn() })),
+}));
+
+const mockPlaybackState = {
+  clearVolumeTransition: vi.fn(),
+  clearAllVolumeTransitions: vi.fn(),
+  resetAllPadVolumes: vi.fn(),
+};
+
+vi.mock("@/state/playbackStore", () => ({
+  usePlaybackStore: {
+    getState: vi.fn(() => mockPlaybackState),
+  },
+}));
+
+function makeMockGain() {
+  return {
+    gain: {
+      value: 1,
+      setValueAtTime: vi.fn(),
+      cancelScheduledValues: vi.fn(),
+    },
+    connect: vi.fn(),
+  };
+}
+
+// ── Imports (after mocks) ────────────────────────────────────────────────────
+
+import { usePlaybackStore } from "@/state/playbackStore";
+import {
+  getPadProgress,
+  getPadGain,
+  cancelPadFade,
+  clearAllFadeTracking,
+  clearAllPadGains,
+  clearAllLayerGains,
+  clearAllLayerChains,
+  clearAllStreamingAudio,
+  clearAllPadProgressInfo,
+  clearAllLayerPending,
+  setPadProgressInfo,
+  registerStreamingAudio,
+  isPadFadingOut,
+  isPadFading,
+  addFadingOutPad,
+  setFadePadTimeout,
+} from "./audioState";
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockCtx.currentTime = 0;
+  mockCtx.createGain.mockImplementation(() => makeMockGain());
+  clearAllPadGains();
+  clearAllLayerGains();
+  clearAllLayerChains();
+  clearAllStreamingAudio();
+  clearAllPadProgressInfo();
+  clearAllLayerPending();
+  clearAllFadeTracking();
+});
+
+// ── getPadProgress ───────────────────────────────────────────────────────────
+
+describe("getPadProgress", () => {
+  it("returns elapsed/duration clamped to [0,1] for non-looping buffer path", () => {
+    setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: false });
+
+    mockCtx.currentTime = 2;
+    expect(getPadProgress("pad-1")).toBeCloseTo(0.5);
+
+    // Clamped at 1 when elapsed exceeds duration
+    mockCtx.currentTime = 10;
+    expect(getPadProgress("pad-1")).toBe(1);
+  });
+
+  it("returns elapsed % duration / duration for looping buffer path", () => {
+    setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: true });
+
+    mockCtx.currentTime = 2;
+    expect(getPadProgress("pad-1")).toBeCloseTo(0.5);
+
+    // Wraps around via modulo
+    mockCtx.currentTime = 5;
+    // elapsed=5, 5%4=1, 1/4=0.25
+    expect(getPadProgress("pad-1")).toBeCloseTo(0.25);
+  });
+
+  it("returns progress from the streaming element with the longest duration", () => {
+    const audio1 = {
+      duration: 10,
+      currentTime: 3,
+    } as unknown as HTMLAudioElement;
+    const audio2 = {
+      duration: 20,
+      currentTime: 5,
+    } as unknown as HTMLAudioElement;
+
+    registerStreamingAudio("pad-1", "layer-1", audio1);
+    registerStreamingAudio("pad-1", "layer-2", audio2);
+
+    // Should pick audio2 (longest duration=20), progress = 5/20 = 0.25
+    expect(getPadProgress("pad-1")).toBeCloseTo(0.25);
+  });
+
+  it("returns null when no progress info and no streaming audio", () => {
+    expect(getPadProgress("pad-1")).toBeNull();
+  });
+
+  it("returns 0 when streaming element duration is not yet known", () => {
+    const audio = {
+      duration: NaN,
+      currentTime: 0,
+    } as unknown as HTMLAudioElement;
+
+    registerStreamingAudio("pad-1", "layer-1", audio);
+    expect(getPadProgress("pad-1")).toBe(0);
+  });
+});
+
+// ── getPadGain ───────────────────────────────────────────────────────────────
+
+describe("getPadGain", () => {
+  it("creates a GainNode on first call", () => {
+    const gain = getPadGain("pad-1");
+    expect(gain).toBeDefined();
+    expect(gain.connect).toBeDefined();
+    expect(mockCtx.createGain).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the same GainNode on subsequent calls", () => {
+    const gain1 = getPadGain("pad-1");
+    const gain2 = getPadGain("pad-1");
+    expect(gain1).toBe(gain2);
+    // Only one createGain call — second call reuses cached node
+    expect(mockCtx.createGain).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates separate GainNodes for different pads", () => {
+    const gain1 = getPadGain("pad-1");
+    const gain2 = getPadGain("pad-2");
+    expect(gain1).not.toBe(gain2);
+    expect(mockCtx.createGain).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── cancelPadFade ────────────────────────────────────────────────────────────
+
+describe("cancelPadFade", () => {
+  it("is idempotent when no fade is registered", () => {
+    // Should not throw
+    expect(() => cancelPadFade("pad-1")).not.toThrow();
+    expect(isPadFadingOut("pad-1")).toBe(false);
+    expect(isPadFading("pad-1")).toBe(false);
+  });
+
+  it("clears fade state for a pad that has an active fade", () => {
+    addFadingOutPad("pad-1");
+    setFadePadTimeout("pad-1", setTimeout(() => {}, 9999));
+    expect(isPadFadingOut("pad-1")).toBe(true);
+    expect(isPadFading("pad-1")).toBe(true);
+
+    cancelPadFade("pad-1");
+
+    expect(isPadFadingOut("pad-1")).toBe(false);
+    expect(isPadFading("pad-1")).toBe(false);
+  });
+});
+
+// ── clearAllFadeTracking ─────────────────────────────────────────────────────
+
+describe("clearAllFadeTracking", () => {
+  it("clears all fade state across multiple pads and resets store", () => {
+    addFadingOutPad("pad-1");
+    addFadingOutPad("pad-2");
+    setFadePadTimeout("pad-1", setTimeout(() => {}, 9999));
+    setFadePadTimeout("pad-2", setTimeout(() => {}, 9999));
+    expect(isPadFadingOut("pad-1")).toBe(true);
+    expect(isPadFadingOut("pad-2")).toBe(true);
+    expect(isPadFading("pad-1")).toBe(true);
+    expect(isPadFading("pad-2")).toBe(true);
+
+    clearAllFadeTracking();
+
+    expect(isPadFadingOut("pad-1")).toBe(false);
+    expect(isPadFadingOut("pad-2")).toBe(false);
+    expect(isPadFading("pad-1")).toBe(false);
+    expect(isPadFading("pad-2")).toBe(false);
+    // Verify playbackStore bulk resets were called
+    expect(usePlaybackStore.getState().clearAllVolumeTransitions).toHaveBeenCalled();
+    expect(usePlaybackStore.getState().resetAllPadVolumes).toHaveBeenCalled();
+  });
+});

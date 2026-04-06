@@ -107,10 +107,14 @@ beforeEach(async () => {
   createdSources.length = 0;
   // Clear chain queue before stopAll so old onended callbacks don't chain
   const { clearAllLayerChains, clearAllLayerGains, clearAllPadGains, clearAllFadeTracking } = await import("./padPlayer");
+  const { clearAllStreamingAudio, clearAllPadProgressInfo, clearAllLayerPending } = await import("./audioState");
   clearAllLayerChains();
   clearAllLayerGains();
   clearAllPadGains();
   clearAllFadeTracking();
+  clearAllStreamingAudio();
+  clearAllPadProgressInfo();
+  clearAllLayerPending();
   usePlaybackStore.getState().stopAll();
   usePlaybackStore.setState({
     masterVolume: 100,
@@ -1080,6 +1084,34 @@ describe("fadePadOut", () => {
     expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(false);
     clearAllFadeTracking();
     vi.useRealTimers();
+  });
+});
+
+describe("freezePadAtCurrentVolume", () => {
+  it("captures current gain value and re-applies it after cancelling fade", async () => {
+    const { freezePadAtCurrentVolume, getPadGain } = await import("./padPlayer");
+    const gain = getPadGain("pad-1");
+    gain.gain.value = 0.6;
+
+    freezePadAtCurrentVolume("pad-1");
+
+    expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
+    expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.6);
+  });
+});
+
+describe("resetPadGain", () => {
+  it("resets gain to 1.0 and updates store", async () => {
+    const { resetPadGain, getPadGain } = await import("./padPlayer");
+    const gain = getPadGain("pad-1");
+    gain.gain.value = 0.3;
+
+    resetPadGain("pad-1");
+
+    expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
+    expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(1.0);
   });
 });
 
