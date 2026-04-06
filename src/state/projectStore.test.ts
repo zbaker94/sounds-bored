@@ -538,6 +538,14 @@ describe("projectStore", () => {
       expect(ids).toEqual(["s1", "s2", "s3"]);
       expect(getState().isDirty).toBe(false);
     });
+
+    it("should be a no-op when toIndex equals array length (post-splice boundary)", () => {
+      loadWithThreeScenes();
+      getState().reorderScenes(0, 3); // 3 === scenes.length, > postSpliceLength(2)
+      const ids = getState().project!.scenes.map((s) => s.id);
+      expect(ids).toEqual(["s1", "s2", "s3"]);
+      expect(getState().isDirty).toBe(false);
+    });
   });
 
   describe("reorderPads", () => {
@@ -605,6 +613,14 @@ describe("projectStore", () => {
     it("should be a no-op for out-of-bounds toIndex", () => {
       loadWithThreePads();
       getState().reorderPads("scene-1", 0, 10);
+      const ids = getState().project!.scenes[0].pads.map((p) => p.id);
+      expect(ids).toEqual(["p1", "p2", "p3"]);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("should be a no-op when toIndex equals array length (post-splice boundary)", () => {
+      loadWithThreePads();
+      getState().reorderPads("scene-1", 0, 3); // 3 === pads.length, > postSpliceLength(2)
       const ids = getState().project!.scenes[0].pads.map((p) => p.id);
       expect(ids).toEqual(["p1", "p2", "p3"]);
       expect(getState().isDirty).toBe(false);
