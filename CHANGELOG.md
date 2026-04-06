@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where pressing a pad with mixed hold + one-shot layers would incorrectly inherit a stale near-zero volume from a fading one-shot voice, causing the hold layer to trigger at the wrong volume instead of full volume.
 - When editing a pad's configuration while it is playing, a notice now appears informing you that sound selection changes will take effect on the next trigger.
 - Sound selection changes made while a pad is playing are now applied correctly at the next chain step — the current sound plays to completion without interruption.
 - Loop restarts now use the latest sound selection from the store, so mid-playback changes to which sounds are assigned take effect at each loop boundary.

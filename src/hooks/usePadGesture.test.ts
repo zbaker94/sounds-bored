@@ -437,6 +437,109 @@ describe("usePadGesture — hold-mode layer pad", () => {
   });
 });
 
+// ─── Mixed hold + one-shot pads ───────────────────────────────────────────────
+
+describe("usePadGesture — mixed hold + one-shot pad", () => {
+  const mixedPad: Pad = {
+    id: "pad-mixed",
+    name: "Mixed Pad",
+    layers: [
+      {
+        id: "layer-hold",
+        selection: { type: "assigned", instances: [] },
+        arrangement: "simultaneous",
+        playbackMode: "hold",
+        retriggerMode: "restart",
+        volume: 1.0,
+      },
+      {
+        id: "layer-oneshot",
+        selection: { type: "assigned", instances: [] },
+        arrangement: "simultaneous",
+        playbackMode: "one-shot",
+        retriggerMode: "restart",
+        volume: 1.0,
+      },
+    ],
+    muteTargetPadIds: [],
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(triggerPad).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("triggers at 1.0 when only the one-shot layer is fading (hold layer inactive)", () => {
+    // Simulate: one-shot is active (fading tail), hold layer is not active.
+    // padVolumes may be near 0 from a previous drag. triggerVolume() must return
+    // 1.0, not the stale near-zero padVolume.
+    usePlaybackStore.setState({
+      playingPadIds: [mixedPad.id],
+      padVolumes: { [mixedPad.id]: 0.02 },
+      isPadActive: (padId: string) => padId === mixedPad.id,
+      isLayerActive: (layerId: string) => layerId === "layer-oneshot",
+    });
+
+    const { result } = renderHook(() => usePadGesture(mixedPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+
+    // Hold layer must trigger at 1.0, not at the stale 0.02 padVolume
+    expect(triggerPad).toHaveBeenCalledTimes(1);
+    expect(triggerPad).toHaveBeenCalledWith(mixedPad, 1.0);
+  });
+
+  it("triggers at current padVolume when the hold layer itself is active (re-press while holding)", () => {
+    // Simulate: hold layer is actively playing at volume 0.7.
+    // triggerVolume() should honour the current padVolume.
+    usePlaybackStore.setState({
+      playingPadIds: [mixedPad.id],
+      padVolumes: { [mixedPad.id]: 0.7 },
+      isPadActive: (padId: string) => padId === mixedPad.id,
+      isLayerActive: (layerId: string) => layerId === "layer-hold",
+    });
+
+    const { result } = renderHook(() => usePadGesture(mixedPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+
+    expect(triggerPad).toHaveBeenCalledTimes(1);
+    expect(triggerPad).toHaveBeenCalledWith(mixedPad, 0.7);
+  });
+
+  it("initialises display bar at 1.0 (not stale padVolume) when only one-shot layer is fading", () => {
+    // wasPlayingAtStart is false for a fresh hold-layer press (only one-shot active).
+    // The hold timer must use 1.0, not the stale 0.02 padVolume, so the display bar
+    // starts at full height matching the actual trigger volume.
+    usePlaybackStore.setState({
+      playingPadIds: [mixedPad.id],
+      padVolumes: { [mixedPad.id]: 0.02 },
+      isPadActive: (padId: string) => padId === mixedPad.id,
+      isLayerActive: (layerId: string) => layerId === "layer-oneshot",
+    });
+
+    const { result } = renderHook(() => usePadGesture(mixedPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    // Advance to hold phase
+    act(() => { vi.advanceTimersByTime(150); });
+
+    // Hold timer writes startVolume to padVolumes for the display bar.
+    // wasPlayingAtStart=false → vol = 1.0 (hold-layer fresh trigger).
+    expect(usePlaybackStore.getState().padVolumes[mixedPad.id]).toBe(1.0);
+  });
+});
+
 // ─── H1 fix: startY staleness ─────────────────────────────────────────────────
 
 describe("usePadGesture — startY staleness fix", () => {
