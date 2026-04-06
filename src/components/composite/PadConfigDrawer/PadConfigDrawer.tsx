@@ -53,7 +53,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   const addPad = useProjectStore((s) => s.addPad);
   const updatePad = useProjectStore((s) => s.updatePad);
   const isPadPlaying = usePlaybackStore((s) =>
-    padId !== undefined ? s.playingPadIds.includes(padId) : false
+    padId !== undefined ? s.playingPadIds.has(padId) : false
   );
 
   const isEditMode = padId !== undefined;

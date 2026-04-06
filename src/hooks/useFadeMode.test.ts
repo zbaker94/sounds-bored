@@ -24,7 +24,7 @@ const allPads = [padA, padB, padEmpty];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  usePlaybackStore.setState({ playingPadIds: [], padVolumes: {} });
+  usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {} });
   useUiStore.setState({ ...initialUiState });
 });
 
@@ -41,7 +41,7 @@ describe("useFadeMode — enterFade / enterCrossfade", () => {
   });
 
   it("enterCrossfade sets mode to 'crossfade'", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     expect(result.current.mode).toBe("crossfade");
@@ -90,7 +90,7 @@ describe("useFadeMode — cancel", () => {
 
 describe("useFadeMode — onPadTap in fade mode", () => {
   it("calls fadePadOut when tapping a playing pad", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
@@ -118,7 +118,7 @@ describe("useFadeMode — onPadTap in fade mode", () => {
 
 describe("useFadeMode — onPadTap in crossfade mode", () => {
   it("selects a pad on first tap", () => {
-    usePlaybackStore.setState({ playingPadIds: [padB.id] }); // need ≥1 playing to enter crossfade
+    usePlaybackStore.setState({ playingPadIds: new Set([padB.id]) }); // need ≥1 playing to enter crossfade
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -143,7 +143,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
   });
 
   it("does not execute automatically when only playing pads are selected", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id, padB.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id, padB.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -155,7 +155,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
 
 describe("useFadeMode — canExecute and execute", () => {
   it("canExecute is false with only playing pads selected", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -163,7 +163,7 @@ describe("useFadeMode — canExecute and execute", () => {
   });
 
   it("canExecute is true with ≥1 playing and ≥1 non-playing selected", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -172,7 +172,7 @@ describe("useFadeMode — canExecute and execute", () => {
   });
 
   it("execute calls crossfadePads with correct pad lists and cancels mode", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -183,7 +183,7 @@ describe("useFadeMode — canExecute and execute", () => {
   });
 
   it("execute is a no-op when canExecute is false", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -206,35 +206,35 @@ describe("useFadeMode — getPadFadeVisual", () => {
   });
 
   it("returns 'crossfade-out' for playing pads in fade mode", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-out");
   });
 
   it("returns 'crossfade-in' for non-playing pads in fade mode", () => {
-    usePlaybackStore.setState({ playingPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set() });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-in");
   });
 
   it("returns 'crossfade-out' for playing unselected pads in crossfade mode", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-out");
   });
 
   it("returns 'crossfade-in' for non-playing unselected pads in crossfade mode", () => {
-    usePlaybackStore.setState({ playingPadIds: [padB.id] }); // need ≥1 playing to enter crossfade
+    usePlaybackStore.setState({ playingPadIds: new Set([padB.id]) }); // need ≥1 playing to enter crossfade
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     expect(result.current.getPadFadeVisual(padA.id)).toBe("crossfade-in");
   });
 
   it("returns 'selected-out' for a selected playing pad", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -242,7 +242,7 @@ describe("useFadeMode — getPadFadeVisual", () => {
   });
 
   it("returns 'selected-in' for a selected non-playing pad", () => {
-    usePlaybackStore.setState({ playingPadIds: [padB.id] }); // need ≥1 playing to enter crossfade
+    usePlaybackStore.setState({ playingPadIds: new Set([padB.id]) }); // need ≥1 playing to enter crossfade
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
@@ -263,14 +263,14 @@ describe("useFadeMode — statusLabel", () => {
   });
 
   it("is 'Select pads to crossfade' when canExecute is false", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] }); // need ≥1 playing to enter crossfade
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) }); // need ≥1 playing to enter crossfade
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     expect(result.current.statusLabel).toBe("Select pads to crossfade");
   });
 
   it("is 'Ready — press X or Enter to execute' when canExecute is true", () => {
-    usePlaybackStore.setState({ playingPadIds: [padA.id] });
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));

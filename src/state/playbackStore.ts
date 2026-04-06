@@ -11,7 +11,7 @@ interface PlaybackState {
   setMasterVolume: (volume: number) => void;
 
   // Which pad IDs currently have active voices (for UI feedback)
-  playingPadIds: string[];
+  playingPadIds: Set<string>;
 
   // Whether a sound preview is currently playing (for Stop All button state)
   isPreviewPlaying: boolean;
@@ -22,7 +22,7 @@ interface PlaybackState {
   updatePadVolume: (padId: string, volume: number) => void;
 
   // Which pad IDs currently have an active automated or gesture-driven volume transition (drives the fill bar)
-  volumeTransitioningPadIds: string[];
+  volumeTransitioningPadIds: Set<string>;
   startVolumeTransition: (padId: string) => void;
   clearVolumeTransition: (padId: string) => void;
   clearAllVolumeTransitions: () => void;
@@ -50,11 +50,12 @@ interface PlaybackState {
   nullAllOnEnded: () => void;
 }
 
+// Factory ensures each spread gets fresh Set/object instances — prevents tests from sharing mutable state.
 export const initialPlaybackState = {
   masterVolume: 100,
-  playingPadIds: [] as string[],
-  padVolumes: {} as Record<string, number>,
-  volumeTransitioningPadIds: [] as string[],
+  get playingPadIds() { return new Set<string>(); },
+  get padVolumes() { return {} as Record<string, number>; },
+  get volumeTransitioningPadIds() { return new Set<string>(); },
   isPreviewPlaying: false,
 };
 
@@ -62,7 +63,7 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
   masterVolume: 100,
   setMasterVolume: (volume) => set({ masterVolume: volume }),
 
-  playingPadIds: [],
+  playingPadIds: new Set<string>(),
   isPreviewPlaying: false,
   setIsPreviewPlaying: (v) => set({ isPreviewPlaying: v }),
   padVolumes: {},
@@ -70,16 +71,22 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
   updatePadVolume: (padId, volume) =>
     set((s) => ({ padVolumes: { ...s.padVolumes, [padId]: volume } })),
 
-  volumeTransitioningPadIds: [],
+  volumeTransitioningPadIds: new Set<string>(),
   startVolumeTransition: (padId) =>
-    set((s) =>
-      s.volumeTransitioningPadIds.includes(padId)
-        ? s
-        : { volumeTransitioningPadIds: [...s.volumeTransitioningPadIds, padId] }
-    ),
+    set((s) => {
+      if (s.volumeTransitioningPadIds.has(padId)) return s;
+      const next = new Set(s.volumeTransitioningPadIds);
+      next.add(padId);
+      return { volumeTransitioningPadIds: next };
+    }),
   clearVolumeTransition: (padId) =>
-    set((s) => ({ volumeTransitioningPadIds: s.volumeTransitioningPadIds.filter((id) => id !== padId) })),
-  clearAllVolumeTransitions: () => set({ volumeTransitioningPadIds: [] }),
+    set((s) => {
+      if (!s.volumeTransitioningPadIds.has(padId)) return s;
+      const next = new Set(s.volumeTransitioningPadIds);
+      next.delete(padId);
+      return { volumeTransitioningPadIds: next };
+    }),
+  clearAllVolumeTransitions: () => set({ volumeTransitioningPadIds: new Set() }),
   resetAllPadVolumes: () => set({ padVolumes: {} }),
 
   // ── Pad-level ─────────────────────────────────────────────────────────────
@@ -88,18 +95,24 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
 
   recordVoice: (padId, voice) => {
     voiceMap.set(padId, [...(voiceMap.get(padId) ?? []), voice]);
-    set((s) =>
-      s.playingPadIds.includes(padId)
-        ? s
-        : { playingPadIds: [...s.playingPadIds, padId] }
-    );
+    set((s) => {
+      if (s.playingPadIds.has(padId)) return s;
+      const next = new Set(s.playingPadIds);
+      next.add(padId);
+      return { playingPadIds: next };
+    });
   },
 
   clearVoice: (padId, voice) => {
     const updated = (voiceMap.get(padId) ?? []).filter((v) => v !== voice);
     if (updated.length === 0) {
       voiceMap.delete(padId);
-      set((s) => ({ playingPadIds: s.playingPadIds.filter((id) => id !== padId) }));
+      set((s) => {
+        if (!s.playingPadIds.has(padId)) return s;
+        const next = new Set(s.playingPadIds);
+        next.delete(padId);
+        return { playingPadIds: next };
+      });
     } else {
       voiceMap.set(padId, updated);
     }
@@ -109,7 +122,12 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
     const voices = voiceMap.get(padId) ?? [];
     const stoppedSet = new Set(voices);
     voiceMap.delete(padId);
-    set((s) => ({ playingPadIds: s.playingPadIds.filter((id) => id !== padId) }));
+    set((s) => {
+      if (!s.playingPadIds.has(padId)) return s;
+      const next = new Set(s.playingPadIds);
+      next.delete(padId);
+      return { playingPadIds: next };
+    });
     // Also clean layerVoiceMap — layers whose voices were on this pad would
     // otherwise remain isLayerActive: true after stopPad.
     for (const [layerId, layerVoices] of layerVoiceMap) {
@@ -135,7 +153,7 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
     const allVoices = [...voiceMap.values()].flat();
     voiceMap.clear();
     layerVoiceMap.clear();
-    set({ playingPadIds: [] });
+    set({ playingPadIds: new Set() });
     for (const voice of allVoices) {
       try { voice.stop(); } catch { /* already ended */ }
     }
@@ -171,7 +189,12 @@ export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
     const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
     if (padVoices.length === 0) {
       voiceMap.delete(padId);
-      set((s) => ({ playingPadIds: s.playingPadIds.filter((id) => id !== padId) }));
+      set((s) => {
+        if (!s.playingPadIds.has(padId)) return s;
+        const next = new Set(s.playingPadIds);
+        next.delete(padId);
+        return { playingPadIds: next };
+      });
     } else {
       voiceMap.set(padId, padVoices);
     }

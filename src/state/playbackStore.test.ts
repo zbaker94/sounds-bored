@@ -4,7 +4,7 @@ import type { AudioVoice } from "@/lib/audio/audioVoice";
 
 const initialState = {
   masterVolume: 100,
-  playingPadIds: [],
+  playingPadIds: new Set<string>(),
   padVolumes: {},
 };
 
@@ -112,7 +112,7 @@ describe("pad-level stop methods", () => {
     usePlaybackStore.getState().recordLayerVoice("pad-1", "layer-1", makeVoice());
     usePlaybackStore.getState().recordLayerVoice("pad-2", "layer-2", makeVoice());
     usePlaybackStore.getState().stopAll();
-    expect(usePlaybackStore.getState().playingPadIds).toHaveLength(0);
+    expect(usePlaybackStore.getState().playingPadIds.size).toBe(0);
     expect(usePlaybackStore.getState().isPadActive("pad-1")).toBe(false);
     expect(usePlaybackStore.getState().isPadActive("pad-2")).toBe(false);
   });

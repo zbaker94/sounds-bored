@@ -45,7 +45,7 @@ describe("PadButton", () => {
   beforeEach(() => {
     useUiStore.setState({ ...initialUiState });
     useProjectStore.setState({ ...initialProjectState });
-    usePlaybackStore.setState({ playingPadIds: [], padVolumes: {}, volumeTransitioningPadIds: [] });
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
     // Make setPadVolume mock update the store, matching real padPlayer behaviour
     vi.mocked(setPadVolume).mockImplementation((padId: string, volume: number) => {
       usePlaybackStore.getState().updatePadVolume(padId, Math.max(0, Math.min(1, volume)));

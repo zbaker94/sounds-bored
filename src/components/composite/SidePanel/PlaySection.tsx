@@ -6,7 +6,7 @@ import { stopAllPads } from "@/lib/audio/padPlayer";
 import { stopPreview } from "@/lib/audio/preview";
 
 export function PlaySection() {
-  const isPlaying = usePlaybackStore((s) => s.playingPadIds.length > 0 || s.isPreviewPlaying);
+  const isPlaying = usePlaybackStore((s) => s.playingPadIds.size > 0 || s.isPreviewPlaying);
 
   return (
     <div className="flex items-center p-1 md:pb-2">
