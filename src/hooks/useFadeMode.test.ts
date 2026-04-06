@@ -315,6 +315,63 @@ describe("useFadeMode — subscription optimization", () => {
   });
 });
 
+describe("useFadeMode — canExecute and statusLabel memoization", () => {
+  it("canExecute and statusLabel values unchanged when hasPlayingPads changes but mode is null", () => {
+    let renderCount = 0;
+    const { result } = renderHook(() => {
+      renderCount++;
+      return useFadeMode(allPads);
+    });
+    const baseRenderCount = renderCount;
+    const initialCanExecute = result.current.canExecute;
+    const initialStatusLabel = result.current.statusLabel;
+
+    // Simulate pad start/stop — triggers hasPlayingPads re-renders but not full-Set subscription
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    });
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set() });
+    });
+
+    expect(result.current.canExecute).toBe(initialCanExecute);
+    expect(result.current.statusLabel).toBe(initialStatusLabel);
+    // Renders are driven only by hasPlayingPads boolean transitions, not full-Set reference changes.
+    // Upper bound of 2 (one per boolean flip); exact count may vary with React batching.
+    expect(renderCount - baseRenderCount).toBeLessThanOrEqual(2);
+  });
+
+  it("canExecute remains correct when an unrelated pad starts during active crossfade", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    act(() => result.current.onPadTap(padA.id));
+    act(() => result.current.onPadTap(padB.id));
+
+    expect(result.current.canExecute).toBe(true);
+
+    // An unrelated pad starts playing — canExecute should remain true
+    act(() => {
+      usePlaybackStore.setState({ playingPadIds: new Set([padA.id, "pad-unrelated"]) });
+    });
+
+    expect(result.current.canExecute).toBe(true);
+  });
+
+  it("statusLabel reverts when canExecute transitions back to false", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    act(() => result.current.onPadTap(padA.id));
+    act(() => result.current.onPadTap(padB.id));
+    expect(result.current.statusLabel).toBe("Ready — press X or Enter to execute");
+
+    // Deselect the non-playing pad — canExecute drops to false
+    act(() => result.current.onPadTap(padB.id));
+    expect(result.current.statusLabel).toBe("Select pads to crossfade");
+  });
+});
+
 describe("useFadeMode — statusLabel", () => {
   it("is null when mode is null", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
