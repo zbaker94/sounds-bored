@@ -1,8 +1,11 @@
 import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { usePadGesture, DRAG_RAMP_MS } from "@/hooks/usePadGesture";
+import { usePadGesture } from "@/hooks/usePadGesture";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
+
+// Mirrors the internal DRAG_RAMP_MS constant in usePadGesture.ts — update together if it changes.
+const DRAG_RAMP_MS = 150;
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
@@ -676,7 +679,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     vi.mocked(setPadVolume).mockClear();
 
     // Advance clock to half ramp duration
-    nowMs = DRAG_RAMP_MS / 2; // 75ms
+    nowMs = DRAG_RAMP_MS / 2;
 
     // Move to 50px up from hold-start (300 → 250)
     act(() => {
@@ -706,7 +709,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     vi.mocked(setPadVolume).mockClear();
 
     // Advance clock to full ramp duration
-    nowMs = DRAG_RAMP_MS; // 150ms
+    nowMs = DRAG_RAMP_MS;
 
     // Move 40px up from hold-start
     act(() => {
@@ -734,7 +737,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     });
 
     // Advance clock past full ramp
-    nowMs = DRAG_RAMP_MS; // 150ms
+    nowMs = DRAG_RAMP_MS;
 
     // Move 200px up (full DRAG_RANGE_PX) → should clamp to 1.0
     act(() => {

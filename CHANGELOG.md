@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal code cleanup only).
 - Fixed a subtle timing bug in pad volume drag gesture where time-based sensitivity ramping could behave incorrectly in certain conditions
 - No user-facing changes in this commit.
 - Fixed a performance issue where the active scene was being recalculated on every auto-save; it now only re-evaluates when the scene list or active scene actually changes.
