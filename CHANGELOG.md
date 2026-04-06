@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal code quality in layer reordering tests (no user-facing behavior changes)
 - Improved stability of the layer list in pad configuration — newly added layers now open automatically and scroll into view more reliably
 - Fixed an edge case where the open layer could become desynced after a form reset
 - Drag-to-reorder layers in pad configuration is more efficient and less prone to unnecessary re-renders

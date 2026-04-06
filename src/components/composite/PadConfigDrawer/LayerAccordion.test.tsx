@@ -1,4 +1,4 @@
-import React from "react";
+import { forwardRef } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -33,7 +33,7 @@ vi.mock("@dnd-kit/utilities", () => ({
 
 vi.mock("motion/react", () => ({
   motion: {
-    div: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+    div: forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
       ({ children, ...props }, ref) => <div ref={ref} {...props}>{children}</div>
     ),
   },
