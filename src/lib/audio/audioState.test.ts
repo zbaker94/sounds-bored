@@ -49,6 +49,7 @@ import {
   clearAllPadGains,
   clearAllLayerGains,
   clearAllLayerChains,
+  clearAllLayerCycleIndexes,
   clearAllStreamingAudio,
   clearAllPadProgressInfo,
   clearAllLayerPending,
@@ -59,6 +60,9 @@ import {
   isPadFading,
   addFadingOutPad,
   setFadePadTimeout,
+  getLayerCycleIndex,
+  setLayerCycleIndex,
+  deleteLayerCycleIndex,
   recordVoice,
   clearVoice,
   recordLayerVoice,
@@ -82,6 +86,7 @@ beforeEach(() => {
   clearAllPadGains();
   clearAllLayerGains();
   clearAllLayerChains();
+  clearAllLayerCycleIndexes();
   clearAllStreamingAudio();
   clearAllPadProgressInfo();
   clearAllLayerPending();
@@ -351,5 +356,38 @@ describe("voice tracking", () => {
     nullAllOnEnded();
     expect(v1.setOnEnded).toHaveBeenCalledWith(null);
     expect(v2.setOnEnded).toHaveBeenCalledWith(null);
+  });
+});
+
+// ── Layer cycle index ────────────────────────────────────────────────────────
+
+describe("layerCycleIndex", () => {
+  it("returns undefined for a layer with no cycle index set", () => {
+    expect(getLayerCycleIndex("layer-1")).toBeUndefined();
+  });
+
+  it("stores and retrieves a cycle index", () => {
+    setLayerCycleIndex("layer-1", 2);
+    expect(getLayerCycleIndex("layer-1")).toBe(2);
+  });
+
+  it("overwrites an existing cycle index", () => {
+    setLayerCycleIndex("layer-1", 0);
+    setLayerCycleIndex("layer-1", 3);
+    expect(getLayerCycleIndex("layer-1")).toBe(3);
+  });
+
+  it("deleteLayerCycleIndex removes the entry", () => {
+    setLayerCycleIndex("layer-1", 1);
+    deleteLayerCycleIndex("layer-1");
+    expect(getLayerCycleIndex("layer-1")).toBeUndefined();
+  });
+
+  it("clearAllLayerCycleIndexes removes all entries", () => {
+    setLayerCycleIndex("layer-1", 0);
+    setLayerCycleIndex("layer-2", 5);
+    clearAllLayerCycleIndexes();
+    expect(getLayerCycleIndex("layer-1")).toBeUndefined();
+    expect(getLayerCycleIndex("layer-2")).toBeUndefined();
   });
 });

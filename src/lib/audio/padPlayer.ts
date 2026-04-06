@@ -39,10 +39,14 @@ import {
   getLayerChain,
   setLayerChain,
   deleteLayerChain,
+  getLayerCycleIndex,
+  setLayerCycleIndex,
+  deleteLayerCycleIndex,
   clearAllFadeTracking,
   clearAllPadGains,
   clearAllLayerGains,
   clearAllLayerChains,
+  clearAllLayerCycleIndexes,
   clearAllLayerPending,
   stopPadVoices,
   stopAllVoices,
@@ -60,6 +64,7 @@ export {
   clearAllPadGains,
   clearAllLayerGains,
   clearAllLayerChains,
+  clearAllLayerCycleIndexes,
   isPadFadingOut,
   isPadFading,
   isPadStreaming,
@@ -253,14 +258,17 @@ export function syncLayerPlaybackMode(layer: Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
   const isLoopMode = layer.playbackMode === "loop" || layer.playbackMode === "hold";
-  // Update the loop flag on non-chained voices (chained arrangements don't use source.loop).
-  const shouldLoop = isLoopMode && !isChained(layer.arrangement);
+  // Update the loop flag on non-chained voices and cycle-mode voices.
+  // Cycle mode plays one sound at a time (like simultaneous), so source.loop
+  // is used instead of chain-based looping.
+  const shouldLoop = isLoopMode && (!isChained(layer.arrangement) || layer.cycleMode);
   for (const voice of voices) {
     voice.setLoop(shouldLoop);
   }
-  // For chained arrangements transitioning away from a looping mode, clear the chain
-  // queue so the onended callback sees remaining === undefined and skips the restart.
-  if (!isLoopMode && isChained(layer.arrangement)) {
+  // For chained arrangements (non-cycle) transitioning away from a looping mode,
+  // clear the chain queue so the onended callback sees remaining === undefined
+  // and skips the restart.
+  if (!isLoopMode && isChained(layer.arrangement) && !layer.cycleMode) {
     deleteLayerChain(layer.id);
   }
 }
@@ -358,12 +366,18 @@ export function syncLayerConfig(layer: Layer, original: Layer): void {
   if (!arrangementChanged && JSON.stringify(original.selection) !== JSON.stringify(layer.selection)) {
     syncLayerSelection(layer);
   }
+  // When cycleMode is toggled off, clear the stale cursor so the next trigger
+  // starts a normal chain instead of using a leftover index.
+  if (original.cycleMode && !layer.cycleMode) {
+    deleteLayerCycleIndex(layer.id);
+  }
 }
 
-/** Stop a single pad, clearing its layer chain queues first so onended doesn't advance the chain. */
+/** Stop a single pad, clearing its layer chain queues and cycle cursors first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
   for (const layer of pad.layers) {
     deleteLayerChain(layer.id);
+    deleteLayerCycleIndex(layer.id);
   }
   stopPadVoices(pad.id);
 }
@@ -385,6 +399,7 @@ export function stopScene(scene: Scene): void {
 export function stopAllPads(): void {
   clearAllFadeTracking();
   clearAllLayerChains();
+  clearAllLayerCycleIndexes();
   clearAllLayerPending();
   // Null all onended callbacks — prevents loop restarts during ramp window
   nullAllOnEnded();
@@ -480,7 +495,7 @@ async function startLayerSound(
       audio = new Audio();
       audio.crossOrigin = "anonymous";
       audio.src = url;
-      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && !isChained(layer.arrangement)) {
+      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode)) {
         audio.loop = true;
       }
       const sourceNode = ctx.createMediaElementSource(audio);
@@ -492,7 +507,7 @@ async function startLayerSound(
       const buffer = await loadBuffer(sound);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && !isChained(layer.arrangement)) {
+      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode)) {
         source.loop = true;
       }
       voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
@@ -604,12 +619,15 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
 
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
-  clearPadProgressInfo(pad.id);
-  // padStreamingAudio is NOT cleared here — per-layer tracking is managed by each retrigger
-  // mode so that 'continue'-mode layers preserve their streaming progress across retriggers.
+  // padProgressInfo and padStreamingAudio are NOT cleared here — per-layer retrigger
+  // mode handling may skip playback entirely (e.g. 'continue'), and clearing eagerly
+  // would freeze the progress bar for layers that keep playing.
+  // Both are cleared lazily below, once we know a layer will actually start new playback.
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   usePlaybackStore.getState().updatePadVolume(pad.id, startVolume);
+
+  let progressCleared = false;
 
   for (const layer of pad.layers) {
     const resolved = resolveSounds(layer, sounds);
@@ -630,6 +648,15 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           // callback won't fire — delete the layer's streaming entry explicitly.
           clearLayerStreamingAudio(pad.id, layer.id);
           stopLayerWithRamp(pad, layer);
+          // Cycle mode: advance cursor so next trigger plays the next sound.
+          if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+            const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
+            if (nextIndex >= resolved.length) {
+              deleteLayerCycleIndex(layer.id);
+            } else {
+              setLayerCycleIndex(layer.id, nextIndex);
+            }
+          }
           continue;
         }
         break;
@@ -642,6 +669,12 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
         if (isLayerPlaying) {
           deleteLayerChain(layer.id);
           stopLayerVoices(pad.id, layer.id);
+          // Cycle mode: back the cursor up so the same sound replays.
+          // (The cursor was already advanced when the sound started.)
+          if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+            const cur = getLayerCycleIndex(layer.id) ?? 0;
+            setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
+          }
         }
         break;
 
@@ -657,32 +690,57 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           clearLayerStreamingAudio(pad.id, layer.id);
           stopLayerVoices(pad.id, layer.id);
 
-          if (remaining.length > 0) {
-            // Advance to next sound in chain
-            const [next, ...rest] = remaining;
-            setLayerChain(layer.id, rest);
-            await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
-          } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
-            // Chain exhausted — loop back to beginning
-            const newOrder = buildPlayOrder(layer.arrangement, resolved);
-            if (newOrder.length > 0) {
-              const [first, ...rest] = newOrder;
+          if (layer.cycleMode && isChained(layer.arrangement)) {
+            // Cycle mode + next: stop current sound, advance cycle cursor, play next.
+            // Falls through to the start-playback section which reads the cycle cursor.
+          } else {
+            if (remaining.length > 0) {
+              // Advance to next sound in chain
+              const [next, ...rest] = remaining;
               setLayerChain(layer.id, rest);
-              await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+              await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+            } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
+              // Chain exhausted — loop back to beginning
+              const newOrder = buildPlayOrder(layer.arrangement, resolved);
+              if (newOrder.length > 0) {
+                const [first, ...rest] = newOrder;
+                setLayerChain(layer.id, rest);
+                await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+              }
             }
+            // one-shot: queue exhausted -> just stop (already done above)
+            continue;
           }
-          // one-shot: queue exhausted -> just stop (already done above)
-          continue;
         }
         break;
     }
 
     // -- Start playback ---
+    if (!progressCleared) {
+      clearPadProgressInfo(pad.id);
+      progressCleared = true;
+    }
     setLayerPending(layer.id);
     try {
       const playOrder = buildPlayOrder(layer.arrangement, resolved);
 
-      if (isChained(layer.arrangement)) {
+      if (layer.cycleMode && isChained(layer.arrangement)) {
+        // Cycle mode: play exactly one sound per trigger, advancing the cursor.
+        // No chain queue — onended will not auto-advance to the next sound.
+        // Loop/hold modes loop the *same* sound via source.loop (same as simultaneous).
+        deleteLayerChain(layer.id);
+        const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
+        const sound = playOrder[cycleIndex % playOrder.length];
+        // Advance cursor for the next trigger
+        const nextIndex = cycleIndex + 1;
+        if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
+          // One-shot: cursor wraps to 0 for the next full cycle
+          deleteLayerCycleIndex(layer.id);
+        } else {
+          setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
+        }
+        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      } else if (isChained(layer.arrangement)) {
         const [first, ...rest] = playOrder;
         setLayerChain(layer.id, rest);
         await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);

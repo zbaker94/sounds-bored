@@ -44,6 +44,7 @@
  * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
  * padStreamingAudio  | pad ID     | Map<layerId, Set<HTMLAudioElement>>        | Active streaming elements for progress/cleanup  | clearLayerStreamingAudio(), stopAllPads()
  * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
+ * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
  * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
  * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
  * padFadeRafs        | pad ID     | RAF ID                                    | Animated volume lerp loops during fades         | cancelPadFade(), clearAllFadeTracking()
@@ -85,6 +86,11 @@ const padStreamingAudio = new Map<string, Map<string, Set<HTMLAudioElement>>>();
 /** Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
  *  Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted. */
 const layerChainQueue = new Map<string, Sound[]>();
+
+/** Cycle cursor: tracks the next index into the play order for layers with cycleMode=true.
+ *  Keyed by layer ID. Persists across triggers so each trigger advances to the next sound.
+ *  Deleted when the layer is stopped via stopAllPads or when cycleMode is toggled off. */
+const layerCycleIndex = new Map<string, number>();
 
 /** Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger. */
 const layerPendingMap = new Set<string>();
@@ -186,6 +192,10 @@ export function clearAllLayerGains(): void {
 
 export function clearAllLayerChains(): void {
   layerChainQueue.clear();
+}
+
+export function clearAllLayerCycleIndexes(): void {
+  layerCycleIndex.clear();
 }
 
 export function clearAllVoices(): void {
@@ -390,6 +400,22 @@ export function setLayerChain(layerId: string, chain: Sound[]): void {
 
 export function deleteLayerChain(layerId: string): void {
   layerChainQueue.delete(layerId);
+}
+
+// ---------------------------------------------------------------------------
+// Layer cycle index (cycleMode: one sound per trigger)
+// ---------------------------------------------------------------------------
+
+export function getLayerCycleIndex(layerId: string): number | undefined {
+  return layerCycleIndex.get(layerId);
+}
+
+export function setLayerCycleIndex(layerId: string, index: number): void {
+  layerCycleIndex.set(layerId, index);
+}
+
+export function deleteLayerCycleIndex(layerId: string): void {
+  layerCycleIndex.delete(layerId);
 }
 
 // ---------------------------------------------------------------------------

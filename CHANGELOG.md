@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Added **Cycle Mode** for sequential and shuffled layers: each pad trigger now plays one sound at a time, advancing through the sequence step-by-step instead of playing the full chain at once
+- In Cycle Mode, loop and hold playback modes loop the current sound in the sequence rather than chaining through all sounds
+- Switching a layer's arrangement back to simultaneous automatically disables Cycle Mode
+- Stopping a pad or all pads resets the cycle position, so the next trigger starts from the beginning of the sequence
 - Fixed a bug where stopping one voice on a pad would incorrectly mark the entire pad as inactive when other voices were still playing
 - Fixed a potential crash caused by re-entrant `onended` callbacks firing synchronously during layer stop — maps are now cleared before calling `stop()` so duplicate cleanup is safely ignored
 - Improved audio engine reliability by consolidating all voice tracking into a single module, preventing edge cases where sounds could incorrectly restart after being stopped

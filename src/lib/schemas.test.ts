@@ -4,6 +4,7 @@ import {
   ProjectHistorySchema,
   ProjectSchema,
   LayerSelectionSchema,
+  LayerSchema,
   PlaybackModeSchema,
   RetriggerModeSchema,
   SoundSchema,
@@ -573,6 +574,52 @@ describe("LayerConfigFormSchema", () => {
       volume: 101,
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("LayerSchema — cycleMode", () => {
+  const validLayer = {
+    id: "layer-1",
+    selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
+    arrangement: "sequential",
+    playbackMode: "one-shot",
+    retriggerMode: "restart",
+    volume: 1.0,
+  };
+
+  it("should default cycleMode to false when not provided", () => {
+    const result = LayerSchema.safeParse(validLayer);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cycleMode).toBe(false);
+    }
+  });
+
+  it("should preserve cycleMode: true when provided", () => {
+    const result = LayerSchema.safeParse({ ...validLayer, cycleMode: true });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cycleMode).toBe(true);
+    }
+  });
+});
+
+describe("LayerConfigFormSchema — cycleMode", () => {
+  const validFormLayer = {
+    id: "layer-1",
+    selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "sound-1", volume: 100 }] },
+    arrangement: "sequential",
+    playbackMode: "one-shot",
+    retriggerMode: "restart",
+    volume: 100,
+  };
+
+  it("should default cycleMode to false when not provided", () => {
+    const result = LayerConfigFormSchema.safeParse(validFormLayer);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cycleMode).toBe(false);
+    }
   });
 });
 

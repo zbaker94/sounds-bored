@@ -1818,3 +1818,378 @@ describe("stopAllPads clears fade tracking", () => {
     vi.useRealTimers();
   });
 });
+
+// ─── Cycle mode tests ────────────────────────────────────────────────────────
+
+describe("cycle mode — sequential", () => {
+  it("plays only one sound per trigger, advancing through the sequence", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger 1: plays sound[0]
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+    expect(mockLoadBuffer.mock.calls[0][0].id).toBe(sounds[0].id);
+
+    // Let sound[0] end naturally
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // No auto-chain — still only 1 load
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Trigger 2: plays sound[1]
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+    expect(mockLoadBuffer.mock.calls[1][0].id).toBe(sounds[1].id);
+
+    createdSources[1].simulateEnd();
+    await tick();
+
+    // Trigger 3: plays sound[2]
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[2].id);
+  });
+
+  it("wraps back to the first sound after exhausting the sequence (one-shot)", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Play A, B
+    await triggerPad(pad);
+    createdSources[0].simulateEnd();
+    await tick();
+    await triggerPad(pad);
+    createdSources[1].simulateEnd();
+    await tick();
+
+    // Next trigger wraps to A (one-shot resets cursor after exhaustion)
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+
+  it("does not auto-chain to the next sound when a cycle sound ends", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Sound ends naturally — should NOT chain to sound[1]
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+    expect(isLayerActive(layer.id)).toBe(false);
+  });
+});
+
+describe("cycle mode — loop/hold", () => {
+  it("sets source.loop = true for loop+cycle (loops same sound, not chain)", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      playbackMode: "loop",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    // source.loop should be true (loops the single sound, like simultaneous)
+    expect(createdSources[0].loop).toBe(true);
+  });
+
+  it("hold+cycle: sets source.loop = true", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      playbackMode: "hold",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    expect(createdSources[0].loop).toBe(true);
+  });
+
+  it("loop+cycle: each retrigger advances to the next sound and loops it", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      playbackMode: "loop",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger 1: plays sound[0] looping
+    await triggerPad(pad);
+    expect(mockLoadBuffer.mock.calls[0][0].id).toBe(sounds[0].id);
+    expect(createdSources[0].loop).toBe(true);
+
+    // Trigger 2 (restart): stops sound[0], replays sound[0] (cursor does not advance)
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+    expect(mockLoadBuffer.mock.calls[1][0].id).toBe(sounds[0].id);
+
+    // Trigger 3 (restart): still sound[0]
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+});
+
+describe("cycle mode — shuffled", () => {
+  it("plays one sound per trigger with shuffled arrangement", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "shuffled",
+      cycleMode: true,
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger 1
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // No auto-chain
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Trigger 2
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("cycle mode — retrigger interactions", () => {
+  it("continue: skips retrigger if cycle sound is still playing", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "continue",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Retrigger while sound[0] still playing: ignored (continue mode)
+    await triggerPad(pad);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+  });
+
+  it("stop: stops the playing cycle sound without advancing", async () => {
+    vi.useFakeTimers();
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "stop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // First trigger: plays sound[0]
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Second trigger while playing: stops (does not advance)
+    await triggerPad(pad);
+    vi.advanceTimersByTime(35);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+    expect(isLayerActive(layer.id)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("next+cycle: stops current sound and plays the next in cycle", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "next",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger 1: plays sound[0]
+    await triggerPad(pad);
+    expect(mockLoadBuffer.mock.calls[0][0].id).toBe(sounds[0].id);
+
+    // Retrigger with next: stops sound[0], advances cursor, plays sound[1]
+    await triggerPad(pad);
+    await tick();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+    expect(mockLoadBuffer.mock.calls[1][0].id).toBe(sounds[1].id);
+
+    // Retrigger again: plays sound[2]
+    await triggerPad(pad);
+    await tick();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
+    expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[2].id);
+  });
+});
+
+describe("cycle mode — stopAllPads resets cycle cursor", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("stopAllPads clears the cycle index so the next trigger starts from 0", async () => {
+    const { triggerPad, stopAllPads } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger 1: plays sound[0], cursor advances to 1
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+
+    // Stop all pads (resets cursor)
+    stopAllPads();
+    await vi.runAllTimersAsync();
+
+    // Next trigger should start from sound[0] again (cursor reset)
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(mockLoadBuffer.mock.calls.at(-1)![0].id).toBe(sounds[0].id);
+  });
+});
+
+describe("cycle mode — stopPad resets cycle cursor", () => {
+  it("stopPad clears the cycle index for that pad's layers", async () => {
+    const { triggerPad, stopPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      cycleMode: true,
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger: plays sound[0], cursor advances to 1
+    await triggerPad(pad);
+
+    // Stop pad (resets cursor)
+    stopPad(pad);
+    await tick();
+
+    // Next trigger should start from sound[0] again
+    await triggerPad(pad);
+    expect(mockLoadBuffer.mock.calls.at(-1)![0].id).toBe(sounds[0].id);
+  });
+});

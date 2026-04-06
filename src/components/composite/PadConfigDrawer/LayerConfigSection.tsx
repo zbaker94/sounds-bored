@@ -49,6 +49,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
   // we use fixed-index alias (0) for TypeScript inference.
   const selPath = `layers.${index}.selection` as `layers.0.selection`;
   const arrPath = `layers.${index}.arrangement` as `layers.0.arrangement`;
+  const cyclePath = `layers.${index}.cycleMode` as `layers.0.cycleMode`;
   const pbPath  = `layers.${index}.playbackMode` as `layers.0.playbackMode`;
   const rtPath  = `layers.${index}.retriggerMode` as `layers.0.retriggerMode`;
   const volPath = `layers.${index}.volume` as `layers.0.volume`;
@@ -62,8 +63,9 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
   function handleArrangementChange(v: Arrangement) {
     setValue(arrPath, v, { shouldDirty: true });
     // "next" retrigger requires a chain — reset to "restart" when switching to simultaneous
-    if (v === "simultaneous" && retriggerMode === "next") {
-      setValue(rtPath, "restart", { shouldDirty: true });
+    if (v === "simultaneous") {
+      if (retriggerMode === "next") setValue(rtPath, "restart", { shouldDirty: true });
+      setValue(cyclePath, false, { shouldDirty: true });
     }
   }
 
@@ -121,6 +123,28 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
           </TabsList>
         </Tabs>
       </div>
+
+      {/* Cycle Mode */}
+      {(arrangement === "sequential" || arrangement === "shuffled") && (
+        <div className="flex flex-col gap-2">
+          <Label variant="section">Mode</Label>
+          <Controller
+            control={control}
+            name={cyclePath}
+            render={({ field }) => (
+              <Tabs
+                value={field.value ? "cycle" : "continuous"}
+                onValueChange={(v) => field.onChange(v === "cycle")}
+              >
+                <TabsList stretch>
+                  <TabsTrigger value="continuous">Continuous</TabsTrigger>
+                  <TabsTrigger value="cycle">Cycle</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+          />
+        </div>
+      )}
 
       {/* Playback Mode */}
       <div className="flex flex-col gap-2">

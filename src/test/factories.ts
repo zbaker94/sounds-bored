@@ -157,6 +157,7 @@ export function createMockLayer(overrides?: Partial<Layer>): Layer {
     id: crypto.randomUUID(),
     selection: { type: "assigned", instances: [] },
     arrangement: "simultaneous",
+    cycleMode: false,
     playbackMode: "one-shot",
     retriggerMode: "restart",
     volume: 100,
