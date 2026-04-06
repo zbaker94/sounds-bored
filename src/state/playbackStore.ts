@@ -13,6 +13,10 @@ interface PlaybackState {
   // Which pad IDs currently have active voices (for UI feedback)
   playingPadIds: string[];
 
+  // Whether a sound preview is currently playing (for Stop All button state)
+  isPreviewPlaying: boolean;
+  setIsPreviewPlaying: (v: boolean) => void;
+
   // Per-pad runtime volume (0–1), mirrored from padGainMap for React reactivity
   padVolumes: Record<string, number>;
   updatePadVolume: (padId: string, volume: number) => void;
@@ -46,11 +50,21 @@ interface PlaybackState {
   nullAllOnEnded: () => void;
 }
 
+export const initialPlaybackState = {
+  masterVolume: 100,
+  playingPadIds: [] as string[],
+  padVolumes: {} as Record<string, number>,
+  volumeTransitioningPadIds: [] as string[],
+  isPreviewPlaying: false,
+};
+
 export const usePlaybackStore = create<PlaybackState>()((set, get) => ({
   masterVolume: 100,
   setMasterVolume: (volume) => set({ masterVolume: volume }),
 
   playingPadIds: [],
+  isPreviewPlaying: false,
+  setIsPreviewPlaying: (v) => set({ isPreviewPlaying: v }),
   padVolumes: {},
 
   updatePadVolume: (padId, volume) =>

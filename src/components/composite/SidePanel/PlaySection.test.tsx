@@ -7,7 +7,12 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   stopAllPads: vi.fn(),
 }));
 
+vi.mock("@/lib/audio/preview", () => ({
+  stopPreview: vi.fn(),
+}));
+
 import { stopAllPads } from "@/lib/audio/padPlayer";
+import { stopPreview } from "@/lib/audio/preview";
 
 describe("PlaySection", () => {
   beforeEach(() => {
@@ -31,11 +36,32 @@ describe("PlaySection", () => {
     expect(screen.getByRole("button")).not.toBeDisabled();
   });
 
+  it("button is enabled when a preview is playing (no pads)", () => {
+    usePlaybackStore.setState({ isPreviewPlaying: true });
+    render(<PlaySection />);
+    expect(screen.getByRole("button")).not.toBeDisabled();
+  });
+
   it("calls stopAllPads (not stopAll) when clicked", () => {
     usePlaybackStore.setState({ playingPadIds: ["pad-1"] });
     render(<PlaySection />);
     fireEvent.click(screen.getByRole("button"));
     expect(stopAllPads).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls stopPreview when clicked", () => {
+    usePlaybackStore.setState({ playingPadIds: ["pad-1"] });
+    render(<PlaySection />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(stopPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls stopPreview and stopAllPads when only preview is playing", () => {
+    usePlaybackStore.setState({ isPreviewPlaying: true });
+    render(<PlaySection />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(stopAllPads).toHaveBeenCalledTimes(1);
+    expect(stopPreview).toHaveBeenCalledTimes(1);
   });
 
   it("does not call the store stopAll directly", () => {
