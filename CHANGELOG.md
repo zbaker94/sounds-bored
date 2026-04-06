@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added internal design spec and implementation plan for the `fix-github-issue` skill, which automates researching and fixing GitHub issues using parallel AI agents with a built-in code review cycle.
 - Fixed a bug where deleting or reordering layers in the pad config drawer could reassign layer IDs, causing incorrect playback behavior for loops and retrigger tracking.
 - Fixed a bug where switching playback mode from "chained" to "loop" mid-playback would not properly restart the loop chain at the next boundary
 - Fixed a crash/hang that could occur when the project was cleared while audio was still playing
