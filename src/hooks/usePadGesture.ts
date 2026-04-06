@@ -8,7 +8,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 const HOLD_MS = 150;        // time before a press becomes a "hold"
 const DRAG_PX = 4;          // vertical pixels before drag mode activates
 const DRAG_RANGE_PX = 200;  // pixels of travel for full 0→1 volume range
-export const DRAG_RAMP_MS = 150; // time-based linear sensitivity ramp (ms)
+const DRAG_RAMP_MS = 150; // time-based linear sensitivity ramp (ms)
 
 type Phase = "idle" | "down" | "hold" | "drag";
 
