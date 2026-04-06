@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- When editing a pad's configuration while it is playing, a notice now appears informing you that sound selection changes will take effect on the next trigger.
+- Sound selection changes made while a pad is playing are now applied correctly at the next chain step — the current sound plays to completion without interruption.
+- Loop restarts now use the latest sound selection from the store, so mid-playback changes to which sounds are assigned take effect at each loop boundary.
 - The "Stop All" button in the sound library panel now also stops any actively previewing sound, not just playing pads
 - The "Stop All" button is now enabled while a sound preview is playing, even if no pads are active
 - Fixed a bug where retriggering a pad in "continue" mode could cause the playback progress bar to disappear for streaming (large-file) audio.

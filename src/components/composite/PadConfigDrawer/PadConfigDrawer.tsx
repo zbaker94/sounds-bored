@@ -5,6 +5,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
+import { usePlaybackStore } from "@/state/playbackStore";
 import { PadConfigSchema } from "@/lib/schemas";
 import type { PadConfigForm, PadConfig, LayerConfigForm, Layer } from "@/lib/schemas";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
@@ -51,6 +52,9 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const addPad = useProjectStore((s) => s.addPad);
   const updatePad = useProjectStore((s) => s.updatePad);
+  const isPadPlaying = usePlaybackStore((s) =>
+    padId !== undefined ? s.playingPadIds.includes(padId) : false
+  );
 
   const isEditMode = padId !== undefined;
 
@@ -143,6 +147,11 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         title={isEditMode ? "Edit Pad" : "New Pad"}
         content={
           <div className="flex flex-col gap-4 px-4 py-2 overflow-y-auto max-h-[65vh]">
+            {isPadPlaying && (
+              <p className="text-sm text-muted-foreground rounded border border-border bg-muted/50 px-3 py-2">
+                Sound selection changes will apply on the next trigger.
+              </p>
+            )}
             <div className="flex flex-col gap-1">
               <Label htmlFor="pad-name">Pad Name</Label>
               <Input
