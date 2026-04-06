@@ -1,5 +1,10 @@
 # Changelog
 
+## Current Changes
+- Fade and crossfade controls now correctly detect whether a pad is playing or stopped internally, eliminating edge cases where the wrong action (fade in vs. fade out) could be triggered
+- Tapping a pad that is already fading out now reverses the fade instead of ignoring the tap
+- Crossfade mode no longer requires the UI to track which pads are playing — the audio engine handles this automatically for more reliable behavior
+
 ## v1.3.1
 
 This release adds Cycle Mode for sequential and shuffled layers — letting each pad trigger advance through sounds one at a time instead of all at once — along with rich tooltips and context-sensitive helper text throughout the pad configuration drawer to make every setting self-explanatory. Under the hood, significant reliability and performance improvements land as well: drag-to-reorder and layer auto-open work more consistently, pad volume dragging feels more responsive, and the audio engine is more stable with fixes for edge cases that could cause sounds to incorrectly restart or fail to stop.
