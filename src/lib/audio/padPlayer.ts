@@ -23,9 +23,10 @@ const layerGainMap = new Map<string, GainNode>();
 // Tracks the longest-duration voice per pad for playback progress display (buffer path).
 const padProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
 
-// Tracks the most-recently-started streaming element per pad for progress display.
+// Tracks all active streaming elements per pad for progress display and cleanup.
 // HTMLAudioElement exposes currentTime/duration after loadedmetadata fires.
-const padStreamingAudio = new Map<string, HTMLAudioElement>();
+// A Set is used so multi-layer pads with simultaneous large files track all voices.
+const padStreamingAudio = new Map<string, Set<HTMLAudioElement>>();
 
 // Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
 // Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted.
@@ -228,14 +229,24 @@ export function getPadProgress(padId: string): number | null {
     }
     return Math.min(1, Math.max(0, elapsed / info.duration));
   }
-  const audio = padStreamingAudio.get(padId);
-  if (audio) {
-    const d = audio.duration;
-    if (d > 0 && isFinite(d)) {
-      return Math.min(1, Math.max(0, audio.currentTime / d));
+  const streamSet = padStreamingAudio.get(padId);
+  if (streamSet && streamSet.size > 0) {
+    // Pick the element with the longest duration, matching how padProgressInfo
+    // picks the longest-duration buffer voice for simultaneous arrangements.
+    let best: HTMLAudioElement | null = null;
+    for (const audio of streamSet) {
+      if (!best || (isFinite(audio.duration) && audio.duration > (best.duration || 0))) {
+        best = audio;
+      }
     }
-    // duration not yet known (loadedmetadata hasn't fired) — return 0 to show bar started
-    return 0;
+    if (best) {
+      const d = best.duration;
+      if (d > 0 && isFinite(d)) {
+        return Math.min(1, Math.max(0, best.currentTime / d));
+      }
+      // duration not yet known (loadedmetadata hasn't fired) — return 0 to show bar started
+      return 0;
+    }
   }
   return null;
 }
@@ -535,7 +546,9 @@ async function startLayerSound(
       }
       const sourceNode = ctx.createMediaElementSource(audio);
       voice = wrapStreamingElement(audio, sourceNode, ctx, layerGain, voiceVolume);
-      padStreamingAudio.set(pad.id, audio);
+      const streamSet = padStreamingAudio.get(pad.id) ?? new Set<HTMLAudioElement>();
+      streamSet.add(audio);
+      padStreamingAudio.set(pad.id, streamSet);
     } else {
       // ── Buffer path (short files) ──────────────────────────────────────────
       // Fully decoded AudioBuffer: instant retrigger, simultaneous instances.
@@ -558,7 +571,13 @@ async function startLayerSound(
     voice.setOnEnded(() => {
       // endedCb is nulled on first fire — prevents double-call if the source
       // ends naturally while a stopWithRamp timeout is pending.
-      if (audio && padStreamingAudio.get(pad.id) === audio) padStreamingAudio.delete(pad.id);
+      if (audio) {
+        const streamSet = padStreamingAudio.get(pad.id);
+        if (streamSet) {
+          streamSet.delete(audio);
+          if (streamSet.size === 0) padStreamingAudio.delete(pad.id);
+        }
+      }
       usePlaybackStore.getState().clearLayerVoice(pad.id, layer.id, voice);
       // Chain to the next sound if one is queued (sequential/shuffled).
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
@@ -652,7 +671,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
   padProgressInfo.delete(pad.id);
-  padStreamingAudio.delete(pad.id);
+  padStreamingAudio.delete(pad.id); // clear Set; audio elements are stopped via playbackStore
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   usePlaybackStore.getState().updatePadVolume(pad.id, startVolume);
