@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where holding a pad with mixed playback modes would use the wrong starting volume for some layers
 - Added a comprehensive manual test suite (`docs/manual-tests/`) covering 18 scenarios including audio playback, pad/scene deletion, sound import, yt-dlp downloads, mute groups, and retrigger modes
 - Test docs confirm fixes for issues #1–#10, including Stop All chain-queue clearing, audio cleanup on pad/scene deletion, loop/mode changes mid-playback, and hold-volume accuracy on mixed pads
 - Fixed a bug where pressing a pad with mixed hold + one-shot layers would incorrectly inherit a stale near-zero volume from a fading one-shot voice, causing the hold layer to trigger at the wrong volume instead of full volume.
