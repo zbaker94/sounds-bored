@@ -8,7 +8,10 @@ import { usePlaybackStore } from "@/state/playbackStore";
 const HOLD_MS = 150;        // time before a press becomes a "hold"
 const DRAG_PX = 4;          // vertical pixels before drag mode activates
 const DRAG_RANGE_PX = 200;  // pixels of travel for full 0→1 volume range
-const DRAG_RAMP_MS = 150; // time-based linear sensitivity ramp (ms)
+const DRAG_RAMP_MS = 150; // time-based linear sensitivity ramp (ms), measured from pointerDown.
+                          // Since HOLD_MS === DRAG_RAMP_MS, the ramp is always fully elapsed
+                          // by the time drag can begin — giving immediate full sensitivity on drag
+                          // while still protecting against accidental micro-drags on very quick presses.
 
 type Phase = "idle" | "down" | "hold" | "drag";
 
@@ -16,7 +19,6 @@ interface GestureState {
   startY: number;
   lastY: number;
   startTime: number;
-  dragStartTime: number;
   phase: Phase;
   wasPlayingAtStart: boolean;
   startVolume: number;
@@ -31,7 +33,6 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     startY: 0,
     lastY: 0,
     startTime: 0,
-    dragStartTime: 0,
     phase: "idle",
     wasPlayingAtStart: false,
     startVolume: 1.0,
@@ -131,7 +132,6 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
     if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
       s.phase = "drag";
-      s.dragStartTime = now();
       usePlaybackStore.getState().startVolumeTransition(pad.id);
 
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
@@ -141,7 +141,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     }
 
     if (s.phase === "drag") {
-      const rampFactor = Math.min(1, (now() - s.dragStartTime) / DRAG_RAMP_MS);
+      const rampFactor = Math.min(1, (now() - s.startTime) / DRAG_RAMP_MS);
       const newVolume = Math.max(0, Math.min(1, s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX));
       s.currentVolume = newVolume;
 
@@ -166,7 +166,6 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     if (wasActive) {
       usePlaybackStore.getState().clearVolumeTransition(pad.id);
     }
-    s.dragStartTime = 0;
     s.phase = "idle";
     s.cancelledFadeAtStart = false;
   }

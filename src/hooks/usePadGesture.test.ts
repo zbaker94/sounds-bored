@@ -642,7 +642,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     vi.useRealTimers();
   });
 
-  it("has zero sensitivity at drag start (rampFactor = 0)", () => {
+  it("has zero sensitivity at drag start when no time has elapsed since pointer down (rampFactor = 0)", () => {
     let nowMs = 0;
     const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
 
@@ -651,8 +651,8 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     });
     act(() => { vi.advanceTimersByTime(150); }); // hold activates, startVolume = 0
 
-    // First move crosses DRAG_PX threshold — drag activates; dragStartTime = nowMs = 0
-    // rampFactor = (0 - 0) / 150 = 0, so newVolume should equal startVolume (0)
+    // nowMs still 0 — no time has elapsed on the fake clock since pointer down
+    // First move crosses DRAG_PX threshold — drag activates; rampFactor = (0 - 0) / 150 = 0
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
@@ -673,13 +673,13 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
     vi.mocked(setPadVolume).mockClear();
 
-    // Activate drag at nowMs=0; dragStartTime = 0
+    // Activate drag at nowMs=0; rampFactor = (0 - 0) / 150 = 0 (startTime = 0)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
     vi.mocked(setPadVolume).mockClear();
 
-    // Advance clock to half ramp duration
+    // Advance clock to half ramp duration (measured from pointer down)
     nowMs = DRAG_RAMP_MS / 2;
 
     // Move to 50px up from hold-start (300 → 250)
@@ -703,13 +703,13 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     });
     act(() => { vi.advanceTimersByTime(150); }); // hold, startVolume = 0
 
-    // Activate drag at nowMs=0; dragStartTime = 0
+    // Activate drag at nowMs=0; rampFactor = (0 - 0) / 150 = 0 (startTime = 0)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });
     vi.mocked(setPadVolume).mockClear();
 
-    // Advance clock to full ramp duration
+    // Advance clock to full ramp duration (measured from pointer down)
     nowMs = DRAG_RAMP_MS;
 
     // Move 40px up from hold-start
@@ -721,6 +721,31 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     const calls = vi.mocked(setPadVolume).mock.calls;
     const vol = calls[calls.length - 1][1];
     expect(vol).toBeCloseTo(0.2, 5);
+  });
+
+  it("pre-accumulates ramp during hold: drag sensitivity is non-zero if time has elapsed since pointer down", () => {
+    let nowMs = 0;
+    const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // hold activates, startVolume = 0
+
+    // Simulate 100ms elapsed since pointer down before the first drag move
+    nowMs = 100;
+
+    // First move crosses DRAG_PX threshold — drag activates
+    // rampFactor = (100 - 0) / 150 ≈ 0.667 (ramp already 2/3 done from hold time)
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+
+    // deltaY = 300 - 290 = 10px; rampFactor ≈ 0.667; linear = 10/200 = 0.05
+    // newVolume ≈ 0 + 0.667 × 0.05 ≈ 0.0333
+    const calls = vi.mocked(setPadVolume).mock.calls;
+    const vol = calls[calls.length - 1][1];
+    expect(vol).toBeCloseTo(10 / 200 * (100 / 150), 3);
   });
 
   it("full range still clamps at 1.0 after ramp completes", () => {
@@ -789,14 +814,16 @@ describe("usePadGesture — onPointerCancel", () => {
   });
 
   it("stops pad and resets gain when cancelled during drag at near-zero volume", () => {
-    const { result } = renderHook(() => usePadGesture(oneShotPad));
+    // Use a manual fake clock so rampFactor stays 0 at drag entry (volume remains at startVolume=0)
+    let nowMs = 0;
+    const { result } = renderHook(() => usePadGesture(oneShotPad, () => nowMs));
 
     act(() => {
       result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
     });
     act(() => { vi.advanceTimersByTime(150); }); // hold activates, startVolume = 0
 
-    // Enter drag — volume stays near zero (rampFactor=0 at drag start)
+    // nowMs=0, so rampFactor = (0-0)/150 = 0 → volume stays at startVolume (0)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
     });

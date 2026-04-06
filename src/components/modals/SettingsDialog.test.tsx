@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
@@ -260,6 +260,77 @@ describe("SettingsDialog — Remove Folder", () => {
     renderDialog();
     openDialog();
     await user.click(screen.getByRole("button", { name: /remove other/i }));
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+  });
+});
+
+describe("SettingsDialog — Playback tab", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function openPlaybackTab(user = userEvent.setup()) {
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("tab", { name: /playback/i }));
+  }
+
+  it("renders the fade duration slider", async () => {
+    useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+    await openPlaybackTab();
+    expect(screen.getByRole("slider")).toBeInTheDocument();
+  });
+
+  it("displays the current fade duration in seconds", async () => {
+    useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 3000 }) });
+    await openPlaybackTab();
+    expect(screen.getByText("3.0s")).toBeInTheDocument();
+  });
+
+  it("updates the store immediately when the slider value changes", async () => {
+    useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+    await openPlaybackTab();
+    const slider = screen.getByRole("slider");
+    act(() => { fireEvent.keyDown(slider, { key: "ArrowRight" }); });
+    expect(useAppSettingsStore.getState().settings?.globalFadeDurationMs).toBe(2100);
+  });
+
+  it("does not call saveSettings synchronously when the slider changes", async () => {
+    useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+    await openPlaybackTab();
+    // Fake timers installed after userEvent interactions to avoid breaking userEvent's internal delays
+    vi.useFakeTimers();
+    const slider = screen.getByRole("slider");
+    act(() => { fireEvent.keyDown(slider, { key: "ArrowRight" }); });
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("calls saveSettings once after the debounce delay when slider stops", async () => {
+    useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+    await openPlaybackTab();
+    // Fake timers installed after userEvent interactions to avoid breaking userEvent's internal delays
+    vi.useFakeTimers();
+    const slider = screen.getByRole("slider");
+    act(() => { fireEvent.keyDown(slider, { key: "ArrowRight" }); });
+    act(() => { fireEvent.keyDown(slider, { key: "ArrowRight" }); });
+    act(() => { fireEvent.keyDown(slider, { key: "ArrowRight" }); });
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(350); });
+    expect(mockSaveSettings).toHaveBeenCalledOnce();
+  });
+
+  it("flushes the pending save when PlaybackTab unmounts before the debounce fires", async () => {
+    useAppSettingsStore.setState({ settings: createMockAppSettings({ globalFadeDurationMs: 2000 }) });
+    const { unmount } = renderDialog();
+    openDialog();
+    await userEvent.setup().click(screen.getByRole("tab", { name: /playback/i }));
+    // Fake timers installed after userEvent interactions to avoid breaking userEvent's internal delays
+    vi.useFakeTimers();
+    const slider = screen.getByRole("slider");
+    act(() => { fireEvent.keyDown(slider, { key: "ArrowRight" }); });
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+    // Unmount before debounce fires — flush should persist the pending value
+    act(() => { unmount(); });
     expect(mockSaveSettings).toHaveBeenCalledOnce();
   });
 });
