@@ -55,6 +55,8 @@ import {
   recordLayerVoice,
   clearLayerVoice,
   isLayerActive,
+  isPadFadingOut,
+  isPadActive,
   stopLayerVoices,
 } from "./audioState";
 
@@ -190,6 +192,37 @@ export async function fadePadIn(pad: Pad, durationMs: number): Promise<void> {
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[]): void {
   fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad)));
   fadingIn.forEach((pad) => fadePadIn(pad, resolveFadeDuration(pad)).catch(console.error));
+}
+
+/**
+ * Orchestration entry point for a single-pad fade tap (fade mode).
+ * Determines whether to reverse a fade-out, start a fade-out, or fade in
+ * based on current audio state — keeping that decision in the audio layer
+ * rather than in the UI hook.
+ */
+export function executeFadeTap(pad: Pad): void {
+  const duration = resolveFadeDuration(pad);
+  if (isPadActive(pad.id)) {
+    if (isPadFadingOut(pad.id)) {
+      fadePadInFromCurrent(pad, duration);
+    } else {
+      fadePadOut(pad, duration);
+    }
+  } else {
+    fadePadIn(pad, duration).catch(console.error);
+  }
+}
+
+/**
+ * Orchestration entry point for crossfade execution.
+ * Splits the selected pads into fading-out (currently playing) and
+ * fading-in (not playing) groups using live audio state, then delegates
+ * to crossfadePads — keeping playback-state queries in the audio layer.
+ */
+export function executeCrossfadeSelection(selectedPads: Pad[]): void {
+  const fadingOut = selectedPads.filter((p) => isPadActive(p.id));
+  const fadingIn = selectedPads.filter((p) => !isPadActive(p.id));
+  crossfadePads(fadingOut, fadingIn);
 }
 
 export function setPadVolume(padId: string, volume: number): void {

@@ -7,15 +7,11 @@ import { createMockPad, createMockLayer } from "@/test/factories";
 import type { Pad } from "@/lib/schemas";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
-  fadePadOut: vi.fn(),
-  fadePadIn: vi.fn().mockResolvedValue(undefined),
-  fadePadInFromCurrent: vi.fn(),
-  isPadFadingOut: vi.fn().mockReturnValue(false),
-  crossfadePads: vi.fn(),
-  resolveFadeDuration: vi.fn().mockReturnValue(2000),
+  executeFadeTap: vi.fn(),
+  executeCrossfadeSelection: vi.fn(),
 }));
 
-import { fadePadOut, fadePadIn, crossfadePads } from "@/lib/audio/padPlayer";
+import { executeFadeTap, executeCrossfadeSelection } from "@/lib/audio/padPlayer";
 
 const padA: Pad = createMockPad({ id: "pad-a", layers: [createMockLayer()] });
 const padB: Pad = createMockPad({ id: "pad-b", layers: [createMockLayer()] });
@@ -89,20 +85,20 @@ describe("useFadeMode — cancel", () => {
 });
 
 describe("useFadeMode — onPadTap in fade mode", () => {
-  it("calls fadePadOut when tapping a playing pad", () => {
+  it("calls executeFadeTap(pad, true) when tapping a playing pad", () => {
     usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
-    expect(fadePadOut).toHaveBeenCalledWith(padA, 2000);
+    expect(executeFadeTap).toHaveBeenCalledWith(padA);
     expect(result.current.mode).toBeNull();
   });
 
-  it("calls fadePadIn when tapping a non-playing pad", () => {
+  it("calls executeFadeTap(pad, false) when tapping a non-playing pad", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
-    expect(fadePadIn).toHaveBeenCalledWith(padA, 2000);
+    expect(executeFadeTap).toHaveBeenCalledWith(padA);
     expect(result.current.mode).toBeNull();
   });
 
@@ -110,8 +106,7 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padEmpty.id));
-    expect(fadePadOut).not.toHaveBeenCalled();
-    expect(fadePadIn).not.toHaveBeenCalled();
+    expect(executeFadeTap).not.toHaveBeenCalled();
     expect(result.current.mode).toBe("fade");
   });
 });
@@ -150,7 +145,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
     act(() => result.current.onPadTap(padB.id));
-    expect(crossfadePads).not.toHaveBeenCalled();
+    expect(executeCrossfadeSelection).not.toHaveBeenCalled();
     expect(result.current.mode).toBe("crossfade");
   });
 });
@@ -173,14 +168,14 @@ describe("useFadeMode — canExecute and execute", () => {
     expect(result.current.canExecute).toBe(true);
   });
 
-  it("execute calls crossfadePads with correct pad lists and cancels mode", () => {
+  it("execute calls executeCrossfadeSelection with selected pads and cancels mode", () => {
     usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
     act(() => result.current.onPadTap(padB.id));
     act(() => result.current.execute());
-    expect(crossfadePads).toHaveBeenCalledWith([padA], [padB]);
+    expect(executeCrossfadeSelection).toHaveBeenCalledWith([padA, padB]);
     expect(result.current.mode).toBeNull();
   });
 
@@ -190,7 +185,7 @@ describe("useFadeMode — canExecute and execute", () => {
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padA.id));
     act(() => result.current.execute());
-    expect(crossfadePads).not.toHaveBeenCalled();
+    expect(executeCrossfadeSelection).not.toHaveBeenCalled();
     expect(result.current.mode).toBe("crossfade");
   });
 });

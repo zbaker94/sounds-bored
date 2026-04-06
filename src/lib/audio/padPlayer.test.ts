@@ -1165,6 +1165,126 @@ describe("crossfadePads", () => {
   });
 });
 
+// ─── executeFadeTap ───────────────────────────────────────────────────────────
+
+describe("executeFadeTap", () => {
+  it("fades out when pad has active voices and is not fading out", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-out-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    executeFadeTap(pad);
+
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    clearAllFadeTracking();
+  });
+
+  it("reverses fade-out when pad has active voices and is already fading out", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-reverse-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    // First tap: starts fade-out
+    executeFadeTap(pad);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+
+    // Second tap: reverses the fade-out
+    executeFadeTap(pad);
+
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    clearAllFadeTracking();
+  });
+
+  it("fades in when pad has no active voices", async () => {
+    const mockBuffer = { duration: 1.0, numberOfChannels: 1, sampleRate: 44100 };
+    mockLoadBuffer.mockResolvedValue(mockBuffer);
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-in-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    executeFadeTap(pad);
+
+    await vi.waitFor(() => {
+      expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    });
+    clearAllFadeTracking();
+  });
+});
+
+// ─── executeCrossfadeSelection ────────────────────────────────────────────────
+
+describe("executeCrossfadeSelection", () => {
+  it("fades out pads with active voices and fades in pads without", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    const { triggerPad, executeCrossfadeSelection, clearAllFadeTracking } = await import("./padPlayer");
+    const padOut = createMockPad({
+      id: "xfade-sel-out",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    const padIn = createMockPad({ id: "xfade-sel-in" });
+
+    await triggerPad(padOut);
+    executeCrossfadeSelection([padOut, padIn]);
+
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padOut.id)).toBe(true);
+    clearAllFadeTracking();
+  });
+
+  it("does not fade out pads with no active voices", async () => {
+    const { executeCrossfadeSelection, clearAllFadeTracking } = await import("./padPlayer");
+    const padA = createMockPad({ id: "xfade-inactive-a" });
+    const padB = createMockPad({ id: "xfade-inactive-b" });
+
+    // Neither pad has active voices — both would be treated as fade-in targets
+    executeCrossfadeSelection([padA, padB]);
+
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padA.id)).toBe(false);
+    clearAllFadeTracking();
+  });
+});
+
 describe("syncLayerPlaybackMode", () => {
   it("is a no-op when the layer has no active voices", async () => {
     const { syncLayerPlaybackMode } = await import("./padPlayer");

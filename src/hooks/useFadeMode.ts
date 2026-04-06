@@ -3,12 +3,8 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
 import {
-  fadePadOut,
-  fadePadIn,
-  fadePadInFromCurrent,
-  isPadFadingOut,
-  crossfadePads,
-  resolveFadeDuration,
+  executeFadeTap,
+  executeCrossfadeSelection,
 } from "@/lib/audio/padPlayer";
 import type { Pad } from "@/lib/schemas";
 
@@ -98,16 +94,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
       if (mode === "fade") {
         const pad = pads.find((p) => p.id === padId)!;
-        const duration = resolveFadeDuration(pad);
-        if (playingPadIds.has(padId)) {
-          if (isPadFadingOut(padId)) {
-            fadePadInFromCurrent(pad, duration);
-          } else {
-            fadePadOut(pad, duration);
-          }
-        } else {
-          fadePadIn(pad, duration).catch(console.error);
-        }
+        executeFadeTap(pad);
         cancel();
         return;
       }
@@ -126,7 +113,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
         setSelectedPadIds(next);
       }
     },
-    [mode, pads, playingPadIds, selectedPadIds, isValidPad, cancel],
+    [mode, pads, selectedPadIds, isValidPad, cancel],
   );
 
   const canExecute = useMemo(() => {
@@ -140,15 +127,10 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
   const execute = useCallback(() => {
     if (!canExecute) return;
-    const fadingOut = pads.filter(
-      (p) => selectedPadIds.has(p.id) && playingPadIds.has(p.id),
-    );
-    const fadingIn = pads.filter(
-      (p) => selectedPadIds.has(p.id) && !playingPadIds.has(p.id),
-    );
-    crossfadePads(fadingOut, fadingIn);
+    const selectedPads = pads.filter((p) => selectedPadIds.has(p.id));
+    executeCrossfadeSelection(selectedPads);
     cancel();
-  }, [canExecute, pads, selectedPadIds, playingPadIds, cancel]);
+  }, [canExecute, pads, selectedPadIds, cancel]);
 
   const getPadFadeVisual = useCallback(
     (padId: string): PadFadeVisual => {
