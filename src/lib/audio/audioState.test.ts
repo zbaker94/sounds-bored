@@ -302,6 +302,43 @@ describe("voice tracking", () => {
     expect(isPadActive("pad-1")).toBe(false);
   });
 
+  it("clearVoice keeps pad active when other voices remain", () => {
+    const v1 = makeVoice();
+    const v2 = makeVoice();
+    recordVoice("pad-1", v1);
+    recordVoice("pad-1", v2);
+    vi.clearAllMocks();
+    clearVoice("pad-1", v1);
+    expect(isPadActive("pad-1")).toBe(true);
+    expect(mockPlaybackState.removePlayingPad).not.toHaveBeenCalled();
+  });
+
+  it("stopLayerVoices keeps pad active when other layers still have voices", () => {
+    const v1 = makeVoice();
+    const v2 = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", v1);
+    recordLayerVoice("pad-1", "layer-2", v2);
+    vi.clearAllMocks();
+    stopLayerVoices("pad-1", "layer-1");
+    expect(isLayerActive("layer-1")).toBe(false);
+    expect(isLayerActive("layer-2")).toBe(true);
+    expect(isPadActive("pad-1")).toBe(true);
+    expect(mockPlaybackState.removePlayingPad).not.toHaveBeenCalled();
+  });
+
+  it("stopLayerVoices cleans maps before stop() so synchronous onended is a safe no-op", () => {
+    const reentrantVoice = makeVoice();
+    // Override stop() to simulate a streaming element that fires onended synchronously
+    reentrantVoice.stop = vi.fn(() => {
+      // At this point, maps should already be cleared — so this is a no-op
+      clearLayerVoice("pad-1", "layer-1", reentrantVoice);
+    });
+    recordLayerVoice("pad-1", "layer-1", reentrantVoice);
+    expect(() => stopLayerVoices("pad-1", "layer-1")).not.toThrow();
+    expect(isLayerActive("layer-1")).toBe(false);
+    expect(isPadActive("pad-1")).toBe(false);
+  });
+
   it("getLayerVoices returns empty array when layer not active", () => {
     expect(getLayerVoices("no-such-layer")).toEqual([]);
   });

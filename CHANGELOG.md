@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stopping one voice on a pad would incorrectly mark the entire pad as inactive when other voices were still playing
+- Fixed a potential crash caused by re-entrant `onended` callbacks firing synchronously during layer stop — maps are now cleared before calling `stop()` so duplicate cleanup is safely ignored
 - Improved audio engine reliability by consolidating all voice tracking into a single module, preventing edge cases where sounds could incorrectly restart after being stopped
 - The "Stop All" button now more reliably halts all active sounds and previews
 - Internal audio engine refactored for better reliability: runtime state (gain nodes, fade tracking, chain queues) is now isolated in a dedicated module, reducing the risk of edge-case bugs during complex playback scenarios.

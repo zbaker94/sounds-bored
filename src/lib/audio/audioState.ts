@@ -202,7 +202,7 @@ export function clearAllFadeTracking(): void {
   const store = usePlaybackStore.getState();
   store.clearAllVolumeTransitions();
   store.resetAllPadVolumes();
-  // NOTE: resetAllPadVolumes fires synchronously here, while playbackStore.stopAll()
+  // NOTE: resetAllPadVolumes fires synchronously here, while stopAllVoices()
   // is called later in the STOP_RAMP_S deferred timeout in stopAllPads(). There is
   // a brief window where padVolumes are reset but voices are still ramping down.
   // This is intentional — the fade bar should disappear immediately on stop.
