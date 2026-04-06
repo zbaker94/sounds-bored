@@ -1337,7 +1337,7 @@ describe("syncLayerArrangement", () => {
     expect(createdSources).toHaveLength(2);
   });
 
-  it("sequential → shuffled + loop: chain rebuilds after exhaustion using live livePlaybackMode", async () => {
+  it("sequential → shuffled + loop: chain rebuilds after exhaustion using live playbackMode", async () => {
     const { triggerPad, syncLayerArrangement } = await import("./padPlayer");
     const sounds = [
       createMockSound({ filePath: "a.wav" }),

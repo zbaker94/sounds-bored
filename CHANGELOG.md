@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad config saves now sync all layer audio settings (playback mode and arrangement) in a single unified update, replacing two separate sync calls.
+- Internal audio engine code was simplified by consolidating `liveArrangement` and `livePlaybackMode` helper functions into one generic helper.
 - Changing a layer's arrangement type (e.g. sequential → simultaneous) while a pad is actively playing now takes effect correctly without requiring a retrigger.
 - Switching between chained arrangements (sequential ↔ shuffled) mid-playback rebuilds the playback queue so the current sound plays out and the new sequence follows.
 - Switching from a chained arrangement to simultaneous mid-playback lets the current sound finish, then resumes with all sounds playing together as expected.

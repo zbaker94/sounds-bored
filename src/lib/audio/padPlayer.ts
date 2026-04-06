@@ -295,29 +295,20 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
 }
 
-/** Read the current arrangement for a layer from the live project store.
- *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted)
+/** Read a single field from a layer in the live project store.
+ *  Falls back to `captured` if the pad or layer is no longer found (e.g. deleted)
  *  or if no project is currently loaded (e.g. project cleared mid-playback). */
-function liveArrangement(padId: string, layerId: string, captured: Layer["arrangement"]): Layer["arrangement"] {
+function liveLayerField<K extends keyof Layer>(
+  padId: string,
+  layerId: string,
+  field: K,
+  captured: Layer[K],
+): Layer[K] {
   const project = useProjectStore.getState().project;
   if (project) {
     for (const scene of project.scenes) {
       const pad = scene.pads.find((p) => p.id === padId);
-      if (pad) return pad.layers.find((l) => l.id === layerId)?.arrangement ?? captured;
-    }
-  }
-  return captured;
-}
-
-/** Read the current playbackMode for a layer from the live project store.
- *  Falls back to the captured value if the pad or layer is no longer found (e.g. deleted)
- *  or if no project is currently loaded (e.g. project cleared mid-playback). */
-function livePlaybackMode(padId: string, layerId: string, captured: Layer["playbackMode"]): Layer["playbackMode"] {
-  const project = useProjectStore.getState().project;
-  if (project) {
-    for (const scene of project.scenes) {
-      const pad = scene.pads.find((p) => p.id === padId);
-      if (pad) return pad.layers.find((l) => l.id === layerId)?.playbackMode ?? captured;
+      if (pad) return pad.layers.find((l) => l.id === layerId)?.[field] ?? captured;
     }
   }
   return captured;
@@ -389,6 +380,16 @@ export function syncLayerArrangement(layer: Layer): void {
     // liveArrangement from the store and starts all sounds simultaneously if looping.
     layerChainQueue.set(layer.id, []);
   }
+}
+
+/**
+ * Sync all live-playback state for a layer after a pad config save.
+ * Calls syncLayerPlaybackMode and/or syncLayerArrangement only for the fields
+ * that actually changed, keeping the audio engine consistent with the updated store.
+ */
+export function syncLayerConfig(layer: Layer, original: Layer): void {
+  if (original.playbackMode !== layer.playbackMode) syncLayerPlaybackMode(layer);
+  if (original.arrangement  !== layer.arrangement)  syncLayerArrangement(layer);
 }
 
 export function clearAllLayerChains(): void {
@@ -563,7 +564,7 @@ async function startLayerSound(
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
       // `remaining.length === 0` means the chain ran to completion naturally.
       const remaining = layerChainQueue.get(layer.id);
-      const liveMode = livePlaybackMode(pad.id, layer.id, layer.playbackMode);
+      const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
       if (remaining === undefined) {
         // Queue was externally cleared (e.g. stopAll, retrigger restart) — do not chain.
       } else if (remaining.length > 0) {
@@ -574,7 +575,7 @@ async function startLayerSound(
         // Chain exhausted naturally — restart according to the current live arrangement.
         // Both liveMode and liveArr read from the store so mid-playback config changes
         // (e.g. switching arrangement while a chain is playing) take effect here.
-        const liveArr = liveArrangement(pad.id, layer.id, layer.arrangement);
+        const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
         if (isChained(liveArr)) {
           const newOrder = buildPlayOrder(liveArr, allSounds);
           if (newOrder.length === 0) { layerChainQueue.delete(layer.id); return; }
@@ -587,6 +588,7 @@ async function startLayerSound(
           layerChainQueue.delete(layer.id);
           const liveLayer = { ...layer, arrangement: liveArr, playbackMode: liveMode };
           for (const sound of allSounds) {
+            // getVoiceVolume reads layer.selection.instances — unchanged by arrangement/mode edits
             startLayerSound(pad, liveLayer, sound, ctx, layerGain, getVoiceVolume(layer, sound), allSounds);
           }
         }

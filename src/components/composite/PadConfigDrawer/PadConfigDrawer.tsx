@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { LayerAccordion } from "./LayerAccordion";
-import { syncLayerVolume, syncLayerPlaybackMode, syncLayerArrangement } from "@/lib/audio/padPlayer";
+import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 import { createDefaultLayer } from "./constants";
 
@@ -127,12 +127,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
       config.layers.forEach((l) => {
         syncLayerVolume(l.id, l.volume);
         const originalLayer = initialConfig?.layers?.find((ol) => ol.id === l.id);
-        if (originalLayer && originalLayer.playbackMode !== l.playbackMode) {
-          syncLayerPlaybackMode(l);
-        }
-        if (originalLayer && originalLayer.arrangement !== l.arrangement) {
-          syncLayerArrangement(l);
-        }
+        if (originalLayer) syncLayerConfig(l, originalLayer);
       });
     } else {
       addPad(sceneId, config);
