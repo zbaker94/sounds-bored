@@ -171,7 +171,8 @@ describe("PadButton", () => {
       // Enter drag phase with a small initial move
       fireEvent.pointerMove(button, { clientY: 195, pointerId: 1 });
 
-      // Advance past DRAG_RAMP_MS (150 ms) so rampFactor reaches 1.0
+      // Ramp already saturated at 1.0 (HOLD_MS=150ms elapsed ≥ DRAG_RAMP_MS=150ms);
+      // advance another 150ms to ensure the move event fires well into drag phase.
       act(() => { vi.advanceTimersByTime(150); });
 
       // Drag 100 px up: startVolume=0, rampFactor=1.0, delta=100, range=200 → 50%

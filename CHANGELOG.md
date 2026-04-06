@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad volume drag now pre-accumulates sensitivity during the hold phase, so dragging immediately after a long press responds with full (or near-full) sensitivity instead of starting sluggish.
 - The fade duration slider in Settings now debounces saves — settings are written to disk only after you stop adjusting, not on every tick
 - Pending slider changes are flushed to disk immediately if the Settings dialog is closed before the debounce fires, preventing data loss
 - Improved performance of crossfade mode: the "can execute" check and status label now update only when relevant state changes, reducing unnecessary re-renders.
