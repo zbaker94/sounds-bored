@@ -11,6 +11,8 @@ export interface ReconcileResult {
   sounds: Sound[];
   /** Whether any changes were made (new sounds added or folderIds backfilled). */
   changed: boolean;
+  /** IDs of folders that could not be read (e.g. outside the app's fs scope). */
+  inaccessibleFolderIds: string[];
 }
 
 /**
@@ -39,22 +41,28 @@ function nameFromFilename(filename: string): string {
 /**
  * Scan a single folder for audio files (non-recursive, top-level only).
  * Returns absolute file paths for each discovered audio file.
+ * Returns null if the folder cannot be accessed (e.g. outside fs scope).
  */
-async function scanFolderForAudioFiles(folderPath: string): Promise<string[]> {
-  const folderExists = await exists(folderPath);
-  if (!folderExists) return [];
+async function scanFolderForAudioFiles(folderPath: string): Promise<string[] | null> {
+  try {
+    const folderExists = await exists(folderPath);
+    if (!folderExists) return [];
 
-  const entries = await readDir(folderPath);
-  const audioPaths: string[] = [];
+    const entries = await readDir(folderPath);
+    const audioPaths: string[] = [];
 
-  for (const entry of entries) {
-    if (entry.isFile && isAudioFile(entry.name)) {
-      const fullPath = await join(folderPath, entry.name);
-      audioPaths.push(fullPath);
+    for (const entry of entries) {
+      if (entry.isFile && isAudioFile(entry.name)) {
+        const fullPath = await join(folderPath, entry.name);
+        audioPaths.push(fullPath);
+      }
     }
-  }
 
-  return audioPaths;
+    return audioPaths;
+  } catch {
+    // Folder is outside the app's fs scope or otherwise inaccessible.
+    return null;
+  }
 }
 
 /**
@@ -86,9 +94,16 @@ export async function reconcileGlobalLibrary(
   // Scan all folders: collect new sounds and build filePath → folderId map
   const newSounds: Sound[] = [];
   const pathToFolderId = new Map<string, string>();
+  const inaccessibleFolderIds: string[] = [];
 
   for (const folder of globalFolders) {
     const audioPaths = await scanFolderForAudioFiles(folder.path);
+
+    if (audioPaths === null) {
+      // Folder could not be read — record it but continue with other folders.
+      inaccessibleFolderIds.push(folder.id);
+      continue;
+    }
 
     for (const filePath of audioPaths) {
       pathToFolderId.set(filePath, folder.id);
@@ -129,6 +144,7 @@ export async function reconcileGlobalLibrary(
   return {
     sounds: [...reconciledExisting, ...newSounds],
     changed,
+    inaccessibleFolderIds,
   };
 }
 
@@ -154,25 +170,36 @@ export interface MissingStatusResult {
  *   - it has a filePath that does not exist on disk, OR
  *   - its folderId points to a missing folder (even if filePath isn't checked separately)
  * Sounds with no filePath are never flagged.
+ *
+ * Folders or files that cannot be checked due to scope restrictions are
+ * silently skipped (not treated as missing).
  */
 export async function checkMissingStatus(
   globalFolders: GlobalFolder[],
   sounds: Sound[],
 ): Promise<MissingStatusResult> {
-  // Check all folder paths in parallel
+  // Check all folder paths in parallel — skip any that throw (outside scope)
   const folderChecks = await Promise.all(
-    globalFolders.map(async (f) => ({ id: f.id, missing: !(await exists(f.path)) })),
+    globalFolders.map(async (f) => {
+      try {
+        return { id: f.id, missing: !(await exists(f.path)) };
+      } catch {
+        return { id: f.id, missing: false };
+      }
+    }),
   );
   const missingFolderIds = new Set(folderChecks.filter((f) => f.missing).map((f) => f.id));
 
-  // Check all sound filePaths in parallel (only sounds that have a filePath)
+  // Check all sound filePaths in parallel — skip any that throw (outside scope)
   const soundsWithPath = sounds.filter((s) => !!s.filePath);
   const soundFileChecks = await Promise.all(
-    soundsWithPath.map(async (s) => ({
-      id: s.id,
-      folderId: s.folderId,
-      missing: !(await exists(s.filePath!)),
-    })),
+    soundsWithPath.map(async (s) => {
+      try {
+        return { id: s.id, folderId: s.folderId, missing: !(await exists(s.filePath!)) };
+      } catch {
+        return { id: s.id, folderId: s.folderId, missing: false };
+      }
+    }),
   );
 
   const missingSoundIds = new Set<string>();

@@ -1,21 +1,22 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
+
+// Module-level singleton: ensures at most one reconcile runs at a time across
+// all hook instances (e.g. MainPage and SoundsPanel both mount concurrently).
+let _reconcileInFlight = false;
 
 export function useReconcileLibrary(): {
   reconcile: () => Promise<void>;
   isReconciling: boolean;
 } {
   const [isReconciling, setIsReconciling] = useState(false);
-  // Ref-based guard so the in-flight check survives re-renders without
-  // causing reconcile to be recreated on every state change.
-  const isReconcilingRef = useRef(false);
 
   const settings = useAppSettingsStore((s) => s.settings);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const clearDirtyFlag = useLibraryStore((s) => s.clearDirtyFlag);
   const setMissingState = useLibraryStore((s) => s.setMissingState);
   const { mutate: saveLibrary } = useSaveGlobalLibrary();
 
@@ -27,14 +28,25 @@ export function useReconcileLibrary(): {
   }, [saveLibrary]);
 
   const reconcile = useCallback(async () => {
-    if (!settings || isReconcilingRef.current) return;
-    isReconcilingRef.current = true;
+    if (!settings || _reconcileInFlight) return;
+    _reconcileInFlight = true;
     setIsReconciling(true);
     try {
       const result = await reconcileGlobalLibrary(
         settings.globalFolders,
         useLibraryStore.getState().sounds,
       );
+
+      // Warn about any folders the app couldn't read (outside fs scope).
+      if (result.inaccessibleFolderIds.length > 0) {
+        const names = settings.globalFolders
+          .filter((f) => result.inaccessibleFolderIds.includes(f.id))
+          .map((f) => f.name)
+          .join(", ");
+        toast.warning(
+          `${result.inaccessibleFolderIds.length === 1 ? "Folder" : "Folders"} could not be scanned: ${names}. Move them to Music, Documents, Downloads, or Desktop.`,
+        );
+      }
 
       // Merge new sounds into the store by filePath — never replaces existing
       // sounds so any user edits (tags, sets) made during the async scan are
@@ -64,16 +76,15 @@ export function useReconcileLibrary(): {
       if (useLibraryStore.getState().isDirty) {
         const latest = useLibraryStore.getState();
         saveLibraryRef.current({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
-        // Clear immediately so a rapid second refresh doesn't hit the dirty
-        // window while the async mutation is still in flight. useSaveGlobalLibrary
-        // also calls clearDirtyFlag in onSuccess as the authoritative clear.
-        clearDirtyFlag();
+        // useSaveGlobalLibrary.onSuccess clears the dirty flag after a successful
+        // write. Do not clear it here — clearing before save completes means a
+        // failed save would silently drop changes.
       }
     } finally {
-      isReconcilingRef.current = false;
+      _reconcileInFlight = false;
       setIsReconciling(false);
     }
-  }, [settings, updateLibrary, clearDirtyFlag, setMissingState]);
+  }, [settings, updateLibrary, setMissingState]);
 
   return { reconcile, isReconciling };
 }

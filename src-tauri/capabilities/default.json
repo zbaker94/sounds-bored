@@ -16,7 +16,7 @@
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
         { "path": "$DESKTOP/**" },
-        { "path": "$MUSIC/**" },
+        { "path": "$AUDIO/**" },
         { "path": "$APPDATA/SoundsBored/**" },
         { "path": "$APPLOCALDATA/SoundsBored/**" }
       ]
@@ -42,7 +42,7 @@
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
         { "path": "$DESKTOP/**" },
-        { "path": "$MUSIC/**" }
+        { "path": "$AUDIO/**" }
       ]
     },
     "updater:default",
