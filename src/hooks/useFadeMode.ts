@@ -8,6 +8,7 @@ import {
   executeCrossfadeSelection,
 } from "@/lib/audio/padPlayer";
 import type { Pad } from "@/lib/schemas";
+import { isFadeablePad } from "@/lib/padUtils";
 
 export type FadeMode = "fade" | "crossfade" | null;
 
@@ -52,11 +53,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const isValidPad = useCallback(
     (padId: string) => {
       const pad = pads.find((p) => p.id === padId);
-      return (
-        pad !== undefined &&
-        pad.layers.length > 0 &&
-        !pad.layers.some((l) => l.playbackMode === "hold")
-      );
+      return pad !== undefined && isFadeablePad(pad);
     },
     [pads],
   );

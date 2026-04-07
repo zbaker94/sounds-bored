@@ -25,7 +25,9 @@
       "Bash(git pull:*)",
       "Bash(xargs grep:*)",
       "Bash(gh pr:*)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(git log:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
