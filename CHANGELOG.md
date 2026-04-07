@@ -1,6 +1,19 @@
 # Changelog
 
 ## Current Changes
+The work for fix/issue-31 is complete:
+- Fix committed: `e7043b8` — replaced `console.error` with `toast.error` in fade handlers
+- Tests committed: `acaae66` — added `MissingFileError` coverage for `startLayerSound`
+- PR #112 is open and up to date with the branch
+
+There are some housekeeping items in the working tree:
+- `coverage/` directory (staged as new files) — this is generated output from `npm run test:coverage` and shouldn't be committed. `coverage/` is not currently in `.gitignore`
+- `package.json` + `package-lock.json` (staged) — these add `@vitest/coverage-v8` and should be committed
+
+Would you like me to:
+1. Add `coverage/` to `.gitignore` and unstage those files
+2. Commit the `package.json`/`package-lock.json` changes
+3. Push to update PR #112
 - When a sound file is missing during playback, the app now detects and marks it as missing in the library — keeping the UI in sync without a manual rescan
 - Audio playback errors now display as toast notifications instead of being silently logged to the console, so you'll see clear error messages when a sound fails to play.
 - Added smooth volume fade animation support for pads, enabling fade-in and fade-out effects during playback
