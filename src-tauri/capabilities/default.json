@@ -13,13 +13,12 @@
     {
       "identifier": "opener:allow-open-path",
       "allow": [
-        { "path": "$HOME/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$MUSIC/**" },
-        { "path": "$APPDATA/**" },
-        { "path": "$APPLOCALDATA/**" }
+        { "path": "$APPDATA/SoundsBored/**" },
+        { "path": "$APPLOCALDATA/SoundsBored/**" }
       ]
     },
     "dialog:default",
@@ -38,9 +37,8 @@
     {
       "identifier": "fs:scope",
       "allow": [
-        { "path": "$APPDATA/**" },
+        { "path": "$APPDATA/SoundsBored/**" },
         { "path": "$APPLOCALDATA/SoundsBored/**" },
-        { "path": "$HOME/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
         { "path": "$DESKTOP/**" },
