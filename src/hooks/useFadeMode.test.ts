@@ -87,7 +87,7 @@ describe("useFadeMode — cancel", () => {
 });
 
 describe("useFadeMode — onPadTap in fade mode", () => {
-  it("calls executeFadeTap(pad, true) when tapping a playing pad", () => {
+  it("calls executeFadeTap(pad, fadeDuration) when tapping a playing pad", () => {
     usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
@@ -96,7 +96,7 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     expect(result.current.mode).toBeNull();
   });
 
-  it("calls executeFadeTap(pad, false) when tapping a non-playing pad", () => {
+  it("calls executeFadeTap(pad, fadeDuration) when tapping a non-playing pad", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
@@ -172,7 +172,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padHold.id));
-    expect(result.current.getPadFadeVisual(padHold.id)).not.toMatch(/selected/);
+    expect(result.current.getPadFadeVisual(padHold.id)).toBe("invalid");
     expect(result.current.mode).toBe("crossfade");
   });
 
@@ -181,7 +181,7 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterCrossfade());
     act(() => result.current.onPadTap(padMixed.id));
-    expect(result.current.getPadFadeVisual(padMixed.id)).not.toMatch(/selected/);
+    expect(result.current.getPadFadeVisual(padMixed.id)).toBe("invalid");
     expect(result.current.mode).toBe("crossfade");
   });
 });

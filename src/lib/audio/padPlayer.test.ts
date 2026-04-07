@@ -1353,6 +1353,7 @@ describe("executeCrossfadeSelection", () => {
     executeCrossfadeSelection([padA, padB]);
 
     expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padA.id)).toBe(false);
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padB.id)).toBe(false);
     clearAllFadeTracking();
   });
 
