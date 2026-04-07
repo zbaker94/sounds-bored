@@ -4,6 +4,7 @@ import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
+import { FadeToolbar } from "./FadeToolbar";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +21,6 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   LayersLogoIcon,
-  VolumeHighIcon,
-  ShuffleIcon,
 } from "@hugeicons/core-free-icons";
 import { useFadeMode } from "@/hooks/useFadeMode";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -180,45 +179,7 @@ export function SceneView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
-      {/* Fade toolbar — hidden in edit mode */}
-      {!editMode && (
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant={fadeMode.mode === "fade" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => fadeMode.mode === "fade" ? fadeMode.cancel() : fadeMode.enterFade()}
-            disabled={editMode}
-            aria-label="Fade pad"
-          >
-            <HugeiconsIcon icon={VolumeHighIcon} size={16} />
-            Fade
-            <Kbd className="ml-1">F</Kbd>
-          </Button>
-          <Button
-            variant={fadeMode.mode === "crossfade" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => {
-              if (fadeMode.mode === "crossfade") {
-                if (fadeMode.canExecute) fadeMode.execute();
-                else fadeMode.cancel();
-              } else {
-                fadeMode.enterCrossfade();
-              }
-            }}
-            disabled={editMode || (fadeMode.mode !== "crossfade" && !fadeMode.hasPlayingPads)}
-            aria-label="Crossfade pads"
-          >
-            <HugeiconsIcon icon={ShuffleIcon} size={16} />
-            Crossfade
-            <Kbd className="ml-1">X</Kbd>
-          </Button>
-          {fadeMode.statusLabel && (
-            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-black/50 text-white border border-white/20">
-              {fadeMode.statusLabel}
-            </span>
-          )}
-        </div>
-      )}
+      <FadeToolbar fadeMode={fadeMode} editMode={editMode} />
       <DndContext
         sensors={editMode ? sensors : []}
         collisionDetection={closestCenter}

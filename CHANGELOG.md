@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Refactored the Fade/Crossfade toolbar into a standalone `FadeToolbar` component for improved code organization (no user-visible behavior change)
 - Fix committed: `e7043b8` — replaced `console.error` with `toast.error` in fade handlers
 - Tests committed: `acaae66` — added `MissingFileError` coverage for `startLayerSound`
 - When a sound file is missing during playback, the app now detects and marks it as missing in the library — keeping the UI in sync without a manual rescan
