@@ -53,6 +53,7 @@ export function SaveProjectDialog({
           <DialogTitle>Save Project</DialogTitle>
           <DialogDescription>
             Enter a name for your project. You'll be prompted to choose a save location next.
+            The save location must be within Music, Documents, Downloads, or Desktop.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">

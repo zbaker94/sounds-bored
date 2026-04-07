@@ -1,5 +1,9 @@
 # Changelog
 
+## Current Changes
+- The app now clearly communicates that project save locations and watched folders must be within Music, Documents, Downloads, or Desktop — hints appear in the Save Project dialog, Settings, sound library empty state, and missing file/folder resolution dialogs.
+- Tightened file system and folder-open permissions to scope app data access to the SoundsBored folder only, rather than your entire home directory and app data root.
+
 ## v1.3.2
 
 Fade and crossfade operations are now significantly more reliable — hold-mode pads are correctly excluded, tapping a fading-out pad reverses it instead of doing nothing, and the audio engine now independently tracks pad state for more consistent behavior. This release also hardens security by validating sound file paths against directory traversal attacks and tightening shell permissions to the minimum required.
