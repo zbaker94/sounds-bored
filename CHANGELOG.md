@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.3.2
+
+Fade and crossfade operations are now significantly more reliable — hold-mode pads are correctly excluded, tapping a fading-out pad reverses it instead of doing nothing, and the audio engine now independently tracks pad state for more consistent behavior. This release also hardens security by validating sound file paths against directory traversal attacks and tightening shell permissions to the minimum required.
+
 - Tightened shell permissions: removed broad `shell:allow-execute` and `shell:default` capabilities, keeping only the minimum required (`allow-spawn`, `allow-kill`)
 - Sound file paths and folder paths are now validated to block path traversal attacks (e.g., `../../etc/passwd`), preventing malicious project files from accessing files outside their intended directories.
 - Fixed a bug where crossfade selection incorrectly tracked the target pad as volume-transitioning after completing a crossfade
