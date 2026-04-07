@@ -31,18 +31,30 @@ export function useReconcileLibrary(): {
     isReconcilingRef.current = true;
     setIsReconciling(true);
     try {
-      const sounds = useLibraryStore.getState().sounds;
-      const result = await reconcileGlobalLibrary(settings.globalFolders, sounds);
+      const result = await reconcileGlobalLibrary(
+        settings.globalFolders,
+        useLibraryStore.getState().sounds,
+      );
 
-      // Only apply if the store hasn't been mutated while the async scan
-      // was running. If isDirty is true, the user modified the library
-      // during the scan — their changes take priority.
-      if (result.changed && !useLibraryStore.getState().isDirty) {
+      // Merge new sounds into the store by filePath — never replaces existing
+      // sounds so any user edits (tags, sets) made during the async scan are
+      // always preserved. External filesystem changes are always reflected.
+      const currentPaths = new globalThis.Set(
+        useLibraryStore.getState().sounds.map((s) => s.filePath).filter(Boolean),
+      );
+      const soundsToAdd = result.sounds.filter(
+        (s) => s.filePath && !currentPaths.has(s.filePath),
+      );
+      if (soundsToAdd.length > 0) {
         updateLibrary((draft) => {
-          draft.sounds = result.sounds;
+          for (const sound of soundsToAdd) {
+            draft.sounds.push(sound);
+          }
         });
       }
 
+      // Always refresh missing-file/folder state so UI reflects the current
+      // filesystem regardless of whether new sounds were discovered.
       const missingResult = await checkMissingStatus(
         settings.globalFolders,
         useLibraryStore.getState().sounds,

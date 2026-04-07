@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- New sounds added to your library folders are now picked up automatically without overwriting any edits (tags, sets, custom names) you made during the scan
+- Missing file indicators in the sound library now always reflect the current state of your filesystem, even when no new sounds were found
 - Fixed a race condition where rapidly rescanning the sound library could cause unsaved changes to be lost
 - Added a **Refresh** button to the sound library panel that rescans your folders for new or removed audio files on demand
 - The sound library now automatically rescans your folders when the app loads, so newly added files appear without manual intervention
