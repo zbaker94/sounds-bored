@@ -1035,6 +1035,26 @@ describe("retrigger stop — ramped stop", () => {
 
 // ─── Fade functions ───────────────────────────────────────────────────────────
 
+describe("resolveFadeDuration", () => {
+  it("returns pad-level fadeDurationMs when set", async () => {
+    const { resolveFadeDuration } = await import("./padPlayer");
+    const pad = createMockPad({ fadeDurationMs: 1500 });
+    expect(resolveFadeDuration(pad, 3000)).toBe(1500);
+  });
+
+  it("falls back to globalFadeDurationMs when pad has none", async () => {
+    const { resolveFadeDuration } = await import("./padPlayer");
+    const pad = createMockPad({ fadeDurationMs: undefined });
+    expect(resolveFadeDuration(pad, 3000)).toBe(3000);
+  });
+
+  it("falls back to 2000ms when neither pad nor global setting is provided", async () => {
+    const { resolveFadeDuration } = await import("./padPlayer");
+    const pad = createMockPad({ fadeDurationMs: undefined });
+    expect(resolveFadeDuration(pad, undefined)).toBe(2000);
+  });
+});
+
 describe("fadePadOut", () => {
   it("schedules a gain ramp to 0 on the pad gain node", async () => {
     const { fadePadOut, getPadGain, clearAllFadeTracking } = await import("./padPlayer");

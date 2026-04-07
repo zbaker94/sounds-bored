@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import {
   executeFadeTap,
   executeCrossfadeSelection,
@@ -94,7 +95,8 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
       if (mode === "fade") {
         const pad = pads.find((p) => p.id === padId)!;
-        executeFadeTap(pad);
+        const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
+        executeFadeTap(pad, globalFadeDurationMs);
         cancel();
         return;
       }
@@ -128,7 +130,8 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const execute = useCallback(() => {
     if (!canExecute) return;
     const selectedPads = pads.filter((p) => selectedPadIds.has(p.id));
-    executeCrossfadeSelection(selectedPads);
+    const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
+    executeCrossfadeSelection(selectedPads, globalFadeDurationMs);
     cancel();
   }, [canExecute, pads, selectedPadIds, cancel]);
 
