@@ -12,6 +12,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Layer, Pad, Scene, Sound } from "@/lib/schemas";
+import { isFadeablePad } from "@/lib/padUtils";
 import { toast } from "sonner";
 
 import {
@@ -197,6 +198,7 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
  * rather than in the UI hook.
  */
 export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
+  if (!isFadeablePad(pad)) return;
   const duration = resolveFadeDuration(pad, globalFadeDurationMs);
   if (isPadActive(pad.id)) {
     if (isPadFadingOut(pad.id)) {
@@ -216,8 +218,9 @@ export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
  * to crossfadePads — keeping playback-state queries in the audio layer.
  */
 export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDurationMs?: number): void {
-  const fadingOut = selectedPads.filter((p) => isPadActive(p.id));
-  const fadingIn = selectedPads.filter((p) => !isPadActive(p.id));
+  const fadeablePads = selectedPads.filter(isFadeablePad);
+  const fadingOut = fadeablePads.filter((p) => isPadActive(p.id));
+  const fadingIn = fadeablePads.filter((p) => !isPadActive(p.id));
   crossfadePads(fadingOut, fadingIn, globalFadeDurationMs);
 }
 

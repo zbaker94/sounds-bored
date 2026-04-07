@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pads set to "hold" mode are now correctly excluded from fade and crossfade operations, preventing unintended audio behavior when triggering fades on hold-mode pads.
+- Mixed-mode pads (containing both hold and non-hold layers) are also excluded from fade operations for consistent, predictable behavior.
 - Pads using "hold" playback mode are now correctly excluded from fade and crossfade operations — tapping a hold or mixed-mode pad during a fade does nothing instead of triggering undefined audio behavior.
 - Fade duration now correctly reads the global fade setting when triggering fades and crossfades, rather than ignoring it
 This diff is purely internal test infrastructure — wrapping renders in a `TooltipProvider`. No user-facing changes occurred.

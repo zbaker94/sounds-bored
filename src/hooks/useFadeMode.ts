@@ -50,14 +50,6 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const editMode = useUiStore((s) => s.editMode);
   const overlayStack = useUiStore((s) => s.overlayStack);
 
-  const isValidPad = useCallback(
-    (padId: string) => {
-      const pad = pads.find((p) => p.id === padId);
-      return pad !== undefined && isFadeablePad(pad);
-    },
-    [pads],
-  );
-
   const cancel = useCallback(() => {
     setMode(null);
     setSelectedPadIds(new Set());
@@ -88,10 +80,10 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
   const onPadTap = useCallback(
     (padId: string) => {
-      if (!isValidPad(padId)) return;
+      const pad = pads.find((p) => p.id === padId);
+      if (!pad || !isFadeablePad(pad)) return;
 
       if (mode === "fade") {
-        const pad = pads.find((p) => p.id === padId)!;
         const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
         executeFadeTap(pad, globalFadeDurationMs);
         cancel();
@@ -112,7 +104,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
         setSelectedPadIds(next);
       }
     },
-    [mode, pads, selectedPadIds, isValidPad, cancel],
+    [mode, pads, selectedPadIds, cancel],
   );
 
   const canExecute = useMemo(() => {
@@ -135,7 +127,8 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const getPadFadeVisual = useCallback(
     (padId: string): PadFadeVisual => {
       if (mode === null) return null;
-      if (!isValidPad(padId)) return "invalid";
+      const pad = pads.find((p) => p.id === padId);
+      if (!pad || !isFadeablePad(pad)) return "invalid";
       if (mode === "fade") return playingPadIds.has(padId) ? "crossfade-out" : "crossfade-in";
 
       const isSelected = selectedPadIds.has(padId);
@@ -143,7 +136,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
       if (isSelected) return isPlaying ? "selected-out" : "selected-in";
       return isPlaying ? "crossfade-out" : "crossfade-in";
     },
-    [mode, isValidPad, selectedPadIds, playingPadIds],
+    [mode, pads, selectedPadIds, playingPadIds],
   );
 
   const statusLabel = useMemo<string | null>(
