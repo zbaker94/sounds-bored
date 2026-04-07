@@ -5,6 +5,7 @@ import { isLayerActive } from "./audioState";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { toast } from "sonner";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -2438,5 +2439,68 @@ describe("cycle mode — stopPad resets cycle cursor", () => {
     // Next trigger should start from sound[0] again
     await triggerPad(pad);
     expect(mockLoadBuffer.mock.calls.at(-1)![0].id).toBe(sounds[0].id);
+  });
+});
+
+// ─── Error handling — toast instead of console.error ─────────────────────────
+
+describe("crossfadePads error handling", () => {
+  it("calls toast.error when fadePadIn rejects", async () => {
+    const { crossfadePads, clearAllFadeTracking } = await import("./padPlayer");
+    const padIn = createMockPad({
+      id: "xfade-err-in",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new Error("AudioContext suspended"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    crossfadePads([], [padIn]);
+    await tick();
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("AudioContext suspended"));
+    clearAllFadeTracking();
+  });
+});
+
+describe("executeFadeTap error handling", () => {
+  it("calls toast.error when fadePadIn rejects on inactive pad", async () => {
+    const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-err-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new Error("AudioContext suspended"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    executeFadeTap(pad);
+    await tick();
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("AudioContext suspended"));
+    clearAllFadeTracking();
+  });
+});
+
+describe("startLayerSound error handling", () => {
+  it("calls toast.error for generic playback errors without console.error", async () => {
+    const consoleSpy = vi.spyOn(console, "error");
+    const { triggerPad } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "generic-err-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new Error("decode failed"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    await triggerPad(pad);
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("decode failed"));
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 });

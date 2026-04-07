@@ -188,7 +188,12 @@ export async function fadePadIn(pad: Pad, durationMs: number): Promise<void> {
 
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
   fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad, globalFadeDurationMs)));
-  fadingIn.forEach((pad) => fadePadIn(pad, resolveFadeDuration(pad, globalFadeDurationMs)).catch(console.error));
+  fadingIn.forEach((pad) =>
+    fadePadIn(pad, resolveFadeDuration(pad, globalFadeDurationMs)).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Playback error: audio fade failed — ${message}`);
+    })
+  );
 }
 
 /**
@@ -207,7 +212,10 @@ export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
       fadePadOut(pad, duration);
     }
   } else {
-    fadePadIn(pad, duration).catch(console.error);
+    fadePadIn(pad, duration).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Playback error: audio fade failed — ${message}`);
+    });
   }
 }
 
@@ -613,7 +621,6 @@ async function startLayerSound(
       toast.error(`Failed to play "${sound.name}" — file not found. Check the Sounds panel.`);
     } else {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[padPlayer] Failed to play "${sound.name}":`, err);
       toast.error(`Failed to play "${sound.name}": ${message}`);
     }
   }
