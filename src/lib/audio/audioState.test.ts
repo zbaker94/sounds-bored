@@ -19,6 +19,7 @@ const mockPlaybackState = {
   addPlayingPad: vi.fn(),
   removePlayingPad: vi.fn(),
   clearAllPlayingPads: vi.fn(),
+  updatePadVolume: vi.fn(),
 };
 
 vi.mock("@/state/playbackStore", () => ({
@@ -74,6 +75,7 @@ import {
   nullAllOnEnded,
   isPadActive,
   isLayerActive,
+  startFadeRaf,
 } from "./audioState";
 import type { AudioVoice } from "./audioVoice";
 
@@ -389,5 +391,121 @@ describe("layerCycleIndex", () => {
     clearAllLayerCycleIndexes();
     expect(getLayerCycleIndex("layer-1")).toBeUndefined();
     expect(getLayerCycleIndex("layer-2")).toBeUndefined();
+  });
+});
+
+// ── startFadeRaf ─────────────────────────────────────────────────────────────
+
+describe("startFadeRaf", () => {
+  let mockNow = 0;
+  const rafCallbacks = new Map<number, (timestamp: number) => void>();
+  let rafIdCounter = 0;
+
+  beforeEach(() => {
+    mockNow = 0;
+    rafCallbacks.clear();
+    rafIdCounter = 0;
+    vi.stubGlobal("performance", { now: () => mockNow });
+    vi.stubGlobal("requestAnimationFrame", (cb: (timestamp: number) => void) => {
+      const id = ++rafIdCounter;
+      rafCallbacks.set(id, cb);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      rafCallbacks.delete(id);
+    });
+  });
+
+  function flushNextRaf() {
+    const entry = rafCallbacks.entries().next().value as [number, (timestamp: number) => void] | undefined;
+    if (!entry) throw new Error("No pending RAF callback");
+    const [id, cb] = entry;
+    rafCallbacks.delete(id);
+    cb(mockNow);
+  }
+
+  it("calls updatePadVolume with fromVolume on the first frame when t=0", () => {
+    mockNow = 1000;
+    startFadeRaf("pad-1", 0.8, 0, 500);
+    // Frame fires at the same instant startFadeRaf was called — elapsed = 0, t = 0
+    flushNextRaf();
+    expect(mockPlaybackState.updatePadVolume).toHaveBeenCalledWith("pad-1", 0.8);
+  });
+
+  it("interpolates linearly at the midpoint", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 1000);
+    mockNow = 500; // elapsed = 500ms, t = 0.5 → volume = 0.5
+    flushNextRaf();
+    expect(mockPlaybackState.updatePadVolume).toHaveBeenCalledWith("pad-1", 0.5);
+  });
+
+  it("calls updatePadVolume with toVolume on the final frame (t=1)", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 1, 0, 1000);
+    mockNow = 1000; // elapsed = durationMs, t = 1
+    flushNextRaf();
+    expect(mockPlaybackState.updatePadVolume).toHaveBeenCalledWith("pad-1", 0);
+  });
+
+  it("does not schedule another RAF frame after t=1", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 500);
+    mockNow = 500; // t = 1
+    flushNextRaf();
+    expect(rafCallbacks.size).toBe(0);
+  });
+
+  it("schedules a new RAF frame when t < 1 (loop continues)", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 1000);
+    expect(rafCallbacks.size).toBe(1);
+    mockNow = 100; // t = 0.1, not done
+    flushNextRaf();
+    // Should have re-scheduled
+    expect(rafCallbacks.size).toBe(1);
+  });
+
+  it("clamps t to 1 when elapsed exceeds durationMs", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 500);
+    mockNow = 9999; // way past duration
+    flushNextRaf();
+    expect(mockPlaybackState.updatePadVolume).toHaveBeenCalledWith("pad-1", 1);
+    expect(rafCallbacks.size).toBe(0);
+  });
+
+  it("cancelPadFade before any frame fires prevents updatePadVolume from being called", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 1000);
+    cancelPadFade("pad-1");
+    expect(rafCallbacks.size).toBe(0);
+    expect(mockPlaybackState.updatePadVolume).not.toHaveBeenCalled();
+  });
+
+  it("cancelPadFade mid-fade stops the loop after the current frame", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 1000);
+    mockNow = 200; // t = 0.2 — fires first frame, re-schedules
+    flushNextRaf();
+    vi.clearAllMocks();
+    mockPlaybackState.updatePadVolume = vi.fn();
+
+    cancelPadFade("pad-1"); // cancel the pending second frame
+
+    expect(rafCallbacks.size).toBe(0);
+    expect(mockPlaybackState.updatePadVolume).not.toHaveBeenCalled();
+  });
+
+  it("works correctly for fade-in (fromVolume=0, toVolume=1)", () => {
+    mockNow = 0;
+    startFadeRaf("pad-1", 0, 1, 2000);
+    mockNow = 1000; // t = 0.5
+    flushNextRaf();
+    expect(mockPlaybackState.updatePadVolume).toHaveBeenCalledWith("pad-1", 0.5);
+    mockNow = 2000; // t = 1
+    flushNextRaf();
+    expect(mockPlaybackState.updatePadVolume).toHaveBeenLastCalledWith("pad-1", 1);
+    expect(rafCallbacks.size).toBe(0);
   });
 });

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added smooth volume fade animation support for pads, enabling fade-in and fade-out effects during playback
 - Fixed a crash/hang when scanning sound library folders located outside the app's permitted file system locations — inaccessible folders are now skipped gracefully
 - Added a warning notification when folders can't be scanned, listing the affected folder names and suggesting valid locations (Music, Documents, Downloads, or Desktop)
 - Corrected the allowed folder scope from `$MUSIC` to `$AUDIO` for file access permissions
