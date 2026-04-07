@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Added a **Refresh** button to the sound library panel that rescans your folders for new or removed audio files on demand
+- The sound library now automatically rescans your folders when the app loads, so newly added files appear without manual intervention
 - The app now clearly communicates that project save locations and watched folders must be within Music, Documents, Downloads, or Desktop — hints appear in the Save Project dialog, Settings, sound library empty state, and missing file/folder resolution dialogs.
 - Tightened file system and folder-open permissions to scope app data access to the SoundsBored folder only, rather than your entire home directory and app data root.
 

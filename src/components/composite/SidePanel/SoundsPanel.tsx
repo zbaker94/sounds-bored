@@ -40,6 +40,7 @@ import {
   LockIcon,
   Alert02Icon,
   Download04Icon,
+  RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder, Sound, Tag } from "@/lib/schemas";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
@@ -69,6 +70,7 @@ import {
 } from "@/components/ui/tooltip";
 import { TruncatedPath } from "@/components/ui/truncated-path";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
+import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { cn } from "@/lib/utils";
 import guyWithTorch from "@/assets/guywithtorch.gif";
 
@@ -290,6 +292,13 @@ export function SoundsPanel() {
   );
 
   useDownloadEventListener(downloadFolderId);
+
+  const { reconcile, isReconciling } = useReconcileLibrary();
+
+  useEffect(() => {
+    reconcile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setSelectedSoundIds(new globalThis.Set());
@@ -545,6 +554,17 @@ export function SoundsPanel() {
           >
             {folders.length > 0 && (
               <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  onClick={reconcile}
+                  disabled={isReconciling}
+                  aria-label="Refresh folders"
+                >
+                  <HugeiconsIcon icon={RefreshIcon} size={12} className={isReconciling ? "animate-spin" : undefined} />
+                  {isReconciling ? "Scanning..." : "Refresh"}
+                </Button>
                 <Button
                   variant="secondary"
                   size="sm"
