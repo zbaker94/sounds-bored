@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loadGlobalLibrary, saveGlobalLibrary } from "./library";
 import { GlobalLibrary } from "./schemas";
 import { QUERY_STALE_TIME } from "./constants";
+import { useLibraryStore } from "@/state/libraryStore";
 
 export function useGlobalLibrary() {
   return useQuery<GlobalLibrary, Error>({
@@ -20,6 +21,7 @@ export function useSaveGlobalLibrary() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["globalLibrary"] });
+      useLibraryStore.getState().clearDirtyFlag();
     },
   });
 }

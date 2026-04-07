@@ -6,6 +6,7 @@ import { SceneView } from "@/components/composite/SceneView/SceneView";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
+import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
@@ -28,10 +29,17 @@ function MainPageInner() {
   useAutoSave();
   useGlobalHotkeys();
 
+  const { reconcile } = useReconcileLibrary();
+
   useEffect(() => {
     return () => {
       stopAllPads();
     };
+  }, []);
+
+  useEffect(() => {
+    reconcile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const {
