@@ -154,7 +154,7 @@ export function DownloadItem({ job }: DownloadItemProps) {
             <Button
               variant="secondary"
               size="icon-xs"
-              className="shrink-0 text-white/40 hover:text-white"
+              className="shrink-0"
               onClick={() => cancelDownload(job.id)}
               disabled={isCancelling}
             >
