@@ -16,7 +16,9 @@ import { executeFadeTap, executeCrossfadeSelection } from "@/lib/audio/padPlayer
 const padA: Pad = createMockPad({ id: "pad-a", layers: [createMockLayer()] });
 const padB: Pad = createMockPad({ id: "pad-b", layers: [createMockLayer()] });
 const padEmpty: Pad = createMockPad({ id: "pad-empty", layers: [] });
-const allPads = [padA, padB, padEmpty];
+const padHold: Pad = createMockPad({ id: "pad-hold", layers: [createMockLayer({ playbackMode: "hold" })] });
+const padMixed: Pad = createMockPad({ id: "pad-mixed", layers: [createMockLayer(), createMockLayer({ playbackMode: "hold" })] });
+const allPads = [padA, padB, padEmpty, padHold, padMixed];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -85,7 +87,7 @@ describe("useFadeMode — cancel", () => {
 });
 
 describe("useFadeMode — onPadTap in fade mode", () => {
-  it("calls executeFadeTap(pad, true) when tapping a playing pad", () => {
+  it("calls executeFadeTap(pad, fadeDuration) when tapping a playing pad", () => {
     usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
@@ -94,7 +96,7 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     expect(result.current.mode).toBeNull();
   });
 
-  it("calls executeFadeTap(pad, false) when tapping a non-playing pad", () => {
+  it("calls executeFadeTap(pad, fadeDuration) when tapping a non-playing pad", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
@@ -106,6 +108,22 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padEmpty.id));
+    expect(executeFadeTap).not.toHaveBeenCalled();
+    expect(result.current.mode).toBe("fade");
+  });
+
+  it("is a no-op when tapping a hold-mode pad", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    act(() => result.current.onPadTap(padHold.id));
+    expect(executeFadeTap).not.toHaveBeenCalled();
+    expect(result.current.mode).toBe("fade");
+  });
+
+  it("is a no-op when tapping a mixed-mode pad", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    act(() => result.current.onPadTap(padMixed.id));
     expect(executeFadeTap).not.toHaveBeenCalled();
     expect(result.current.mode).toBe("fade");
   });
@@ -146,6 +164,24 @@ describe("useFadeMode — onPadTap in crossfade mode", () => {
     act(() => result.current.onPadTap(padA.id));
     act(() => result.current.onPadTap(padB.id));
     expect(executeCrossfadeSelection).not.toHaveBeenCalled();
+    expect(result.current.mode).toBe("crossfade");
+  });
+
+  it("does not select a hold-mode pad in crossfade mode", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    act(() => result.current.onPadTap(padHold.id));
+    expect(result.current.getPadFadeVisual(padHold.id)).toBe("invalid");
+    expect(result.current.mode).toBe("crossfade");
+  });
+
+  it("does not select a mixed-mode pad in crossfade mode", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    act(() => result.current.onPadTap(padMixed.id));
+    expect(result.current.getPadFadeVisual(padMixed.id)).toBe("invalid");
     expect(result.current.mode).toBe("crossfade");
   });
 });
@@ -200,6 +236,32 @@ describe("useFadeMode — getPadFadeVisual", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     expect(result.current.getPadFadeVisual(padEmpty.id)).toBe("invalid");
+  });
+
+  it("returns 'invalid' for a pad with a hold-mode layer in fade mode", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    expect(result.current.getPadFadeVisual(padHold.id)).toBe("invalid");
+  });
+
+  it("returns 'invalid' for a mixed-mode pad (hold + non-hold) in fade mode", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    expect(result.current.getPadFadeVisual(padMixed.id)).toBe("invalid");
+  });
+
+  it("returns 'invalid' for a hold-mode pad in crossfade mode", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    expect(result.current.getPadFadeVisual(padHold.id)).toBe("invalid");
+  });
+
+  it("returns 'invalid' for a mixed-mode pad in crossfade mode", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterCrossfade());
+    expect(result.current.getPadFadeVisual(padMixed.id)).toBe("invalid");
   });
 
   it("returns 'crossfade-out' for playing pads in fade mode", () => {
