@@ -90,7 +90,7 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
-    expect(executeFadeTap).toHaveBeenCalledWith(padA);
+    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined);
     expect(result.current.mode).toBeNull();
   });
 
@@ -98,7 +98,7 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
-    expect(executeFadeTap).toHaveBeenCalledWith(padA);
+    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined);
     expect(result.current.mode).toBeNull();
   });
 
@@ -175,7 +175,7 @@ describe("useFadeMode — canExecute and execute", () => {
     act(() => result.current.onPadTap(padA.id));
     act(() => result.current.onPadTap(padB.id));
     act(() => result.current.execute());
-    expect(executeCrossfadeSelection).toHaveBeenCalledWith([padA, padB]);
+    expect(executeCrossfadeSelection).toHaveBeenCalledWith([padA, padB], undefined);
     expect(result.current.mode).toBeNull();
   });
 

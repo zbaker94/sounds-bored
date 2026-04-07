@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fade duration now correctly reads the global fade setting when triggering fades and crossfades, rather than ignoring it
 This diff is purely internal test infrastructure — wrapping renders in a `TooltipProvider`. No user-facing changes occurred.
 
 There are no customer-facing changelog entries to write for this diff.

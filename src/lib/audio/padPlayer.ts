@@ -89,12 +89,8 @@ export function freezePadAtCurrentVolume(padId: string): void {
   usePlaybackStore.getState().updatePadVolume(padId, currentValue);
 }
 
-export function resolveFadeDuration(pad: Pad): number {
-  return (
-    pad.fadeDurationMs ??
-    useAppSettingsStore.getState().settings?.globalFadeDurationMs ??
-    2000
-  );
+export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): number {
+  return pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
 }
 
 export function fadePadOut(pad: Pad, durationMs: number): void {
@@ -189,9 +185,9 @@ export async function fadePadIn(pad: Pad, durationMs: number): Promise<void> {
   setFadePadTimeout(pad.id, timeoutId);
 }
 
-export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[]): void {
-  fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad)));
-  fadingIn.forEach((pad) => fadePadIn(pad, resolveFadeDuration(pad)).catch(console.error));
+export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
+  fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad, globalFadeDurationMs)));
+  fadingIn.forEach((pad) => fadePadIn(pad, resolveFadeDuration(pad, globalFadeDurationMs)).catch(console.error));
 }
 
 /**
@@ -200,8 +196,8 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[]): void {
  * based on current audio state — keeping that decision in the audio layer
  * rather than in the UI hook.
  */
-export function executeFadeTap(pad: Pad): void {
-  const duration = resolveFadeDuration(pad);
+export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
+  const duration = resolveFadeDuration(pad, globalFadeDurationMs);
   if (isPadActive(pad.id)) {
     if (isPadFadingOut(pad.id)) {
       fadePadInFromCurrent(pad, duration);
@@ -219,10 +215,10 @@ export function executeFadeTap(pad: Pad): void {
  * fading-in (not playing) groups using live audio state, then delegates
  * to crossfadePads — keeping playback-state queries in the audio layer.
  */
-export function executeCrossfadeSelection(selectedPads: Pad[]): void {
+export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDurationMs?: number): void {
   const fadingOut = selectedPads.filter((p) => isPadActive(p.id));
   const fadingIn = selectedPads.filter((p) => !isPadActive(p.id));
-  crossfadePads(fadingOut, fadingIn);
+  crossfadePads(fadingOut, fadingIn, globalFadeDurationMs);
 }
 
 export function setPadVolume(padId: string, volume: number): void {
