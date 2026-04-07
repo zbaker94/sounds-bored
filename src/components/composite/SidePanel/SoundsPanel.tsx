@@ -632,7 +632,7 @@ export function SoundsPanel() {
                     </EmptyTitle>
                   </EmptyHeader>
                   <EmptyDescription className="text-white/50">
-                    Add a folder to watch for audio files.
+                    Add a folder to watch for audio files. Folders must be within Music, Documents, Downloads, or Desktop.
                   </EmptyDescription>
                   <EmptyContent className="flex-row justify-center">
                     <Button

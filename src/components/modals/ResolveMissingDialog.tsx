@@ -183,6 +183,9 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
                     {sound.filePath}
                   </span>
                 )}
+                <span className="block mt-2 text-xs text-muted-foreground">
+                  The replacement file must be within Music, Documents, Downloads, or Desktop.
+                </span>
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="gap-2">

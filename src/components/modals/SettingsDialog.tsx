@@ -171,6 +171,9 @@ function FoldersTab() {
           <HugeiconsIcon icon={FolderAddIcon} size={16} />
           Add Folder
         </Button>
+        <p className="text-xs text-muted-foreground text-center">
+          Folders must be within Music, Documents, Downloads, or Desktop.
+        </p>
       </div>
     </div>
   );

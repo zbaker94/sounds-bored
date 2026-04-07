@@ -392,6 +392,9 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
                 <span className="block mt-1 text-xs font-mono break-all text-muted-foreground">
                   <TruncatedPath path={folder.path} />
                 </span>
+                <span className="block mt-2 text-xs text-muted-foreground">
+                  The replacement folder must be within Music, Documents, Downloads, or Desktop.
+                </span>
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="gap-2">
