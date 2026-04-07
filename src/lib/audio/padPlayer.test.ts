@@ -5,6 +5,7 @@ import { isLayerActive } from "./audioState";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { toast } from "sonner";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -36,8 +37,14 @@ vi.mock("./streamingCache", () => ({
 vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => `asset://localhost/${path}`,
 }));
+const mockGetAppSettings = vi.fn(() => ({ settings: null as unknown }));
 vi.mock("@/state/appSettingsStore", () => ({
-  useAppSettingsStore: { getState: () => ({ settings: null }) },
+  useAppSettingsStore: { getState: () => mockGetAppSettings() },
+}));
+
+const mockCheckMissingStatus = vi.fn();
+vi.mock("@/lib/library.reconcile", () => ({
+  checkMissingStatus: (...args: unknown[]) => mockCheckMissingStatus(...args),
 }));
 
 // ── Audio global mock (streaming path) ───────────────────────────────────────
@@ -2438,5 +2445,110 @@ describe("cycle mode — stopPad resets cycle cursor", () => {
     // Next trigger should start from sound[0] again
     await triggerPad(pad);
     expect(mockLoadBuffer.mock.calls.at(-1)![0].id).toBe(sounds[0].id);
+  });
+});
+
+// ─── Error handling — toast instead of console.error ─────────────────────────
+
+describe("crossfadePads error handling", () => {
+  it("calls toast.error when fadePadIn rejects", async () => {
+    const { crossfadePads, clearAllFadeTracking } = await import("./padPlayer");
+    const padIn = createMockPad({
+      id: "xfade-err-in",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new Error("AudioContext suspended"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    crossfadePads([], [padIn]);
+    await tick();
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("AudioContext suspended"));
+    clearAllFadeTracking();
+  });
+});
+
+describe("executeFadeTap error handling", () => {
+  it("calls toast.error when fadePadIn rejects on inactive pad", async () => {
+    const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-err-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new Error("AudioContext suspended"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    executeFadeTap(pad);
+    await tick();
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("AudioContext suspended"));
+    clearAllFadeTracking();
+  });
+});
+
+describe("startLayerSound error handling", () => {
+  it("calls toast.error for generic playback errors without console.error", async () => {
+    const consoleSpy = vi.spyOn(console, "error");
+    const { triggerPad } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "generic-err-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new Error("decode failed"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    await triggerPad(pad);
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("decode failed"));
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+});
+
+describe("startLayerSound MissingFileError handling", () => {
+  it("shows a file-not-found toast when settings are absent", async () => {
+    const { MissingFileError } = await import("./bufferCache");
+    const { triggerPad } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "missing-no-settings-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    setSounds([createMockSound({ id: "s1", name: "kick", filePath: "sounds/kick.wav" })]);
+    mockLoadBuffer.mockRejectedValue(new MissingFileError("not found"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    await triggerPad(pad);
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("file not found"));
+    expect(mockCheckMissingStatus).not.toHaveBeenCalled();
+  });
+
+  it("calls checkMissingStatus and updates missing state when settings exist", async () => {
+    const { MissingFileError } = await import("./bufferCache");
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ id: "s1", name: "kick", filePath: "sounds/kick.wav" });
+    setSounds([sound]);
+    mockGetAppSettings.mockReturnValueOnce({ settings: { globalFolders: ["/sounds"] } });
+    mockCheckMissingStatus.mockResolvedValue({ missingSoundIds: new Set(["s1"]), missingFolderIds: new Set() });
+    mockLoadBuffer.mockRejectedValue(new MissingFileError("not found"));
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+    const pad = createMockPad({
+      id: "missing-with-settings-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("file not found"));
+    expect(mockCheckMissingStatus).toHaveBeenCalledWith(["/sounds"], expect.any(Array));
   });
 });

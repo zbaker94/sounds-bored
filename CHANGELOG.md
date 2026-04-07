@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fix committed: `e7043b8` — replaced `console.error` with `toast.error` in fade handlers
+- Tests committed: `acaae66` — added `MissingFileError` coverage for `startLayerSound`
+- When a sound file is missing during playback, the app now detects and marks it as missing in the library — keeping the UI in sync without a manual rescan
+- Audio playback errors now display as toast notifications instead of being silently logged to the console, so you'll see clear error messages when a sound fails to play.
 - Added smooth volume fade animation support for pads, enabling fade-in and fade-out effects during playback
 - Fixed a crash/hang when scanning sound library folders located outside the app's permitted file system locations — inaccessible folders are now skipped gracefully
 - Added a warning notification when folders can't be scanned, listing the affected folder names and suggesting valid locations (Music, Documents, Downloads, or Desktop)
