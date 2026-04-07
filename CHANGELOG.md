@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed audio engine memory leak: gain nodes are now properly disconnected from the audio graph when pads are stopped or the project is closed, preventing accumulation of orphaned audio nodes.
 - Refactored the Fade/Crossfade toolbar into a standalone `FadeToolbar` component for improved code organization (no user-visible behavior change)
 - Fix committed: `e7043b8` — replaced `console.error` with `toast.error` in fade handlers
 - Tests committed: `acaae66` — added `MissingFileError` coverage for `startLayerSound`

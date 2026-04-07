@@ -36,6 +36,7 @@ function makeMockGain() {
       cancelScheduledValues: vi.fn(),
     },
     connect: vi.fn(),
+    disconnect: vi.fn(),
   };
 }
 
@@ -45,6 +46,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import {
   getPadProgress,
   getPadGain,
+  getOrCreateLayerGain,
   cancelPadFade,
   clearAllFadeTracking,
   clearAllPadGains,
@@ -177,6 +179,58 @@ describe("getPadGain", () => {
     const gain2 = getPadGain("pad-2");
     expect(gain1).not.toBe(gain2);
     expect(mockCtx.createGain).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── clearAllPadGains ─────────────────────────────────────────────────────────
+
+describe("clearAllPadGains", () => {
+  it("disconnects all pad gain nodes before clearing", () => {
+    const gain1 = getPadGain("pad-1");
+    const gain2 = getPadGain("pad-2");
+
+    clearAllPadGains();
+
+    expect(gain1.disconnect).toHaveBeenCalledTimes(1);
+    expect(gain2.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("empties the map so a subsequent getPadGain call creates a new node", () => {
+    const first = getPadGain("pad-1");
+    clearAllPadGains();
+    const second = getPadGain("pad-1");
+    expect(second).not.toBe(first);
+  });
+
+  it("is safe to call on an empty map", () => {
+    expect(() => clearAllPadGains()).not.toThrow();
+  });
+});
+
+// ── clearAllLayerGains ───────────────────────────────────────────────────────
+
+describe("clearAllLayerGains", () => {
+  it("disconnects all layer gain nodes before clearing", () => {
+    const padGain = getPadGain("pad-1");
+    const layerGain1 = getOrCreateLayerGain("layer-1", 80, padGain);
+    const layerGain2 = getOrCreateLayerGain("layer-2", 50, padGain);
+
+    clearAllLayerGains();
+
+    expect(layerGain1.disconnect).toHaveBeenCalledTimes(1);
+    expect(layerGain2.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("empties the map so a subsequent getOrCreateLayerGain call creates a new node", () => {
+    const padGain = getPadGain("pad-1");
+    const first = getOrCreateLayerGain("layer-1", 80, padGain);
+    clearAllLayerGains();
+    const second = getOrCreateLayerGain("layer-1", 80, padGain);
+    expect(second).not.toBe(first);
+  });
+
+  it("is safe to call on an empty map", () => {
+    expect(() => clearAllLayerGains()).not.toThrow();
   });
 });
 
