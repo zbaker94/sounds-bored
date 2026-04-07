@@ -37,8 +37,8 @@
  *
  * Name               | Keys       | Values                                    | Purpose                                         | Cleared by
  * -------------------|------------|-------------------------------------------|-------------------------------------------------|-----------------------------------
- * padGainMap         | pad ID     | GainNode                                  | Per-pad gain node in audio graph                | clearAllPadGains(), stopAllPads()
- * layerGainMap       | layer ID   | GainNode                                  | Per-layer gain node, connects to padGain        | clearAllLayerGains(), stopAllPads()
+ * padGainMap         | pad ID     | GainNode                                  | Per-pad gain node in audio graph                | clearAllPadGains() (disconnects+clears), stopAllPads()
+ * layerGainMap       | layer ID   | GainNode                                  | Per-layer gain node, connects to padGain        | clearAllLayerGains() (disconnects+clears), stopAllPads()
  * voiceMap           | pad ID     | AudioVoice[]                              | Active voices per pad (UI + stop tracking)      | clearAllVoices(), stopAllVoices()
  * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
  * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
@@ -183,10 +183,12 @@ export function forEachPadGain(fn: (padId: string, gain: GainNode) => void): voi
 // ---------------------------------------------------------------------------
 
 export function clearAllPadGains(): void {
+  for (const gain of padGainMap.values()) gain.disconnect();
   padGainMap.clear();
 }
 
 export function clearAllLayerGains(): void {
+  for (const gain of layerGainMap.values()) gain.disconnect();
   layerGainMap.clear();
 }
 
