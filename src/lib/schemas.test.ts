@@ -366,9 +366,30 @@ describe("SoundSchema — filePath validation", () => {
     expect(SoundSchema.safeParse({ ...validSound, filePath: "C:/Users/user/Music/kick.wav" }).success).toBe(true);
   });
 
-  it("should accept a path containing ..", () => {
-    // filePath is now just a non-empty string — path validation is filesystem-level
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "/music/../sounds/kick.wav" }).success).toBe(true);
+  it("should accept a path with single-dot segments (./sounds/kick.wav)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "./sounds/kick.wav" }).success).toBe(true);
+  });
+
+  it("should accept a filename containing consecutive dots not at a segment boundary (track..remastered.wav)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "/music/track..remastered.wav" }).success).toBe(true);
+  });
+
+  it("should reject a path containing .. as a path segment (/music/../sounds/kick.wav)", () => {
+    const result = SoundSchema.safeParse({ ...validSound, filePath: "/music/../sounds/kick.wav" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain(
+        "filePath must not contain path traversal sequences (..)"
+      );
+    }
+  });
+
+  it("should reject a Unix path traversal attack (../../etc/passwd)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "../../etc/passwd" }).success).toBe(false);
+  });
+
+  it("should reject a Windows backslash path traversal (..\\..\\ variant)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "sounds\\..\\..\\secrets.txt" }).success).toBe(false);
   });
 
   it("should reject an empty string filePath", () => {

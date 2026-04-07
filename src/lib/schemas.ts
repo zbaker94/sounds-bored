@@ -29,7 +29,13 @@ export type RetriggerMode = z.infer<typeof RetriggerModeSchema>;
 export const SoundSchema = z.object({
   id: z.string(),
   name: z.string(),
-  filePath: z.string().min(1).optional(),  // absolute path when present
+  filePath: z
+    .string()
+    .min(1)
+    .refine((p) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(p), {
+      message: "filePath must not contain path traversal sequences (..)",
+    })
+    .optional(),  // absolute path on disk; optional for sounds awaiting download
   folderId: z.string().optional(),         // GlobalFolder ID — null for manually added sounds
   sourceUrl: z.string().optional(),        // original web URL for yt-dlp re-download
   tags: z.array(z.string()),               // Tag IDs — resolve against global library
@@ -202,7 +208,12 @@ export type Project = z.infer<typeof ProjectSchema>;
 
 export const GlobalFolderSchema = z.object({
   id: z.uuid(),
-  path: z.string().min(1),   // absolute path on disk
+  path: z
+    .string()
+    .min(1)
+    .refine((p) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(p), {
+      message: "path must not contain path traversal sequences (..)",
+    }),  // absolute path on disk
   name: z.string().min(1),   // display name
 });
 
