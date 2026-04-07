@@ -27,7 +27,9 @@
       "Bash(gh pr:*)",
       "Bash(gh auth:*)",
       "Bash(grep -E \"\\\\.ts$\")",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(python -c \"import json,sys; m=json.load\\(sys.stdin\\); [print\\(p['manifest_path']\\) for p in m['packages'] if 'shell' in p['name']]\")"
     ]
   },
   "enableAllProjectMcpServers": true,

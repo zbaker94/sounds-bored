@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Tightened shell permissions: removed broad `shell:allow-execute` and `shell:default` capabilities, keeping only the minimum required (`allow-spawn`, `allow-kill`)
 - Sound file paths and folder paths are now validated to block path traversal attacks (e.g., `../../etc/passwd`), preventing malicious project files from accessing files outside their intended directories.
 - Fixed a bug where crossfade selection incorrectly tracked the target pad as volume-transitioning after completing a crossfade
 - Improved fade mode behavior: non-fadeable pads (hold-mode pads, mixed-mode pads) now explicitly show as "invalid" when selected during crossfade, making their ineligibility clearer
