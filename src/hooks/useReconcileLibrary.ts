@@ -15,6 +15,7 @@ export function useReconcileLibrary(): {
 
   const settings = useAppSettingsStore((s) => s.settings);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
+  const clearDirtyFlag = useLibraryStore((s) => s.clearDirtyFlag);
   const setMissingState = useLibraryStore((s) => s.setMissingState);
   const { mutate: saveLibrary } = useSaveGlobalLibrary();
 
@@ -51,12 +52,16 @@ export function useReconcileLibrary(): {
       if (useLibraryStore.getState().isDirty) {
         const latest = useLibraryStore.getState();
         saveLibraryRef.current({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+        // Clear immediately so a rapid second refresh doesn't hit the dirty
+        // window while the async mutation is still in flight. useSaveGlobalLibrary
+        // also calls clearDirtyFlag in onSuccess as the authoritative clear.
+        clearDirtyFlag();
       }
     } finally {
       isReconcilingRef.current = false;
       setIsReconciling(false);
     }
-  }, [settings, updateLibrary, setMissingState]);
+  }, [settings, updateLibrary, clearDirtyFlag, setMissingState]);
 
   return { reconcile, isReconciling };
 }

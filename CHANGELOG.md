@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a race condition where rapidly rescanning the sound library could cause unsaved changes to be lost
 - Added a **Refresh** button to the sound library panel that rescans your folders for new or removed audio files on demand
 - The sound library now automatically rescans your folders when the app loads, so newly added files appear without manual intervention
 - The app now clearly communicates that project save locations and watched folders must be within Music, Documents, Downloads, or Desktop — hints appear in the Save Project dialog, Settings, sound library empty state, and missing file/folder resolution dialogs.
