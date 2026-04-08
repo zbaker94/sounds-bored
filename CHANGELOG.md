@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pads with no assigned layers are now correctly recognized as disabled
 - Pads now track sound health state — each pad reports "ok", "partial", or "disabled" based on whether its assigned sounds exist in the library
 - Orphaned sound references are automatically cleaned from pad layers when sounds are removed from the library
 - The app can now identify which pads and layers are affected when specific sounds go missing

@@ -121,6 +121,11 @@ describe("getPadSoundState", () => {
 
     expect(getPadSoundState(pad, new Set(["gone"]))).toBe("partial");
   });
+
+  it("returns 'disabled' when pad has no layers", () => {
+    const pad = createMockPad({ layers: [] });
+    expect(getPadSoundState(pad, new Set())).toBe("disabled");
+  });
 });
 
 // ── getAffectedPads ───────────────────────────────────────────────────────────
