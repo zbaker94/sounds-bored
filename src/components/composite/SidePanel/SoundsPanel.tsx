@@ -1,8 +1,11 @@
 import { useState, useMemo, useEffect, useRef, memo, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { exists, remove } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
@@ -29,6 +32,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   FolderMusicIcon,
   Folder01Icon,
+  FolderOpenIcon,
   ChevronRight,
   Music,
   Add01Icon,
@@ -40,6 +44,7 @@ import {
   LockIcon,
   Alert02Icon,
   Download04Icon,
+  Delete02Icon,
   RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder, Sound, Tag } from "@/lib/schemas";
@@ -130,6 +135,8 @@ export function SoundsPanel() {
   const { data: settings } = useAppSettings();
   const folders = settings?.globalFolders ?? EMPTY_FOLDERS;
 
+  const removeGlobalFolder = useAppSettingsStore((s) => s.removeGlobalFolder);
+
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
 
@@ -145,6 +152,15 @@ export function SoundsPanel() {
 
   const [selectedId, setSelectedId] = useState<string | null>(
     folders[0]?.id ?? sets[0]?.id ?? null,
+  );
+
+  const selectedFolder = useMemo(
+    () => folders.find((f) => f.id === selectedId) ?? null,
+    [folders, selectedId],
+  );
+
+  const isSelectedFolderAssigned = !!selectedId && (
+    selectedId === settings?.downloadFolderId || selectedId === settings?.importFolderId
   );
 
   const soundsForSelectedId = useMemo(
@@ -230,7 +246,19 @@ export function SoundsPanel() {
     if (!settings) return;
     setIsBulkRemoving(true);
     try {
-      const folderIdsToRemove = new globalThis.Set(allMissingFolders.map((f) => f.id));
+      const storeSettings = useAppSettingsStore.getState().settings;
+      const assignedIds = new globalThis.Set(
+        [storeSettings?.downloadFolderId, storeSettings?.importFolderId].filter(Boolean) as string[],
+      );
+      const safeToRemove = allMissingFolders.filter((f) => !assignedIds.has(f.id));
+      const skippedCount = allMissingFolders.length - safeToRemove.length;
+      const folderIdsToRemove = new globalThis.Set(safeToRemove.map((f) => f.id));
+      if (folderIdsToRemove.size === 0) {
+        if (skippedCount > 0) {
+          toast.warning(`${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`);
+        }
+        return;
+      }
       const updatedSettings = {
         ...settings,
         globalFolders: settings.globalFolders.filter((f) => !folderIdsToRemove.has(f.id)),
@@ -250,11 +278,112 @@ export function SoundsPanel() {
       toast.success(
         `${folderIdsToRemove.size} missing folder${folderIdsToRemove.size > 1 ? "s" : ""} and ${soundIdsToRemove.size} sound${soundIdsToRemove.size !== 1 ? "s" : ""} removed`,
       );
+      if (skippedCount > 0) {
+        toast.warning(`${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`);
+      }
     } catch {
       toast.error("Failed to remove missing folders");
     } finally {
       setIsBulkRemoving(false);
       setConfirmRemoveFoldersOpen(false);
+    }
+  }
+
+  // ── Folder delete from disk handler ────────────────────────────────────────
+
+  async function handleDeleteFolderFromDisk() {
+    if (!selectedFolder) return;
+    // Use a single store snapshot to avoid TOCTOU between query cache and store.
+    const storeSettings = useAppSettingsStore.getState().settings;
+    if (!storeSettings) return;
+    // Double-check: UI disables this button when assigned, but guard here in case
+    // the folder was assigned (e.g. via SettingsDialog) while the confirm dialog was open.
+    if (storeSettings.downloadFolderId === selectedFolder.id || storeSettings.importFolderId === selectedFolder.id) {
+      toast.error("Cannot delete: folder is assigned as download or import destination");
+      setConfirmDeleteFolderOpen(false);
+      return;
+    }
+    const folderId = selectedFolder.id;
+    const folderName = selectedFolder.name;
+    const folderPath = selectedFolder.path;
+    setIsDeletingFolder(true);
+    try {
+      // Update store and persist before touching disk — if persistence fails,
+      // the user retains their files and can retry.
+      const folderSoundIds = sounds.filter((s) => s.folderId === folderId).map((s) => s.id);
+      for (const id of folderSoundIds) evictBuffer(id);
+      updateLibrary((draft) => {
+        draft.sounds = draft.sounds.filter((s) => s.folderId !== folderId);
+      });
+      removeGlobalFolder(folderId);
+      const settingsAfterRemove = useAppSettingsStore.getState().settings;
+      if (settingsAfterRemove) {
+        await saveSettings(settingsAfterRemove);
+      }
+      const latest = useLibraryStore.getState();
+      await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      const updatedFolders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+      const missingResult = await checkMissingStatus(updatedFolders, latest.sounds);
+      useLibraryStore.getState().setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
+      // Disk deletion last — data is already cleaned up; a failure here is recoverable.
+      const folderExists = await exists(folderPath);
+      if (folderExists) {
+        await remove(folderPath, { recursive: true });
+      }
+      setSelectedId(null);
+      toast.success(`Folder "${folderName}" deleted from disk`);
+    } catch {
+      toast.error("Failed to delete folder from disk");
+    } finally {
+      setIsDeletingFolder(false);
+      setConfirmDeleteFolderOpen(false);
+    }
+  }
+
+  // ── Sounds delete from disk handler ────────────────────────────────────────
+
+  async function handleDeleteSoundsFromDisk() {
+    setIsDeletingSounds(true);
+    try {
+      const count = selectedSoundIds.size;
+      const soundsToDelete = sounds.filter((s) => selectedSoundIds.has(s.id));
+      let deletedFromDisk = 0;
+      let failedCount = 0;
+      for (const sound of soundsToDelete) {
+        // Only attempt disk deletion for folder-backed sounds — their filePath is
+        // an absolute path built from the GlobalFolder.path. Sounds without a
+        // folderId may have non-absolute paths and are skipped for fs deletion.
+        if (sound.filePath && sound.folderId && !missingSoundIds.has(sound.id)) {
+          try {
+            await remove(sound.filePath);
+            deletedFromDisk++;
+          } catch {
+            failedCount++;
+          }
+        }
+        evictBuffer(sound.id);
+      }
+      updateLibrary((draft) => {
+        draft.sounds = draft.sounds.filter((s) => !selectedSoundIds.has(s.id));
+      });
+      const latest = useLibraryStore.getState();
+      await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      const currentFolders = useAppSettingsStore.getState().settings?.globalFolders ?? [];
+      const missingResult = await checkMissingStatus(currentFolders, latest.sounds);
+      useLibraryStore.getState().setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
+      setSelectedSoundIds(new globalThis.Set());
+      if (failedCount > 0) {
+        toast.warning(`${deletedFromDisk} of ${count} file${count > 1 ? "s" : ""} deleted; ${failedCount} could not be removed from disk`);
+      } else if (deletedFromDisk < count) {
+        toast.success(`${count} removed from library (${deletedFromDisk} deleted from disk)`);
+      } else {
+        toast.success(`${count} sound${count > 1 ? "s" : ""} deleted from disk`);
+      }
+    } catch {
+      toast.error("Failed to delete sounds from disk");
+    } finally {
+      setIsDeletingSounds(false);
+      setConfirmDeleteSoundsFromDiskOpen(false);
     }
   }
 
@@ -274,7 +403,11 @@ export function SoundsPanel() {
   const folderWasResolved = useRef(false);
   const [confirmRemoveSoundsOpen, setConfirmRemoveSoundsOpen] = useState(false);
   const [confirmRemoveFoldersOpen, setConfirmRemoveFoldersOpen] = useState(false);
+  const [confirmDeleteFolderOpen, setConfirmDeleteFolderOpen] = useState(false);
+  const [confirmDeleteSoundsFromDiskOpen, setConfirmDeleteSoundsFromDiskOpen] = useState(false);
   const [isBulkRemoving, setIsBulkRemoving] = useState(false);
+  const [isDeletingFolder, setIsDeletingFolder] = useState(false);
+  const [isDeletingSounds, setIsDeletingSounds] = useState(false);
   const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -401,6 +534,20 @@ export function SoundsPanel() {
       setSelectedSoundIds(new globalThis.Set());
     } else {
       setSelectedSoundIds(new globalThis.Set(selectableIds));
+    }
+  }
+
+  async function handleOpenFolderInExplorer() {
+    if (!selectedFolder) return;
+    try {
+      const folderExists = await exists(selectedFolder.path);
+      if (!folderExists) {
+        toast.error("Folder no longer exists on disk");
+        return;
+      }
+      await openPath(selectedFolder.path);
+    } catch {
+      toast.error("Failed to open folder");
     }
   }
 
@@ -552,31 +699,67 @@ export function SoundsPanel() {
           <div
             className={cn(panelClass, "flex-1 border border-white overflow-y-auto flex flex-col")}
           >
-            {folders.length > 0 && (
-              <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 text-xs px-2"
-                  onClick={reconcile}
-                  disabled={isReconciling}
-                  aria-label="Refresh folders"
-                >
-                  <HugeiconsIcon icon={RefreshIcon} size={12} className={isReconciling ? "animate-spin" : undefined} />
-                  {isReconciling ? "Scanning..." : "Refresh"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 text-xs px-2"
-                  onClick={handleAddFolder}
-                  disabled={isAddingFolder}
-                >
-                  <HugeiconsIcon icon={Add01Icon} size={12} />
-                  {isAddingFolder ? "Adding..." : "Add Folder"}
-                </Button>
-              </div>
-            )}
+            <div className="sticky top-0 z-10 flex items-center gap-2 p-2 bg-black/70 backdrop-blur-sm border-b border-white/20 shrink-0">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={reconcile}
+                disabled={isReconciling}
+                aria-label="Refresh folders"
+              >
+                <HugeiconsIcon icon={RefreshIcon} size={12} className={isReconciling ? "animate-spin" : undefined} />
+                {isReconciling ? "Scanning..." : "Refresh"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={handleAddFolder}
+                disabled={isAddingFolder}
+              >
+                <HugeiconsIcon icon={Add01Icon} size={12} />
+                {isAddingFolder ? "Adding..." : "Add Folder"}
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      disabled={selectedFolder === null}
+                      onClick={handleOpenFolderInExplorer}
+                    >
+                      <HugeiconsIcon icon={FolderOpenIcon} size={12} />
+                      Open
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Open in Explorer</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      disabled={selectedFolder === null || isSelectedFolderAssigned}
+                      onClick={() => setConfirmDeleteFolderOpen(true)}
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={12} />
+                      Delete
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isSelectedFolderAssigned
+                    ? "Cannot delete: folder is assigned as download or import destination"
+                    : "Delete folder from disk"}
+                </TooltipContent>
+              </Tooltip>
+            </div>
             {allMissingFolders.length > 0 && (
               <div className="flex items-center gap-1.5 px-2 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-xs shrink-0">
                 <HugeiconsIcon icon={Alert02Icon} size={12} />
@@ -702,6 +885,15 @@ export function SoundsPanel() {
               onClick={() => setAddTagsOpen(true)}
             >
               <HugeiconsIcon icon={Tag01Icon} size={12} /> Manage Tags
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 text-xs px-2"
+              disabled={selectedSoundIds.size === 0}
+              onClick={() => setConfirmDeleteSoundsFromDiskOpen(true)}
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={12} /> Delete from Disk
             </Button>
           </div>
           {allMissingSounds.length > 0 && (
@@ -872,7 +1064,7 @@ export function SoundsPanel() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleRemoveAllMissingSounds} disabled={isBulkRemoving}>
-              {isBulkRemoving ? "Removing…" : `Remove ${allMissingSounds.length} Sound${allMissingSounds.length > 1 ? "s" : ""}`}
+              {isBulkRemoving ? "Removing..." : `Remove ${allMissingSounds.length} Sound${allMissingSounds.length > 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -898,7 +1090,51 @@ export function SoundsPanel() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleRemoveAllMissingFolders} disabled={isBulkRemoving}>
-              {isBulkRemoving ? "Removing…" : `Remove ${allMissingFolders.length} Folder${allMissingFolders.length > 1 ? "s" : ""}`}
+              {isBulkRemoving ? "Removing..." : `Remove ${allMissingFolders.length} Folder${allMissingFolders.length > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete folder from disk */}
+      <Dialog open={confirmDeleteFolderOpen} onOpenChange={setConfirmDeleteFolderOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Folder from Disk</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the folder{" "}
+              <strong>{selectedFolder?.name ?? ""}</strong> and ALL files inside it from disk,
+              and remove all associated sounds from your library. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteFolderOpen(false)} disabled={isDeletingFolder}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteFolderFromDisk} disabled={isDeletingFolder}>
+              {isDeletingFolder ? "Deleting..." : "Delete from Disk"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete sounds from disk */}
+      <Dialog open={confirmDeleteSoundsFromDiskOpen} onOpenChange={setConfirmDeleteSoundsFromDiskOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Sounds from Disk</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{selectedSoundIds.size}</strong> sound
+              {selectedSoundIds.size > 1 ? " files" : " file"} from disk and remove them from your library.
+              This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteSoundsFromDiskOpen(false)} disabled={isDeletingSounds}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSoundsFromDisk} disabled={isDeletingSounds}>
+              {isDeletingSounds ? "Deleting..." : `Delete ${selectedSoundIds.size} Sound${selectedSoundIds.size > 1 ? "s" : ""} from Disk`}
             </Button>
           </DialogFooter>
         </DialogContent>

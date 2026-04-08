@@ -1,5 +1,12 @@
 # Changelog
 
+## Current Changes
+- You can now delete sound folders and individual sound files directly from disk via the Sounds panel, with confirmation dialogs to prevent accidents
+- Folders assigned as download or import destinations are protected from deletion, with clear tooltips explaining why
+- Added "Open in Explorer" buttons to sound folders in both the Sounds panel and Settings, letting you quickly browse folder contents in your file manager
+- Recent projects on the Start screen now have buttons to remove entries from the recent list or permanently delete the project folder from disk
+- "Remove missing folders" now skips any folders assigned as download/import destinations and reports how many were skipped
+
 ## v1.3.4
 
 This release delivers a major visual overhaul to pad playback feedback — active pads now glow with yellow borders and drop-shadows, animate with a 3D card flip in edit mode, and transition colors and volume indicators smoothly — alongside several bug fixes resolving stale progress bar states, audio playback failures from incorrect CORS settings, and performance improvements through memoized gesture handlers.

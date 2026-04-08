@@ -1,4 +1,4 @@
-import { useProjectHistory } from "@/lib/history.queries";
+import { useProjectHistory, useSaveProjectHistory } from "@/lib/history.queries";
 import { useLoadProject, useLoadProjectFromPath, useCreateProject } from "@/lib/project.queries";
 import { useProjectStore } from "@/state/projectStore";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -8,9 +8,11 @@ import { useState, useCallback } from "react";
 import { Project, ProjectHistoryEntry } from "@/lib/schemas";
 import logo from "@/assets/sleeping knight-emblem.gif";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { exists } from "@tauri-apps/plugin-fs";
+import { exists, remove } from "@tauri-apps/plugin-fs";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { FolderOpenIcon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { FolderOpenIcon, Settings01Icon, Delete02Icon, FolderRemoveIcon } from "@hugeicons/core-free-icons";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 
@@ -21,7 +23,10 @@ export function StartScreen() {
   const loadProjectFromPathMutation = useLoadProjectFromPath();
   const createProjectMutation = useCreateProject();
   const navigate = useNavigate();
+  const saveHistoryMutation = useSaveProjectHistory();
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<ProjectHistoryEntry | null>(null);
+  const [isDeletingFromDisk, setIsDeletingFromDisk] = useState(false);
   const openOverlay = useUiStore((s) => s.openOverlay);
 
   // Common logic for navigating to main page after loading/creating a project
@@ -49,6 +54,54 @@ export function StartScreen() {
     const result = await loadProjectMutation.mutateAsync();
     if (result) {
       navigateToProject(result, false); // Existing projects are in permanent locations
+    }
+  };
+
+  const handleOpenProjectInExplorer = async (entry: ProjectHistoryEntry) => {
+    try {
+      const pathExists = await exists(entry.path);
+      if (!pathExists) {
+        toast.error("Project folder no longer exists at this location.");
+        return;
+      }
+      await openPath(entry.path);
+    } catch {
+      toast.error("Could not open project folder.");
+    }
+  };
+
+  const handleRemoveFromHistory = async (entry: ProjectHistoryEntry) => {
+    try {
+      const updated = recentProjects.filter((p) => p.path !== entry.path);
+      await saveHistoryMutation.mutateAsync(updated);
+    } catch {
+      toast.error("Could not remove project from history.");
+    }
+  };
+
+  const handleDeleteFromDisk = async () => {
+    const entry = confirmDeleteEntry;
+    if (!entry) return;
+    const currentPath = useProjectStore.getState().folderPath;
+    if (currentPath && entry.path === currentPath) {
+      toast.error("Cannot delete the currently loaded project.");
+      setConfirmDeleteEntry(null);
+      return;
+    }
+    setIsDeletingFromDisk(true);
+    try {
+      const pathExists = await exists(entry.path);
+      if (pathExists) {
+        await remove(entry.path, { recursive: true });
+      }
+      const updated = recentProjects.filter((p) => p.path !== entry.path);
+      await saveHistoryMutation.mutateAsync(updated);
+      setConfirmDeleteEntry(null);
+      toast.success(`"${entry.name}" deleted from disk.`);
+    } catch {
+      toast.error(`Could not delete "${entry.name}" from disk.`);
+    } finally {
+      setIsDeletingFromDisk(false);
     }
   };
 
@@ -118,21 +171,30 @@ export function StartScreen() {
                       <span className="ml-2 text-xs text-muted-foreground">{new Date(entry.date).toLocaleString()}</span>
                     </span>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const pathExists = await exists(entry.path);
-                          if (!pathExists) {
-                            toast.error("Project folder no longer exists at this location.");
-                            return;
-                          }
-                          await openPath(entry.path);
-                        } catch {
-                          toast.error("Could not open project folder.");
-                        }
-                      }} aria-label={`Open folder for ${entry.name}`}>
-                        <HugeiconsIcon icon={FolderOpenIcon} size={16} />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenProjectInExplorer(entry); }} aria-label={`Open folder for ${entry.name}`}>
+                            <HugeiconsIcon icon={FolderOpenIcon} size={16} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Open in Explorer</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" disabled={saveHistoryMutation.isPending} onClick={(e) => { e.stopPropagation(); handleRemoveFromHistory(entry); }} aria-label={`Remove ${entry.name} from history`}>
+                            <HugeiconsIcon icon={Delete02Icon} size={16} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Remove from recent list</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmDeleteEntry(entry); }} aria-label={`Delete ${entry.name} from disk`}>
+                            <HugeiconsIcon icon={FolderRemoveIcon} size={16} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete from disk</TooltipContent>
+                      </Tooltip>
                       <Button size="sm" onClick={() => handleLoad(entry)}>Load</Button>
                     </div>
                   </li>
@@ -140,6 +202,22 @@ export function StartScreen() {
               </ul>
         </CardContent>
       </Card>
+      <Dialog open={confirmDeleteEntry !== null} onOpenChange={(open) => { if (!open && !isDeletingFromDisk) setConfirmDeleteEntry(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project from Disk</DialogTitle>
+            <DialogDescription>
+              Permanently delete <strong>{confirmDeleteEntry?.name}</strong> and all its contents from disk? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteEntry(null)} disabled={isDeletingFromDisk}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteFromDisk} disabled={isDeletingFromDisk}>
+              {isDeletingFromDisk ? "Deleting..." : "Delete from Disk"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

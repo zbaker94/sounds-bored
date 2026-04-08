@@ -23,9 +23,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { TruncatedPath } from "@/components/ui/truncated-path";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Delete02Icon, FolderAddIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Delete02Icon, FolderAddIcon, FolderOpenIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { exists } from "@tauri-apps/plugin-fs";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import { toast } from "sonner";
@@ -98,6 +101,19 @@ function FoldersTab() {
     persist();
   }
 
+  async function handleOpenInExplorer(folder: GlobalFolder) {
+    try {
+      const folderExists = await exists(folder.path);
+      if (!folderExists) {
+        toast.error("Folder no longer exists at this location.");
+        return;
+      }
+      await openPath(folder.path);
+    } catch {
+      toast.error("Could not open folder in file explorer.");
+    }
+  }
+
   function handleRemoveFolder(folderId: string) {
     try {
       removeGlobalFolder(folderId);
@@ -160,6 +176,7 @@ function FoldersTab() {
             assigned={isAssigned(folder.id)}
             onRemove={() => handleRemoveFolder(folder.id)}
             onRename={(name) => handleRename(folder.id, name)}
+            onOpenInExplorer={() => handleOpenInExplorer(folder)}
           />
         ))}
         <Button
@@ -363,6 +380,7 @@ interface FolderRowProps {
   assigned: boolean;
   onRemove: () => void;
   onRename: (name: string) => void;
+  onOpenInExplorer: () => void;
 }
 
 function FolderRow({
@@ -370,6 +388,7 @@ function FolderRow({
   assigned,
   onRemove,
   onRename,
+  onOpenInExplorer,
 }: FolderRowProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(folder.name);
@@ -427,15 +446,37 @@ function FolderRow({
           className="block text-xs text-muted-foreground"
         />
       </div>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={onRemove}
-        disabled={assigned}
-        aria-label={`Remove ${folder.name}`}
-      >
-        <HugeiconsIcon icon={Delete02Icon} size={16} />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onOpenInExplorer}
+            aria-label={`Open ${folder.name} in file explorer`}
+          >
+            <HugeiconsIcon icon={FolderOpenIcon} size={16} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Open in Explorer</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onRemove}
+              disabled={assigned}
+              aria-label={`Remove ${folder.name}`}
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={16} />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {assigned ? "Cannot remove: folder is assigned as download or import destination" : "Remove folder"}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
