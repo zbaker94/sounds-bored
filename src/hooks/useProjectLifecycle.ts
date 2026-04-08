@@ -81,9 +81,10 @@ export function useProjectLifecycle() {
 
   useEffect(() => {
     if (!project) return;
-    // Stable key: a new project load resets this. We use name+lastSaved because
-    // the project object reference changes on every updateProject call.
-    const key = project.name + "|" + (project.lastSaved ?? "");
+    // Use folderPath as the dedup key — it is unique per project location and
+    // stable across updateProject calls (only changes on load/save-as).
+    // Falls back to name+lastSaved for temporary projects with no folderPath yet.
+    const key = folderPath ?? (project.name + "|" + (project.lastSaved ?? ""));
     if (cleanedProjectKeyRef.current === key) return;
     cleanedProjectKeyRef.current = key;
 
@@ -94,13 +95,13 @@ export function useProjectLifecycle() {
     if (removedCount > 0) {
       updateProject(cleaned);
     }
-  }, [project, updateProject]);
+  }, [project, folderPath, updateProject]);
 
   // Notify user if missing sounds are used in the loaded project
   useEffect(() => {
     if (!project || missingSoundIds.size === 0) return;
 
-    const projectKey = project.name + "|" + (project.lastSaved ?? "");
+    const projectKey = folderPath ?? (project.name + "|" + (project.lastSaved ?? ""));
     if (lastNotifiedProjectKey.current === projectKey) return;
     lastNotifiedProjectKey.current = projectKey;
 

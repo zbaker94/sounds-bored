@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where missing-sound warnings and cleanup could fire multiple times for the same project after edits
 - Added tests verifying that delete confirmation dialogs show which pads will be affected when deleting sounds or folders referenced by the current project.
 - Added tests confirming the impact section is hidden when no pads reference the sounds being deleted.
 - When deleting a sound folder or sounds from disk, the confirmation dialog now shows which pads and layers in your current project will be affected by the deletion.
