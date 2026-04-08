@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { useProjectStore } from "@/state/projectStore";
 import { Tabs, TabsList } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -63,9 +64,20 @@ export function SceneTabBar() {
                   items={sceneIds}
                   strategy={horizontalListSortingStrategy}
                 >
-                  {scenes.map((scene) => (
-                    <SceneTab key={scene.id} scene={scene} />
-                  ))}
+                  <AnimatePresence initial={false}>
+                    {scenes.map((scene) => (
+                      <motion.div
+                        key={scene.id}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -8 }}
+                        transition={{ duration: 0.15 }}
+                        layout
+                      >
+                        <SceneTab scene={scene} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </SortableContext>
               </DndContext>
             </TabsList>

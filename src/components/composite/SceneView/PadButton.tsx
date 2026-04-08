@@ -17,12 +17,13 @@ import type { PadFadeVisual } from "@/hooks/useFadeMode";
 interface PadButtonProps {
   pad: Pad;
   sceneId: string;
+  index?: number;
   onEditClick?: (pad: Pad) => void;
   fadeVisual?: PadFadeVisual;
   onFadeTap?: (padId: string) => void;
 }
 
-export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -178,58 +179,94 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
         </AnimatePresence>
         <motion.div
           className="w-full h-full"
-          style={{ rotateX: tiltEnabled ? rotateX : 0, rotateY: tiltEnabled ? rotateY : 0, transformPerspective: 600 }}
+          style={{ rotateX: tiltEnabled ? rotateX : 0, rotateY: tiltEnabled ? rotateY : 0, transformPerspective: 600, transformStyle: 'preserve-3d' }}
           whileTap={!editMode && fadeVisual === null ? { scale: 0.95 } : undefined}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onPointerDown={!editMode ? handleWrapperPointerDown : undefined}
         >
-        <button
-          {...(editMode
-            ? {}
-            : fadeVisual !== null
-              ? fadeHandlers
-              : gestureHandlers
-          )}
-          className={cn(
-            "relative w-full h-full rounded-xl overflow-hidden",
-            "flex items-center justify-center p-2",
-            "bg-card text-card-foreground",
-            "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
-            "text-sm font-semibold text-center select-none",
-            editMode
-              ? "border-2 border-dashed border-foreground/50 cursor-default"
-              : fadeVisual !== null
-                ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
-                : cn(
-                    "border-2 transition-all cursor-pointer",
-                    "hover:brightness-110",
-                    isPlaying
-                      ? "border-black drop-shadow-[0_5px_0px_rgba(0,0,0,1)]"
-                      : "border-black/20"
-                  )
-          )}
-          style={{ backgroundColor: pad.color ?? undefined }}
-        >
-          {/* Volume transition bar — shows for all automated and gesture-driven volume changes */}
-          {!editMode && showVolumeDisplay && (
-            <div
-              className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
-              style={{ height: `${displayVolume * 100}%` }}
-            />
-          )}
-          {/* Playback progress — normal mode only; renders on top of fill bar, slightly transparent */}
-          {!editMode && isPlaying && (
-            <div
-              className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
-              style={{ width: `${progress * 100}%` }}
-            />
-          )}
+          {/* Flip container — rotates to reveal back face (edit overlay) */}
+          <motion.div
+            className="relative w-full h-full"
+            animate={{ rotateY: editMode ? 180 : 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22, delay: index * 0.03 }}
+            style={{ transformStyle: 'preserve-3d' }}
+          >
+            {/* Front face — normal pad */}
+            <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
+              <button
+                {...(fadeVisual !== null ? fadeHandlers : gestureHandlers)}
+                className={cn(
+                  "relative w-full h-full rounded-xl overflow-hidden",
+                  "flex items-center justify-center p-2",
+                  "bg-card text-card-foreground",
+                  "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
+                  "text-sm font-semibold text-center select-none",
+                  fadeVisual !== null
+                    ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
+                    : cn(
+                        "border-2 transition-all cursor-pointer",
+                        "hover:brightness-110",
+                        isPlaying
+                          ? "border-black drop-shadow-[0_5px_0px_rgba(0,0,0,1)]"
+                          : "border-black/20"
+                      )
+                )}
+                style={{ backgroundColor: pad.color ?? undefined }}
+              >
+                {/* Volume transition bar */}
+                <AnimatePresence>
+                  {showVolumeDisplay && (
+                    <motion.div
+                      key="vol-bar"
+                      className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
+                      style={{ height: `${displayVolume * 100}%` }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                    />
+                  )}
+                </AnimatePresence>
+                {/* Playback progress */}
+                {isPlaying && (
+                  <div
+                    className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                )}
+                {/* Pad name + optional volume — volume wrapper grows/shrinks height so name drifts smoothly */}
+                <div className="relative z-10 flex flex-col items-center gap-0.5">
+                  <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
+                  <AnimatePresence>
+                    {showVolumeDisplay && (
+                      <motion.div
+                        key="vol-label"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: "hidden" }}
+                        className="flex justify-center"
+                      >
+                        <span className="text-xs font-bold tabular-nums">
+                          {Math.round(displayVolume * 100)}%
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </button>
+            </div>
 
-          {/* Edit mode overlay */}
-          {editMode && (
-            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-between p-1.5 pointer-events-none">
-              <div className="flex flex-col items-center gap-0.5 pointer-events-none">
+            {/* Back face — edit overlay */}
+            <div
+              className="absolute inset-0 rounded-xl overflow-hidden bg-card flex flex-col items-center justify-between p-1.5"
+              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
+            >
+              {/* Dark overlay for readability — sits on top of the pad color */}
+              <div className="absolute inset-0 bg-black/60" />
+              <div className="relative z-10 flex flex-col items-center gap-0.5">
                 <span className="text-white text-xs font-semibold line-clamp-2 text-center leading-tight">
                   {pad.name}
                 </span>
@@ -237,7 +274,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
                   {layerCount} {layerCount === 1 ? "layer" : "layers"}
                 </span>
               </div>
-              <div className="flex gap-1 pointer-events-auto">
+              <div className="relative z-10 flex gap-1">
                 <button
                   type="button"
                   aria-label="Edit pad"
@@ -264,20 +301,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
                 </button>
               </div>
             </div>
-          )}
-
-          {/* Pad name + optional volume — normal mode */}
-          {!editMode && (
-            <div className="relative z-10 flex flex-col items-center gap-0.5">
-              <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-              {showVolumeDisplay && (
-                <span className="text-xs font-bold tabular-nums">
-                  {Math.round(displayVolume * 100)}%
-                </span>
-              )}
-            </div>
-          )}
-        </button>
+          </motion.div>
         </motion.div>
       </div>
 

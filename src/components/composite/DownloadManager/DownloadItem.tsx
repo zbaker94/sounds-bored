@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Loading03Icon,
@@ -66,48 +67,59 @@ export function DownloadItem({ job }: DownloadItemProps) {
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
       <div className="shrink-0">
-        {job.status === "queued" && (
-          <HugeiconsIcon
-            icon={Loading03Icon}
-            size={14}
-            className="text-white/50 animate-spin"
-          />
-        )}
-        {job.status === "downloading" && (
-          <HugeiconsIcon
-            icon={Loading03Icon}
-            size={14}
-            className="text-primary animate-spin"
-          />
-        )}
-        {job.status === "processing" && (
-          <HugeiconsIcon
-            icon={Loading03Icon}
-            size={14}
-            className="text-primary animate-spin"
-          />
-        )}
-        {job.status === "completed" && (
-          <HugeiconsIcon
-            icon={CheckmarkCircle01Icon}
-            size={14}
-            className="text-green-500"
-          />
-        )}
-        {job.status === "failed" && (
-          <HugeiconsIcon
-            icon={Alert02Icon}
-            size={14}
-            className="text-destructive"
-          />
-        )}
-        {job.status === "cancelled" && (
-          <HugeiconsIcon
-            icon={Cancel01Icon}
-            size={14}
-            className="text-white/30"
-          />
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={job.status}
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.12 }}
+            style={{ display: "inline-flex" }}
+          >
+            {job.status === "queued" && (
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                size={14}
+                className="text-white/50 animate-spin"
+              />
+            )}
+            {job.status === "downloading" && (
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                size={14}
+                className="text-primary animate-spin"
+              />
+            )}
+            {job.status === "processing" && (
+              <HugeiconsIcon
+                icon={Loading03Icon}
+                size={14}
+                className="text-primary animate-spin"
+              />
+            )}
+            {job.status === "completed" && (
+              <HugeiconsIcon
+                icon={CheckmarkCircle01Icon}
+                size={14}
+                className="text-green-500"
+              />
+            )}
+            {job.status === "failed" && (
+              <HugeiconsIcon
+                icon={Alert02Icon}
+                size={14}
+                className="text-destructive"
+              />
+            )}
+            {job.status === "cancelled" && (
+              <HugeiconsIcon
+                icon={Cancel01Icon}
+                size={14}
+                className="text-white/30"
+              />
+            )}
+          </motion.span>
+        </AnimatePresence>
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">

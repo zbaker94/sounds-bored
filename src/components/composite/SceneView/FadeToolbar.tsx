@@ -1,3 +1,4 @@
+import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { VolumeHighIcon, ShuffleIcon } from "@hugeicons/core-free-icons";
@@ -9,14 +10,17 @@ interface FadeToolbarProps {
   // also consumes it for PadButton rendering (getPadFadeVisual, onPadTap). Calling
   // useFadeMode() twice would create two independent state machines.
   fadeMode: UseFadeModeReturn;
-  editMode: boolean;
 }
 
-export function FadeToolbar({ fadeMode, editMode }: FadeToolbarProps) {
-  if (editMode) return null;
-
+export function FadeToolbar({ fadeMode }: FadeToolbarProps) {
   return (
-    <div className="flex items-center gap-2 shrink-0">
+    <motion.div
+      className="flex items-center gap-2 shrink-0"
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.15 }}
+    >
       <Button
         variant={fadeMode.mode === "fade" ? "default" : "ghost"}
         size="sm"
@@ -47,11 +51,20 @@ export function FadeToolbar({ fadeMode, editMode }: FadeToolbarProps) {
         Crossfade
         <Kbd className="ml-1">X</Kbd>
       </Button>
-      {fadeMode.statusLabel && (
-        <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-black/50 text-white border border-white/20">
-          {fadeMode.statusLabel}
-        </span>
-      )}
-    </div>
+      <AnimatePresence>
+        {fadeMode.statusLabel && (
+          <motion.span
+            key="status-label"
+            className="text-xs font-medium px-2.5 py-1 rounded-full bg-black/50 text-white border border-white/20"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ duration: 0.15 }}
+          >
+            {fadeMode.statusLabel}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

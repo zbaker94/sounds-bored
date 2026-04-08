@@ -21,22 +21,15 @@ function makeFadeMode(overrides: Partial<UseFadeModeReturn> = {}): UseFadeModeRe
 }
 
 describe("FadeToolbar", () => {
-  it("renders nothing when editMode is true", () => {
-    const { container } = render(
-      <FadeToolbar fadeMode={makeFadeMode()} editMode={true} />,
-    );
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("renders Fade and Crossfade buttons when editMode is false", () => {
-    render(<FadeToolbar fadeMode={makeFadeMode()} editMode={false} />);
+  it("renders Fade and Crossfade buttons", () => {
+    render(<FadeToolbar fadeMode={makeFadeMode()} />);
     expect(screen.getByRole("button", { name: "Fade pad" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Crossfade pads" })).toBeInTheDocument();
   });
 
   it("calls enterFade when Fade button is clicked and mode is null", async () => {
     const enterFade = vi.fn();
-    render(<FadeToolbar fadeMode={makeFadeMode({ enterFade })} editMode={false} />);
+    render(<FadeToolbar fadeMode={makeFadeMode({ enterFade })} />);
     await userEvent.click(screen.getByRole("button", { name: "Fade pad" }));
     expect(enterFade).toHaveBeenCalledOnce();
   });
@@ -46,7 +39,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: "fade", cancel })}
-        editMode={false}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Fade pad" }));
@@ -57,7 +49,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: null, hasPlayingPads: false })}
-        editMode={false}
       />,
     );
     expect(screen.getByRole("button", { name: "Crossfade pads" })).toBeDisabled();
@@ -68,7 +59,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: null, hasPlayingPads: true, enterCrossfade })}
-        editMode={false}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Crossfade pads" }));
@@ -80,7 +70,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: "crossfade", canExecute: true, execute })}
-        editMode={false}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Crossfade pads" }));
@@ -92,7 +81,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: "crossfade", canExecute: false, cancel })}
-        editMode={false}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Crossfade pads" }));
@@ -103,7 +91,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ statusLabel: "Select pad to fade out" })}
-        editMode={false}
       />,
     );
     expect(screen.getByText("Select pad to fade out")).toBeInTheDocument();
@@ -111,7 +98,7 @@ describe("FadeToolbar", () => {
 
   it("does not render status label when statusLabel is null", () => {
     render(
-      <FadeToolbar fadeMode={makeFadeMode({ statusLabel: null })} editMode={false} />,
+      <FadeToolbar fadeMode={makeFadeMode({ statusLabel: null })} />,
     );
     expect(screen.queryByText(/select pad/i)).not.toBeInTheDocument();
   });
@@ -120,7 +107,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: null, hasPlayingPads: true })}
-        editMode={false}
       />,
     );
     expect(screen.getByRole("button", { name: "Crossfade pads" })).toBeEnabled();
@@ -130,7 +116,6 @@ describe("FadeToolbar", () => {
     render(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: "crossfade", hasPlayingPads: false })}
-        editMode={false}
       />,
     );
     expect(screen.getByRole("button", { name: "Crossfade pads" })).toBeEnabled();
@@ -138,7 +123,7 @@ describe("FadeToolbar", () => {
 
   it("Fade button uses default variant when mode is 'fade'", () => {
     render(
-      <FadeToolbar fadeMode={makeFadeMode({ mode: "fade" })} editMode={false} />,
+      <FadeToolbar fadeMode={makeFadeMode({ mode: "fade" })} />,
     );
     expect(screen.getByRole("button", { name: "Fade pad" })).toHaveAttribute(
       "data-variant",
@@ -148,7 +133,7 @@ describe("FadeToolbar", () => {
 
   it("Fade button uses ghost variant when mode is not 'fade'", () => {
     render(
-      <FadeToolbar fadeMode={makeFadeMode({ mode: null })} editMode={false} />,
+      <FadeToolbar fadeMode={makeFadeMode({ mode: null })} />,
     );
     expect(screen.getByRole("button", { name: "Fade pad" })).toHaveAttribute(
       "data-variant",
