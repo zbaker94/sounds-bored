@@ -70,18 +70,13 @@ download_ffmpeg_windows() {
   chmod +x "$dest"
 }
 
-# macOS — evermeet.cx (arm64 and x64 zips, each containing just the binary)
+# macOS — Homebrew (most reliable in CI; works for both arm64 and x86_64)
 download_ffmpeg_macos() {
   local arch="$1" triple="$2"
   local dest="$BINARIES_DIR/ffmpeg-$triple"
-  echo "  ffmpeg: evermeet.cx $arch -> ffmpeg-$triple"
-  local zip="$TMPDIR_LOCAL/ffmpeg-macos-$arch.zip"
-  if [ "$arch" = "arm64" ]; then
-    curl -sSfL "https://evermeet.cx/ffmpeg/getrelease/arm64/ffmpeg/zip" -o "$zip"
-  else
-    curl -sSfL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o "$zip"
-  fi
-  unzip -p "$zip" "ffmpeg" > "$dest"
+  echo "  ffmpeg: homebrew -> ffmpeg-$triple"
+  brew install --quiet ffmpeg 2>/dev/null || true
+  cp "$(brew --prefix)/bin/ffmpeg" "$dest"
   chmod +x "$dest"
 }
 
