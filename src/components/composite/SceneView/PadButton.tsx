@@ -130,15 +130,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
 
   const layerCount = pad.layers.length;
 
-  const fadeHandlers = {
+  const fadeHandlers = useMemo(() => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.currentTarget.setPointerCapture(e.pointerId);
       onFadeTap?.(pad.id);
     },
-  };
+  }), [onFadeTap, pad.id]);
 
-  const fadeVisualClass = (() => {
+  const fadeVisualClass = useMemo(() => {
     switch (fadeVisual) {
       case "crossfade-out":   return "border-amber-400";
       case "crossfade-in":    return "border-emerald-400";
@@ -147,7 +147,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
       case "invalid":         return "opacity-40 pointer-events-none";
       default:                return null;
     }
-  })();
+  }, [fadeVisual]);
 
   return (
     <>

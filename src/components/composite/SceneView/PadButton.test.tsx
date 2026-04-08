@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
-import { usePlaybackStore } from "@/state/playbackStore";
+import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
@@ -45,7 +45,7 @@ describe("PadButton", () => {
   beforeEach(() => {
     useUiStore.setState({ ...initialUiState });
     useProjectStore.setState({ ...initialProjectState });
-    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
+    usePlaybackStore.setState({ ...initialPlaybackState });
     // Make setPadVolume mock update the store, matching real padPlayer behaviour
     vi.mocked(setPadVolume).mockImplementation((padId: string, volume: number) => {
       usePlaybackStore.getState().updatePadVolume(padId, Math.max(0, Math.min(1, volume)));
@@ -272,6 +272,7 @@ describe("PadButton — fade visual states", () => {
     renderPadWithFadeVisual("invalid");
     const btn = screen.getByRole("button", { name: "Kick" });
     expect(btn.className).toMatch(/opacity-40/);
+    expect(btn.className).toMatch(/pointer-events-none/);
   });
 
   it("calls onFadeTap with pad.id on pointer down when fadeVisual is set", async () => {
@@ -289,6 +290,63 @@ describe("PadButton — fade visual states", () => {
     const btn = screen.getByRole("button", { name: "Kick" });
     await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
     expect(onFadeTap).not.toHaveBeenCalled();
+  });
+});
+
+describe("PadButton — fade visual correctness after re-render", () => {
+  beforeEach(() => {
+    useUiStore.setState({ ...initialUiState });
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    HTMLButtonElement.prototype.setPointerCapture = vi.fn();
+  });
+
+  it("fadeVisualClass remains correct after unrelated playback state change", () => {
+    const pad = loadPadInStore();
+    const { rerender } = render(
+      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />
+    );
+
+    act(() => {
+      usePlaybackStore.getState().addPlayingPad("unrelated-pad");
+    });
+
+    rerender(<PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />);
+
+    expect(screen.getByRole("button", { name: "Kick" }).className).toMatch(/border-amber/);
+  });
+
+  // Verifies behavioral correctness after a re-render — does not assert referential identity.
+  it("fadeHandlers.onPointerDown still calls onFadeTap with correct padId after re-render", async () => {
+    const onFadeTap = vi.fn();
+    const pad = loadPadInStore();
+    const { rerender } = render(
+      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-in" onFadeTap={onFadeTap} />
+    );
+
+    act(() => {
+      usePlaybackStore.getState().addPlayingPad("unrelated-pad");
+    });
+
+    rerender(
+      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-in" onFadeTap={onFadeTap} />
+    );
+
+    await userEvent.pointer({ target: screen.getByRole("button", { name: "Kick" }), keys: "[MouseLeft]" });
+    expect(onFadeTap).toHaveBeenCalledTimes(1);
+    expect(onFadeTap).toHaveBeenCalledWith("pad-1");
+  });
+
+  it("fadeVisualClass updates when fadeVisual prop changes", () => {
+    const pad = loadPadInStore();
+    const { rerender } = render(
+      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />
+    );
+
+    rerender(<PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-in" />);
+
+    expect(screen.getByRole("button", { name: "Kick" }).className).toMatch(/border-emerald/);
+    expect(screen.getByRole("button", { name: "Kick" }).className).not.toMatch(/border-amber/);
   });
 });
 
