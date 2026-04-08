@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pads now track sound health state — each pad reports "ok", "partial", or "disabled" based on whether its assigned sounds exist in the library
+- Orphaned sound references are automatically cleaned from pad layers when sounds are removed from the library
+- The app can now identify which pads and layers are affected when specific sounds go missing
 - Pads with missing sounds now appear dimmed and unclickable, preventing accidental triggers
 - A warning icon appears on pads and individual layers when some (but not all) sounds are missing
 - Orphaned sound references are automatically cleaned up when a project loads or the sound library refreshes
