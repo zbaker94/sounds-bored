@@ -7,7 +7,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useFieldArray, useFormContext } from "react-hook-form";
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -15,10 +15,17 @@ import {
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Alert02Icon } from "@hugeicons/core-free-icons";
 import type { PadConfigForm } from "@/lib/schemas";
 import { LayerConfigSection } from "./LayerConfigSection";
 import { createDefaultLayer } from "./constants";
+import { useLibraryStore } from "@/state/libraryStore";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+type LayerWarning = {
+  isEmpty: boolean;       // instances array is empty (layer is inert after auto-clean)
+  missingNames: string[]; // display names of sounds that are in library but missing from disk
+};
 
 interface SortableLayerItemProps {
   fieldId: string;
@@ -29,6 +36,7 @@ interface SortableLayerItemProps {
   onOpenChange: (open: boolean) => void;
   shouldScrollIntoView?: boolean;
   onScrollComplete?: () => void;
+  warning: LayerWarning;
 }
 
 function SortableLayerItem({
@@ -40,6 +48,7 @@ function SortableLayerItem({
   onOpenChange,
   shouldScrollIntoView,
   onScrollComplete,
+  warning,
 }: SortableLayerItemProps) {
   const {
     attributes,
@@ -108,6 +117,22 @@ function SortableLayerItem({
               Layer {index + 1}
             </button>
           </CollapsibleTrigger>
+
+          {/* Warning icon — shown when layer has missing or empty sounds */}
+          {(warning.isEmpty || warning.missingNames.length > 0) && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="shrink-0">
+                  <HugeiconsIcon icon={Alert02Icon} size={14} className="text-amber-400" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {warning.isEmpty
+                  ? "No sounds assigned to this layer."
+                  : `Missing sounds: ${warning.missingNames.join(", ")}`}
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Remove button */}
           <button
@@ -188,6 +213,24 @@ export function LayerAccordion() {
 
   const layerIds = useMemo(() => fieldIdKey.split(",").filter(Boolean), [fieldIdKey]);
 
+  const watchedLayers = useWatch({ control, name: "layers" }) as PadConfigForm["layers"];
+  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
+  const sounds = useLibraryStore((s) => s.sounds);
+  const soundById = useMemo(() => new Map(sounds.map((s) => [s.id, s])), [sounds]);
+
+  const layerWarnings = useMemo<LayerWarning[]>(
+    () =>
+      (watchedLayers ?? []).map((layer) => {
+        if (layer.selection.type !== "assigned") return { isEmpty: false, missingNames: [] };
+        if (layer.selection.instances.length === 0) return { isEmpty: true, missingNames: [] };
+        const missingNames = layer.selection.instances
+          .filter((inst) => missingSoundIds.has(inst.soundId))
+          .map((inst) => soundById.get(inst.soundId)?.name ?? "Unknown");
+        return { isEmpty: false, missingNames };
+      }),
+    [watchedLayers, missingSoundIds, soundById],
+  );
+
   return (
     <div className="flex flex-col gap-2">
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -207,6 +250,7 @@ export function LayerAccordion() {
                 onOpenChange={(open) => handleOpenChange(field.rhfId, open)}
                 shouldScrollIntoView={pendingScrollId === field.rhfId}
                 onScrollComplete={() => setPendingScrollId(null)}
+                warning={layerWarnings[i] ?? { isEmpty: false, missingNames: [] }}
               />
             ))}
           </div>

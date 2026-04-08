@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Layers with missing or empty sounds now show a warning icon in the pad config drawer, with a tooltip explaining which sounds are missing or that no sounds are assigned
 - Pads with missing sounds can now be selected as crossfade targets in fade mode (previously they were fully disabled and unclickable)
 - The missing-sound warning icon on pads is now slightly larger (16px instead of 12px) for better visibility
 - Pads with missing sound files are now visually disabled (dimmed, unclickable) when all assigned sounds are unavailable
