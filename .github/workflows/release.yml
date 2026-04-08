@@ -139,6 +139,8 @@ jobs:
       - name: Download sidecar binaries
         shell: bash
         run: bash scripts/download-yt-dlp.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

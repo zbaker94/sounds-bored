@@ -27,7 +27,10 @@ mkdir -p "$BINARIES_DIR"
 
 echo "Fetching latest yt-dlp release..."
 # grep -o extracts the key+value pair regardless of whitespace around the colon
-YTDLP_VERSION=$(curl -sSfL "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest" \
+# Pass Authorization header if GITHUB_TOKEN is set (avoids 403 rate-limit in CI)
+YTDLP_VERSION=$(curl -sSfL \
+  ${GITHUB_TOKEN:+-H "Authorization: token $GITHUB_TOKEN"} \
+  "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest" \
   | grep -o '"tag_name"\s*:\s*"[^"]*"' \
   | grep -o '"[^"]*"$' \
   | tr -d '"')
