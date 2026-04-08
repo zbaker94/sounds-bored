@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Added tests verifying that delete confirmation dialogs show which pads will be affected when deleting sounds or folders referenced by the current project.
+- Added tests confirming the impact section is hidden when no pads reference the sounds being deleted.
 - When deleting a sound folder or sounds from disk, the confirmation dialog now shows which pads and layers in your current project will be affected by the deletion.
 - Fixed missing sound names in layer warnings to show the sound ID instead of "Unknown" when the sound name cannot be found
 - Layers with missing or empty sounds now show a warning icon in the pad config drawer, with a tooltip explaining which sounds are missing or that no sounds are assigned

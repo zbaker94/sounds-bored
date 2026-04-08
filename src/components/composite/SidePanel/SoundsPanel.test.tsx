@@ -4,11 +4,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SoundsPanel } from "./SoundsPanel";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import {
   createMockSound,
   createMockGlobalFolder,
   createMockAppSettings,
   createMockSet,
+  createMockProject,
+  createMockScene,
+  createMockPad,
+  createMockLayer,
+  createMockSoundInstance,
 } from "@/test/factories";
 
 // Mock Tauri dialog (tauri-mocks.ts already mocks plugin-dialog globally,
@@ -85,6 +91,7 @@ function renderPanel(queryClient?: QueryClient) {
 
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
+  useProjectStore.setState({ ...initialProjectState });
   vi.mocked(useAppSettings).mockReturnValue({
     data: createMockAppSettings(),
     isLoading: false,
@@ -521,5 +528,116 @@ describe("SoundsPanel", () => {
 
     const addToSetBtn = screen.getByRole("button", { name: /add to set/i });
     expect(addToSetBtn).not.toBeDisabled();
+  });
+
+  describe("impact preview in delete dialogs", () => {
+    it("shows affected pads in folder delete dialog when project references folder sounds", async () => {
+      const folder = createMockGlobalFolder({ id: "folder-1", name: "Drums" });
+      const sound = createMockSound({ id: "kick-id", name: "Kick", folderId: "folder-1" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      const inst = createMockSoundInstance({ soundId: "kick-id" });
+      const layer = createMockLayer({ selection: { type: "assigned", instances: [inst] } });
+      const pad = createMockPad({ name: "Kick Pad", layers: [layer] });
+      const scene = createMockScene({ name: "Scene 1", pads: [pad] });
+      const project = createMockProject({ scenes: [scene] });
+      useProjectStore.setState({
+        ...initialProjectState,
+        project,
+        folderPath: "/some/path",
+        historyEntry: { name: "Test", path: "/some/path", date: new Date().toISOString() },
+      });
+
+      // Folder is not used as download/import destination
+      vi.mocked(useAppSettings).mockReturnValue({
+        data: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other-id", importFolderId: "other-id2" },
+        isLoading: false,
+        isError: false,
+      } as unknown as ReturnType<typeof useAppSettings>);
+
+      renderPanel();
+
+      // folder is auto-selected (first folder) — click the Delete button
+      const deleteBtn = screen.getByRole("button", { name: /^delete$/i });
+      await act(async () => {
+        fireEvent.click(deleteBtn);
+      });
+
+      expect(screen.getByText("Affects this project:")).toBeInTheDocument();
+      expect(screen.getByText('"Kick Pad"')).toBeInTheDocument();
+    });
+
+    it("shows affected pads in sounds delete dialog when project references selected sounds", async () => {
+      const sound = createMockSound({ id: "snare-id", name: "Snare" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      const inst = createMockSoundInstance({ soundId: "snare-id" });
+      const layer = createMockLayer({ selection: { type: "assigned", instances: [inst] } });
+      const pad = createMockPad({ name: "Snare Pad", layers: [layer] });
+      const scene = createMockScene({ name: "Scene 1", pads: [pad] });
+      const project = createMockProject({ scenes: [scene] });
+      useProjectStore.setState({
+        ...initialProjectState,
+        project,
+        folderPath: "/some/path",
+        historyEntry: { name: "Test", path: "/some/path", date: new Date().toISOString() },
+      });
+
+      vi.mocked(useAppSettings).mockReturnValue({
+        data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+        isLoading: false,
+        isError: false,
+      } as unknown as ReturnType<typeof useAppSettings>);
+
+      renderPanel();
+
+      // Select the sound via checkbox
+      const checkbox = screen.getByRole("checkbox");
+      await act(async () => {
+        fireEvent.click(checkbox);
+      });
+
+      // Click "Delete from Disk" button
+      const deleteFromDiskBtn = screen.getByRole("button", { name: /delete from disk/i });
+      await act(async () => {
+        fireEvent.click(deleteFromDiskBtn);
+      });
+
+      expect(screen.getByText("Affects this project:")).toBeInTheDocument();
+      expect(screen.getByText('"Snare Pad"')).toBeInTheDocument();
+    });
+
+    it("does not show impact section in sounds delete dialog when no pads reference the sounds", async () => {
+      const sound = createMockSound({ id: "unused-id", name: "Unused" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+      // No project pads reference "unused-id"
+      const project = createMockProject({ scenes: [] });
+      useProjectStore.setState({
+        ...initialProjectState,
+        project,
+        folderPath: "/some/path",
+        historyEntry: { name: "Test", path: "/some/path", date: new Date().toISOString() },
+      });
+
+      vi.mocked(useAppSettings).mockReturnValue({
+        data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+        isLoading: false,
+        isError: false,
+      } as unknown as ReturnType<typeof useAppSettings>);
+
+      renderPanel();
+
+      const checkbox = screen.getByRole("checkbox");
+      await act(async () => {
+        fireEvent.click(checkbox);
+      });
+
+      const deleteFromDiskBtn = screen.getByRole("button", { name: /delete from disk/i });
+      await act(async () => {
+        fireEvent.click(deleteFromDiskBtn);
+      });
+
+      expect(screen.queryByText("Affects this project:")).not.toBeInTheDocument();
+    });
   });
 });
