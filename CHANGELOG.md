@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.4.0
+
+This release overhauls how the app handles missing and deleted sounds — pads now visually indicate when sounds are unavailable, stale references are automatically cleaned up on load, and delete confirmations show exactly which pads and layers will be affected before you confirm. You can also delete sound folders and files directly from the Sounds panel, open folders in Explorer from both the panel and Settings, and manage recent projects from the Start screen with new remove and delete options.
+
 - Fixed a bug where missing-sound warnings and cleanup could fire multiple times for the same project after edits
 - Added tests verifying that delete confirmation dialogs show which pads will be affected when deleting sounds or folders referenced by the current project.
 - Added tests confirming the impact section is hidden when no pads reference the sounds being deleted.
