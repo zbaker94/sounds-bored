@@ -171,7 +171,7 @@ describe("SoundsPanel", () => {
     vi.mocked(open).mockResolvedValueOnce(null);
 
     renderPanel();
-    const btn = screen.getByRole("button", { name: /add folder/i });
+    const btn = screen.getAllByRole("button", { name: /add folder/i })[0];
     await act(async () => {
       fireEvent.click(btn);
     });

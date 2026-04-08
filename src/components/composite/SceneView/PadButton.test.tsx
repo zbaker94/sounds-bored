@@ -232,7 +232,14 @@ describe("PadButton", () => {
 import type { PadFadeVisual } from "@/hooks/useFadeMode";
 
 function renderPadWithFadeVisual(fadeVisual: PadFadeVisual, onFadeTap = vi.fn()) {
-  const pad = loadPadInStore();
+  // Use a tag-based layer so getPadSoundState returns "ok" (not "disabled"),
+  // allowing fadeVisualClass to be applied rather than the unplayable override.
+  const pad = loadPadInStore({
+    layers: [createMockLayer({
+      id: "layer-1",
+      selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
+    })],
+  });
   return render(
     <PadButton
       pad={pad}
@@ -302,7 +309,7 @@ describe("PadButton — fade visual correctness after re-render", () => {
   });
 
   it("fadeVisualClass remains correct after unrelated playback state change", () => {
-    const pad = loadPadInStore();
+    const pad = loadPadInStore({ layers: [createMockLayer({ id: "layer-1", selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })] });
     const { rerender } = render(
       <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />
     );
@@ -338,7 +345,7 @@ describe("PadButton — fade visual correctness after re-render", () => {
   });
 
   it("fadeVisualClass updates when fadeVisual prop changes", () => {
-    const pad = loadPadInStore();
+    const pad = loadPadInStore({ layers: [createMockLayer({ id: "layer-1", selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })] });
     const { rerender } = render(
       <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />
     );
