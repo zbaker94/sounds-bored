@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Added visual warning indicators on pads when assigned sounds are missing from disk, so broken pads are immediately visible without needing to trigger them
+- Pads where all assigned sounds are missing are now automatically disabled to prevent silent playback failures
+- Delete confirmation dialogs now show which pads and layers will be affected before you confirm a deletion
+- Stale sound references are automatically cleaned up when loading a project or refreshing the library
+- Per-layer warnings in the pad config drawer identify exactly which sounds are missing or unassigned
 - You can now delete sound folders and individual sound files directly from disk via the Sounds panel, with confirmation dialogs to prevent accidents
 - Folders assigned as download or import destinations are protected from deletion, with clear tooltips explaining why
 - Added "Open in Explorer" buttons to sound folders in both the Sounds panel and Settings, letting you quickly browse folder contents in your file manager
