@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Pads with missing sounds now appear dimmed and unclickable, preventing accidental triggers
+- A warning icon appears on pads and individual layers when some (but not all) sounds are missing
+- Orphaned sound references are automatically cleaned up when a project loads or the sound library refreshes
+- Delete confirmation dialogs now show which pads and layers will be affected before you confirm
 - Added visual warning indicators on pads when assigned sounds are missing from disk, so broken pads are immediately visible without needing to trigger them
 - Pads where all assigned sounds are missing are now automatically disabled to prevent silent playback failures
 - Delete confirmation dialogs now show which pads and layers will be affected before you confirm a deletion
