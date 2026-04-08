@@ -51,6 +51,8 @@ vi.mock("@/lib/library.reconcile", () => ({
 
 const mockAudioInstances: Array<{
   src: string;
+  crossOrigin: string;
+  crossOriginSetter: ReturnType<typeof vi.fn>;
   currentTime: number;
   loop: boolean;
   pause: ReturnType<typeof vi.fn>;
@@ -60,6 +62,14 @@ const mockAudioInstances: Array<{
 
 vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any, src?: string) {
   this.src = src ?? "";
+  let _crossOrigin = "";
+  const crossOriginSetter = vi.fn((val: string) => { _crossOrigin = val; });
+  Object.defineProperty(this, "crossOrigin", {
+    get: () => _crossOrigin,
+    set: crossOriginSetter,
+    configurable: true,
+  });
+  this.crossOriginSetter = crossOriginSetter;
   this.currentTime = 0;
   this.loop = false;
   this.pause = vi.fn();
@@ -779,6 +789,24 @@ describe("streaming path (large files)", () => {
     // Retrigger with continue — the layer skips (already playing), tracking must survive
     await triggerPad(pad);
     expect(isPadStreaming(pad.id)).toBe(true);
+  });
+
+  it("does not set crossOrigin on the Audio element for local asset:// URLs", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "ambient.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+
+    expect(mockAudioInstances).toHaveLength(1);
+    expect(mockAudioInstances[0].crossOriginSetter).not.toHaveBeenCalled();
   });
 });
 

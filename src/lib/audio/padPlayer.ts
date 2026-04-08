@@ -533,7 +533,6 @@ async function startLayerSound(
       // loadedmetadata fires; getPadProgress reads it directly from the element.
       const url = convertFileSrc(sound.filePath!);
       audio = new Audio();
-      audio.crossOrigin = "anonymous";
       audio.src = url;
       if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode)) {
         audio.loop = true;
