@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pads with missing sound files are now visually disabled (dimmed, unclickable) when all assigned sounds are unavailable
+- Pads with only some missing sounds show a warning icon; hovering it explains which sounds need attention
 - Fixed a bug where orphan sound cleanup could run repeatedly when the sound library changed, improving stability on project load
 - Stale sound references are now automatically removed from pads when a project loads or the sound library is reconciled, keeping project data consistent with the available library.
 - Pads with no assigned layers are now correctly recognized as disabled

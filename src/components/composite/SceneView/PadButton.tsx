@@ -5,11 +5,14 @@ import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
+import { useLibraryStore } from "@/state/libraryStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { getPadProgress, stopPad } from "@/lib/audio/padPlayer";
+import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { PencilEdit01Icon, Copy01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { PencilEdit01Icon, Copy01Icon, Delete02Icon, Alert02Icon } from "@hugeicons/core-free-icons";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { PadFadeVisual } from "@/hooks/useFadeMode";
@@ -149,6 +152,13 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
 
   const layerCount = pad.layers.length;
 
+  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
+  const padSoundState = useMemo(
+    () => getPadSoundState(pad, missingSoundIds),
+    [pad, missingSoundIds],
+  );
+  const isUnplayable = padSoundState === "disabled";
+
   const fadeHandlers = useMemo(() => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
@@ -216,21 +226,24 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
               <button
                 aria-label={pad.name}
                 {...(fadeVisual !== null ? fadeHandlers : gestureHandlers)}
+                disabled={isUnplayable}
                 className={cn(
                   "relative w-full h-full rounded-xl overflow-hidden",
                   "flex items-center justify-center p-2",
                   "bg-card text-card-foreground",
                   "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
                   "text-sm font-semibold text-center select-none",
-                  fadeVisual !== null
-                    ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
-                    : cn(
-                        "border-2 transition-all cursor-pointer",
-                        "hover:brightness-110",
-                        isPlaying
-                          ? "border-yellow-400"
-                          : "border-black/20"
-                      )
+                  isUnplayable
+                    ? "opacity-40 pointer-events-none border-2 border-black/20"
+                    : fadeVisual !== null
+                      ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
+                      : cn(
+                          "border-2 transition-all cursor-pointer",
+                          "hover:brightness-110",
+                          isPlaying
+                            ? "border-yellow-400"
+                            : "border-black/20"
+                        )
                 )}
                 style={{
                   backgroundColor: isPlaying ? "#000" : (pad.color ?? undefined),
@@ -276,6 +289,18 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                   )}
                 </div>
               </button>
+              {padSoundState === "partial" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute bottom-1 right-1 z-20 pointer-events-auto">
+                      <HugeiconsIcon icon={Alert02Icon} size={12} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Some assigned sounds are missing from the library. Open pad settings to review.
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
 
             {/* Back face — edit overlay */}
