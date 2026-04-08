@@ -90,6 +90,40 @@ describe("checkIsLargeFile", () => {
       expect.objectContaining({ method: "HEAD" }),
     );
   });
+
+  describe("fileSizeBytes fast path", () => {
+    it("returns true when fileSizeBytes is at threshold — no fetch", async () => {
+      const sound = createMockSound({ filePath: "big.wav", fileSizeBytes: LARGE });
+      expect(await checkIsLargeFile(sound)).toBe(true);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns true when fileSizeBytes is above threshold — no fetch", async () => {
+      const sound = createMockSound({ filePath: "huge.wav", fileSizeBytes: LARGE + 1024 });
+      expect(await checkIsLargeFile(sound)).toBe(true);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns false when fileSizeBytes is below threshold — no fetch", async () => {
+      const sound = createMockSound({ filePath: "small.mp3", fileSizeBytes: SMALL });
+      expect(await checkIsLargeFile(sound)).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("caches the fast-path result — second call also skips fetch", async () => {
+      const sound = createMockSound({ filePath: "big.wav", fileSizeBytes: LARGE });
+      await checkIsLargeFile(sound);
+      await checkIsLargeFile(sound);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("falls back to HEAD request when fileSizeBytes is undefined", async () => {
+      mockFetch.mockResolvedValue(headResponse(SMALL));
+      const sound = createMockSound({ filePath: "unknown.mp3" });
+      expect(await checkIsLargeFile(sound)).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("evictSizeCache", () => {

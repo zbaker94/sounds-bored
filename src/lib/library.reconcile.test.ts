@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reconcileGlobalLibrary, checkMissingStatus } from "./library.reconcile";
 import { mockFs, mockPath } from "@/test/tauri-mocks";
 import { createMockGlobalFolder } from "@/test/factories";
 import { Sound } from "./schemas";
+
+// Extend mockFs with stat (not in the shared mock yet)
+const mockStat = vi.fn();
+(mockFs as Record<string, unknown>).stat = mockStat;
 
 // Helper to create a Sound for testing
 function createSound(overrides: Partial<Sound> & { id: string; name: string }): Sound {
@@ -37,6 +41,10 @@ describe("reconcileGlobalLibrary", () => {
 
     // Default: all paths exist (folders and files)
     mockFs.exists.mockResolvedValue(true);
+
+    // Default: stat returns a size of 1024 bytes
+    mockStat.mockReset();
+    mockStat.mockResolvedValue({ size: 1024, isFile: true, isDirectory: false, isSymlink: false });
   });
 
   describe("discovering new sounds", () => {
@@ -242,6 +250,7 @@ describe("reconcileGlobalLibrary", () => {
         name: "kick",
         filePath: "/music/samples/kick.wav",
         folderId: "folder-original",
+        fileSizeBytes: 1024,
       });
 
       mockReadDir({
@@ -309,6 +318,7 @@ describe("reconcileGlobalLibrary", () => {
         name: "kick",
         filePath: "/music/kick.wav",
         folderId: "f1",
+        fileSizeBytes: 1024,
       });
 
       mockReadDir({ "/music": [fileEntry("kick.wav")] });
@@ -378,6 +388,124 @@ describe("reconcileGlobalLibrary", () => {
 
       expect(result.missingFolderIds).toContain("f1");
       expect(result.missingSoundIds.size).toBe(0);
+    });
+  });
+
+  describe("fileSizeBytes population", () => {
+    it("should populate fileSizeBytes on new sounds from stat", async () => {
+      const folder = createMockGlobalFolder({ path: "/music/samples" });
+      mockReadDir({
+        "/music/samples": [
+          fileEntry("kick.wav"),
+          fileEntry("snare.mp3"),
+        ],
+      });
+
+      mockStat.mockImplementation((path: string) => {
+        if (path === "/music/samples/kick.wav") return Promise.resolve({ size: 2048 });
+        if (path === "/music/samples/snare.mp3") return Promise.resolve({ size: 4096 });
+        return Promise.resolve({ size: 1024 });
+      });
+
+      const result = await reconcileGlobalLibrary([folder], []);
+
+      expect(result.sounds).toHaveLength(2);
+      expect(result.sounds[0].fileSizeBytes).toBe(2048);
+      expect(result.sounds[1].fileSizeBytes).toBe(4096);
+    });
+
+    it("should backfill fileSizeBytes on existing sounds missing it", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const existingSound = createSound({
+        id: "s1",
+        name: "kick",
+        filePath: "/music/kick.wav",
+        folderId: "f1",
+      });
+
+      mockReadDir({ "/music": [fileEntry("kick.wav")] });
+      mockStat.mockResolvedValue({ size: 5000 });
+
+      const result = await reconcileGlobalLibrary([folder], [existingSound]);
+
+      expect(result.changed).toBe(true);
+      expect(result.sounds[0].id).toBe("s1");
+      expect(result.sounds[0].fileSizeBytes).toBe(5000);
+    });
+
+    it("should not overwrite existing fileSizeBytes on sounds that already have it", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const existingSound = createSound({
+        id: "s1",
+        name: "kick",
+        filePath: "/music/kick.wav",
+        folderId: "f1",
+        fileSizeBytes: 9999,
+      });
+
+      mockReadDir({ "/music": [fileEntry("kick.wav")] });
+      mockStat.mockResolvedValue({ size: 5000 });
+
+      const result = await reconcileGlobalLibrary([folder], [existingSound]);
+
+      expect(result.sounds[0].fileSizeBytes).toBe(9999);
+      // stat should not have been called for this sound since it already has fileSizeBytes
+    });
+
+    it("should handle stat failure gracefully for new sounds", async () => {
+      const folder = createMockGlobalFolder({ path: "/music" });
+      mockReadDir({
+        "/music": [
+          fileEntry("kick.wav"),
+          fileEntry("snare.mp3"),
+        ],
+      });
+
+      mockStat.mockImplementation((path: string) => {
+        if (path === "/music/kick.wav") return Promise.reject(new Error("Permission denied"));
+        return Promise.resolve({ size: 4096 });
+      });
+
+      const result = await reconcileGlobalLibrary([folder], []);
+
+      expect(result.sounds).toHaveLength(2);
+      // kick.wav stat failed — no fileSizeBytes
+      expect(result.sounds[0].fileSizeBytes).toBeUndefined();
+      // snare.mp3 stat succeeded
+      expect(result.sounds[1].fileSizeBytes).toBe(4096);
+    });
+
+    it("should handle stat failure gracefully for existing sounds backfill", async () => {
+      const existingSound = createSound({
+        id: "s1",
+        name: "kick",
+        filePath: "/music/kick.wav",
+        folderId: "f1",
+      });
+
+      mockStat.mockRejectedValue(new Error("File not accessible"));
+
+      const result = await reconcileGlobalLibrary([], [existingSound]);
+
+      expect(result.sounds).toHaveLength(1);
+      expect(result.sounds[0].id).toBe("s1");
+      expect(result.sounds[0].fileSizeBytes).toBeUndefined();
+    });
+
+    it("should backfill fileSizeBytes on existing sounds even without folder scan", async () => {
+      // Sound exists in library but no folders are configured — stat backfill should still run
+      const existingSound = createSound({
+        id: "s1",
+        name: "kick",
+        filePath: "/some/path/kick.wav",
+      });
+
+      mockStat.mockResolvedValue({ size: 3333 });
+
+      const result = await reconcileGlobalLibrary([], [existingSound]);
+
+      expect(result.changed).toBe(true);
+      expect(result.sounds[0].fileSizeBytes).toBe(3333);
     });
   });
 

@@ -24,6 +24,14 @@ export async function checkIsLargeFile(sound: Sound): Promise<boolean> {
   if (!sound.filePath) return false;
   if (sizeCache.has(sound.id)) return sizeCache.get(sound.id)!;
 
+  // Fast path: use pre-populated file size from schema (populated at reconcile/download time)
+  if (sound.fileSizeBytes !== undefined) {
+    const isLarge = sound.fileSizeBytes >= LARGE_FILE_THRESHOLD_BYTES;
+    sizeCache.set(sound.id, isLarge);
+    return isLarge;
+  }
+
+  // Slow path: fall back to HTTP HEAD request (first trigger before reconcile runs)
   const url = convertFileSrc(sound.filePath);
   let isLarge = false;
   try {
