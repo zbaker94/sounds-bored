@@ -1,5 +1,9 @@
 # Changelog
 
+## Current Changes
+- Pad buttons with an "invalid" fade state are now non-interactive (pointer events disabled), preventing accidental clicks
+- Fixed a performance issue where fade state and handlers were being recalculated on every render instead of only when their dependencies change
+
 ## v1.3.3
 
 This release brings meaningful reliability improvements to audio playback and the sound library: gain node memory leaks are fixed, missing files are now detected and flagged during playback, and errors surface as toast notifications instead of silent failures. The sound library also gains automatic rescanning on startup, an on-demand Refresh button, and smarter folder scanning that skips inaccessible locations gracefully while preserving any custom tags, names, or sets you've already added.
