@@ -225,7 +225,7 @@ jobs:
           RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
 
       - name: Upload Windows build to itch.io
-        uses: Ayowel/butler-to-itch.io@v1.0.0
+        uses: Ayowel/butler-to-itch@v1
         with:
           butler-key: ${{ secrets.BUTLER_API_KEY }}
           itch-user: zbaker5
@@ -235,7 +235,7 @@ jobs:
           version: ${{ needs.prepare.outputs.version }}
 
       - name: Upload macOS build to itch.io
-        uses: Ayowel/butler-to-itch.io@v1.0.0
+        uses: Ayowel/butler-to-itch@v1
         with:
           butler-key: ${{ secrets.BUTLER_API_KEY }}
           itch-user: zbaker5
@@ -245,7 +245,7 @@ jobs:
           version: ${{ needs.prepare.outputs.version }}
 
       - name: Upload Linux build to itch.io
-        uses: Ayowel/butler-to-itch.io@v1.0.0
+        uses: Ayowel/butler-to-itch@v1
         with:
           butler-key: ${{ secrets.BUTLER_API_KEY }}
           itch-user: zbaker5
