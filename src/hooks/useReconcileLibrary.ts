@@ -4,6 +4,8 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
+import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
+import { useProjectStore } from "@/state/projectStore";
 
 // Module-level singleton: ensures at most one reconcile runs at a time across
 // all hook instances (e.g. MainPage and SoundsPanel both mount concurrently).
@@ -72,6 +74,17 @@ export function useReconcileLibrary(): {
         useLibraryStore.getState().sounds,
       );
       setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
+
+      // Auto-clean orphan soundIds from any loaded project.
+      // Reads state imperatively to avoid stale closure over project/sounds.
+      const currentProject = useProjectStore.getState().project;
+      if (currentProject) {
+        const latestSounds = useLibraryStore.getState().sounds;
+        const { project: cleaned, removedCount } = reconcileProjectSounds(currentProject, latestSounds);
+        if (removedCount > 0) {
+          useProjectStore.getState().updateProject(cleaned);
+        }
+      }
 
       if (useLibraryStore.getState().isDirty) {
         const latest = useLibraryStore.getState();

@@ -9,6 +9,7 @@ import { discardTemporaryProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
+import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
 
 /**
  * Manages the window close lifecycle for MainPage:
@@ -20,6 +21,8 @@ export function useProjectLifecycle() {
   const folderPath = useProjectStore((s) => s.folderPath);
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const isDirty = useProjectStore((s) => s.isDirty);
+  const updateProject = useProjectStore((s) => s.updateProject);
+  const sounds = useLibraryStore((s) => s.sounds);
   const navigate = useNavigate();
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
@@ -74,6 +77,22 @@ export function useProjectLifecycle() {
   const handleCancelClose = () => {
     closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
   };
+
+  const cleanedProjectKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!project) return;
+    // Stable key: a new project load resets this. We use name+lastSaved because
+    // the project object reference changes on every updateProject call.
+    const key = project.name + (project.lastSaved ?? "");
+    if (cleanedProjectKeyRef.current === key) return;
+    cleanedProjectKeyRef.current = key;
+
+    const { project: cleaned, removedCount } = reconcileProjectSounds(project, sounds);
+    if (removedCount > 0) {
+      updateProject(cleaned);
+    }
+  }, [project, sounds, updateProject]);
 
   // Notify user if missing sounds are used in the loaded project
   useEffect(() => {

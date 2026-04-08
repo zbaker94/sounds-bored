@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Stale sound references are now automatically removed from pads when a project loads or the sound library is reconciled, keeping project data consistent with the available library.
 - Pads with no assigned layers are now correctly recognized as disabled
 - Pads now track sound health state — each pad reports "ok", "partial", or "disabled" based on whether its assigned sounds exist in the library
 - Orphaned sound references are automatically cleaned from pad layers when sounds are removed from the library
