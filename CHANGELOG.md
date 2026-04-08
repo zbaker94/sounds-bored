@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.3.4
+
+This release delivers a major visual overhaul to pad playback feedback — active pads now glow with yellow borders and drop-shadows, animate with a 3D card flip in edit mode, and transition colors and volume indicators smoothly — alongside several bug fixes resolving stale progress bar states, audio playback failures from incorrect CORS settings, and performance improvements through memoized gesture handlers.
+
 - Playing pad indicator now includes a yellow drop-shadow glow on the entire button, and the pulse ring follows the pad's 3D tilt animation when pressed
 - Pad buttons now display a more prominent glowing border animation when playing (thicker, extends slightly beyond the button edge)
 - Active pads turn black with white text while playing, with a smooth 0.7s color transition
