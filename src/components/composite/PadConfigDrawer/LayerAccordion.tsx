@@ -225,7 +225,7 @@ export function LayerAccordion() {
         if (layer.selection.instances.length === 0) return { isEmpty: true, missingNames: [] };
         const missingNames = layer.selection.instances
           .filter((inst) => missingSoundIds.has(inst.soundId))
-          .map((inst) => soundById.get(inst.soundId)?.name ?? "Unknown");
+          .map((inst) => soundById.get(inst.soundId)?.name ?? inst.soundId);
         return { isEmpty: false, missingNames };
       }),
     [watchedLayers, missingSoundIds, soundById],

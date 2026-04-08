@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
@@ -7,7 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PadConfigSchema } from "@/lib/schemas";
 import type { PadConfigForm } from "@/lib/schemas";
 import { LayerAccordion } from "./LayerAccordion";
-import { createMockLayer } from "@/test/factories";
+import { createMockLayer, createMockSoundInstance, createMockSound } from "@/test/factories";
+import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@dnd-kit/sortable", () => ({
   useSortable: () => ({
@@ -59,15 +61,20 @@ function Wrapper({ defaultValues }: { defaultValues: PadConfigForm }) {
     defaultValues,
   });
   return (
-    <FormProvider {...methods}>
-      <form>
-        <LayerAccordion />
-      </form>
-    </FormProvider>
+    <TooltipProvider>
+      <FormProvider {...methods}>
+        <form>
+          <LayerAccordion />
+        </form>
+      </FormProvider>
+    </TooltipProvider>
   );
 }
 
 describe("LayerAccordion", () => {
+  beforeEach(() => {
+    useLibraryStore.setState({ ...initialLibraryState });
+  });
   it("renders a label for each layer", () => {
     const layers = [createMockLayer(), createMockLayer(), createMockLayer()];
     render(<Wrapper defaultValues={makeDefaultValues(layers)} />);
@@ -129,5 +136,41 @@ describe("LayerAccordion", () => {
 
     expect(screen.getByText("Layer 2")).toBeInTheDocument();
     expect(screen.getByTestId("layer-config-1")).toBeInTheDocument();
+  });
+
+  describe("layer warnings", () => {
+    it("shows no warning icon on a clean layer", () => {
+      const sound = createMockSound({ id: "s1" });
+      useLibraryStore.setState({ sounds: [sound], missingSoundIds: new globalThis.Set<string>() });
+      const inst = createMockSoundInstance({ soundId: "s1" });
+      const layers = [createMockLayer({ selection: { type: "assigned", instances: [inst] } })];
+      render(<Wrapper defaultValues={makeDefaultValues(layers)} />);
+      expect(screen.queryByRole("img", { hidden: true })).not.toBeInTheDocument();
+    });
+
+    it("shows warning icon when layer instances is empty", () => {
+      const layers = [createMockLayer({ selection: { type: "assigned", instances: [] } })];
+      render(<Wrapper defaultValues={makeDefaultValues(layers)} />);
+      // The Alert02Icon renders as an SVG; we verify the tooltip trigger span is present
+      expect(document.querySelector(".text-amber-400")).toBeInTheDocument();
+    });
+
+    it("shows warning icon when layer has missing sounds", () => {
+      const sound = createMockSound({ id: "s-missing", name: "Kick 808" });
+      useLibraryStore.setState({
+        sounds: [sound],
+        missingSoundIds: new globalThis.Set(["s-missing"]),
+      });
+      const inst = createMockSoundInstance({ soundId: "s-missing" });
+      const layers = [createMockLayer({ selection: { type: "assigned", instances: [inst] } })];
+      render(<Wrapper defaultValues={makeDefaultValues(layers)} />);
+      expect(document.querySelector(".text-amber-400")).toBeInTheDocument();
+    });
+
+    it("does not show warning icon on tag or set layers", () => {
+      const layers = [createMockLayer({ selection: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 } })];
+      render(<Wrapper defaultValues={makeDefaultValues(layers)} />);
+      expect(document.querySelector(".text-amber-400")).not.toBeInTheDocument();
+    });
   });
 });
