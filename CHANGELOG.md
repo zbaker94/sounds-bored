@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Pad buttons now display a more prominent glowing border animation when playing (thicker, extends slightly beyond the button edge)
+- Active pads turn black with white text while playing, with a smooth 0.7s color transition
+- Playing pad borders highlight in yellow instead of black
+- Playback progress bar changed from dark overlay to a subtle white overlay
 - Progress bar now resets to 0 when a pad retriggers to the next sound, instead of briefly showing the previous sound's position
 - Fixed a bug where the progress bar could display stale progress during the moment between stopping one sound and loading the next
 - Pad volume display now fades out smoothly after release instead of disappearing abruptly

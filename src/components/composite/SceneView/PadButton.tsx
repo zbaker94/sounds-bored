@@ -188,7 +188,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
           {isPlaying && !editMode && (
             <motion.div
               key="pulse"
-              className="absolute inset-0 rounded-xl pointer-events-none border-2 border-white/60 z-10"
+              className="absolute -inset-1 rounded-xl pointer-events-none border-4 border-white/60 z-10"
               animate={{ opacity: [0.3, 0.8, 0.3] }}
               transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
               exit={{ opacity: 0 }}
@@ -227,11 +227,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                         "border-2 transition-all cursor-pointer",
                         "hover:brightness-110",
                         isPlaying
-                          ? "border-black drop-shadow-[0_5px_0px_rgba(0,0,0,1)]"
+                          ? "border-yellow-400 drop-shadow-[0_5px_0px_#FACC15]"
                           : "border-black/20"
                       )
                 )}
-                style={{ backgroundColor: pad.color ?? undefined }}
+                style={{
+                  backgroundColor: isPlaying ? "#000" : (pad.color ?? undefined),
+                  transition: "background-color 0.7s ease",
+                  color: isPlaying ? "#fff" : undefined,
+                }}
               >
                 {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
                 {showVolumeDisplay && (
@@ -246,7 +250,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                 {/* Playback progress */}
                 {isPlaying && (
                   <div
-                    className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
+                    className="absolute top-0 left-0 bottom-0 pointer-events-none bg-white/20"
                     style={{ width: `${progress * 100}%` }}
                   />
                 )}
