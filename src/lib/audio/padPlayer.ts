@@ -728,6 +728,10 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           // setOnEnded(null) nulled the cleanup callback — delete streaming entry explicitly.
           clearLayerStreamingAudio(pad.id, layer.id);
           stopLayerVoices(pad.id, layer.id);
+          // Clear progress immediately so the bar resets to 0 while the next
+          // buffer loads. Without this, stale padProgressInfo keeps advancing
+          // during the async gap and the bar shows the old sound's position.
+          clearPadProgressInfo(pad.id);
 
           if (layer.cycleMode && isChained(layer.arrangement)) {
             // Cycle mode + next: stop current sound, advance cycle cursor, play next.

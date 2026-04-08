@@ -869,6 +869,32 @@ describe("retrigger next", () => {
     expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
   });
 
+  it("sets padProgressInfo for the new sound after retrigger", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const { getPadProgressInfo } = await import("./audioState");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+    expect(getPadProgressInfo(pad.id)).not.toBeUndefined();
+
+    await triggerPad(pad); // A → B
+    await tick();
+    // padProgressInfo must be set (non-null) so the progress bar can advance
+    expect(getPadProgressInfo(pad.id)).not.toBeUndefined();
+  });
+
   it("stops without restart on a one-shot layer when queue is exhausted", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sounds = [

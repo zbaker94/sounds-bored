@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Progress bar now resets to 0 when a pad retriggers to the next sound, instead of briefly showing the previous sound's position
+- Fixed a bug where the progress bar could display stale progress during the moment between stopping one sound and loading the next
 - Pad volume display now fades out smoothly after release instead of disappearing abruptly
 - Fixed a one-frame volume jump when the volume indicator transitions from live to lingering display
 - Drag-and-drop pad reordering now works in both normal and edit mode (previously disabled outside edit mode)

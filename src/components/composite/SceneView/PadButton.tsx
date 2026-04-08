@@ -134,7 +134,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     if (isPlaying) {
       const animate = () => {
         const p = getPadProgress(pad.id);
-        if (p !== null) setProgress(p);
+        setProgress(p ?? 0);
         rafRef.current = requestAnimationFrame(animate);
       };
       rafRef.current = requestAnimationFrame(animate);
