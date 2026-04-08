@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Pads now flip with a 3D card animation when entering edit mode, revealing controls on the back face
+- Download queue items animate in and out smoothly when added or removed
+- Scene tabs animate when added or removed from the tab bar
+- The fade/crossfade toolbar slides in and out when toggling edit mode
+- Status indicators throughout the UI (download state icons, volume display, fade status label) now transition with subtle fade and scale animations
 - Fixed an audio playback bug where sounds could fail to play due to an unnecessary `crossOrigin = "anonymous"` setting on local audio files
 - Pad button gesture handlers are now memoized, preventing unnecessary re-renders and improving performance when interacting with pads.
 - Pad buttons with an "invalid" fade state are now non-interactive (pointer events disabled), preventing accidental clicks
