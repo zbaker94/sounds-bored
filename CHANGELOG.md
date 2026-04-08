@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When deleting a sound folder or sounds from disk, the confirmation dialog now shows which pads and layers in your current project will be affected by the deletion.
 - Fixed missing sound names in layer warnings to show the sound ID instead of "Unknown" when the sound name cannot be found
 - Layers with missing or empty sounds now show a warning icon in the pad config drawer, with a tooltip explaining which sounds are missing or that no sounds are assigned
 - Pads with missing sounds can now be selected as crossfade targets in fade mode (previously they were fully disabled and unclickable)

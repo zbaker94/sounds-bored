@@ -57,6 +57,8 @@ import { DownloadDialog } from "@/components/modals/DownloadDialog";
 import { DownloadItem } from "@/components/composite/DownloadManager/DownloadItem";
 import { useDownloadEventListener } from "@/lib/ytdlp.queries";
 import { useDownloadStore } from "@/state/downloadStore";
+import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
+import { useProjectStore } from "@/state/projectStore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -131,6 +133,7 @@ export function SoundsPanel() {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);
+  const project = useProjectStore((s) => s.project);
 
   const { data: settings } = useAppSettings();
   const folders = settings?.globalFolders ?? EMPTY_FOLDERS;
@@ -405,6 +408,8 @@ export function SoundsPanel() {
   const [confirmRemoveFoldersOpen, setConfirmRemoveFoldersOpen] = useState(false);
   const [confirmDeleteFolderOpen, setConfirmDeleteFolderOpen] = useState(false);
   const [confirmDeleteSoundsFromDiskOpen, setConfirmDeleteSoundsFromDiskOpen] = useState(false);
+  const [affectedPadsForFolderDelete, setAffectedPadsForFolderDelete] = useState<AffectedPad[]>([]);
+  const [affectedPadsForSoundsDelete, setAffectedPadsForSoundsDelete] = useState<AffectedPad[]>([]);
   const [isBulkRemoving, setIsBulkRemoving] = useState(false);
   const [isDeletingFolder, setIsDeletingFolder] = useState(false);
   const [isDeletingSounds, setIsDeletingSounds] = useState(false);
@@ -746,7 +751,17 @@ export function SoundsPanel() {
                       size="sm"
                       className="h-7 text-xs px-2"
                       disabled={selectedFolder === null || isSelectedFolderAssigned}
-                      onClick={() => setConfirmDeleteFolderOpen(true)}
+                      onClick={() => {
+                        if (selectedFolder && project) {
+                          const folderSoundIds = new globalThis.Set(
+                            sounds.filter((s) => s.folderId === selectedFolder.id).map((s) => s.id),
+                          );
+                          setAffectedPadsForFolderDelete(getAffectedPads(project, folderSoundIds));
+                        } else {
+                          setAffectedPadsForFolderDelete([]);
+                        }
+                        setConfirmDeleteFolderOpen(true);
+                      }}
                     >
                       <HugeiconsIcon icon={Delete02Icon} size={12} />
                       Delete
@@ -891,7 +906,14 @@ export function SoundsPanel() {
               size="sm"
               className="h-7 text-xs px-2"
               disabled={selectedSoundIds.size === 0}
-              onClick={() => setConfirmDeleteSoundsFromDiskOpen(true)}
+              onClick={() => {
+                if (project) {
+                  setAffectedPadsForSoundsDelete(getAffectedPads(project, selectedSoundIds));
+                } else {
+                  setAffectedPadsForSoundsDelete([]);
+                }
+                setConfirmDeleteSoundsFromDiskOpen(true);
+              }}
             >
               <HugeiconsIcon icon={Delete02Icon} size={12} /> Delete from Disk
             </Button>
@@ -1107,6 +1129,20 @@ export function SoundsPanel() {
               and remove all associated sounds from your library. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          {affectedPadsForFolderDelete.length > 0 && (
+            <div className="text-sm space-y-1">
+              <p className="font-medium text-amber-400">Affects this project:</p>
+              <ul className="space-y-0.5 text-muted-foreground">
+                {affectedPadsForFolderDelete.map((ap, i) => (
+                  <li key={i}>
+                    <span className="text-foreground">"{ap.padName}"</span>
+                    {" "}({ap.sceneName}) — Layer{ap.layerIndices.length > 1 ? "s" : ""}{" "}
+                    {ap.layerIndices.join(", ")}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmDeleteFolderOpen(false)} disabled={isDeletingFolder}>
               Cancel
@@ -1129,6 +1165,20 @@ export function SoundsPanel() {
               This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          {affectedPadsForSoundsDelete.length > 0 && (
+            <div className="text-sm space-y-1">
+              <p className="font-medium text-amber-400">Affects this project:</p>
+              <ul className="space-y-0.5 text-muted-foreground">
+                {affectedPadsForSoundsDelete.map((ap, i) => (
+                  <li key={i}>
+                    <span className="text-foreground">"{ap.padName}"</span>
+                    {" "}({ap.sceneName}) — Layer{ap.layerIndices.length > 1 ? "s" : ""}{" "}
+                    {ap.layerIndices.join(", ")}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmDeleteSoundsFromDiskOpen(false)} disabled={isDeletingSounds}>
               Cancel
