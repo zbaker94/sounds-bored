@@ -221,3 +221,28 @@ jobs:
             --notes-file release-notes.md
         env:
           RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+
+      - name: Install butler
+        run: |
+          curl -L -o butler.zip "https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default"
+          unzip butler.zip -d butler-bin
+          chmod +x butler-bin/butler
+          echo "$PWD/butler-bin" >> $GITHUB_PATH
+
+      - name: Upload Windows build to itch.io
+        run: butler push release-artifacts/*_x64-setup.exe zbaker5/sounds-bored:windows --userversion "$VERSION"
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+
+      - name: Upload macOS build to itch.io
+        run: butler push release-artifacts/*_aarch64.dmg zbaker5/sounds-bored:mac --userversion "$VERSION"
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+
+      - name: Upload Linux build to itch.io
+        run: butler push release-artifacts/*_amd64.AppImage zbaker5/sounds-bored:linux --userversion "$VERSION"
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          VERSION: ${{ needs.prepare.outputs.version }}
