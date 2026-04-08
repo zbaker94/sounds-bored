@@ -227,9 +227,9 @@ jobs:
       - name: Upload builds to itch.io
         uses: Ayowel/butler-to-itch@v1
         with:
-          butler-key: ${{ secrets.BUTLER_API_KEY }}
-          itch-user: zbaker5
-          itch-game: sounds-bored
+          butler_key: ${{ secrets.BUTLER_API_KEY }}
+          itch_user: zbaker5
+          itch_game: sounds-bored
           version: ${{ needs.prepare.outputs.version }}
           files: |
             windows  release-artifacts/*_x64-setup.exe
