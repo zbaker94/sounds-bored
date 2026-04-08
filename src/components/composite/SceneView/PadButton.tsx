@@ -226,7 +226,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
               <button
                 aria-label={pad.name}
                 {...(fadeVisual !== null ? fadeHandlers : gestureHandlers)}
-                disabled={isUnplayable}
+                // In fade mode, keep the button interactive so it can be selected as a crossfade target
+                disabled={isUnplayable && fadeVisual === null}
                 className={cn(
                   "relative w-full h-full rounded-xl overflow-hidden",
                   "flex items-center justify-center p-2",
@@ -234,7 +235,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                   "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
                   "text-sm font-semibold text-center select-none",
                   isUnplayable
-                    ? "opacity-40 pointer-events-none border-2 border-black/20"
+                    ? "opacity-40 border-2 border-black/20"
                     : fadeVisual !== null
                       ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
                       : cn(
@@ -293,7 +294,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="absolute bottom-1 right-1 z-20 pointer-events-auto">
-                      <HugeiconsIcon icon={Alert02Icon} size={12} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                      <HugeiconsIcon icon={Alert02Icon} size={16} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top">

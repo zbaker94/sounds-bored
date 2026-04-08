@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pads with missing sounds can now be selected as crossfade targets in fade mode (previously they were fully disabled and unclickable)
+- The missing-sound warning icon on pads is now slightly larger (16px instead of 12px) for better visibility
 - Pads with missing sound files are now visually disabled (dimmed, unclickable) when all assigned sounds are unavailable
 - Pads with only some missing sounds show a warning icon; hovering it explains which sounds need attention
 - Fixed a bug where orphan sound cleanup could run repeatedly when the sound library changed, improving stability on project load
