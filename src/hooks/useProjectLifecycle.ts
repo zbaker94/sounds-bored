@@ -22,7 +22,6 @@ export function useProjectLifecycle() {
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const isDirty = useProjectStore((s) => s.isDirty);
   const updateProject = useProjectStore((s) => s.updateProject);
-  const sounds = useLibraryStore((s) => s.sounds);
   const navigate = useNavigate();
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
@@ -84,21 +83,24 @@ export function useProjectLifecycle() {
     if (!project) return;
     // Stable key: a new project load resets this. We use name+lastSaved because
     // the project object reference changes on every updateProject call.
-    const key = project.name + (project.lastSaved ?? "");
+    const key = project.name + "|" + (project.lastSaved ?? "");
     if (cleanedProjectKeyRef.current === key) return;
     cleanedProjectKeyRef.current = key;
 
-    const { project: cleaned, removedCount } = reconcileProjectSounds(project, sounds);
+    // Read sounds imperatively to avoid re-running this effect whenever the
+    // library changes — useReconcileLibrary handles post-reconcile cleanup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const { project: cleaned, removedCount } = reconcileProjectSounds(project, useLibraryStore.getState().sounds);
     if (removedCount > 0) {
       updateProject(cleaned);
     }
-  }, [project, sounds, updateProject]);
+  }, [project, updateProject]);
 
   // Notify user if missing sounds are used in the loaded project
   useEffect(() => {
     if (!project || missingSoundIds.size === 0) return;
 
-    const projectKey = project.name + (project.lastSaved ?? "");
+    const projectKey = project.name + "|" + (project.lastSaved ?? "");
     if (lastNotifiedProjectKey.current === projectKey) return;
     lastNotifiedProjectKey.current = projectKey;
 
