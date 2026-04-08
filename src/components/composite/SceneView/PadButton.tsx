@@ -183,26 +183,27 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
         {...(editMode ? { ...attributes, ...listeners } : {})}
       >
-        {/* Playing pulse ring — sibling of the tilt wrapper, outside overflow-hidden button */}
-        <AnimatePresence>
-          {isPlaying && !editMode && (
-            <motion.div
-              key="pulse"
-              className="absolute -inset-1 rounded-xl pointer-events-none border-4 border-white/60 z-10"
-              animate={{ opacity: [0.3, 0.8, 0.3] }}
-              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-              exit={{ opacity: 0 }}
-            />
-          )}
-        </AnimatePresence>
         <motion.div
-          className="w-full h-full"
+          className={cn("w-full h-full", isPlaying && !editMode && "drop-shadow-[0_5px_0px_#FACC15]")}
           style={{ rotateX: tiltEnabled ? rotateX : 0, rotateY: tiltEnabled ? rotateY : 0, transformPerspective: 600, transformStyle: 'preserve-3d' }}
           whileTap={!editMode && fadeVisual === null ? { scale: 0.95 } : undefined}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onPointerDown={!editMode ? handleWrapperPointerDown : undefined}
         >
+          {/* Playing pulse ring — inside tilt wrapper so it follows the 3D rotation */}
+          <AnimatePresence>
+            {isPlaying && !editMode && (
+              <motion.div
+                key="pulse"
+                className="absolute -inset-1 rounded-xl pointer-events-none border-4 border-white/60 z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0.3, 0.8, 0.3] }}
+                transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+                exit={{ opacity: 0, transition: { duration: 0.2, ease: "easeOut" } }}
+              />
+            )}
+          </AnimatePresence>
           {/* Flip container — rotates to reveal back face (edit overlay) */}
           <motion.div
             className="relative w-full h-full"
@@ -227,7 +228,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                         "border-2 transition-all cursor-pointer",
                         "hover:brightness-110",
                         isPlaying
-                          ? "border-yellow-400 drop-shadow-[0_5px_0px_#FACC15]"
+                          ? "border-yellow-400"
                           : "border-black/20"
                       )
                 )}

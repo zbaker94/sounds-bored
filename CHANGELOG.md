@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Playing pad indicator now includes a yellow drop-shadow glow on the entire button, and the pulse ring follows the pad's 3D tilt animation when pressed
 - Pad buttons now display a more prominent glowing border animation when playing (thicker, extends slightly beyond the button edge)
 - Active pads turn black with white text while playing, with a smooth 0.7s color transition
 - Playing pad borders highlight in yellow instead of black
