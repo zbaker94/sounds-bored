@@ -791,7 +791,7 @@ describe("streaming path (large files)", () => {
     expect(isPadStreaming(pad.id)).toBe(true);
   });
 
-  it("does not set crossOrigin on the Audio element for local asset:// URLs", async () => {
+  it("sets crossOrigin='anonymous' on the Audio element before src for Web Audio compatibility", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sound = createMockSound({ filePath: "ambient.wav" });
     setSounds([sound]);
@@ -806,7 +806,7 @@ describe("streaming path (large files)", () => {
     await triggerPad(pad);
 
     expect(mockAudioInstances).toHaveLength(1);
-    expect(mockAudioInstances[0].crossOriginSetter).not.toHaveBeenCalled();
+    expect(mockAudioInstances[0].crossOriginSetter).toHaveBeenCalledWith('anonymous');
   });
 });
 

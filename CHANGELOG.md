@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Pad volume display now fades out smoothly after release instead of disappearing abruptly
+- Fixed a one-frame volume jump when the volume indicator transitions from live to lingering display
+- Drag-and-drop pad reordering now works in both normal and edit mode (previously disabled outside edit mode)
+- Fixed audio playback compatibility issue that could cause errors when playing sounds through the Web Audio API
 - Pads now flip with a 3D card animation when entering edit mode, revealing controls on the back face
 - Download queue items animate in and out smoothly when added or removed
 - Scene tabs animate when added or removed from the tab bar

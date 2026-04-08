@@ -183,7 +183,7 @@ export function SceneView() {
         {!editMode && <FadeToolbar key="fade-toolbar" fadeMode={fadeMode} />}
       </AnimatePresence>
       <DndContext
-        sensors={editMode ? sensors : []}
+        sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}

@@ -56,7 +56,7 @@ describe("PadButton", () => {
     it("renders the pad name", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.getByText("Kick")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
     });
 
     it("does not show the edit overlay", () => {
@@ -147,7 +147,7 @@ describe("PadButton", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
-      const button = screen.getByRole("button");
+      const button = screen.getByRole("button", { name: "Kick" });
 
       // Pointer down on a non-playing pad
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
@@ -156,14 +156,14 @@ describe("PadButton", () => {
       act(() => { vi.advanceTimersByTime(150); });
 
       expect(screen.getByText("0%")).toBeInTheDocument();
-      expect(screen.getByText("Kick")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
     });
 
     it("updates percentage as volume changes while dragging", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
-      const button = screen.getByRole("button");
+      const button = screen.getByRole("button", { name: "Kick" });
 
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
       act(() => { vi.advanceTimersByTime(150); });
@@ -184,7 +184,7 @@ describe("PadButton", () => {
     it("shows volume transition bar during hold phase and hides it after release", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      const button = screen.getByRole("button");
+      const button = screen.getByRole("button", { name: "Kick" });
 
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
       act(() => { vi.advanceTimersByTime(150); }); // hold activates
@@ -204,7 +204,7 @@ describe("PadButton", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
-      const button = screen.getByRole("button");
+      const button = screen.getByRole("button", { name: "Kick" });
 
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
       act(() => { vi.advanceTimersByTime(150); });
@@ -213,7 +213,7 @@ describe("PadButton", () => {
       fireEvent.pointerMove(button, { clientY: 190, pointerId: 1 });
 
       // Name always shown; volume % also shown during drag
-      expect(screen.getByText("Kick")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
       expect(screen.queryByText(/\d+%/)).toBeInTheDocument();
 
       act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
@@ -221,7 +221,7 @@ describe("PadButton", () => {
       act(() => { vi.advanceTimersByTime(700); });
 
       // After release: name still shown, volume % gone
-      expect(screen.getByText("Kick")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
       expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
     });
   });

@@ -12,7 +12,7 @@ expect.extend(matchers);
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
+    matches: query === "(prefers-reduced-motion: reduce)",
     media: query,
     onchange: null,
     addEventListener: vi.fn(),

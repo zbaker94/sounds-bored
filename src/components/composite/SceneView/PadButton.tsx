@@ -32,12 +32,13 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.has(pad.id));
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
-  const [frozenVolume, setFrozenVolume] = useState(liveVolume);
+  const [volumeExiting, setVolumeExiting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks the last volume seen while transitioning; read by effect on transition end
+  // Tracks the last volume seen while transitioning; read synchronously during render on transition end
   const lastTransitionVolumeRef = useRef(liveVolume);
 
   // Update during render while actively transitioning — before the store resets to 1.0
@@ -45,26 +46,43 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     lastTransitionVolumeRef.current = liveVolume;
   }
 
-  // During transition show the live value; when transition ends, show the snapshot for the linger period
-  const displayVolume = isVolumeTransitioning ? liveVolume : frozenVolume;
+  // During transition show the live value; when transition ends, read the snapshot directly from ref
+  // (avoids a 1-frame jump that would occur if we stored it in state and updated via useEffect)
+  const displayVolume = isVolumeTransitioning ? liveVolume : lastTransitionVolumeRef.current;
 
   useEffect(() => {
     if (isVolumeTransitioning) {
+      // Cancel any pending linger/fade timers (re-triggered during hold)
+      if (volumeFadeTimerRef.current !== null) {
+        clearTimeout(volumeFadeTimerRef.current);
+        volumeFadeTimerRef.current = null;
+      }
       if (volumeHideTimerRef.current !== null) {
         clearTimeout(volumeHideTimerRef.current);
         volumeHideTimerRef.current = null;
       }
       setShowVolumeDisplay(true);
+      setVolumeExiting(false);
     } else {
-      setFrozenVolume(lastTransitionVolumeRef.current);
-      volumeHideTimerRef.current = setTimeout(() => {
-        setShowVolumeDisplay(false);
-        volumeHideTimerRef.current = null;
-      }, 670);
+      // Linger at full opacity, then fade, then unmount
+      volumeFadeTimerRef.current = setTimeout(() => {
+        volumeFadeTimerRef.current = null;
+        setVolumeExiting(true);
+        volumeHideTimerRef.current = setTimeout(() => {
+          volumeHideTimerRef.current = null;
+          setShowVolumeDisplay(false);
+          setVolumeExiting(false);
+        }, 220);
+      }, 450);
     }
     return () => {
+      if (volumeFadeTimerRef.current !== null) {
+        clearTimeout(volumeFadeTimerRef.current);
+        volumeFadeTimerRef.current = null;
+      }
       if (volumeHideTimerRef.current !== null) {
         clearTimeout(volumeHideTimerRef.current);
+        volumeHideTimerRef.current = null;
       }
     };
   }, [isVolumeTransitioning]);
@@ -193,8 +211,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
             style={{ transformStyle: 'preserve-3d' }}
           >
             {/* Front face — normal pad */}
-            <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
+            <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={editMode || undefined}>
               <button
+                aria-label={pad.name}
                 {...(fadeVisual !== null ? fadeHandlers : gestureHandlers)}
                 className={cn(
                   "relative w-full h-full rounded-xl overflow-hidden",
@@ -214,20 +233,16 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                 )}
                 style={{ backgroundColor: pad.color ?? undefined }}
               >
-                {/* Volume transition bar */}
-                <AnimatePresence>
-                  {showVolumeDisplay && (
-                    <motion.div
-                      key="vol-bar"
-                      className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
-                      style={{ height: `${displayVolume * 100}%` }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                    />
-                  )}
-                </AnimatePresence>
+                {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
+                {showVolumeDisplay && (
+                  <motion.div
+                    className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
+                    style={{ height: `${displayVolume * 100}%` }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: volumeExiting ? 0 : 1 }}
+                    transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
+                  />
+                )}
                 {/* Playback progress */}
                 {isPlaying && (
                   <div
@@ -235,34 +250,34 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     style={{ width: `${progress * 100}%` }}
                   />
                 )}
-                {/* Pad name + optional volume — volume wrapper grows/shrinks height so name drifts smoothly */}
+                {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
                 <div className="relative z-10 flex flex-col items-center gap-0.5">
-                  <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-                  <AnimatePresence>
-                    {showVolumeDisplay && (
-                      <motion.div
-                        key="vol-label"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ overflow: "hidden" }}
-                        className="flex justify-center"
-                      >
-                        <span className="text-xs font-bold tabular-nums">
-                          {Math.round(displayVolume * 100)}%
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
+                  {showVolumeDisplay && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{
+                        opacity: volumeExiting ? 0 : 1,
+                        height: volumeExiting ? 0 : "auto",
+                      }}
+                      transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
+                      style={{ overflow: "hidden" }}
+                      className="flex justify-center"
+                    >
+                      <span className="text-xs font-bold tabular-nums">
+                        {Math.round(displayVolume * 100)}%
+                      </span>
+                    </motion.div>
+                  )}
                 </div>
               </button>
             </div>
 
             {/* Back face — edit overlay */}
             <div
-              className="absolute inset-0 rounded-xl overflow-hidden bg-card flex flex-col items-center justify-between p-1.5"
-              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
+              className="absolute inset-0 rounded-xl overflow-hidden bg-card flex flex-col items-center justify-between p-1.5 [backface-visibility:hidden]"
+              style={{ transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
+              aria-hidden={!editMode || undefined}
             >
               {/* Dark overlay for readability — sits on top of the pad color */}
               <div className="absolute inset-0 bg-black/60" />
