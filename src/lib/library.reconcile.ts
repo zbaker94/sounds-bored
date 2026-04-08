@@ -1,4 +1,4 @@
-import { readDir, exists } from "@tauri-apps/plugin-fs";
+import { readDir, exists, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
 import { Sound, GlobalFolder } from "./schemas";
 import { AUDIO_EXTENSIONS } from "./constants";
@@ -110,36 +110,95 @@ export async function reconcileGlobalLibrary(
 
       if (!soundsByPath.has(filePath)) {
         const filename = filePath.split(/[\\/]/).pop() ?? filePath;
-        newSounds.push({
+        const sound: Sound = {
           id: crypto.randomUUID(),
           name: nameFromFilename(filename),
           filePath,
           folderId: folder.id,
           tags: [],
           sets: [],
-        });
-        soundsByPath.set(filePath, newSounds[newSounds.length - 1]);
+        };
+        newSounds.push(sound);
+        soundsByPath.set(filePath, sound);
       }
     }
   }
 
-  // Backfill folderId on existing sounds discovered in a folder but lacking folderId
+  // Stat new sounds in parallel to populate fileSizeBytes
+  await Promise.all(
+    newSounds.map(async (sound) => {
+      if (!sound.filePath) return;
+      try {
+        const info = await stat(sound.filePath);
+        sound.fileSizeBytes = info.size;
+      } catch {
+        // stat failed — leave fileSizeBytes undefined
+      }
+    }),
+  );
+
+  // Backfill folderId and fileSizeBytes on existing sounds
   const reconciledExisting: Sound[] = [];
-  let anyFolderIdUpdated = false;
+  let anyFieldUpdated = false;
+
+  // Collect backfill stat promises for existing sounds missing fileSizeBytes
+  interface BackfillEntry {
+    index: number;
+    filePath: string;
+  }
+  const backfillStatEntries: BackfillEntry[] = [];
 
   for (const sound of existingSounds) {
+    let updated = { ...sound };
+    let wasUpdated = false;
+
     if (sound.filePath && !sound.folderId) {
       const discoveredFolderId = pathToFolderId.get(sound.filePath);
       if (discoveredFolderId) {
-        reconciledExisting.push({ ...sound, folderId: discoveredFolderId });
-        anyFolderIdUpdated = true;
-        continue;
+        updated = { ...updated, folderId: discoveredFolderId };
+        wasUpdated = true;
       }
     }
-    reconciledExisting.push(sound);
+
+    reconciledExisting.push(updated);
+
+    if (sound.filePath && sound.fileSizeBytes == null) {
+      backfillStatEntries.push({
+        index: reconciledExisting.length - 1,
+        filePath: sound.filePath,
+      });
+    }
+
+    if (wasUpdated) {
+      anyFieldUpdated = true;
+    }
   }
 
-  const changed = newSounds.length > 0 || anyFolderIdUpdated;
+  // Batch stat calls for existing sounds missing fileSizeBytes
+  if (backfillStatEntries.length > 0) {
+    const statResults = await Promise.all(
+      backfillStatEntries.map(async (entry) => {
+        try {
+          const info = await stat(entry.filePath);
+          return { index: entry.index, size: info.size };
+        } catch {
+          return { index: entry.index, size: undefined };
+        }
+      }),
+    );
+
+    for (const result of statResults) {
+      if (result.size != null) {
+        reconciledExisting[result.index] = {
+          ...reconciledExisting[result.index],
+          fileSizeBytes: result.size,
+        };
+        anyFieldUpdated = true;
+      }
+    }
+  }
+
+  const changed = newSounds.length > 0 || anyFieldUpdated;
 
   return {
     sounds: [...reconciledExisting, ...newSounds],

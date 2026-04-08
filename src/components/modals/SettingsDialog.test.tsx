@@ -8,6 +8,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { open } from "@tauri-apps/plugin-dialog";
 import { StartScreen } from "@/components/screens/start/StartScreen";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
@@ -21,6 +22,7 @@ vi.mock("@/contexts/ProjectActionsContext", () => ({
 
 vi.mock("@/lib/history.queries", () => ({
   useProjectHistory: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+  useSaveProjectHistory: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }));
 vi.mock("@/lib/project.queries", () => ({
   useLoadProject: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
@@ -39,7 +41,11 @@ vi.mock("@/lib/appSettings.queries", () => ({
 }));
 
 function renderDialog() {
-  return render(<SettingsDialog />);
+  return render(
+    <TooltipProvider>
+      <SettingsDialog />
+    </TooltipProvider>
+  );
 }
 
 function openDialog() {

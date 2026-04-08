@@ -41,6 +41,7 @@ export const SoundSchema = z.object({
   tags: z.array(z.string()),               // Tag IDs — resolve against global library
   sets: z.array(z.string()),               // Set IDs — resolve against global library
   durationMs: z.number().optional(),
+  fileSizeBytes: z.number().optional(),   // file size in bytes — populated at reconcile/download time
 });
 
 export type Sound = z.infer<typeof SoundSchema>;

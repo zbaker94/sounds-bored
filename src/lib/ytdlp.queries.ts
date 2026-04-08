@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { stat } from "@tauri-apps/plugin-fs";
 import { startDownload, cancelDownload, listenToDownloadEvents } from "@/lib/ytdlp";
 import { useDownloadStore } from "@/state/downloadStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -81,24 +82,38 @@ export function useDownloadEventListener(downloadFolderId?: string) {
       });
 
       if (event.status === "completed" && event.outputPath) {
-        const jobs = useDownloadStore.getState().jobs;
-        const job = jobs[event.id];
-        // Guard against duplicate completion events adding the sound twice
-        if (job?.soundId) return;
-        const soundId = crypto.randomUUID();
-        updateLibrary((draft) => {
-          draft.sounds.push({
-            id: soundId,
-            name: job?.outputName ?? "Downloaded Sound",
-            filePath: event.outputPath,
-            folderId: downloadFolderIdRef.current,
-            sourceUrl: job?.url,
-            tags: [],
-            sets: [],
+        const outputPath = event.outputPath;
+        const eventId = event.id;
+        (async () => {
+          const jobs = useDownloadStore.getState().jobs;
+          const job = jobs[eventId];
+          // Guard against duplicate completion events adding the sound twice
+          if (job?.soundId) return;
+          const soundId = crypto.randomUUID();
+
+          let fileSizeBytes: number | undefined;
+          try {
+            const statResult = await stat(outputPath);
+            fileSizeBytes = statResult.size;
+          } catch {
+            // file stat failed — proceed without size
+          }
+
+          updateLibrary((draft) => {
+            draft.sounds.push({
+              id: soundId,
+              name: job?.outputName ?? "Downloaded Sound",
+              filePath: outputPath,
+              folderId: downloadFolderIdRef.current,
+              sourceUrl: job?.url,
+              tags: [],
+              sets: [],
+              ...(fileSizeBytes !== undefined && { fileSizeBytes }),
+            });
           });
-        });
-        updateJob(event.id, { soundId });
-        toast.success("Download complete", { description: job?.outputName });
+          updateJob(eventId, { soundId });
+          toast.success("Download complete", { description: job?.outputName });
+        })();
       }
 
       if (event.status === "failed") {
