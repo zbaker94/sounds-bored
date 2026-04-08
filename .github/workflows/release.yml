@@ -224,32 +224,14 @@ jobs:
         env:
           RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
 
-      - name: Upload Windows build to itch.io
-        uses: Ayowel/butler-to-itch.io@v1.0.0
+      - name: Upload builds to itch.io
+        uses: Ayowel/butler-to-itch@v1
         with:
           butler-key: ${{ secrets.BUTLER_API_KEY }}
           itch-user: zbaker5
           itch-game: sounds-bored
-          channel: windows
-          package: release-artifacts/*_x64-setup.exe
           version: ${{ needs.prepare.outputs.version }}
-
-      - name: Upload macOS build to itch.io
-        uses: Ayowel/butler-to-itch.io@v1.0.0
-        with:
-          butler-key: ${{ secrets.BUTLER_API_KEY }}
-          itch-user: zbaker5
-          itch-game: sounds-bored
-          channel: mac
-          package: release-artifacts/*_aarch64.dmg
-          version: ${{ needs.prepare.outputs.version }}
-
-      - name: Upload Linux build to itch.io
-        uses: Ayowel/butler-to-itch.io@v1.0.0
-        with:
-          butler-key: ${{ secrets.BUTLER_API_KEY }}
-          itch-user: zbaker5
-          itch-game: sounds-bored
-          channel: linux
-          package: release-artifacts/*_amd64.AppImage
-          version: ${{ needs.prepare.outputs.version }}
+          files: |
+            windows  release-artifacts/*_x64-setup.exe
+            mac      release-artifacts/*_aarch64.dmg
+            linux    release-artifacts/*_amd64.AppImage
