@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad button gesture handlers are now memoized, preventing unnecessary re-renders and improving performance when interacting with pads.
 - Pad buttons with an "invalid" fade state are now non-interactive (pointer events disabled), preventing accidental clicks
 - Fixed a performance issue where fade state and handlers were being recalculated on every render instead of only when their dependencies change
 

@@ -886,3 +886,43 @@ describe("usePadGesture — onPointerCancel", () => {
     expect(resetPadGain).toHaveBeenCalledWith(holdPad.id);
   });
 });
+
+// ─── Handler reference stability ─────────────────────────────────────────────
+
+describe("usePadGesture — handler reference stability", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    usePlaybackStore.setState({ playingPadIds: new Set(), padVolumes: {}, volumeTransitioningPadIds: new Set() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns stable gestureHandlers reference when pad has not changed", () => {
+    const { result, rerender } = renderHook(() => usePadGesture(oneShotPad));
+    const first = result.current.gestureHandlers;
+    rerender();
+    expect(result.current.gestureHandlers).toBe(first);
+  });
+
+  it("returns stable individual handler references when pad has not changed", () => {
+    const { result, rerender } = renderHook(() => usePadGesture(oneShotPad));
+    const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu } = result.current.gestureHandlers;
+    rerender();
+    expect(result.current.gestureHandlers.onPointerDown).toBe(onPointerDown);
+    expect(result.current.gestureHandlers.onPointerMove).toBe(onPointerMove);
+    expect(result.current.gestureHandlers.onPointerUp).toBe(onPointerUp);
+    expect(result.current.gestureHandlers.onPointerCancel).toBe(onPointerCancel);
+    expect(result.current.gestureHandlers.onContextMenu).toBe(onContextMenu);
+  });
+
+  it("returns new gestureHandlers reference when pad changes", () => {
+    let pad = oneShotPad;
+    const { result, rerender } = renderHook(() => usePadGesture(pad));
+    const first = result.current.gestureHandlers;
+    pad = { ...oneShotPad, id: "pad-other" };
+    rerender();
+    expect(result.current.gestureHandlers).not.toBe(first);
+  });
+});
