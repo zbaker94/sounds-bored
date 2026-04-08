@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
@@ -179,9 +179,11 @@ export function SceneView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
-      <FadeToolbar fadeMode={fadeMode} editMode={editMode} />
+      <AnimatePresence>
+        {!editMode && <FadeToolbar key="fade-toolbar" fadeMode={fadeMode} />}
+      </AnimatePresence>
       <DndContext
-        sensors={editMode ? sensors : []}
+        sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -203,6 +205,7 @@ export function SceneView() {
                 <PadButton
                   pad={pad}
                   sceneId={activeScene.id}
+                  index={i}
                   onEditClick={handleEditClick}
                   fadeVisual={fadeMode.getPadFadeVisual(pad.id)}
                   onFadeTap={fadeMode.onPadTap}
@@ -233,31 +236,40 @@ export function SceneView() {
         </SortableContext>
       </DndContext>
 
-      {totalPages > 1 && !isDraggingPad && (
-        <div className="flex items-center justify-center gap-3 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={safePage === 0}
-            onClick={() => setPage((p) => p - 1)}
-            aria-label="Previous page"
+      <AnimatePresence>
+        {totalPages > 1 && !isDraggingPad && (
+          <motion.div
+            key="page-nav"
+            className="flex items-center justify-center gap-3 shrink-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
-          </Button>
-          <span className="text-white tabular-nums font-deathletter">
-            {safePage + 1} / {totalPages}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            disabled={isLastPage}
-            onClick={() => setPage((p) => p + 1)}
-            aria-label="Next page"
-          >
-            <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
-          </Button>
-        </div>
-      )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={safePage === 0}
+              onClick={() => setPage((p) => p - 1)}
+              aria-label="Previous page"
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
+            </Button>
+            <span className="text-white tabular-nums font-deathletter">
+              {safePage + 1} / {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={isLastPage}
+              onClick={() => setPage((p) => p + 1)}
+              aria-label="Next page"
+            >
+              <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <PadConfigDrawer
         sceneId={activeScene.id}

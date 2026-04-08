@@ -17,12 +17,13 @@ import type { PadFadeVisual } from "@/hooks/useFadeMode";
 interface PadButtonProps {
   pad: Pad;
   sceneId: string;
+  index?: number;
   onEditClick?: (pad: Pad) => void;
   fadeVisual?: PadFadeVisual;
   onFadeTap?: (padId: string) => void;
 }
 
-export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -31,12 +32,13 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
   const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.has(pad.id));
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
-  const [frozenVolume, setFrozenVolume] = useState(liveVolume);
+  const [volumeExiting, setVolumeExiting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks the last volume seen while transitioning; read by effect on transition end
+  // Tracks the last volume seen while transitioning; read synchronously during render on transition end
   const lastTransitionVolumeRef = useRef(liveVolume);
 
   // Update during render while actively transitioning — before the store resets to 1.0
@@ -44,26 +46,43 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
     lastTransitionVolumeRef.current = liveVolume;
   }
 
-  // During transition show the live value; when transition ends, show the snapshot for the linger period
-  const displayVolume = isVolumeTransitioning ? liveVolume : frozenVolume;
+  // During transition show the live value; when transition ends, read the snapshot directly from ref
+  // (avoids a 1-frame jump that would occur if we stored it in state and updated via useEffect)
+  const displayVolume = isVolumeTransitioning ? liveVolume : lastTransitionVolumeRef.current;
 
   useEffect(() => {
     if (isVolumeTransitioning) {
+      // Cancel any pending linger/fade timers (re-triggered during hold)
+      if (volumeFadeTimerRef.current !== null) {
+        clearTimeout(volumeFadeTimerRef.current);
+        volumeFadeTimerRef.current = null;
+      }
       if (volumeHideTimerRef.current !== null) {
         clearTimeout(volumeHideTimerRef.current);
         volumeHideTimerRef.current = null;
       }
       setShowVolumeDisplay(true);
+      setVolumeExiting(false);
     } else {
-      setFrozenVolume(lastTransitionVolumeRef.current);
-      volumeHideTimerRef.current = setTimeout(() => {
-        setShowVolumeDisplay(false);
-        volumeHideTimerRef.current = null;
-      }, 670);
+      // Linger at full opacity, then fade, then unmount
+      volumeFadeTimerRef.current = setTimeout(() => {
+        volumeFadeTimerRef.current = null;
+        setVolumeExiting(true);
+        volumeHideTimerRef.current = setTimeout(() => {
+          volumeHideTimerRef.current = null;
+          setShowVolumeDisplay(false);
+          setVolumeExiting(false);
+        }, 220);
+      }, 450);
     }
     return () => {
+      if (volumeFadeTimerRef.current !== null) {
+        clearTimeout(volumeFadeTimerRef.current);
+        volumeFadeTimerRef.current = null;
+      }
       if (volumeHideTimerRef.current !== null) {
         clearTimeout(volumeHideTimerRef.current);
+        volumeHideTimerRef.current = null;
       }
     };
   }, [isVolumeTransitioning]);
@@ -115,7 +134,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
     if (isPlaying) {
       const animate = () => {
         const p = getPadProgress(pad.id);
-        if (p !== null) setProgress(p);
+        setProgress(p ?? 0);
         rafRef.current = requestAnimationFrame(animate);
       };
       rafRef.current = requestAnimationFrame(animate);
@@ -164,72 +183,110 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
         className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
         {...(editMode ? { ...attributes, ...listeners } : {})}
       >
-        {/* Playing pulse ring — sibling of the tilt wrapper, outside overflow-hidden button */}
-        <AnimatePresence>
-          {isPlaying && !editMode && (
-            <motion.div
-              key="pulse"
-              className="absolute inset-0 rounded-xl pointer-events-none border-2 border-white/60 z-10"
-              animate={{ opacity: [0.3, 0.8, 0.3] }}
-              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-              exit={{ opacity: 0 }}
-            />
-          )}
-        </AnimatePresence>
         <motion.div
-          className="w-full h-full"
-          style={{ rotateX: tiltEnabled ? rotateX : 0, rotateY: tiltEnabled ? rotateY : 0, transformPerspective: 600 }}
+          className={cn("w-full h-full", isPlaying && !editMode && "drop-shadow-[0_5px_0px_#FACC15]")}
+          style={{ rotateX: tiltEnabled ? rotateX : 0, rotateY: tiltEnabled ? rotateY : 0, transformPerspective: 600, transformStyle: 'preserve-3d' }}
           whileTap={!editMode && fadeVisual === null ? { scale: 0.95 } : undefined}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onPointerDown={!editMode ? handleWrapperPointerDown : undefined}
         >
-        <button
-          {...(editMode
-            ? {}
-            : fadeVisual !== null
-              ? fadeHandlers
-              : gestureHandlers
-          )}
-          className={cn(
-            "relative w-full h-full rounded-xl overflow-hidden",
-            "flex items-center justify-center p-2",
-            "bg-card text-card-foreground",
-            "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
-            "text-sm font-semibold text-center select-none",
-            editMode
-              ? "border-2 border-dashed border-foreground/50 cursor-default"
-              : fadeVisual !== null
-                ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
-                : cn(
-                    "border-2 transition-all cursor-pointer",
-                    "hover:brightness-110",
-                    isPlaying
-                      ? "border-black drop-shadow-[0_5px_0px_rgba(0,0,0,1)]"
-                      : "border-black/20"
-                  )
-          )}
-          style={{ backgroundColor: pad.color ?? undefined }}
-        >
-          {/* Volume transition bar — shows for all automated and gesture-driven volume changes */}
-          {!editMode && showVolumeDisplay && (
-            <div
-              className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
-              style={{ height: `${displayVolume * 100}%` }}
-            />
-          )}
-          {/* Playback progress — normal mode only; renders on top of fill bar, slightly transparent */}
-          {!editMode && isPlaying && (
-            <div
-              className="absolute top-0 left-0 bottom-0 pointer-events-none bg-black/35"
-              style={{ width: `${progress * 100}%` }}
-            />
-          )}
+          {/* Playing pulse ring — inside tilt wrapper so it follows the 3D rotation */}
+          <AnimatePresence>
+            {isPlaying && !editMode && (
+              <motion.div
+                key="pulse"
+                className="absolute -inset-1 rounded-xl pointer-events-none border-4 border-white/60 z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0.3, 0.8, 0.3] }}
+                transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+                exit={{ opacity: 0, transition: { duration: 0.2, ease: "easeOut" } }}
+              />
+            )}
+          </AnimatePresence>
+          {/* Flip container — rotates to reveal back face (edit overlay) */}
+          <motion.div
+            className="relative w-full h-full"
+            animate={{ rotateY: editMode ? 180 : 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22, delay: index * 0.03 }}
+            style={{ transformStyle: 'preserve-3d' }}
+          >
+            {/* Front face — normal pad */}
+            <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={editMode || undefined}>
+              <button
+                aria-label={pad.name}
+                {...(fadeVisual !== null ? fadeHandlers : gestureHandlers)}
+                className={cn(
+                  "relative w-full h-full rounded-xl overflow-hidden",
+                  "flex items-center justify-center p-2",
+                  "bg-card text-card-foreground",
+                  "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
+                  "text-sm font-semibold text-center select-none",
+                  fadeVisual !== null
+                    ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
+                    : cn(
+                        "border-2 transition-all cursor-pointer",
+                        "hover:brightness-110",
+                        isPlaying
+                          ? "border-yellow-400"
+                          : "border-black/20"
+                      )
+                )}
+                style={{
+                  backgroundColor: isPlaying ? "#000" : (pad.color ?? undefined),
+                  transition: "background-color 0.7s ease",
+                  color: isPlaying ? "#fff" : undefined,
+                }}
+              >
+                {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
+                {showVolumeDisplay && (
+                  <motion.div
+                    className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
+                    style={{ height: `${displayVolume * 100}%` }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: volumeExiting ? 0 : 1 }}
+                    transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
+                  />
+                )}
+                {/* Playback progress */}
+                {isPlaying && (
+                  <div
+                    className="absolute top-0 left-0 bottom-0 pointer-events-none bg-white/20"
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                )}
+                {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
+                <div className="relative z-10 flex flex-col items-center gap-0.5">
+                  <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
+                  {showVolumeDisplay && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{
+                        opacity: volumeExiting ? 0 : 1,
+                        height: volumeExiting ? 0 : "auto",
+                      }}
+                      transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
+                      style={{ overflow: "hidden" }}
+                      className="flex justify-center"
+                    >
+                      <span className="text-xs font-bold tabular-nums">
+                        {Math.round(displayVolume * 100)}%
+                      </span>
+                    </motion.div>
+                  )}
+                </div>
+              </button>
+            </div>
 
-          {/* Edit mode overlay */}
-          {editMode && (
-            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-between p-1.5 pointer-events-none">
-              <div className="flex flex-col items-center gap-0.5 pointer-events-none">
+            {/* Back face — edit overlay */}
+            <div
+              className="absolute inset-0 rounded-xl overflow-hidden bg-card flex flex-col items-center justify-between p-1.5 [backface-visibility:hidden]"
+              style={{ transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
+              aria-hidden={!editMode || undefined}
+            >
+              {/* Dark overlay for readability — sits on top of the pad color */}
+              <div className="absolute inset-0 bg-black/60" />
+              <div className="relative z-10 flex flex-col items-center gap-0.5">
                 <span className="text-white text-xs font-semibold line-clamp-2 text-center leading-tight">
                   {pad.name}
                 </span>
@@ -237,7 +294,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
                   {layerCount} {layerCount === 1 ? "layer" : "layers"}
                 </span>
               </div>
-              <div className="flex gap-1 pointer-events-auto">
+              <div className="relative z-10 flex gap-1">
                 <button
                   type="button"
                   aria-label="Edit pad"
@@ -264,20 +321,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, onEditClick, fa
                 </button>
               </div>
             </div>
-          )}
-
-          {/* Pad name + optional volume — normal mode */}
-          {!editMode && (
-            <div className="relative z-10 flex flex-col items-center gap-0.5">
-              <span className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-              {showVolumeDisplay && (
-                <span className="text-xs font-bold tabular-nums">
-                  {Math.round(displayVolume * 100)}%
-                </span>
-              )}
-            </div>
-          )}
-        </button>
+          </motion.div>
         </motion.div>
       </div>
 

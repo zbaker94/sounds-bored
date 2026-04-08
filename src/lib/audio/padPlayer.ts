@@ -533,6 +533,7 @@ async function startLayerSound(
       // loadedmetadata fires; getPadProgress reads it directly from the element.
       const url = convertFileSrc(sound.filePath!);
       audio = new Audio();
+      audio.crossOrigin = 'anonymous';
       audio.src = url;
       if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode)) {
         audio.loop = true;
@@ -727,6 +728,10 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           // setOnEnded(null) nulled the cleanup callback — delete streaming entry explicitly.
           clearLayerStreamingAudio(pad.id, layer.id);
           stopLayerVoices(pad.id, layer.id);
+          // Clear progress immediately so the bar resets to 0 while the next
+          // buffer loads. Without this, stale padProgressInfo keeps advancing
+          // during the async gap and the bar shows the old sound's position.
+          clearPadProgressInfo(pad.id);
 
           if (layer.cycleMode && isChained(layer.arrangement)) {
             // Cycle mode + next: stop current sound, advance cycle cursor, play next.

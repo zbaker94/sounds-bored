@@ -791,7 +791,7 @@ describe("streaming path (large files)", () => {
     expect(isPadStreaming(pad.id)).toBe(true);
   });
 
-  it("does not set crossOrigin on the Audio element for local asset:// URLs", async () => {
+  it("sets crossOrigin='anonymous' on the Audio element before src for Web Audio compatibility", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sound = createMockSound({ filePath: "ambient.wav" });
     setSounds([sound]);
@@ -806,7 +806,7 @@ describe("streaming path (large files)", () => {
     await triggerPad(pad);
 
     expect(mockAudioInstances).toHaveLength(1);
-    expect(mockAudioInstances[0].crossOriginSetter).not.toHaveBeenCalled();
+    expect(mockAudioInstances[0].crossOriginSetter).toHaveBeenCalledWith('anonymous');
   });
 });
 
@@ -867,6 +867,32 @@ describe("retrigger next", () => {
 
     expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
     expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+
+  it("sets padProgressInfo for the new sound after retrigger", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const { getPadProgressInfo } = await import("./audioState");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+    expect(getPadProgressInfo(pad.id)).not.toBeUndefined();
+
+    await triggerPad(pad); // A → B
+    await tick();
+    // padProgressInfo must be set (non-null) so the progress bar can advance
+    expect(getPadProgressInfo(pad.id)).not.toBeUndefined();
   });
 
   it("stops without restart on a one-shot layer when queue is exhausted", async () => {

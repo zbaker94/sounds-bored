@@ -32,6 +32,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
     if (!sound.filePath) throw new MissingFileError(`Sound "${sound.name}" has no file path`);
     const url = convertFileSrc(sound.filePath);
     const audio = new Audio();
+    audio.crossOrigin = 'anonymous';
     audio.src = url;
     const sourceNode = ctx.createMediaElementSource(audio);
     sourceNode.connect(getMasterGain());

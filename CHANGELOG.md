@@ -1,6 +1,22 @@
 # Changelog
 
 ## Current Changes
+- Playing pad indicator now includes a yellow drop-shadow glow on the entire button, and the pulse ring follows the pad's 3D tilt animation when pressed
+- Pad buttons now display a more prominent glowing border animation when playing (thicker, extends slightly beyond the button edge)
+- Active pads turn black with white text while playing, with a smooth 0.7s color transition
+- Playing pad borders highlight in yellow instead of black
+- Playback progress bar changed from dark overlay to a subtle white overlay
+- Progress bar now resets to 0 when a pad retriggers to the next sound, instead of briefly showing the previous sound's position
+- Fixed a bug where the progress bar could display stale progress during the moment between stopping one sound and loading the next
+- Pad volume display now fades out smoothly after release instead of disappearing abruptly
+- Fixed a one-frame volume jump when the volume indicator transitions from live to lingering display
+- Drag-and-drop pad reordering now works in both normal and edit mode (previously disabled outside edit mode)
+- Fixed audio playback compatibility issue that could cause errors when playing sounds through the Web Audio API
+- Pads now flip with a 3D card animation when entering edit mode, revealing controls on the back face
+- Download queue items animate in and out smoothly when added or removed
+- Scene tabs animate when added or removed from the tab bar
+- The fade/crossfade toolbar slides in and out when toggling edit mode
+- Status indicators throughout the UI (download state icons, volume display, fade status label) now transition with subtle fade and scale animations
 - Fixed an audio playback bug where sounds could fail to play due to an unnecessary `crossOrigin = "anonymous"` setting on local audio files
 - Pad button gesture handlers are now memoized, preventing unnecessary re-renders and improving performance when interacting with pads.
 - Pad buttons with an "invalid" fade state are now non-interactive (pointer events disabled), preventing accidental clicks

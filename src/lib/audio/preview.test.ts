@@ -84,14 +84,14 @@ describe("preview — streaming path (large files)", () => {
     mockAudioInstances.length = 0; // clear the stop-triggered instance if any
   });
 
-  it("does not set crossOrigin on the Audio element for local asset:// URLs", async () => {
+  it("sets crossOrigin='anonymous' on the Audio element before src for Web Audio compatibility", async () => {
     const { playPreview } = await import("./preview");
     const sound = createMockSound({ filePath: "ambient.wav" });
 
     await playPreview(sound);
 
     expect(mockAudioInstances).toHaveLength(1);
-    expect(mockAudioInstances[0].crossOriginSetter).not.toHaveBeenCalled();
+    expect(mockAudioInstances[0].crossOriginSetter).toHaveBeenCalledWith('anonymous');
   });
 
   it("creates a MediaElementSource and plays the audio", async () => {
