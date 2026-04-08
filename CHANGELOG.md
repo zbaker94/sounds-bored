@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.3.3
+
+This release brings meaningful reliability improvements to audio playback and the sound library: gain node memory leaks are fixed, missing files are now detected and flagged during playback, and errors surface as toast notifications instead of silent failures. The sound library also gains automatic rescanning on startup, an on-demand Refresh button, and smarter folder scanning that skips inaccessible locations gracefully while preserving any custom tags, names, or sets you've already added.
+
 - Minor visual styling update to the cancel download button in the Download Manager
 - Fixed audio engine memory leak: gain nodes are now properly disconnected from the audio graph when pads are stopped or the project is closed, preventing accumulation of orphaned audio nodes.
 - Refactored the Fade/Crossfade toolbar into a standalone `FadeToolbar` component for improved code organization (no user-visible behavior change)
