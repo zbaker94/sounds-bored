@@ -848,6 +848,11 @@ export async function triggerLayer(pad: Pad, layer: Layer): Promise<void> {
         deleteLayerChain(layer.id);
         clearLayerStreamingAudio(pad.id, layer.id);
         stopLayerWithRampInternal(pad, layer);
+        setTimeout(() => {
+          if (!isPadActive(pad.id)) {
+            usePlaybackStore.getState().removePlayingPad(pad.id);
+          }
+        }, STOP_RAMP_S * 1000 + 10);
         if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
           const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
           if (nextIndex >= resolved.length) {

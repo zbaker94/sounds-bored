@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an issue where pads could remain stuck in an active state after being stopped, ensuring proper cleanup after playback ends.
 - Fixed a bug where fade levels were applied in the wrong order, causing fades to go the wrong direction
 - Added internal test coverage for layer volume tracking in the playback state (no user-facing changes)
 - Added multi-fade mode UI pill that shows how many pads are selected for a fade operation, with Execute and Cancel controls
