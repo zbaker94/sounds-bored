@@ -2,7 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FadeToolbar } from "./FadeToolbar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { UseFadeModeReturn } from "@/hooks/useFadeMode";
+
+function renderWithTooltip(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
 
 function makeFadeMode(overrides: Partial<UseFadeModeReturn> = {}): UseFadeModeReturn {
   return {
@@ -38,7 +43,7 @@ describe("FadeToolbar", () => {
 
   it("calls cancel when Fade button is clicked and mode is 'fade'", async () => {
     const cancel = vi.fn();
-    render(
+    renderWithTooltip(
       <FadeToolbar
         fadeMode={makeFadeMode({ mode: "fade", cancel })}
       />,
@@ -124,7 +129,7 @@ describe("FadeToolbar", () => {
   });
 
   it("Fade button uses default variant when mode is 'fade'", () => {
-    render(
+    renderWithTooltip(
       <FadeToolbar fadeMode={makeFadeMode({ mode: "fade" })} />,
     );
     expect(screen.getByRole("button", { name: "Fade pad" })).toHaveAttribute(
@@ -146,7 +151,7 @@ describe("FadeToolbar", () => {
 
 describe("FadeToolbar — fade volume slider", () => {
   it("shows two-handle slider instead of Crossfade button when mode is 'fade'", () => {
-    render(
+    renderWithTooltip(
       <FadeToolbar
         fadeMode={{ ...makeFadeMode({ mode: "fade" }), fadeLevels: [0, 100] as [number, number], setFadeLevels: vi.fn() } as any}
       />,

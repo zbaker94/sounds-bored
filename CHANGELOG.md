@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed tooltip rendering in the fade volume slider by moving `TooltipProvider` to a higher level in the component tree
 - Added a two-handle volume slider to the Fade toolbar, letting you set custom start and end volume levels when fading pads in or out
 - Fade operations now respect the slider values instead of always fading between silence and full volume
 - Canceling fade mode resets the volume slider back to its defaults (0%–100%)

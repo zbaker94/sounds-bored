@@ -8,7 +8,6 @@ import { Slider as SliderPrimitive } from "radix-ui";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { UseFadeModeReturn } from "@/hooks/useFadeMode";
@@ -64,8 +63,7 @@ export function FadeToolbar({ fadeMode }: FadeToolbarProps) {
             transition={{ duration: 0.15 }}
             className="h-8 w-36 flex items-center px-1"
           >
-            <TooltipProvider>
-              <SliderPrimitive.Root
+            <SliderPrimitive.Root
                 value={fadeMode.fadeLevels}
                 onValueChange={(v) => fadeMode.setFadeLevels(v as [number, number])}
                 onPointerUp={() => setThumbsDragging([false, false])}
@@ -91,7 +89,6 @@ export function FadeToolbar({ fadeMode }: FadeToolbarProps) {
                   </Tooltip>
                 ))}
               </SliderPrimitive.Root>
-            </TooltipProvider>
           </motion.div>
         ) : (
           <motion.div
