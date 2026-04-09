@@ -6,6 +6,7 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { MultiFadePill } from "./MultiFadePill";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
+import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -42,6 +43,9 @@ const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
 
 export function SceneView() {
+  // Register multi-fade hotkeys (escape=cancel, enter=execute)
+  useMultiFadeMode();
+
   // Split into two selectors + useMemo so the O(n) .find() scan only runs when
   // scenes or activeSceneId actually changes. Notably, isDirty (toggled on every
   // auto-save) lives outside project, so it does not produce a new scenes reference
