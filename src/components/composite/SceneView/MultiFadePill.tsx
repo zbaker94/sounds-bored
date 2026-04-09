@@ -2,14 +2,11 @@ import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, PlayIcon } from "@hugeicons/core-free-icons";
-import type { UseMultiFadeModeReturn } from "@/hooks/useMultiFadeMode";
+import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
 
-interface MultiFadePillProps {
-  mode: UseMultiFadeModeReturn;
-}
-
-export function MultiFadePill({ mode }: MultiFadePillProps) {
-  const count = mode.selectedPads.size;
+export function MultiFadePill() {
+  const { selectedPads, canExecute, execute, cancel } = useMultiFadeMode();
+  const count = selectedPads.size;
 
   return (
     <motion.div
@@ -26,8 +23,8 @@ export function MultiFadePill({ mode }: MultiFadePillProps) {
       <Button
         size="sm"
         variant="default"
-        disabled={!mode.canExecute}
-        onClick={() => mode.execute()}
+        disabled={!canExecute}
+        onClick={() => execute()}
         className="gap-1.5"
       >
         <HugeiconsIcon icon={PlayIcon} size={14} />
@@ -35,7 +32,7 @@ export function MultiFadePill({ mode }: MultiFadePillProps) {
       </Button>
       <button
         type="button"
-        onClick={() => mode.cancel()}
+        onClick={() => cancel()}
         className="p-1 rounded-full hover:bg-white/20 transition-colors"
         aria-label="Cancel multi-fade"
       >

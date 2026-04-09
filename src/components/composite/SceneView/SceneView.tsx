@@ -22,7 +22,7 @@ import {
   ArrowRight01Icon,
   LayersLogoIcon,
 } from "@hugeicons/core-free-icons";
-import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
+import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn, modKey } from "@/lib/utils";
 import {
@@ -77,16 +77,18 @@ export function SceneView() {
   }
 
   const pads = activeScene?.pads ?? [];
-  const multiFadeMode = useMultiFadeMode(pads);
+  const multiFadeActive = useMultiFadeStore((s) => s.active);
+  const reopenPadId = useMultiFadeStore((s) => s.reopenPadId);
+  const clearMultiFadeReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
 
   // Reopen popover on the origin pad after multi-fade cancel
   const [openPopoverPadId, setOpenPopoverPadId] = useState<string | null>(null);
   useEffect(() => {
-    if (multiFadeMode.reopenPadId) {
-      setOpenPopoverPadId(multiFadeMode.reopenPadId);
-      multiFadeMode.clearReopenPadId();
+    if (reopenPadId) {
+      setOpenPopoverPadId(reopenPadId);
+      clearMultiFadeReopenPadId();
     }
-  }, [multiFadeMode.reopenPadId, multiFadeMode.clearReopenPadId]);
+  }, [reopenPadId, clearMultiFadeReopenPadId]);
 
   const handlePopoverOpened = useCallback(() => {
     setOpenPopoverPadId(null);
@@ -216,7 +218,6 @@ export function SceneView() {
                   sceneId={activeScene.id}
                   index={i}
                   onEditClick={handleEditClick}
-                  multiFadeMode={multiFadeMode}
                   forcePopoverOpen={openPopoverPadId === pad.id}
                   onPopoverOpened={handlePopoverOpened}
                 />
@@ -247,8 +248,8 @@ export function SceneView() {
       </DndContext>
 
       <AnimatePresence>
-        {multiFadeMode.active && (
-          <MultiFadePill key="multi-fade-pill" mode={multiFadeMode} />
+        {multiFadeActive && (
+          <MultiFadePill key="multi-fade-pill" />
         )}
       </AnimatePresence>
 

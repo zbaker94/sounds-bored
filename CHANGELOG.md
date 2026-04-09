@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Multi-fade mode state is now managed in a dedicated store, improving reliability and eliminating potential state sync issues between components
+- Pad buttons no longer require multi-fade state to be passed down as props, simplifying the component interface
+- Multi-fade fade levels now correctly initialize based on whether a pad is actively playing at the moment of selection
 - Layer volume sliders in the pad live controls popover now update independently — each layer subscribes to its own volume instead of re-rendering all layers together, reducing unnecessary UI updates.
 - Pad fade controls now automatically detect whether a pad is playing or stopped, removing the need to track playback state separately when applying fade in/out
 - Fixed an issue where volume sliders on pad controls could get stuck in a dragging state if the mouse was released outside the slider bounds.

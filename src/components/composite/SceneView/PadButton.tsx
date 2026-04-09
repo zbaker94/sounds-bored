@@ -7,8 +7,10 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
+import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { getPadProgress, stopPad } from "@/lib/audio/padPlayer";
+import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Copy01Icon, Delete02Icon, Alert02Icon } from "@hugeicons/core-free-icons";
@@ -17,19 +19,17 @@ import { PadLiveControlPopover } from "./PadLiveControlPopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { UseMultiFadeModeReturn } from "@/hooks/useMultiFadeMode";
 
 interface PadButtonProps {
   pad: Pad;
   sceneId: string;
   index?: number;
   onEditClick?: (pad: Pad) => void;
-  multiFadeMode?: UseMultiFadeModeReturn;
   forcePopoverOpen?: boolean;
   onPopoverOpened?: () => void;
 }
 
-export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, multiFadeMode, forcePopoverOpen, onPopoverOpened }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, forcePopoverOpen, onPopoverOpened }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -123,10 +123,17 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     [transform, transition],
   );
 
-  // Multi-fade mode derived state
-  const multiFadeActive = multiFadeMode?.active ?? false;
-  const isMultiFadeSelected = multiFadeActive && multiFadeMode!.selectedPads.has(pad.id);
-  const multiFadeLevels = isMultiFadeSelected ? multiFadeMode!.selectedPads.get(pad.id)!.levels : null;
+  // Multi-fade mode derived state — read from store directly
+  const multiFadeActive = useMultiFadeStore((s) => s.active);
+  const isMultiFadeSelected = useMultiFadeStore((s) => s.active && s.selectedPads.has(pad.id));
+  const multiFadeLevels = useMultiFadeStore((s) => {
+    if (!s.active) return null;
+    const entry = s.selectedPads.get(pad.id);
+    return entry ? entry.levels : null;
+  });
+  const toggleMultiFadePad = useMultiFadeStore((s) => s.toggleMultiFadePad);
+  const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
+  const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
 
   // 3D tilt — disabled in edit mode, during drag, and in multi-fade mode
   const tiltEnabled = !editMode && !isSortableDragging && !multiFadeActive;
@@ -186,9 +193,10 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
       if (e.button !== 0) return;
       e.preventDefault();
       const vol = usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0;
-      multiFadeMode?.togglePad(pad, vol);
+      const playing = isPadActive(pad.id);
+      toggleMultiFadePad(pad.id, playing, vol);
     },
-  }), [multiFadeMode, pad]);
+  }), [toggleMultiFadePad, pad.id]);
 
   // Right-click opens live control popover
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -330,7 +338,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     >
                       <SliderPrimitive.Root
                         value={[multiFadeLevels[0], multiFadeLevels[1]]}
-                        onValueChange={(v) => multiFadeMode!.setFadeLevels(pad.id, [v[0], v[1]])}
+                        onValueChange={(v) => setMultiFadeLevels(pad.id, [v[0], v[1]])}
                         min={0}
                         max={100}
                         step={1}
@@ -428,7 +436,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         onOpenChange={setPopoverOpen}
         anchorRef={buttonRef}
         onMultiFadeStart={(padId, currentVol) => {
-          multiFadeMode?.enter(padId, currentVol);
+          const playing = isPadActive(padId);
+          enterMultiFade(padId, playing, currentVol);
           setPopoverOpen(false);
         }}
       />
