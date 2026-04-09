@@ -3,8 +3,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useUiStore } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import {
-  fadePadOut,
-  fadePadIn,
+  fadePadWithLevels,
   resolveFadeDuration,
 } from "@/lib/audio/padPlayer";
 import { isPadActive } from "@/lib/audio/audioState";
@@ -124,18 +123,11 @@ export function useMultiFadeMode(pads: Pad[]): UseMultiFadeModeReturn {
       const pad = pads.find((p) => p.id === padId);
       if (!pad) continue;
       const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-      const playing = isPadActive(padId);
 
-      if (playing) {
-        // Fade from right thumb to left thumb
-        fadePadOut(pad, duration, fade.levels[1] / 100, fade.levels[0] / 100);
-      } else {
-        // Fade from left thumb to right thumb
-        fadePadIn(pad, duration, fade.levels[0] / 100, fade.levels[1] / 100).catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : String(err);
-          toast.error(`Playback error: audio fade failed — ${message}`);
-        });
-      }
+      fadePadWithLevels(pad, duration, fade.levels[0] / 100, fade.levels[1] / 100).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(`Playback error: audio fade failed — ${message}`);
+      });
     }
 
     setActive(false);

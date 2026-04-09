@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad fade controls now automatically detect whether a pad is playing or stopped, removing the need to track playback state separately when applying fade in/out
 - Fixed an issue where volume sliders on pad controls could get stuck in a dragging state if the mouse was released outside the slider bounds.
 - Performance improvement: pad volume is now read more efficiently during fade operations, reducing unnecessary re-renders
 - Added multi-pad fade mode: select multiple pads and fade them in or out simultaneously with configurable volume levels

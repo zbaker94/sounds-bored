@@ -989,6 +989,28 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
   });
 }
 
+/**
+ * Fade a pad in or out based on its current playback state, using explicit level endpoints.
+ * @param pad - The pad to fade
+ * @param duration - Fade duration in milliseconds
+ * @param fromLevel - Start level (0–1)
+ * @param toLevel - End level (0–1)
+ */
+export function fadePadWithLevels(
+  pad: Pad,
+  duration: number,
+  fromLevel: number,
+  toLevel: number,
+): Promise<void> {
+  const playing = isPadActive(pad.id);
+  if (playing) {
+    fadePadOut(pad, duration, fromLevel, toLevel);
+    return Promise.resolve();
+  } else {
+    return fadePadIn(pad, duration, fromLevel, toLevel);
+  }
+}
+
 /** Skip back in a sequential/shuffled chain. No-op for simultaneous arrangement. */
 export function skipLayerBack(pad: Pad, layerId: string): void {
   const layer = pad.layers.find((l) => l.id === layerId);

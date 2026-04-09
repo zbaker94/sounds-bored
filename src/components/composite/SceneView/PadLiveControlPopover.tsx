@@ -32,8 +32,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import {
   triggerPad,
   stopPad,
-  fadePadOut,
-  fadePadIn,
+  fadePadWithLevels,
   resolveFadeDuration,
   triggerLayer,
   stopLayerWithRamp,
@@ -153,16 +152,12 @@ function PadLiveControlContent({
     const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
     const duration = resolveFadeDuration(pad, globalFadeDurationMs);
 
-    if (isPlaying) {
-      fadePadOut(pad, duration, fadeLevels[1] / 100, fadeLevels[0] / 100);
-    } else {
-      fadePadIn(pad, duration, fadeLevels[0] / 100, fadeLevels[1] / 100).catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Playback error: audio fade failed — ${message}`);
-      });
-    }
+    fadePadWithLevels(pad, duration, fadeLevels[0] / 100, fadeLevels[1] / 100).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Playback error: audio fade failed — ${message}`);
+    });
     onClose();
-  }, [isPlaying, pad, fadeLevels, onClose]);
+  }, [pad, fadeLevels, onClose]);
 
   const handleMultiFade = useCallback(() => {
     onMultiFadeStart(pad.id, padVolume);
