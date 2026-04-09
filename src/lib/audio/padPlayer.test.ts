@@ -2994,3 +2994,398 @@ describe("skipLayerBack", () => {
     expect(chain?.length).toBe(2); // [soundB, soundC]
   });
 });
+
+// ─── fadePadWithLevels ────────────────────────────────────────────────────────
+
+describe("fadePadWithLevels", () => {
+  it("calls fadePadOut (volume transition) with SWAPPED levels when pad is playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { triggerPad, fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-playing-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+
+    // fadePadWithLevels(pad, 1000, fromLevel=0.2, toLevel=0.8)
+    // Since pad is playing, should call fadePadOut with swapped args:
+    //   fadePadOut(pad, 1000, fromVolume=0.8, toVolume=0.2)
+    // This ramps the gain from 0.8 down to 0.2.
+    const gain = (await import("./padPlayer")).getPadGain(pad.id);
+    fadePadWithLevels(pad, 1000, 0.2, 0.8);
+
+    // fadePadOut schedules a ramp — verify the ramp was called with the toVolume=0.2 (swapped fromLevel)
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("shows volume transition when pad is playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { triggerPad, fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-transition-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    fadePadWithLevels(pad, 1000, 0.0, 1.0);
+
+    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    clearAllFadeTracking();
+  });
+
+  it("returns a resolved promise for playing path", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { triggerPad, fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-promise-playing-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    const result = fadePadWithLevels(pad, 1000, 0.0, 1.0);
+
+    // Playing path returns Promise.resolve()
+    await expect(result).resolves.toBeUndefined();
+    clearAllFadeTracking();
+  });
+
+  it("fades in (ramps gain up) when pad is not playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const { fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-not-playing-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    // Pad is NOT playing — fadePadWithLevels should call fadePadIn(pad, 1000, 0.0, 0.8)
+    // fadePadIn triggers the pad then ramps gain up to toLevel=0.8
+    const resultPromise = fadePadWithLevels(pad, 1000, 0.0, 0.8);
+
+    // fadePadIn path triggers the pad and starts a volume transition
+    await vi.waitFor(() => {
+      expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    });
+    await expect(resultPromise).resolves.toBeUndefined();
+    clearAllFadeTracking();
+  });
+
+  it("ramps gain to toLevel (not 1.0) when pad is not playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const mockGain = makeMockGain();
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(mockGain);
+
+    const { fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-ramp-level-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    // fromLevel=0.0, toLevel=0.6 — fadePadIn should ramp to 0.6, not 1.0
+    fadePadWithLevels(pad, 1000, 0.0, 0.6);
+
+    await vi.waitFor(() => {
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
+    });
+    clearAllFadeTracking();
+  });
+});
+
+// ─── stopLayerWithRamp ────────────────────────────────────────────────────────
+
+describe("stopLayerWithRamp", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("is a no-op when layer id doesn't exist on the pad", async () => {
+    const { stopLayerWithRamp } = await import("./padPlayer");
+    const pad = createMockPad();
+    expect(() => stopLayerWithRamp(pad, "nonexistent-layer")).not.toThrow();
+  });
+
+  it("is a no-op when the layer has no active voices", async () => {
+    const { stopLayerWithRamp } = await import("./padPlayer");
+    const layer = createMockLayer({ arrangement: "simultaneous" });
+    const pad = createMockPad({ layers: [layer] });
+
+    // layer has no voices — should not throw or call source.stop
+    expect(() => stopLayerWithRamp(pad, layer.id)).not.toThrow();
+    vi.advanceTimersByTime(35);
+    // No sources were created, nothing to verify beyond no-throw
+  });
+
+  it("removes pad from playingPadIds after ramp when no layers remain active", async () => {
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const { triggerPad, stopLayerWithRamp } = await import("./padPlayer");
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    stopLayerWithRamp(pad, layer.id);
+
+    // During the ramp, pad should still appear playing
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    // After ramp completes
+    vi.advanceTimersByTime(35);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("does not remove pad from playingPadIds when another layer is still active", async () => {
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer1 = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const layer2 = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer1, layer2] });
+
+    const { triggerPad, stopLayerWithRamp } = await import("./padPlayer");
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    // Stop only layer1 — layer2 is still active
+    stopLayerWithRamp(pad, layer1.id);
+    vi.advanceTimersByTime(35);
+
+    // Pad should still be playing because layer2 is active
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+  });
+
+  it("ramps the source gain to 0 before stopping", async () => {
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const { triggerPad, stopLayerWithRamp } = await import("./padPlayer");
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(createdSources).toHaveLength(1);
+
+    stopLayerWithRamp(pad, layer.id);
+    // Source not stopped synchronously — ramp in progress
+    expect(createdSources[0].stop).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(35);
+    expect(createdSources[0].stop).toHaveBeenCalledOnce();
+  });
+});
+
+// ─── triggerLayer ─────────────────────────────────────────────────────────────
+
+describe("triggerLayer", () => {
+  it("is a no-op when no sounds are resolved for the layer", async () => {
+    const { triggerLayer } = await import("./padPlayer");
+    // No sounds in library — resolved will be empty
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: "si-1", soundId: "nonexistent", volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerLayer(pad, layer);
+
+    expect(mockLoadBuffer).not.toHaveBeenCalled();
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("starts playback and marks pad as playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const sound = createMockSound({ id: "s1", filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerLayer(pad, layer);
+
+    expect(mockLoadBuffer).toHaveBeenCalledOnce();
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+  });
+
+  it("retriggerMode stop: stops the layer when active and does not restart", async () => {
+    vi.useFakeTimers();
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "stop",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // First trigger — starts playback
+    await triggerLayer(pad, layer);
+    await vi.runAllTimersAsync();
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Second trigger while active with stop mode — stops, does NOT play again
+    await triggerLayer(pad, layer);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1); // no new loads
+
+    // After ramp completes, layer is no longer active
+    vi.advanceTimersByTime(35);
+    const { isLayerActive: checkLayerActive } = await import("./audioState");
+    expect(checkLayerActive(layer.id)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("retriggerMode stop: removes pad from playingPadIds after ramp", async () => {
+    vi.useFakeTimers();
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "stop",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerLayer(pad, layer);
+    await vi.runAllTimersAsync();
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    // Second trigger stops it
+    await triggerLayer(pad, layer);
+    vi.advanceTimersByTime(35);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("retriggerMode continue: ignores retrigger when already playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "continue",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerLayer(pad, layer);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Retrigger while active: should be ignored
+    await triggerLayer(pad, layer);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+  });
+
+  it("retriggerMode restart: stops and restarts when already playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockImplementation(() => {
+      const s = makeMockSource();
+      createdSources.push(s);
+      return s;
+    });
+    mockCtx.createGain.mockReturnValue(makeMockGain());
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerLayer(pad, layer);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(1);
+
+    // Retrigger with restart: should restart playback
+    await triggerLayer(pad, layer);
+    expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+  });
+});
