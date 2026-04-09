@@ -46,6 +46,8 @@ import {
   Download04Icon,
   Delete02Icon,
   RefreshIcon,
+  Search01Icon,
+  Cancel01Icon,
 } from "@hugeicons/core-free-icons";
 import type { GlobalFolder, Sound, Tag } from "@/lib/schemas";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
@@ -61,6 +63,7 @@ import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
 import { useProjectStore } from "@/state/projectStore";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Item,
   ItemActions,
@@ -156,6 +159,7 @@ export function SoundsPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(
     folders[0]?.id ?? sets[0]?.id ?? null,
   );
+  const [searchQuery, setSearchQuery] = useState("");
 
   const selectedFolder = useMemo(
     () => folders.find((f) => f.id === selectedId) ?? null,
@@ -176,9 +180,36 @@ export function SoundsPanel() {
     [sounds, selectedId],
   );
 
+  const filteredSets = useMemo(() => {
+    if (!searchQuery) return sets;
+    const q = searchQuery.toLowerCase();
+    return sets.filter((s) => s.name.toLowerCase().includes(q));
+  }, [sets, searchQuery]);
+
+  const filteredFolders = useMemo(() => {
+    if (!searchQuery) return folders;
+    const q = searchQuery.toLowerCase();
+    return folders.filter(
+      (f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q),
+    );
+  }, [folders, searchQuery]);
+
+  const filteredSounds = useMemo(() => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return sounds.filter((s) => {
+        if (s.name.toLowerCase().includes(q)) return true;
+        return tags
+          .filter((t) => s.tags.includes(t.id))
+          .some((t) => t.name.toLowerCase().includes(q));
+      });
+    }
+    return soundsForSelectedId;
+  }, [sounds, soundsForSelectedId, tags, searchQuery]);
+
   const selectableSounds = useMemo(
-    () => soundsForSelectedId.filter((s) => !missingSoundIds.has(s.id)),
-    [soundsForSelectedId, missingSoundIds],
+    () => filteredSounds.filter((s) => !missingSoundIds.has(s.id)),
+    [filteredSounds, missingSoundIds],
   );
 
   const allMissingSounds = useMemo(
@@ -629,6 +660,33 @@ export function SoundsPanel() {
           </TooltipTrigger>
           <TooltipContent>Download from URL</TooltipContent>
         </Tooltip>
+        <div className="relative ml-auto flex items-center">
+          <HugeiconsIcon
+            icon={Search01Icon}
+            size={14}
+            className="absolute left-2.5 text-white/50 pointer-events-none"
+          />
+          <Input
+            type="text"
+            placeholder="Search..."
+            className="h-8 pl-8 pr-7 w-48 text-sm rounded-full bg-black border-white text-white placeholder:text-white/60 focus-visible:border-white focus-visible:ring-white/20"
+            value={searchQuery}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchQuery(value);
+              if (value) setSelectedId(null);
+            }}
+          />
+          {searchQuery && (
+            <button
+              className="absolute right-2.5 text-yellow-400 hover:text-yellow-300"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={14} />
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex flex-1 min-h-0 gap-2">
         <div className="flex flex-col w-1/2 gap-2">
@@ -666,7 +724,7 @@ export function SoundsPanel() {
               </div>
             )}
             <div className="p-2 flex-1">
-            {sets.map((set) => (
+            {filteredSets.map((set) => (
               <Item
                 key={set.id}
                 variant="panel"
@@ -685,7 +743,7 @@ export function SoundsPanel() {
               </Item>
             ))}
             </div>
-            {sets.length === 0 && (
+            {sets.length === 0 && !searchQuery && (
               <Empty>
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
@@ -817,7 +875,7 @@ export function SoundsPanel() {
               </div>
             )}
             <div className="p-2 flex-1">
-              {folders.map((folder) => {
+              {filteredFolders.map((folder) => {
                 const isFolderMissing = missingFolderIds.has(folder.id);
                 return (
                   <Item
@@ -857,7 +915,7 @@ export function SoundsPanel() {
                   </Item>
                 );
               })}
-              {folders.length === 0 && (
+              {folders.length === 0 && !searchQuery && (
                 <Empty>
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -967,10 +1025,10 @@ export function SoundsPanel() {
             {activeDownloadJobs.map((job) => (
               <DownloadItem key={job.id} job={job} />
             ))}
-            {activeDownloadJobs.length > 0 && soundsForSelectedId.length > 0 && (
+            {activeDownloadJobs.length > 0 && filteredSounds.length > 0 && (
               <div className="border-t border-white/10 my-1" />
             )}
-            {soundsForSelectedId.map((sound) => {
+            {filteredSounds.map((sound) => {
               const isSoundMissing = missingSoundIds.has(sound.id);
               return (
                 <Item
