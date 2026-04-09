@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.4.3
+
+Developers can now build installer artifacts locally using the new `scripts/build-local.sh` script, mirroring the CI release workflow without needing to push a tag.
+
 - Added a local release build script (`scripts/build-local.sh`) that lets developers build installer artifacts locally without CI.
 
 ## v1.4.0
