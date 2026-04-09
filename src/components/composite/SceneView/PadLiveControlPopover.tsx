@@ -54,6 +54,103 @@ interface PadLiveControlPopoverProps {
 
 const STAGGER_DELAY = 0.04;
 
+function LayerRow({
+  pad,
+  layer,
+  idx,
+  layerActive,
+}: {
+  pad: Pad;
+  layer: Pad["layers"][number];
+  idx: number;
+  layerActive: boolean;
+}) {
+  const layerVol = usePlaybackStore((s) => Math.round((s.layerVolumes[layer.id] ?? 1.0) * 100));
+  const showSkip = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
+
+  return (
+    <motion.div
+      key={layer.id}
+      className="flex flex-col gap-1 rounded-lg bg-muted/50 p-1.5"
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.12, delay: STAGGER_DELAY * 2 + idx * 0.03 }}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className={`text-xs ${layerActive ? "text-emerald-400" : "text-muted-foreground"}`}>
+          {layerActive ? "\u25CF" : "\u25CB"}
+        </span>
+        <span className="text-xs font-medium flex-1 truncate">
+          {layer.name || `Layer ${idx + 1}`}
+        </span>
+        <AnimatePresence mode="wait">
+          {layerActive ? (
+            <motion.div key="stop-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+              <button
+                type="button"
+                onClick={() => stopLayerWithRamp(pad, layer.id)}
+                className="p-0.5 rounded hover:bg-destructive/20 transition-colors"
+                aria-label={`Stop ${layer.name || `Layer ${idx + 1}`}`}
+              >
+                <HugeiconsIcon icon={StopIcon} size={12} />
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div key="play-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerLayer(pad, layer).catch((err: unknown) => {
+                    const message = err instanceof Error ? err.message : String(err);
+                    toast.error(`Playback error: ${message}`);
+                  });
+                }}
+                className="p-0.5 rounded hover:bg-primary/20 transition-colors"
+                aria-label={`Play ${layer.name || `Layer ${idx + 1}`}`}
+              >
+                <HugeiconsIcon icon={PlayIcon} size={12} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {showSkip && (
+          <>
+            <button
+              type="button"
+              onClick={() => skipLayerBack(pad, layer.id)}
+              className="p-0.5 rounded hover:bg-muted transition-colors"
+              aria-label="Skip back"
+            >
+              <HugeiconsIcon icon={PreviousIcon} size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => skipLayerForward(pad, layer.id)}
+              className="p-0.5 rounded hover:bg-muted transition-colors"
+              aria-label="Skip forward"
+            >
+              <HugeiconsIcon icon={NextIcon} size={12} />
+            </button>
+          </>
+        )}
+      </div>
+      <SliderPrimitive.Root
+        value={[layerVol]}
+        onValueChange={([v]) => setLayerVolume(layer.id, v / 100)}
+        min={0}
+        max={100}
+        step={1}
+        className="relative flex w-full touch-none items-center select-none"
+      >
+        <SliderPrimitive.Track className="relative grow overflow-hidden rounded-4xl bg-muted h-2 w-full">
+          <SliderPrimitive.Range className="absolute h-full bg-primary" />
+        </SliderPrimitive.Track>
+        <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm ring-ring/50 transition-colors select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden" />
+      </SliderPrimitive.Root>
+    </motion.div>
+  );
+}
+
 function PadLiveControlContent({
   pad,
   onMultiFadeStart,
@@ -65,7 +162,6 @@ function PadLiveControlContent({
 }) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
-  const layerVolumes = usePlaybackStore((s) => s.layerVolumes);
 
   const [fadeLevels, setFadeLevels] = useState<[number, number]>(() => {
     if (isPlaying) {
@@ -254,89 +350,14 @@ function PadLiveControlContent({
         <div className="flex flex-col gap-1">
           {pad.layers.map((layer, idx) => {
             const layerActive = activeLayerIds.has(layer.id);
-            const layerVol = Math.round((layerVolumes[layer.id] ?? 1.0) * 100);
-            const showSkip = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
-
             return (
-              <motion.div
+              <LayerRow
                 key={layer.id}
-                className="flex flex-col gap-1 rounded-lg bg-muted/50 p-1.5"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.12, delay: STAGGER_DELAY * 2 + idx * 0.03 }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs ${layerActive ? "text-emerald-400" : "text-muted-foreground"}`}>
-                    {layerActive ? "\u25CF" : "\u25CB"}
-                  </span>
-                  <span className="text-xs font-medium flex-1 truncate">
-                    {layer.name || `Layer ${idx + 1}`}
-                  </span>
-                  <AnimatePresence mode="wait">
-                    {layerActive ? (
-                      <motion.div key="stop-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
-                        <button
-                          type="button"
-                          onClick={() => stopLayerWithRamp(pad, layer.id)}
-                          className="p-0.5 rounded hover:bg-destructive/20 transition-colors"
-                          aria-label={`Stop ${layer.name || `Layer ${idx + 1}`}`}
-                        >
-                          <HugeiconsIcon icon={StopIcon} size={12} />
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <motion.div key="play-layer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            triggerLayer(pad, layer).catch((err: unknown) => {
-                              const message = err instanceof Error ? err.message : String(err);
-                              toast.error(`Playback error: ${message}`);
-                            });
-                          }}
-                          className="p-0.5 rounded hover:bg-primary/20 transition-colors"
-                          aria-label={`Play ${layer.name || `Layer ${idx + 1}`}`}
-                        >
-                          <HugeiconsIcon icon={PlayIcon} size={12} />
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  {showSkip && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => skipLayerBack(pad, layer.id)}
-                        className="p-0.5 rounded hover:bg-muted transition-colors"
-                        aria-label="Skip back"
-                      >
-                        <HugeiconsIcon icon={PreviousIcon} size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => skipLayerForward(pad, layer.id)}
-                        className="p-0.5 rounded hover:bg-muted transition-colors"
-                        aria-label="Skip forward"
-                      >
-                        <HugeiconsIcon icon={NextIcon} size={12} />
-                      </button>
-                    </>
-                  )}
-                </div>
-                <SliderPrimitive.Root
-                  value={[layerVol]}
-                  onValueChange={([v]) => setLayerVolume(layer.id, v / 100)}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="relative flex w-full touch-none items-center select-none"
-                >
-                  <SliderPrimitive.Track className="relative grow overflow-hidden rounded-4xl bg-muted h-2 w-full">
-                    <SliderPrimitive.Range className="absolute h-full bg-primary" />
-                  </SliderPrimitive.Track>
-                  <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm ring-ring/50 transition-colors select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden" />
-                </SliderPrimitive.Root>
-              </motion.div>
+                pad={pad}
+                layer={layer}
+                idx={idx}
+                layerActive={layerActive}
+              />
             );
           })}
         </div>
