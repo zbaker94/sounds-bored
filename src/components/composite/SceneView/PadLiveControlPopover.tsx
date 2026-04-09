@@ -75,6 +75,16 @@ function PadLiveControlContent({
     return [0, 100];
   });
 
+  // Re-sync fadeLevels when playback state changes so the slider is never stale
+  useEffect(() => {
+    if (isPlaying) {
+      setFadeLevels([0, Math.round(padVolume * 100)]);
+    } else {
+      setFadeLevels([0, 100]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying]); // intentionally omit padVolume — only sync on play/stop transitions
+
   // Track active layers via RAF polling — only runs when pad is playing
   const [activeLayerIds, setActiveLayerIds] = useState<Set<string>>(new Set());
   const rafRef = useRef<number | null>(null);
