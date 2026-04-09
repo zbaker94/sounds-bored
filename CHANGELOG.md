@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.4.4
+
+This release includes internal infrastructure improvements only — no changes to app functionality or user-facing features.
+
 - Internal release infrastructure refactored; no changes to app functionality or user-facing features.
 
 ## v1.4.3
