@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added comprehensive test coverage for the multi-pad fade mode feature, validating selection management, execution, and cancellation behavior.
 - Live volume control is now tracked per-layer, enabling real-time visual feedback for individual layer volume adjustments during playback.
 - Multi-fade mode state is now managed in a dedicated store, improving reliability and eliminating potential state sync issues between components
 - Pad buttons no longer require multi-fade state to be passed down as props, simplifying the component interface
