@@ -822,10 +822,11 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
 export function setLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
+  const clamped = Math.max(0, Math.min(1, volume));
   const ctx = getAudioContext();
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  usePlaybackStore.getState().updateLayerVolume(layerId, volume);
+  gain.gain.setValueAtTime(clamped, ctx.currentTime);
+  usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
 }
 
 /** Trigger a single layer of a pad in isolation, respecting retrigger mode/arrangement/selection. */

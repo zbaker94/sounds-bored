@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Layer volume control now clamps to a valid 0–100% range, preventing audio distortion from out-of-bounds values
 - Added live layer volume control, allowing per-layer volume to be adjusted during playback
 - Added skip forward/back controls for sequential pad layers, enabling navigation through a layer's sound sequence while playing
 - Added comprehensive test coverage for the multi-pad fade mode feature, validating selection management, execution, and cancellation behavior.

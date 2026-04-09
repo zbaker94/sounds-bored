@@ -2803,6 +2803,35 @@ describe("setLayerVolume", () => {
     const layerGain = gains[1];
     expect(layerGain.gain.setValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
   });
+
+  it("clamps volume to [0, 1] range", async () => {
+    const { triggerPad, setLayerVolume } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Test clamping values greater than 1
+    setLayerVolume(layer.id, 1.5);
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeLessThanOrEqual(1.0);
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(1.0);
+
+    // Test clamping values less than 0
+    setLayerVolume(layer.id, -0.5);
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeGreaterThanOrEqual(0.0);
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(0.0);
+
+    // Test that values within range are not changed
+    setLayerVolume(layer.id, 0.5);
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(0.5);
+  });
 });
 
 // ─── skipLayerForward ─────────────────────────────────────────────────────────
