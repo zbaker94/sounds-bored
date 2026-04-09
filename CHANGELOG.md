@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added internal filesystem capability to support file metadata operations
 - Added a search bar to the Sound Library panel that filters sounds, folders, and sets by name in real time
 - When searching, results span all sounds across the library (not limited to the selected folder/set), with tag-name matching included
 - A clear button (×) appears in the search bar to quickly reset the filter

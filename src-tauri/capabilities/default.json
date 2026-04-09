@@ -31,6 +31,7 @@
     "fs:allow-mkdir",
     "fs:allow-remove",
     "fs:allow-exists",
+    "fs:allow-stat",
     "fs:scope-appdata-recursive",
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
