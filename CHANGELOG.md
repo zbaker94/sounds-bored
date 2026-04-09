@@ -1,5 +1,10 @@
 # Changelog
 
+## Current Changes
+- Added a two-handle volume slider to the Fade toolbar, letting you set custom start and end volume levels when fading pads in or out
+- Fade operations now respect the slider values instead of always fading between silence and full volume
+- Canceling fade mode resets the volume slider back to its defaults (0%–100%)
+
 ## v1.4.4
 
 This release includes internal infrastructure improvements only — no changes to app functionality or user-facing features.

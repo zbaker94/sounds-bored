@@ -10,6 +10,8 @@ function makeFadeMode(overrides: Partial<UseFadeModeReturn> = {}): UseFadeModeRe
     hasPlayingPads: false,
     canExecute: false,
     statusLabel: null,
+    fadeLevels: [0, 100],
+    setFadeLevels: vi.fn(),
     getPadFadeVisual: vi.fn().mockReturnValue(null),
     enterFade: vi.fn(),
     enterCrossfade: vi.fn(),
@@ -139,5 +141,37 @@ describe("FadeToolbar", () => {
       "data-variant",
       "ghost",
     );
+  });
+});
+
+describe("FadeToolbar — fade volume slider", () => {
+  it("shows two-handle slider instead of Crossfade button when mode is 'fade'", () => {
+    render(
+      <FadeToolbar
+        fadeMode={{ ...makeFadeMode({ mode: "fade" }), fadeLevels: [0, 100] as [number, number], setFadeLevels: vi.fn() } as any}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Crossfade pads" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("slider")).toHaveLength(2);
+  });
+
+  it("does not show slider when mode is null", () => {
+    render(
+      <FadeToolbar
+        fadeMode={{ ...makeFadeMode({ mode: null }), fadeLevels: [0, 100] as [number, number], setFadeLevels: vi.fn() } as any}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Crossfade pads" })).toBeInTheDocument();
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  });
+
+  it("does not show slider when mode is 'crossfade'", () => {
+    render(
+      <FadeToolbar
+        fadeMode={{ ...makeFadeMode({ mode: "crossfade" }), fadeLevels: [0, 100] as [number, number], setFadeLevels: vi.fn() } as any}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Crossfade pads" })).toBeInTheDocument();
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   });
 });

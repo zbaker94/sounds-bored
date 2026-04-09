@@ -1145,6 +1145,21 @@ describe("fadePadOut", () => {
     vi.useRealTimers();
   });
 
+  it("does not stop the pad when toVolume is non-zero", async () => {
+    vi.useFakeTimers();
+    const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-nonzero-pad" });
+
+    usePlaybackStore.setState({ playingPadIds: new Set([pad.id]) });
+
+    fadePadOut(pad, 500, undefined, 0.3);
+    vi.advanceTimersByTime(510);
+
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+    clearAllFadeTracking();
+    vi.useRealTimers();
+  });
+
   it("adds pad to volumeTransitioningPadIds when fade starts", async () => {
     const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-vol-pad" });
@@ -2605,5 +2620,127 @@ describe("startLayerSound MissingFileError handling", () => {
 
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("file not found"));
     expect(mockCheckMissingStatus).toHaveBeenCalledWith(["/sounds"], expect.any(Array));
+  });
+});
+
+// ─── fadePadOut — custom volumes ─────────────────────────────────────────────
+
+describe("fadePadOut — custom fromVolume and toVolume", () => {
+  it("ramps to custom toVolume instead of 0 when provided", async () => {
+    const { fadePadOut, getPadGain, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-custom-to-pad" });
+
+    fadePadOut(pad, 1000, undefined, 0.3);
+
+    const gain = getPadGain(pad.id);
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("sets gain to custom fromVolume before ramping when provided", async () => {
+    const { fadePadOut, getPadGain, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({ id: "fade-out-custom-from-pad" });
+
+    fadePadOut(pad, 1000, 0.8, 0.0);
+
+    const gain = getPadGain(pad.id);
+    expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.8, expect.any(Number));
+    clearAllFadeTracking();
+  });
+});
+
+// ─── fadePadIn — custom volumes ───────────────────────────────────────────────
+
+describe("fadePadIn — custom fromVolume and toVolume", () => {
+  it("ramps to custom toVolume instead of 1.0 when provided", async () => {
+    const mockBuffer = { duration: 1.0, numberOfChannels: 1, sampleRate: 44100 };
+    mockLoadBuffer.mockResolvedValue(mockBuffer);
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    const gain = makeMockGain();
+    mockCtx.createGain.mockReturnValue(gain);
+
+    const { fadePadIn, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fade-in-custom-to-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await fadePadIn(pad, 1000, undefined, 0.7);
+
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("starts from custom fromVolume instead of 0 when provided", async () => {
+    const mockBuffer = { duration: 1.0, numberOfChannels: 1, sampleRate: 44100 };
+    mockLoadBuffer.mockResolvedValue(mockBuffer);
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    const gain = makeMockGain();
+    mockCtx.createGain.mockReturnValue(gain);
+
+    const { fadePadIn, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fade-in-custom-from-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await fadePadIn(pad, 1000, 0.4, 1.0);
+
+    expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.4, expect.any(Number));
+    clearAllFadeTracking();
+  });
+});
+
+// ─── executeFadeTap — custom volumes ─────────────────────────────────────────
+
+describe("executeFadeTap — custom fromVolume and toVolume", () => {
+  it("fades out to custom toVolume when pad is active", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    const gain = makeMockGain();
+    mockCtx.createGain.mockReturnValue(gain);
+
+    const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-custom-out-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    executeFadeTap(pad, undefined, 1.0, 0.2);
+
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("fades in to custom toVolume when pad is not active", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    const gain = makeMockGain();
+    mockCtx.createGain.mockReturnValue(gain);
+
+    const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "tap-custom-in-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    executeFadeTap(pad, undefined, 0.0, 0.7);
+    await tick();
+
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, expect.any(Number));
+    clearAllFadeTracking();
   });
 });

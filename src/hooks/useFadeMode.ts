@@ -25,6 +25,8 @@ export interface UseFadeModeReturn {
   hasPlayingPads: boolean;
   canExecute: boolean;
   statusLabel: string | null;
+  fadeLevels: [number, number];
+  setFadeLevels: (levels: [number, number]) => void;
   getPadFadeVisual: (padId: string) => PadFadeVisual;
   enterFade: () => void;
   enterCrossfade: () => void;
@@ -38,6 +40,7 @@ const EMPTY_PAD_IDS = Object.freeze(new Set<string>()) as ReadonlySet<string>;
 export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const [mode, setMode] = useState<FadeMode>(null);
   const [selectedPadIds, setSelectedPadIds] = useState<Set<string>>(new Set());
+  const [fadeLevels, setFadeLevels] = useState<[number, number]>([0, 100]);
 
   // Primitive subscription — always active, for entry guards and hotkey checks
   const hasPlayingPads = usePlaybackStore((s) => s.playingPadIds.size > 0);
@@ -53,6 +56,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
   const cancel = useCallback(() => {
     setMode(null);
     setSelectedPadIds(new Set());
+    setFadeLevels([0, 100]);
   }, []);
 
   // Cancel when edit mode activates
@@ -85,7 +89,10 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
 
       if (mode === "fade") {
         const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
-        executeFadeTap(pad, globalFadeDurationMs);
+        const isPlaying = playingPadIds.has(padId);
+        const fromVol = isPlaying ? fadeLevels[1] / 100 : fadeLevels[0] / 100;
+        const toVol   = isPlaying ? fadeLevels[0] / 100 : fadeLevels[1] / 100;
+        executeFadeTap(pad, globalFadeDurationMs, fromVol, toVol);
         cancel();
         return;
       }
@@ -104,7 +111,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
         setSelectedPadIds(next);
       }
     },
-    [mode, pads, selectedPadIds, cancel],
+    [mode, pads, selectedPadIds, cancel, fadeLevels, playingPadIds],
   );
 
   const canExecute = useMemo(() => {
@@ -178,6 +185,8 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
     hasPlayingPads,
     canExecute,
     statusLabel,
+    fadeLevels,
+    setFadeLevels,
     getPadFadeVisual,
     enterFade,
     enterCrossfade,

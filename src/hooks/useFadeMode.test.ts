@@ -92,7 +92,8 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
-    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined);
+    // playing pad + default levels [0,100]: from=high=1.0, to=low=0.0
+    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined, 1.0, 0.0);
     expect(result.current.mode).toBeNull();
   });
 
@@ -100,7 +101,8 @@ describe("useFadeMode — onPadTap in fade mode", () => {
     const { result } = renderHook(() => useFadeMode(allPads));
     act(() => result.current.enterFade());
     act(() => result.current.onPadTap(padA.id));
-    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined);
+    // non-playing pad + default levels [0,100]: from=low=0.0, to=high=1.0
+    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined, 0.0, 1.0);
     expect(result.current.mode).toBeNull();
   });
 
@@ -455,5 +457,45 @@ describe("useFadeMode — statusLabel", () => {
     act(() => result.current.onPadTap(padA.id));
     act(() => result.current.onPadTap(padB.id));
     expect(result.current.statusLabel).toBe("Ready — press X or Enter to execute");
+  });
+});
+
+describe("useFadeMode — fadeLevels", () => {
+  it("defaults to [0, 100]", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    expect((result.current as any).fadeLevels).toEqual([0, 100]);
+  });
+
+  it("setFadeLevels updates the slider values", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => (result.current as any).setFadeLevels([20, 80]));
+    expect((result.current as any).fadeLevels).toEqual([20, 80]);
+  });
+
+  it("cancel resets fadeLevels to [0, 100]", () => {
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => (result.current as any).setFadeLevels([20, 80]));
+    act(() => result.current.cancel());
+    expect((result.current as any).fadeLevels).toEqual([0, 100]);
+  });
+});
+
+describe("useFadeMode — onPadTap passes custom fade levels to executeFadeTap", () => {
+  it("uses custom levels: from=high, to=low for a playing pad", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set([padA.id]) });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    act(() => (result.current as any).setFadeLevels([20, 80]));
+    act(() => result.current.onPadTap(padA.id));
+    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined, 0.8, 0.2);
+  });
+
+  it("uses custom levels: from=low, to=high for a non-playing pad", () => {
+    usePlaybackStore.setState({ playingPadIds: new Set() });
+    const { result } = renderHook(() => useFadeMode(allPads));
+    act(() => result.current.enterFade());
+    act(() => (result.current as any).setFadeLevels([20, 80]));
+    act(() => result.current.onPadTap(padA.id));
+    expect(executeFadeTap).toHaveBeenCalledWith(padA, undefined, 0.2, 0.8);
   });
 });

@@ -94,18 +94,20 @@ export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): nu
   return pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
 }
 
-export function fadePadOut(pad: Pad, durationMs: number): void {
+export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): void {
   // 1. Cancel any prior fade for this pad (RAF, timeout, store signal)
   cancelPadFade(pad.id);
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
-  const fromVolume = gain.gain.value;
+  const currentGain = gain.gain.value;
+  const startVol = fromVolume ?? currentGain;
+  const endVol = toVolume ?? 0;
 
   // 2. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(fromVolume, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + durationMs / 1000);
+  gain.gain.setValueAtTime(startVol, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
   // 3. Mark this pad as fading out so a reverse fade-in can be detected
   addFadingOutPad(pad.id);
@@ -114,14 +116,16 @@ export function fadePadOut(pad: Pad, durationMs: number): void {
   usePlaybackStore.getState().startVolumeTransition(pad.id);
 
   // 5. Animate padVolumes via RAF
-  startFadeRaf(pad.id, fromVolume, 0, durationMs);
+  startFadeRaf(pad.id, startVol, endVol, durationMs);
 
   // 6. Schedule cleanup (stored in fadePadTimeouts so cancelPadFade can cancel it)
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
     removeFadingOutPad(pad.id);
-    stopPad(pad);
-    resetPadGain(pad.id);
+    if (endVol === 0) {
+      stopPad(pad);
+      resetPadGain(pad.id);
+    }
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);
 }
@@ -130,24 +134,25 @@ export function fadePadOut(pad: Pad, durationMs: number): void {
  * Reverse an in-progress fade-out: cancel it and ramp gain back up to 1.0 from current value.
  * Unlike fadePadIn, this does NOT restart the audio — the existing voices keep playing.
  */
-export function fadePadInFromCurrent(pad: Pad, durationMs: number): void {
+export function fadePadInFromCurrent(pad: Pad, durationMs: number, toVolume?: number): void {
   // 1. Cancel the fade-out (RAF, timeout, store signal, fadingOutPadIds)
   cancelPadFade(pad.id);
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
   const fromVolume = gain.gain.value;
+  const endVol = toVolume ?? 1.0;
 
   // 2. Schedule Web Audio ramp back to full volume
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(fromVolume, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + durationMs / 1000);
+  gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
   // 3. Show the visual bar
   usePlaybackStore.getState().startVolumeTransition(pad.id);
 
   // 4. Animate padVolumes via RAF
-  startFadeRaf(pad.id, fromVolume, 1.0, durationMs);
+  startFadeRaf(pad.id, fromVolume, endVol, durationMs);
 
   // 5. Schedule cleanup
   const timeoutId = setTimeout(() => {
@@ -157,26 +162,29 @@ export function fadePadInFromCurrent(pad: Pad, durationMs: number): void {
   setFadePadTimeout(pad.id, timeoutId);
 }
 
-export async function fadePadIn(pad: Pad, durationMs: number): Promise<void> {
+export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): Promise<void> {
   // 1. Cancel any prior fade for this pad
   cancelPadFade(pad.id);
 
-  // 2. Start pad at gain 0 (triggerPad also calls updatePadVolume(pad.id, 0))
-  await triggerPad(pad, 0);
+  const startVol = fromVolume ?? 0;
+  const endVol = toVolume ?? 1.0;
+
+  // 2. Start pad at gain startVol (triggerPad also calls updatePadVolume(pad.id, startVol))
+  await triggerPad(pad, startVol);
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
 
   // 3. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + durationMs / 1000);
+  gain.gain.setValueAtTime(startVol, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
   // 4. Show the visual bar
   usePlaybackStore.getState().startVolumeTransition(pad.id);
 
   // 5. Animate padVolumes via RAF
-  startFadeRaf(pad.id, 0, 1.0, durationMs);
+  startFadeRaf(pad.id, startVol, endVol, durationMs);
 
   // 6. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
   const timeoutId = setTimeout(() => {
@@ -202,17 +210,17 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
  * based on current audio state — keeping that decision in the audio layer
  * rather than in the UI hook.
  */
-export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
+export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number, fromVolume?: number, toVolume?: number): void {
   if (!isFadeablePad(pad)) return;
   const duration = resolveFadeDuration(pad, globalFadeDurationMs);
   if (isPadActive(pad.id)) {
     if (isPadFadingOut(pad.id)) {
-      fadePadInFromCurrent(pad, duration);
+      fadePadInFromCurrent(pad, duration, toVolume);
     } else {
-      fadePadOut(pad, duration);
+      fadePadOut(pad, duration, fromVolume, toVolume);
     }
   } else {
-    fadePadIn(pad, duration).catch((err: unknown) => {
+    fadePadIn(pad, duration, fromVolume, toVolume).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Playback error: audio fade failed — ${message}`);
     });
