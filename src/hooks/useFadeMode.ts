@@ -90,7 +90,7 @@ export function useFadeMode(pads: Pad[]): UseFadeModeReturn {
       if (mode === "fade") {
         const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
         const isPlaying = playingPadIds.has(padId);
-        const fromVol = isPlaying ? fadeLevels[1] / 100 : fadeLevels[0] / 100;
+        const fromVol = isPlaying ? undefined : fadeLevels[0] / 100;
         const toVol   = isPlaying ? fadeLevels[0] / 100 : fadeLevels[1] / 100;
         executeFadeTap(pad, globalFadeDurationMs, fromVol, toVol);
         cancel();
