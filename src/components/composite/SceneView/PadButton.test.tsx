@@ -348,9 +348,13 @@ describe("right-click / context menu", () => {
     expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
   });
 
-  it("popover opens when forcePopoverOpen prop is set", () => {
+  it("popover opens when reopenPadId in multiFade store matches pad id", async () => {
     const pad = loadPadInStore();
-    render(<PadButton pad={pad} sceneId="scene-1" forcePopoverOpen={true} />);
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+    act(() => {
+      useMultiFadeStore.setState({ reopenPadId: pad.id });
+    });
     expect(screen.getByTestId("live-control-popover")).toBeInTheDocument();
   });
 });

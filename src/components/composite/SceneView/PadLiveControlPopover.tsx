@@ -29,6 +29,8 @@ import {
 import { useIsMd } from "@/hooks/useBreakpoint";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { isPadActive } from "@/lib/audio/audioState";
 import {
   triggerPad,
   stopPad,
@@ -49,7 +51,6 @@ interface PadLiveControlPopoverProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
-  onMultiFadeStart: (padId: string, currentVolume: number) => void;
 }
 
 const STAGGER_DELAY = 0.04;
@@ -153,15 +154,14 @@ function LayerRow({
 
 function PadLiveControlContent({
   pad,
-  onMultiFadeStart,
   onClose,
 }: {
   pad: Pad;
-  onMultiFadeStart: (padId: string, currentVolume: number) => void;
   onClose: () => void;
 }) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
+  const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
 
   const [fadeLevels, setFadeLevels] = useState<[number, number]>(() => {
     if (isPlaying) {
@@ -256,9 +256,10 @@ function PadLiveControlContent({
   }, [pad, fadeLevels, onClose]);
 
   const handleMultiFade = useCallback(() => {
-    onMultiFadeStart(pad.id, padVolume);
+    const playing = isPadActive(pad.id);
+    enterMultiFade(pad.id, playing, padVolume);
     onClose();
-  }, [pad.id, padVolume, onMultiFadeStart, onClose]);
+  }, [pad.id, padVolume, enterMultiFade, onClose]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -382,7 +383,6 @@ export function PadLiveControlPopover({
   open,
   onOpenChange,
   anchorRef,
-  onMultiFadeStart,
 }: PadLiveControlPopoverProps) {
   const isDesktop = useIsMd();
 
@@ -402,7 +402,6 @@ export function PadLiveControlPopover({
           <div className="px-4 pb-4">
             <PadLiveControlContent
               pad={pad}
-              onMultiFadeStart={onMultiFadeStart}
               onClose={handleClose}
             />
           </div>
@@ -417,7 +416,6 @@ export function PadLiveControlPopover({
       <PopoverContent className="w-72" side="top" sideOffset={8}>
         <PadLiveControlContent
           pad={pad}
-          onMultiFadeStart={onMultiFadeStart}
           onClose={handleClose}
         />
       </PopoverContent>

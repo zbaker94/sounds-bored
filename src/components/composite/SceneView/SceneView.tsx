@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
@@ -78,21 +78,6 @@ export function SceneView() {
 
   const pads = activeScene?.pads ?? [];
   const multiFadeActive = useMultiFadeStore((s) => s.active);
-  const reopenPadId = useMultiFadeStore((s) => s.reopenPadId);
-  const clearMultiFadeReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
-
-  // Reopen popover on the origin pad after multi-fade cancel
-  const [openPopoverPadId, setOpenPopoverPadId] = useState<string | null>(null);
-  useEffect(() => {
-    if (reopenPadId) {
-      setOpenPopoverPadId(reopenPadId);
-      clearMultiFadeReopenPadId();
-    }
-  }, [reopenPadId, clearMultiFadeReopenPadId]);
-
-  const handlePopoverOpened = useCallback(() => {
-    setOpenPopoverPadId(null);
-  }, []);
 
   const handleEditClick = useCallback((pad: Pad) => {
     setEditingPad(pad);
@@ -218,8 +203,6 @@ export function SceneView() {
                   sceneId={activeScene.id}
                   index={i}
                   onEditClick={handleEditClick}
-                  forcePopoverOpen={openPopoverPadId === pad.id}
-                  onPopoverOpened={handlePopoverOpened}
                 />
               </motion.div>
             ))}

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pad live controls now manage their own popover state internally, removing the need for the scene to coordinate popover reopening after multi-fade mode exits
+- The live controls popover now automatically closes when multi-fade mode is activated
+- Multi-fade mode startup logic moved from the pad button into the live controls panel itself, simplifying the component interface
 - Fixed a bug where skipping back in a non-cycle-mode layer incorrectly set the cycle index, causing potential playback position tracking issues
 - Fixed an issue where pads could remain stuck in an active state after being stopped, ensuring proper cleanup after playback ends.
 - Fixed a bug where fade levels were applied in the wrong order, causing fades to go the wrong direction

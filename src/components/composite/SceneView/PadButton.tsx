@@ -25,11 +25,9 @@ interface PadButtonProps {
   sceneId: string;
   index?: number;
   onEditClick?: (pad: Pad) => void;
-  forcePopoverOpen?: boolean;
-  onPopoverOpened?: () => void;
 }
 
-export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, forcePopoverOpen, onPopoverOpened }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -93,17 +91,37 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     };
   }, [isVolumeTransitioning]);
 
+  // Multi-fade mode derived state — read from store directly
+  const multiFadeActive = useMultiFadeStore((s) => s.active);
+  const isMultiFadeSelected = useMultiFadeStore((s) => s.active && s.selectedPads.has(pad.id));
+  const multiFadeLevels = useMultiFadeStore((s) => {
+    if (!s.active) return null;
+    const entry = s.selectedPads.get(pad.id);
+    return entry ? entry.levels : null;
+  });
+  const toggleMultiFadePad = useMultiFadeStore((s) => s.toggleMultiFadePad);
+  const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
+  const reopenPadId = useMultiFadeStore((s) => s.reopenPadId);
+  const clearReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
+
   // Popover (right-click live controls)
   const [popoverOpen, setPopoverOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Force-open popover when SceneView signals reopenPadId
+  // Close popover when multi-fade mode activates
   useEffect(() => {
-    if (forcePopoverOpen && !popoverOpen) {
-      setPopoverOpen(true);
-      onPopoverOpened?.();
+    if (multiFadeActive) {
+      setPopoverOpen(false);
     }
-  }, [forcePopoverOpen, popoverOpen, onPopoverOpened]);
+  }, [multiFadeActive]);
+
+  // Reopen popover when this pad is the reopenPadId after multi-fade cancel
+  useEffect(() => {
+    if (reopenPadId === pad.id) {
+      setPopoverOpen(true);
+      clearReopenPadId();
+    }
+  }, [reopenPadId, pad.id, clearReopenPadId]);
 
   const {
     attributes,
@@ -122,18 +140,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     }),
     [transform, transition],
   );
-
-  // Multi-fade mode derived state — read from store directly
-  const multiFadeActive = useMultiFadeStore((s) => s.active);
-  const isMultiFadeSelected = useMultiFadeStore((s) => s.active && s.selectedPads.has(pad.id));
-  const multiFadeLevels = useMultiFadeStore((s) => {
-    if (!s.active) return null;
-    const entry = s.selectedPads.get(pad.id);
-    return entry ? entry.levels : null;
-  });
-  const toggleMultiFadePad = useMultiFadeStore((s) => s.toggleMultiFadePad);
-  const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
-  const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
 
   // 3D tilt — disabled in edit mode, during drag, and in multi-fade mode
   const tiltEnabled = !editMode && !isSortableDragging && !multiFadeActive;
@@ -435,11 +441,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         open={popoverOpen}
         onOpenChange={setPopoverOpen}
         anchorRef={buttonRef}
-        onMultiFadeStart={(padId, currentVol) => {
-          const playing = isPadActive(padId);
-          enterMultiFade(padId, playing, currentVol);
-          setPopoverOpen(false);
-        }}
       />
     </>
   );
