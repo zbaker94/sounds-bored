@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fading multiple pads at once now shows an error notification if any individual pad's fade fails during execution.
 - Added live pad control popover with Start/Stop buttons that reflect current playback state
 - Fade In/Fade Out button dynamically updates based on whether the pad is currently playing
 - Fade slider automatically syncs its current-volume thumb to the pad's actual volume when playback starts

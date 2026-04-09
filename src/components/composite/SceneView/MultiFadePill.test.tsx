@@ -2,89 +2,90 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MultiFadePill } from "./MultiFadePill";
-
-// Mock useMultiFadeMode since it reads from store + creates callbacks
-vi.mock("@/hooks/useMultiFadeMode", () => ({
-  useMultiFadeMode: vi.fn(),
-}));
-import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
-
-const mockExecute = vi.fn();
-const mockCancel = vi.fn();
-
+import { useMultiFadeStore } from "@/state/multiFadeStore";
 import type { SelectedPadFade } from "@/state/multiFadeStore";
+import { useProjectStore } from "@/state/projectStore";
+import { createMockProject, createMockScene, createMockPad } from "@/test/factories";
 
-function setupMockHook({ canExecute = false, selectedCount = 0 } = {}) {
+// Mock audio module so fadePadWithLevels doesn't run real Web Audio
+vi.mock("@/lib/audio/padPlayer", () => ({
+  fadePadWithLevels: vi.fn().mockResolvedValue(undefined),
+  resolveFadeDuration: vi.fn().mockReturnValue(1000),
+}));
+
+import { fadePadWithLevels } from "@/lib/audio/padPlayer";
+
+function setupStore({ active = true, selectedCount = 0, padIds }: { active?: boolean; selectedCount?: number; padIds?: string[] } = {}) {
   const selectedPads = new Map<string, SelectedPadFade>();
-  for (let i = 0; i < selectedCount; i++) {
-    selectedPads.set(`pad-${i}`, { padId: `pad-${i}`, levels: [0, 100] });
+  const ids = padIds ?? Array.from({ length: selectedCount }, (_, i) => `pad-${i}`);
+  for (const id of ids) {
+    selectedPads.set(id, { padId: id, levels: [0, 100] });
   }
-  vi.mocked(useMultiFadeMode).mockReturnValue({
-    active: true,
-    canExecute,
-    selectedPads,
-    execute: mockExecute,
-    cancel: mockCancel,
-    originPadId: null,
-    reopenPadId: null,
-    enter: vi.fn(),
-    togglePad: vi.fn(),
-    setFadeLevels: vi.fn(),
-    clearReopenPadId: vi.fn(),
-  });
+  useMultiFadeStore.setState({ active, selectedPads });
 }
 
 describe("MultiFadePill", () => {
   beforeEach(() => {
-    mockExecute.mockReset();
-    mockCancel.mockReset();
+    vi.clearAllMocks();
+    // Reset store to default inactive state
+    useMultiFadeStore.setState({
+      active: false,
+      selectedPads: new Map(),
+      originPadId: null,
+      reopenPadId: null,
+    });
+    useProjectStore.setState({ project: null });
   });
 
   it("shows '0 pads selected' when no pads are selected", () => {
-    setupMockHook({ selectedCount: 0 });
+    setupStore({ selectedCount: 0 });
     render(<MultiFadePill />);
     expect(screen.getByText("0 pads selected")).toBeInTheDocument();
   });
 
   it("shows '1 pad selected' (singular) when one pad is selected", () => {
-    setupMockHook({ selectedCount: 1 });
+    setupStore({ selectedCount: 1 });
     render(<MultiFadePill />);
     expect(screen.getByText("1 pad selected")).toBeInTheDocument();
   });
 
   it("shows correct count when multiple pads are selected", () => {
-    setupMockHook({ selectedCount: 3 });
+    setupStore({ selectedCount: 3 });
     render(<MultiFadePill />);
     expect(screen.getByText("3 pads selected")).toBeInTheDocument();
   });
 
   it("calls execute when Execute Fade button is clicked", async () => {
     const user = userEvent.setup();
-    setupMockHook({ canExecute: true, selectedCount: 1 });
+    const pad = createMockPad({ id: "pad-0" });
+    const scene = createMockScene({ pads: [pad] });
+    useProjectStore.setState({ project: createMockProject({ scenes: [scene] }) });
+    setupStore({ active: true, padIds: ["pad-0"] });
     render(<MultiFadePill />);
     await user.click(screen.getByRole("button", { name: /execute fade/i }));
-    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(fadePadWithLevels).toHaveBeenCalledTimes(1);
   });
 
   it("Execute Fade button is disabled when canExecute is false", () => {
-    setupMockHook({ canExecute: false, selectedCount: 0 });
+    setupStore({ active: true, selectedCount: 0 });
     render(<MultiFadePill />);
     const executeButton = screen.getByRole("button", { name: /execute fade/i });
     expect(executeButton).toBeDisabled();
   });
 
   it("Execute Fade button is enabled when canExecute is true", () => {
-    setupMockHook({ canExecute: true, selectedCount: 1 });
+    setupStore({ active: true, selectedCount: 1 });
     render(<MultiFadePill />);
     const executeButton = screen.getByRole("button", { name: /execute fade/i });
     expect(executeButton).toBeEnabled();
   });
 
-  it("calls cancel when cancel button is clicked", async () => {
+  it("calls cancelMultiFade when cancel button is clicked", async () => {
     const user = userEvent.setup();
-    setupMockHook({ canExecute: false, selectedCount: 0 });
+    setupStore({ active: true, selectedCount: 0 });
+    const cancelSpy = vi.spyOn(useMultiFadeStore.getState(), "cancelMultiFade");
     render(<MultiFadePill />);
     await user.click(screen.getByRole("button", { name: /cancel multi-fade/i }));
-    expect(mockCancel).toHaveBeenCalledTimes(1);
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
   });
 });

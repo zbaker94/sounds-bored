@@ -1,12 +1,42 @@
+import { useCallback } from "react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, PlayIcon } from "@hugeicons/core-free-icons";
-import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
+import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useProjectStore } from "@/state/projectStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
+import { toast } from "sonner";
 
 export function MultiFadePill() {
-  const { selectedPads, canExecute, execute, cancel } = useMultiFadeMode();
-  const count = selectedPads.size;
+  const count = useMultiFadeStore((s) => s.selectedPads.size);
+  const active = useMultiFadeStore((s) => s.active);
+  const canExecute = active && count > 0;
+  const cancelMultiFade = useMultiFadeStore((s) => s.cancelMultiFade);
+  const resetMultiFade = useMultiFadeStore((s) => s.resetMultiFade);
+
+  const execute = useCallback(() => {
+    if (!canExecute) return;
+    const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+    const allSelectedPads = useMultiFadeStore.getState().selectedPads;
+    const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
+
+    for (const [padId, fade] of allSelectedPads) {
+      const pad = pads.find((p) => p.id === padId);
+      if (!pad) continue;
+      const duration = resolveFadeDuration(pad, globalFadeDurationMs);
+      fadePadWithLevels(pad, duration, fade.levels[0] / 100, fade.levels[1] / 100).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(`Playback error: audio fade failed — ${message}`);
+      });
+    }
+    resetMultiFade();
+  }, [canExecute, resetMultiFade]);
+
+  const cancel = useCallback(() => {
+    cancelMultiFade();
+  }, [cancelMultiFade]);
 
   return (
     <motion.div
