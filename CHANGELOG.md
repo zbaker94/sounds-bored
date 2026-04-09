@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a visual bug where the fade volume slider could show stale values when a pad starts or stops playing
+- Improved internal fade control logic so volume slider thumbs stay accurately in sync during playback
+- Fixed stale layer state not being cleared when the live control popover closes or resets
 - Added keyboard shortcuts in the scene view: press **Escape** to cancel a multi-fade operation and **Enter** to execute it.
 - Fading multiple pads at once now shows an error notification if any individual pad's fade fails during execution.
 - Added live pad control popover with Start/Stop buttons that reflect current playback state

@@ -170,21 +170,19 @@ function PadLiveControlContent({
     return [0, 100];
   });
 
-  // Re-sync fadeLevels when playback state changes so the slider is never stale
+  // Sync fadeLevels with playback state:
+  // - On play/stop transitions: full reset
+  // - While playing: keep right thumb tracking current volume
   useEffect(() => {
     if (isPlaying) {
-      setFadeLevels([0, Math.round(padVolume * 100)]);
+      setFadeLevels((prev) => {
+        const newRight = Math.round(padVolume * 100);
+        return prev[1] === newRight ? prev : [prev[0], newRight];
+      });
     } else {
       setFadeLevels([0, 100]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying]); // intentionally omit padVolume — only sync on play/stop transitions
-
-  // Keep the "start (current)" thumb in sync with actual current volume while playing
-  useEffect(() => {
-    if (!isPlaying) return;
-    setFadeLevels((prev) => [prev[0], Math.round(padVolume * 100)]);
-  }, [padVolume, isPlaying]);
+  }, [isPlaying, padVolume]);
 
   // Clear thumbsDragging when pointer released anywhere (handles out-of-bounds release)
   useEffect(() => {
@@ -226,6 +224,7 @@ function PadLiveControlContent({
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
+      setActiveLayerIds(new Set()); // clear stale state on unmount/effect re-run
     };
   }, [isPlaying, pad.layers]);
 

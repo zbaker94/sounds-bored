@@ -996,11 +996,20 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
 }
 
 /**
- * Fade a pad in or out based on its current playback state, using explicit level endpoints.
+ * Fade a pad in or out based on its current playback state, using slider-convention level endpoints.
+ *
+ * Level convention (matches the UI slider layout):
+ *   - `fromLevel` is the LEFT thumb — the LOWER volume endpoint (end of fade-out / start of fade-in)
+ *   - `toLevel` is the RIGHT thumb — the HIGHER volume endpoint (start of fade-out / end of fade-in)
+ *
+ * When the pad is PLAYING (fade-out): fades from `toLevel` → `fromLevel` (high → low).
+ *   Args are swapped when passed to `fadePadOut` to match this direction.
+ * When the pad is NOT PLAYING (fade-in): fades from `fromLevel` → `toLevel` (low → high).
+ *
  * @param pad - The pad to fade
  * @param duration - Fade duration in milliseconds
- * @param fromLevel - Start level (0–1)
- * @param toLevel - End level (0–1)
+ * @param fromLevel - Left thumb level (0–1), lower volume endpoint
+ * @param toLevel - Right thumb level (0–1), higher volume endpoint
  */
 export function fadePadWithLevels(
   pad: Pad,
