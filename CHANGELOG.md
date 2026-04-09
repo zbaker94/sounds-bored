@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking a pad now opens a live controls popover for quick adjustments without entering edit mode
+- Pads selected during multi-fade mode display a visual selection ring to indicate their inclusion
+- Clicking a pad while multi-fade mode is active toggles it in/out of the fade selection instead of triggering playback
+- The playback pulse animation is suppressed on pads while multi-fade mode is active to reduce visual noise
+- The live controls popover is blocked from opening in edit mode or during multi-fade mode to prevent conflicts
 - Layer volume control now clamps to a valid 0–100% range, preventing audio distortion from out-of-bounds values
 - Added live layer volume control, allowing per-layer volume to be adjusted during playback
 - Added skip forward/back controls for sequential pad layers, enabling navigation through a layer's sound sequence while playing

@@ -4,10 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume, stopPad } from "@/lib/audio/padPlayer";
+
+vi.mock("./PadLiveControlPopover", () => ({
+  PadLiveControlPopover: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="live-control-popover" /> : null,
+}));
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
@@ -227,133 +233,125 @@ describe("PadButton", () => {
   });
 });
 
-// ─── Fade mode visual states ──────────────────────────────────────────────────
-
-import type { PadFadeVisual } from "@/hooks/useFadeMode";
-
-function renderPadWithFadeVisual(fadeVisual: PadFadeVisual, onFadeTap = vi.fn()) {
-  // Use a tag-based layer so getPadSoundState returns "ok" (not "disabled"),
-  // allowing fadeVisualClass to be applied rather than the unplayable override.
-  const pad = loadPadInStore({
-    layers: [createMockLayer({
-      id: "layer-1",
-      selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
-    })],
-  });
-  return render(
-    <PadButton
-      pad={pad}
-      sceneId="scene-1"
-      fadeVisual={fadeVisual}
-      onFadeTap={onFadeTap}
-    />
-  );
-}
-
-describe("PadButton — fade visual states", () => {
-  it("applies amber ring class when fadeVisual is 'crossfade-out'", () => {
-    renderPadWithFadeVisual("crossfade-out");
-    const btn = screen.getByRole("button", { name: "Kick" });
-    expect(btn.className).toMatch(/border-amber/);
-  });
-
-  it("applies green ring class when fadeVisual is 'crossfade-in'", () => {
-    renderPadWithFadeVisual("crossfade-in");
-    const btn = screen.getByRole("button", { name: "Kick" });
-    expect(btn.className).toMatch(/border-emerald/);
-  });
-
-  it("applies bold amber ring class when fadeVisual is 'selected-out'", () => {
-    renderPadWithFadeVisual("selected-out");
-    const btn = screen.getByRole("button", { name: "Kick" });
-    expect(btn.className).toMatch(/ring-amber/);
-  });
-
-  it("applies bold green ring class when fadeVisual is 'selected-in'", () => {
-    renderPadWithFadeVisual("selected-in");
-    const btn = screen.getByRole("button", { name: "Kick" });
-    expect(btn.className).toMatch(/ring-emerald/);
-  });
-
-  it("applies opacity-40 and pointer-events-none when fadeVisual is 'invalid'", () => {
-    renderPadWithFadeVisual("invalid");
-    const btn = screen.getByRole("button", { name: "Kick" });
-    expect(btn.className).toMatch(/opacity-40/);
-    expect(btn.className).toMatch(/pointer-events-none/);
-  });
-
-  it("calls onFadeTap with pad.id on pointer down when fadeVisual is set", async () => {
-    const onFadeTap = vi.fn();
-    renderPadWithFadeVisual("crossfade-in", onFadeTap);
-    const btn = screen.getByRole("button", { name: "Kick" });
-    await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
-    expect(onFadeTap).toHaveBeenCalledTimes(1);
-    expect(onFadeTap).toHaveBeenCalledWith("pad-1");
-  });
-
-  it("does not call onFadeTap when fadeVisual is null", async () => {
-    const onFadeTap = vi.fn();
-    renderPadWithFadeVisual(null, onFadeTap);
-    const btn = screen.getByRole("button", { name: "Kick" });
-    await userEvent.pointer({ target: btn, keys: "[MouseLeft]" });
-    expect(onFadeTap).not.toHaveBeenCalled();
-  });
-});
-
-describe("PadButton — fade visual correctness after re-render", () => {
+describe("multi-fade mode", () => {
   beforeEach(() => {
     useUiStore.setState({ ...initialUiState });
     useProjectStore.setState({ ...initialProjectState });
     usePlaybackStore.setState({ ...initialPlaybackState });
-    HTMLButtonElement.prototype.setPointerCapture = vi.fn();
-  });
-
-  it("fadeVisualClass remains correct after unrelated playback state change", () => {
-    const pad = loadPadInStore({ layers: [createMockLayer({ id: "layer-1", selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })] });
-    const { rerender } = render(
-      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />
-    );
-
-    act(() => {
-      usePlaybackStore.getState().addPlayingPad("unrelated-pad");
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "some-other-pad",
+      selectedPads: new Map(),
+      reopenPadId: null,
     });
-
-    rerender(<PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />);
-
-    expect(screen.getByRole("button", { name: "Kick" }).className).toMatch(/border-amber/);
   });
 
-  // Verifies behavioral correctness after a re-render — does not assert referential identity.
-  it("fadeHandlers.onPointerDown still calls onFadeTap with correct padId after re-render", async () => {
-    const onFadeTap = vi.fn();
+  afterEach(() => {
+    useMultiFadeStore.setState({
+      active: false,
+      originPadId: null,
+      selectedPads: new Map(),
+      reopenPadId: null,
+    });
+  });
+
+  it("shows multi-fade selection ring when pad is selected in multi-fade mode", () => {
     const pad = loadPadInStore();
-    const { rerender } = render(
-      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-in" onFadeTap={onFadeTap} />
-    );
-
-    act(() => {
-      usePlaybackStore.getState().addPlayingPad("unrelated-pad");
+    // Select this pad in multi-fade mode
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "some-other-pad",
+      selectedPads: new Map([["pad-1", { padId: "pad-1", levels: [0, 100] }]]),
+      reopenPadId: null,
     });
-
-    rerender(
-      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-in" onFadeTap={onFadeTap} />
-    );
-
-    await userEvent.pointer({ target: screen.getByRole("button", { name: "Kick" }), keys: "[MouseLeft]" });
-    expect(onFadeTap).toHaveBeenCalledTimes(1);
-    expect(onFadeTap).toHaveBeenCalledWith("pad-1");
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    const button = screen.getByRole("button", { name: "Kick" });
+    // When selected in multi-fade mode, the button gets the teal/amber selection ring class
+    expect(button).toHaveClass("ring-2");
   });
 
-  it("fadeVisualClass updates when fadeVisual prop changes", () => {
-    const pad = loadPadInStore({ layers: [createMockLayer({ id: "layer-1", selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })] });
-    const { rerender } = render(
-      <PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-out" />
-    );
+  it("clicking pad in multi-fade mode calls toggleMultiFadePad", async () => {
+    const pad = loadPadInStore();
+    const mockToggle = vi.fn();
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "some-other-pad",
+      selectedPads: new Map(),
+      reopenPadId: null,
+      toggleMultiFadePad: mockToggle,
+    } as any);
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    const button = screen.getByRole("button", { name: "Kick" });
+    fireEvent.pointerDown(button, { button: 0, pointerId: 1 });
+    expect(mockToggle).toHaveBeenCalledWith("pad-1", expect.any(Boolean), expect.any(Number));
+  });
 
-    rerender(<PadButton pad={pad} sceneId="scene-1" fadeVisual="crossfade-in" />);
+  it("does not show pulse ring when multi-fade mode is active even while playing", () => {
+    const pad = loadPadInStore();
+    usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    // The pulse ring has a specific class — when multiFadeActive it should not render
+    // (AnimatePresence removes it from DOM when condition is false)
+    expect(screen.queryByTestId("pulse-ring")).not.toBeInTheDocument();
+  });
+});
 
-    expect(screen.getByRole("button", { name: "Kick" }).className).toMatch(/border-emerald/);
-    expect(screen.getByRole("button", { name: "Kick" }).className).not.toMatch(/border-amber/);
+describe("right-click / context menu", () => {
+  beforeEach(() => {
+    useUiStore.setState({ ...initialUiState });
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useMultiFadeStore.setState({
+      active: false,
+      originPadId: null,
+      selectedPads: new Map(),
+      reopenPadId: null,
+    });
+  });
+
+  it("right-clicking the pad button opens the live control popover", async () => {
+    const pad = loadPadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    // The context menu handler is on the outer div wrapper, not the button itself
+    const button = screen.getByRole("button", { name: "Kick" });
+    // eslint-disable-next-line testing-library/no-node-access
+    const wrapper = button.parentElement!.parentElement!.parentElement!.parentElement!;
+    fireEvent.contextMenu(wrapper);
+    expect(screen.getByTestId("live-control-popover")).toBeInTheDocument();
+  });
+
+  it("right-clicking does not open popover in edit mode", async () => {
+    useUiStore.setState({ ...initialUiState, editMode: true });
+    const pad = loadPadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    // In edit mode the Kick button has aria-hidden; query by test-id on the pad name span
+    const padName = screen.getByTestId("pad-name");
+    // eslint-disable-next-line testing-library/no-node-access
+    const wrapper = padName.closest("div[style]") ?? padName.parentElement!.parentElement!.parentElement!.parentElement!.parentElement!;
+    fireEvent.contextMenu(wrapper);
+    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+  });
+
+  it("right-clicking does not open popover in multi-fade mode", async () => {
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "some-other-pad",
+      selectedPads: new Map(),
+      reopenPadId: null,
+    });
+    const pad = loadPadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    const button = screen.getByRole("button", { name: "Kick" });
+    // eslint-disable-next-line testing-library/no-node-access
+    const wrapper = button.parentElement!.parentElement!.parentElement!.parentElement!;
+    fireEvent.contextMenu(wrapper);
+    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+  });
+
+  it("popover opens when forcePopoverOpen prop is set", () => {
+    const pad = loadPadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" forcePopoverOpen={true} />);
+    expect(screen.getByTestId("live-control-popover")).toBeInTheDocument();
   });
 });
 
