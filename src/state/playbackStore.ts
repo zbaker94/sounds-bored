@@ -23,6 +23,12 @@ interface PlaybackState {
   padVolumes: Record<string, number>;
   updatePadVolume: (padId: string, volume: number) => void;
 
+  // Per-layer runtime volume (0–1), mirrored from layerGainMap for React reactivity
+  layerVolumes: Record<string, number>;
+  updateLayerVolume: (layerId: string, volume: number) => void;
+  removeLayerVolume: (layerId: string) => void;
+  removeLayerVolumes: (layerIds: string[]) => void;
+
   // Which pad IDs currently have an active automated or gesture-driven volume transition (drives the fill bar)
   volumeTransitioningPadIds: Set<string>;
   startVolumeTransition: (padId: string) => void;
@@ -37,6 +43,7 @@ export const initialPlaybackState = {
   masterVolume: 100,
   get playingPadIds() { return new Set<string>(); },
   get padVolumes() { return {} as Record<string, number>; },
+  get layerVolumes() { return {} as Record<string, number>; },
   get volumeTransitioningPadIds() { return new Set<string>(); },
   isPreviewPlaying: false,
 };
@@ -71,6 +78,27 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
 
   updatePadVolume: (padId, volume) =>
     set((s) => ({ padVolumes: { ...s.padVolumes, [padId]: volume } })),
+
+  layerVolumes: {},
+
+  updateLayerVolume: (layerId, volume) =>
+    set((s) => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } })),
+
+  removeLayerVolume: (layerId) =>
+    set((s) => {
+      const next = { ...s.layerVolumes };
+      delete next[layerId];
+      return { layerVolumes: next };
+    }),
+
+  removeLayerVolumes: (layerIds) =>
+    set((s) => {
+      const next = { ...s.layerVolumes };
+      for (const id of layerIds) {
+        delete next[id];
+      }
+      return { layerVolumes: next };
+    }),
 
   volumeTransitioningPadIds: new Set<string>(),
   startVolumeTransition: (padId) =>

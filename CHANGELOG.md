@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Live volume control is now tracked per-layer, enabling real-time visual feedback for individual layer volume adjustments during playback.
 - Multi-fade mode state is now managed in a dedicated store, improving reliability and eliminating potential state sync issues between components
 - Pad buttons no longer require multi-fade state to be passed down as props, simplifying the component interface
 - Multi-fade fade levels now correctly initialize based on whether a pad is actively playing at the moment of selection
