@@ -6,6 +6,7 @@ import { PadLiveControlPopover } from "./PadLiveControlPopover";
 import { createMockPad, createMockLayer } from "@/test/factories";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useIsMd } from "@/hooks/useBreakpoint";
 
 // Mock popover and drawer UI wrappers to avoid Radix portal issues
 vi.mock("@/components/ui/popover", () => ({
@@ -175,5 +176,21 @@ describe("PadLiveControlPopover", () => {
     expect(sliderThumbs.length).toBeGreaterThanOrEqual(2);
     // The second fade-slider thumb (index 1 = "start current") should reflect padVolume 0.75 → 75%
     expect(sliderThumbs[1]).toHaveAttribute("aria-valuenow", "75");
+  });
+
+  describe("mobile (drawer) path", () => {
+    it("renders a Drawer instead of Popover on mobile", () => {
+      vi.mocked(useIsMd).mockReturnValue(false);
+      renderPopover({ name: "Mobile Test Pad" });
+
+      // Verify pad name is visible in drawer (at least one instance)
+      expect(screen.getAllByText("Mobile Test Pad").length).toBeGreaterThan(0);
+
+      // Verify Start/Stop button is visible (pad controls should render)
+      expect(screen.getByRole("button", { name: /start/i })).toBeInTheDocument();
+
+      // Verify popover-content testid is NOT present (drawer should render instead)
+      expect(screen.queryByTestId("popover-content")).not.toBeInTheDocument();
+    });
   });
 });
