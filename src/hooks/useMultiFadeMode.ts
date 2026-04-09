@@ -10,6 +10,24 @@ import { toast } from "sonner";
 
 export type { SelectedPadFade } from "@/state/multiFadeStore";
 
+export function executeMultiFadeNow(): void {
+  const { selectedPads, resetMultiFade } = useMultiFadeStore.getState();
+  if (selectedPads.size === 0) return;
+  const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+  const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
+
+  for (const [padId, fade] of selectedPads) {
+    const pad = pads.find((p) => p.id === padId);
+    if (!pad) continue;
+    const duration = resolveFadeDuration(pad, globalFadeDurationMs);
+    fadePadWithLevels(pad, duration, fade.levels[0] / 100, fade.levels[1] / 100).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Playback error: audio fade failed — ${message}`);
+    });
+  }
+  resetMultiFade();
+}
+
 export interface UseMultiFadeModeReturn {
   active: boolean;
   originPadId: string | null;
@@ -33,7 +51,6 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
   const toggleMultiFadePad = useMultiFadeStore((s) => s.toggleMultiFadePad);
   const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
   const cancelMultiFade = useMultiFadeStore((s) => s.cancelMultiFade);
-  const resetMultiFade = useMultiFadeStore((s) => s.resetMultiFade);
   const clearMultiFadeReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
 
   const editMode = useUiStore((s) => s.editMode);
@@ -71,21 +88,8 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
 
   const execute = useCallback(() => {
     if (!canExecute) return;
-    const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
-    const allSelectedPads = useMultiFadeStore.getState().selectedPads;
-    const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
-
-    for (const [padId, fade] of allSelectedPads) {
-      const pad = pads.find((p) => p.id === padId);
-      if (!pad) continue;
-      const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-      fadePadWithLevels(pad, duration, fade.levels[0] / 100, fade.levels[1] / 100).catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Playback error: audio fade failed — ${message}`);
-      });
-    }
-    resetMultiFade();
-  }, [canExecute, resetMultiFade]);
+    executeMultiFadeNow();
+  }, [canExecute]);
 
   const cancel = useCallback(() => {
     cancelMultiFade();
