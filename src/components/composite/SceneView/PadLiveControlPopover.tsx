@@ -180,6 +180,12 @@ function PadLiveControlContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying]); // intentionally omit padVolume — only sync on play/stop transitions
 
+  // Keep the "start (current)" thumb in sync with actual current volume while playing
+  useEffect(() => {
+    if (!isPlaying) return;
+    setFadeLevels((prev) => [prev[0], Math.round(padVolume * 100)]);
+  }, [padVolume, isPlaying]);
+
   // Clear thumbsDragging when pointer released anywhere (handles out-of-bounds release)
   useEffect(() => {
     const handlePointerUp = () => setThumbsDragging([false, false]);
