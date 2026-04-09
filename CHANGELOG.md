@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Internal release infrastructure refactored; no changes to app functionality or user-facing features.
+
 ## v1.4.3
 
 Developers can now build installer artifacts locally using the new `scripts/build-local.sh` script, mirroring the CI release workflow without needing to push a tag.
