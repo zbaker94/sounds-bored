@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Added a local release build script (`scripts/build-local.sh`) that lets developers build installer artifacts locally without CI.
+
 ## v1.4.0
 
 This release overhauls how the app handles missing and deleted sounds — pads now visually indicate when sounds are unavailable, stale references are automatically cleaned up on load, and delete confirmations show exactly which pads and layers will be affected before you confirm. You can also delete sound folders and files directly from the Sounds panel, open folders in Explorer from both the panel and Settings, and manage recent projects from the Start screen with new remove and delete options.
