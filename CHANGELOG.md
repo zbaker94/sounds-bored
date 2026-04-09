@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Added a live control popover for pads, letting you start/stop playback, fade in/out with adjustable start and end volume levels, and control individual layers — all without leaving the pad grid
+- Each layer in the popover shows its active state and has its own volume slider, plus skip forward/back controls for sequential and shuffled layers
+- Added a "Multi-fade with others..." option to initiate a synchronized fade across multiple pads at once
+- The popover adapts to screen size, appearing as a bottom drawer on smaller screens and a floating popover on desktop
 - Added live volume control for individual pad layers during playback
 - Added ability to trigger or stop a single layer independently without affecting other layers on the same pad
 - Added skip forward/back controls for sequential and shuffled sound arrangements within a layer
