@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Added live pad control popover with Start/Stop buttons that reflect current playback state
+- Fade In/Fade Out button dynamically updates based on whether the pad is currently playing
+- Fade slider automatically syncs its current-volume thumb to the pad's actual volume when playback starts
 - Added comprehensive test suite for the multi-fade store, covering pad selection, volume level tracking, fade lifecycle (enter/cancel/reset), and state isolation.
 - No user-facing changes in this update — internal test coverage was added for audio playback reliability (fade transitions, layer stop behavior, retrigger modes).
 - Live volume fader now stays in sync with the pad's actual volume while the pad is playing
