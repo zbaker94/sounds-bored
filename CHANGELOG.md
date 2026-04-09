@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking a pad now opens a live controls popover with quick access to fade and other per-pad actions
+- A new multi-fade mode lets you select multiple pads and execute a fade across all of them simultaneously
+- Selected pads in multi-fade mode show a volume range slider overlay to set start/end fade levels
+- A floating pill appears at the bottom of the scene while multi-fade mode is active, showing selection count with Execute and Cancel buttons
+- Pads visually indicate their multi-fade selection state with colored highlight rings (amber for playing, teal for stopped)
 - Added internal filesystem capability to support file metadata operations
 - Added a search bar to the Sound Library panel that filters sounds, folders, and sets by name in real time
 - When searching, results span all sounds across the library (not limited to the selected folder/set), with tag-name matching included

@@ -1,5 +1,6 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
+import { Slider as SliderPrimitive } from "radix-ui";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -12,21 +13,23 @@ import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Copy01Icon, Delete02Icon, Alert02Icon } from "@hugeicons/core-free-icons";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
+import { PadLiveControlPopover } from "./PadLiveControlPopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { PadFadeVisual } from "@/hooks/useFadeMode";
+import type { UseMultiFadeModeReturn } from "@/hooks/useMultiFadeMode";
 
 interface PadButtonProps {
   pad: Pad;
   sceneId: string;
   index?: number;
   onEditClick?: (pad: Pad) => void;
-  fadeVisual?: PadFadeVisual;
-  onFadeTap?: (padId: string) => void;
+  multiFadeMode?: UseMultiFadeModeReturn;
+  forcePopoverOpen?: boolean;
+  onPopoverOpened?: () => void;
 }
 
-export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, fadeVisual = null, onFadeTap }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick, multiFadeMode, forcePopoverOpen, onPopoverOpened }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -90,6 +93,18 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     };
   }, [isVolumeTransitioning]);
 
+  // Popover (right-click live controls)
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Force-open popover when SceneView signals reopenPadId
+  useEffect(() => {
+    if (forcePopoverOpen && !popoverOpen) {
+      setPopoverOpen(true);
+      onPopoverOpened?.();
+    }
+  }, [forcePopoverOpen, popoverOpen, onPopoverOpened]);
+
   const {
     attributes,
     listeners,
@@ -108,8 +123,13 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     [transform, transition],
   );
 
-  // 3D tilt — disabled in edit mode, during drag, and in fade mode
-  const tiltEnabled = !editMode && !isSortableDragging && fadeVisual === null;
+  // Multi-fade mode derived state
+  const multiFadeActive = multiFadeMode?.active ?? false;
+  const isMultiFadeSelected = multiFadeActive && multiFadeMode!.selectedPads.has(pad.id);
+  const multiFadeLevels = isMultiFadeSelected ? multiFadeMode!.selectedPads.get(pad.id)!.levels : null;
+
+  // 3D tilt — disabled in edit mode, during drag, and in multi-fade mode
+  const tiltEnabled = !editMode && !isSortableDragging && !multiFadeActive;
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [4, -4]), { stiffness: 300, damping: 30 });
@@ -159,24 +179,29 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   );
   const isUnplayable = padSoundState === "disabled";
 
-  const fadeHandlers = useMemo(() => ({
+  // Multi-fade mode: left-click toggles pad selection instead of triggering playback
+  const multiFadeHandlers = useMemo(() => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      onFadeTap?.(pad.id);
+      e.preventDefault();
+      multiFadeMode?.togglePad(pad, liveVolume);
     },
-  }), [onFadeTap, pad.id]);
+  }), [multiFadeMode, pad, liveVolume]);
 
-  const fadeVisualClass = useMemo(() => {
-    switch (fadeVisual) {
-      case "crossfade-out":   return "border-amber-400";
-      case "crossfade-in":    return "border-emerald-400";
-      case "selected-out":    return "border-amber-500 ring-2 ring-amber-500";
-      case "selected-in":     return "border-emerald-500 ring-2 ring-emerald-500";
-      case "invalid":         return "opacity-40 pointer-events-none";
-      default:                return null;
-    }
-  }, [fadeVisual]);
+  // Right-click opens live control popover
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (editMode || multiFadeActive) return;
+    e.preventDefault();
+    setPopoverOpen(true);
+  }, [editMode, multiFadeActive]);
+
+  // Selection ring styling for multi-fade selected pads
+  const multiFadeSelectionClass = useMemo(() => {
+    if (!isMultiFadeSelected) return null;
+    return isPlaying
+      ? "border-amber-400 ring-2 ring-amber-400"
+      : "border-teal-400 ring-2 ring-teal-400";
+  }, [isMultiFadeSelected, isPlaying]);
 
   return (
     <>
@@ -192,18 +217,19 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         style={dndStyle}
         className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
         {...(editMode ? { ...attributes, ...listeners } : {})}
+        onContextMenu={handleContextMenu}
       >
         <motion.div
           className={cn("w-full h-full", isPlaying && !editMode && "drop-shadow-[0_5px_0px_#FACC15]")}
           style={{ rotateX: tiltEnabled ? rotateX : 0, rotateY: tiltEnabled ? rotateY : 0, transformPerspective: 600, transformStyle: 'preserve-3d' }}
-          whileTap={!editMode && fadeVisual === null ? { scale: 0.95 } : undefined}
+          whileTap={!editMode && !multiFadeActive ? { scale: 0.95 } : undefined}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onPointerDown={!editMode ? handleWrapperPointerDown : undefined}
         >
           {/* Playing pulse ring — inside tilt wrapper so it follows the 3D rotation */}
           <AnimatePresence>
-            {isPlaying && !editMode && (
+            {isPlaying && !editMode && !multiFadeActive && (
               <motion.div
                 key="pulse"
                 className="absolute -inset-1 rounded-xl pointer-events-none border-4 border-white/60 z-10"
@@ -224,20 +250,20 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
             {/* Front face — normal pad */}
             <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={editMode || undefined}>
               <button
+                ref={buttonRef}
                 aria-label={pad.name}
-                {...(fadeVisual !== null ? fadeHandlers : gestureHandlers)}
-                // In fade mode, keep the button interactive so it can be selected as a crossfade target
-                disabled={isUnplayable && fadeVisual === null}
+                {...(multiFadeActive ? multiFadeHandlers : gestureHandlers)}
+                disabled={isUnplayable && !multiFadeActive}
                 className={cn(
                   "relative w-full h-full rounded-xl overflow-hidden",
                   "flex items-center justify-center p-2",
                   "bg-card text-card-foreground",
                   "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
                   "text-sm font-semibold text-center select-none",
-                  isUnplayable
+                  isUnplayable && !multiFadeActive
                     ? "opacity-40 border-2 border-black/20"
-                    : fadeVisual !== null
-                      ? cn("border-2 cursor-pointer", fadeVisualClass, fadeVisual !== "invalid" && "hover:brightness-110")
+                    : multiFadeSelectionClass
+                      ? cn("border-2 cursor-pointer", multiFadeSelectionClass)
                       : cn(
                           "border-2 transition-all cursor-pointer",
                           "hover:brightness-110",
@@ -289,6 +315,38 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     </motion.div>
                   )}
                 </div>
+                {/* Multi-fade slider overlay on selected pad */}
+                <AnimatePresence>
+                  {isMultiFadeSelected && multiFadeLevels && (
+                    <motion.div
+                      className="absolute bottom-0 left-0 right-0 z-20 px-2 pb-1.5 pt-0.5 bg-black/60 backdrop-blur-sm rounded-b-xl"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ duration: 0.15 }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <SliderPrimitive.Root
+                        value={[multiFadeLevels[0], multiFadeLevels[1]]}
+                        onValueChange={(v) => multiFadeMode!.setFadeLevels(pad.id, [v[0], v[1]])}
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="relative flex w-full touch-none items-center select-none"
+                      >
+                        <SliderPrimitive.Track className="relative grow overflow-hidden rounded-4xl bg-white/20 h-2 w-full">
+                          <SliderPrimitive.Range className="absolute h-full bg-primary" />
+                        </SliderPrimitive.Track>
+                        <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm transition-colors select-none" />
+                        <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm transition-colors select-none" />
+                      </SliderPrimitive.Root>
+                      <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
+                        <span>{isPlaying ? "end" : "start"}</span>
+                        <span>{isPlaying ? "start" : "end"}</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </button>
               {padSoundState === "partial" && (
                 <Tooltip>
@@ -360,6 +418,17 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
           deletePad(sceneId, pad.id);
         }}
         onCancel={() => setConfirmingDelete(false)}
+      />
+
+      <PadLiveControlPopover
+        pad={pad}
+        open={popoverOpen}
+        onOpenChange={setPopoverOpen}
+        anchorRef={buttonRef}
+        onMultiFadeStart={(padId, currentVol) => {
+          multiFadeMode?.enter(padId, currentVol);
+          setPopoverOpen(false);
+        }}
       />
     </>
   );

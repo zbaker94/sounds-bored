@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
-import { FadeToolbar } from "./FadeToolbar";
+import { MultiFadePill } from "./MultiFadePill";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ import {
   ArrowRight01Icon,
   LayersLogoIcon,
 } from "@hugeicons/core-free-icons";
-import { useFadeMode } from "@/hooks/useFadeMode";
+import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn, modKey } from "@/lib/utils";
 import {
@@ -58,7 +58,6 @@ export function SceneView() {
 
   const addScene = useProjectStore((s) => s.addScene);
   const reorderPads = useProjectStore((s) => s.reorderPads);
-  const editMode = useUiStore((s) => s.editMode);
   const [isDraggingPad, setIsDraggingPad] = useState(false);
 
   const sensors = useSensors(
@@ -78,7 +77,20 @@ export function SceneView() {
   }
 
   const pads = activeScene?.pads ?? [];
-  const fadeMode = useFadeMode(pads);
+  const multiFadeMode = useMultiFadeMode(pads);
+
+  // Reopen popover on the origin pad after multi-fade cancel
+  const [openPopoverPadId, setOpenPopoverPadId] = useState<string | null>(null);
+  useEffect(() => {
+    if (multiFadeMode.reopenPadId) {
+      setOpenPopoverPadId(multiFadeMode.reopenPadId);
+      multiFadeMode.clearReopenPadId();
+    }
+  }, [multiFadeMode.reopenPadId, multiFadeMode.clearReopenPadId]);
+
+  const handlePopoverOpened = useCallback(() => {
+    setOpenPopoverPadId(null);
+  }, []);
 
   const handleEditClick = useCallback((pad: Pad) => {
     setEditingPad(pad);
@@ -178,10 +190,7 @@ export function SceneView() {
   const displayPads = isDraggingPad ? pads : pagePads;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 p-4 gap-4">
-      <AnimatePresence>
-        {!editMode && <FadeToolbar key="fade-toolbar" fadeMode={fadeMode} />}
-      </AnimatePresence>
+    <div className="flex-1 flex flex-col min-h-0 p-4 gap-4 relative">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -207,8 +216,9 @@ export function SceneView() {
                   sceneId={activeScene.id}
                   index={i}
                   onEditClick={handleEditClick}
-                  fadeVisual={fadeMode.getPadFadeVisual(pad.id)}
-                  onFadeTap={fadeMode.onPadTap}
+                  multiFadeMode={multiFadeMode}
+                  forcePopoverOpen={openPopoverPadId === pad.id}
+                  onPopoverOpened={handlePopoverOpened}
                 />
               </motion.div>
             ))}
@@ -235,6 +245,12 @@ export function SceneView() {
           </div>
         </SortableContext>
       </DndContext>
+
+      <AnimatePresence>
+        {multiFadeMode.active && (
+          <MultiFadePill key="multi-fade-pill" mode={multiFadeMode} />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {totalPages > 1 && !isDraggingPad && (
