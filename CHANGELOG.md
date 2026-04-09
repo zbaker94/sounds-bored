@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Added multi-pad fade mode: select multiple pads and fade them in or out simultaneously with configurable volume levels
+- Fade levels are independently adjustable per pad before executing the fade
+- Press Enter to execute the fade or Escape to cancel; the mode also auto-cancels when edit mode activates or any overlay opens
 - Fixed an issue where the volume slider in the pad live control popover could show a stale value after stopping and restarting playback
 - Added a live control popover for pads, letting you start/stop playback, fade in/out with adjustable start and end volume levels, and control individual layers — all without leaving the pad grid
 - Each layer in the popover shows its active state and has its own volume slider, plus skip forward/back controls for sequential and shuffled layers
