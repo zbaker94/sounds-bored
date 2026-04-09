@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added internal test coverage for layer volume tracking in the playback state (no user-facing changes)
 - Added multi-fade mode UI pill that shows how many pads are selected for a fade operation, with Execute and Cancel controls
 - Right-clicking a pad now opens a live controls popover for quick adjustments without entering edit mode
 - Pads selected during multi-fade mode display a visual selection ring to indicate their inclusion
