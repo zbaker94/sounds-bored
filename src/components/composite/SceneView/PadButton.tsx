@@ -180,13 +180,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const isUnplayable = padSoundState === "disabled";
 
   // Multi-fade mode: left-click toggles pad selection instead of triggering playback
+  // Read liveVolume imperatively to avoid recomputing on every RAF frame during a fade
   const multiFadeHandlers = useMemo(() => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      multiFadeMode?.togglePad(pad, liveVolume);
+      const vol = usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0;
+      multiFadeMode?.togglePad(pad, vol);
     },
-  }), [multiFadeMode, pad, liveVolume]);
+  }), [multiFadeMode, pad]);
 
   // Right-click opens live control popover
   const handleContextMenu = useCallback((e: React.MouseEvent) => {

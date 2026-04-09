@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Performance improvement: pad volume is now read more efficiently during fade operations, reducing unnecessary re-renders
 - Added multi-pad fade mode: select multiple pads and fade them in or out simultaneously with configurable volume levels
 - Fade levels are independently adjustable per pad before executing the fade
 - Press Enter to execute the fade or Escape to cancel; the mode also auto-cancels when edit mode activates or any overlay opens
