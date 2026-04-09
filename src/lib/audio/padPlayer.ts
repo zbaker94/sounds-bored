@@ -1005,7 +1005,9 @@ export function fadePadWithLevels(
 ): Promise<void> {
   const playing = isPadActive(pad.id);
   if (playing) {
-    fadePadOut(pad, duration, fromLevel, toLevel);
+    // fromLevel is the lower end-level, toLevel is the higher start-level (per UI convention)
+    // fadePadOut expects (fromVolume=start/current, toVolume=end/lower)
+    fadePadOut(pad, duration, toLevel, fromLevel);
     return Promise.resolve();
   } else {
     return fadePadIn(pad, duration, fromLevel, toLevel);
