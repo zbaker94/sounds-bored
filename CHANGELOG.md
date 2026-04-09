@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where skipping back in a non-cycle-mode layer incorrectly set the cycle index, causing potential playback position tracking issues
 - Fixed an issue where pads could remain stuck in an active state after being stopped, ensuring proper cleanup after playback ends.
 - Fixed a bug where fade levels were applied in the wrong order, causing fades to go the wrong direction
 - Added internal test coverage for layer volume tracking in the playback state (no user-facing changes)

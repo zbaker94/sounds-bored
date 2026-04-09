@@ -1037,7 +1037,10 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
   // currentPos = how many sounds have already played in this cycle
   const currentPos = Math.max(0, playOrder.length - (chain?.length ?? 0) - 1);
   const prevIndex = Math.max(0, currentPos - 1);
-  setLayerCycleIndex(layerId, prevIndex);
+  // Only update cycle index for cycle-mode layers
+  if (layer.cycleMode) {
+    setLayerCycleIndex(layerId, prevIndex);
+  }
 
   const sound = playOrder[prevIndex % playOrder.length];
 

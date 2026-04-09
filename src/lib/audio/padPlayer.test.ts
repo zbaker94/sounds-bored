@@ -2955,8 +2955,8 @@ describe("skipLayerBack", () => {
     skipLayerBack(pad, layer.id);
     await tick();
 
-    // cycleIndex should be 0 (stayed at start), chain rebuilt from index 1 onward
-    expect(getLayerCycleIndex(layer.id)).toBe(0);
+    // cycleIndex should not be set (non-cycle-mode layer), chain rebuilt from index 0 onward
+    expect(getLayerCycleIndex(layer.id)).toBeUndefined();
     const chain = getLayerChain(layer.id);
     expect(chain?.length).toBe(2); // [soundB, soundC]
   });
@@ -2989,7 +2989,7 @@ describe("skipLayerBack", () => {
     skipLayerBack(pad, layer.id);
     await tick();
 
-    expect(getLayerCycleIndex(layer.id)).toBe(0);
+    expect(getLayerCycleIndex(layer.id)).toBeUndefined();
     const chain = getLayerChain(layer.id);
     expect(chain?.length).toBe(2); // [soundB, soundC]
   });
