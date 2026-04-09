@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Multi-fade mode now automatically cancels when edit mode is enabled or a dialog/overlay is opened, preventing conflicting UI states
 - Fixed a visual bug where the fade volume slider could show stale values when a pad starts or stops playing
 - Improved internal fade control logic so volume slider thumbs stay accurately in sync during playback
 - Fixed stale layer state not being cleared when the live control popover closes or resets

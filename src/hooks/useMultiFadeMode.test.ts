@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useMultiFadeMode } from "./useMultiFadeMode";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { useUiStore, initialUiState } from "@/state/uiStore";
 import { createMockProject, createMockScene, createMockPad, createMockHistoryEntry } from "@/test/factories";
 
 // Mock audio functions
@@ -40,6 +41,7 @@ const initialMultiFadeState = {
 beforeEach(() => {
   useProjectStore.setState({ ...initialProjectState });
   useMultiFadeStore.setState({ ...initialMultiFadeState });
+  useUiStore.setState({ ...initialUiState });
   vi.clearAllMocks();
 });
 
@@ -187,5 +189,89 @@ describe("useMultiFadeMode — execute()", () => {
     });
 
     expect(fadePadWithLevels).not.toHaveBeenCalled();
+  });
+
+  it("execute() passes correct fromLevel and toLevel to fadePadWithLevels", async () => {
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    // Set up: one non-playing pad with custom levels
+    const pads = loadPadsInStore(1);
+    const pad = pads[0];
+
+    // Enter multi-fade and set specific levels [20, 75]
+    act(() => {
+      useMultiFadeStore.getState().enterMultiFade("some-origin", false);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, false, 0.75);
+      useMultiFadeStore.getState().setMultiFadeLevels(pad.id, [20, 75]);
+    });
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.execute(); });
+
+    expect(fadePadWithLevels).toHaveBeenCalledWith(pad, 1000, 0.20, 0.75);
+    // Note: 1000 comes from the mocked resolveFadeDuration
+  });
+
+  it("execute() calls fadePadWithLevels for both playing and non-playing pads", async () => {
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    // Two pads: one playing, one not
+    const pads = loadPadsInStore(2);
+    const [pad0, pad1] = pads;
+
+    act(() => {
+      useMultiFadeStore.getState().enterMultiFade("some-origin", false);
+      // pad0: playing=true, pad1: playing=false
+      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, true, 0.8);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, false, 0.5);
+    });
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.execute(); });
+
+    // Both pads should be called
+    expect(fadePadWithLevels).toHaveBeenCalledTimes(2);
+    // Verify each pad was called with its correct pad object
+    const calledPadIds = (fadePadWithLevels as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => (call[0] as { id: string }).id
+    );
+    expect(calledPadIds).toContain(pad0.id);
+    expect(calledPadIds).toContain(pad1.id);
+  });
+});
+
+describe("useMultiFadeMode — auto-cancel side effects", () => {
+  it("cancels multi-fade when editMode becomes true", () => {
+    const pads = loadPadsInStore(1);
+    const { result } = renderHook(() => useMultiFadeMode());
+
+    // Enter multi-fade so it is active
+    act(() => {
+      result.current.enter(pads[0].id);
+    });
+    expect(result.current.active).toBe(true);
+
+    // Enable editMode
+    act(() => {
+      useUiStore.getState().toggleEditMode();
+    });
+
+    expect(result.current.active).toBe(false);
+  });
+
+  it("cancels multi-fade when an overlay is pushed to overlayStack", () => {
+    const pads = loadPadsInStore(1);
+    const { result } = renderHook(() => useMultiFadeMode());
+
+    // Enter multi-fade so it is active
+    act(() => {
+      result.current.enter(pads[0].id);
+    });
+    expect(result.current.active).toBe(true);
+
+    // Push an overlay onto the stack
+    act(() => {
+      useUiStore.getState().openOverlay("some-dialog", "dialog");
+    });
+
+    expect(result.current.active).toBe(false);
   });
 });
