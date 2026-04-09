@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added multi-fade mode UI pill that shows how many pads are selected for a fade operation, with Execute and Cancel controls
 - Right-clicking a pad now opens a live controls popover for quick adjustments without entering edit mode
 - Pads selected during multi-fade mode display a visual selection ring to indicate their inclusion
 - Clicking a pad while multi-fade mode is active toggles it in/out of the fade selection instead of triggering playback
