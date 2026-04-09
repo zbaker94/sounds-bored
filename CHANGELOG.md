@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- You can now create a new set directly from the "Add to Set" dialog by typing a name and selecting "Create" — no need to create sets separately first.
+- The set selector now shows even when no sets exist, replacing the previous "No sets yet" dead end.
 - Fixed tooltip rendering in the fade volume slider by moving `TooltipProvider` to a higher level in the component tree
 - Added a two-handle volume slider to the Fade toolbar, letting you set custom start and end volume levels when fading pads in or out
 - Fade operations now respect the slider values instead of always fading between silence and full volume
