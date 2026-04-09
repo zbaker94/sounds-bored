@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- You can now delete sets from the sound library — a new "Delete Set" button appears when a set is selected, with a confirmation dialog to prevent accidental deletions
+- Deleting a set only removes the set itself; sounds within it are preserved in your library
 - You can now create a new set directly from the "Add to Set" dialog by typing a name and selecting "Create" — no need to create sets separately first.
 - The set selector now shows even when no sets exist, replacing the previous "No sets yet" dead end.
 - Fixed tooltip rendering in the fade volume slider by moving `TooltipProvider` to a higher level in the component tree

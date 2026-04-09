@@ -20,6 +20,7 @@ interface LibraryActions {
   clearDirtyFlag: () => void;
   addSet: (name: string) => Set;
   duplicateSet: (setId: string) => Set | null;
+  deleteSet: (setId: string) => void;
   addSoundsToSet: (soundIds: string[], setId: string) => void;
   /** Ensure a tag with the given name exists (case-insensitive match); create if not found. Returns the tag. */
   ensureTagExists: (name: string, color?: string, isSystem?: boolean) => Tag;
@@ -101,6 +102,15 @@ export const useLibraryStore = create<LibraryStore>()(
       });
       return newSet;
     },
+
+    deleteSet: (setId) =>
+      set((draft) => {
+        draft.sets = draft.sets.filter((s) => s.id !== setId);
+        for (const sound of draft.sounds) {
+          sound.sets = sound.sets.filter((id) => id !== setId);
+        }
+        draft.isDirty = true;
+      }),
 
     addSoundsToSet: (soundIds, setId) =>
       set((draft) => {

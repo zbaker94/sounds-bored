@@ -395,6 +395,7 @@ export function SoundsPanel() {
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [addSetOpen, setAddSetOpen] = useState(false);
+  const [confirmDeleteSetOpen, setConfirmDeleteSetOpen] = useState(false);
   const [addToSetOpen, setAddToSetOpen] = useState(false);
   const [addTagsOpen, setAddTagsOpen] = useState(false);
   // Dialog queues — queue[0] is the active item; empty = closed.
@@ -531,6 +532,17 @@ export function SoundsPanel() {
     toast.success(`"${newSet.name}" created`);
   }
 
+  async function handleDeleteSet() {
+    if (!selectedId) return;
+    const setName = sets.find((s) => s.id === selectedId)?.name ?? "";
+    useLibraryStore.getState().deleteSet(selectedId);
+    const latest = useLibraryStore.getState();
+    await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+    setSelectedId(null);
+    setConfirmDeleteSetOpen(false);
+    toast.success(`"${setName}" deleted`);
+  }
+
   function handleSelectAllNone() {
     const selectableIds = selectableSounds.map((s) => s.id);
     const allSelectableSelected =
@@ -641,6 +653,15 @@ export function SoundsPanel() {
                   onClick={handleDuplicateSet}
                 >
                   Duplicate Set
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 text-xs px-2"
+                  disabled={!selectedId || !sets.some((s) => s.id === selectedId)}
+                  onClick={() => setConfirmDeleteSetOpen(true)}
+                >
+                  <HugeiconsIcon icon={Delete02Icon} size={12} /> Delete Set
                 </Button>
               </div>
             )}
@@ -1149,6 +1170,27 @@ export function SoundsPanel() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteFolderFromDisk} disabled={isDeletingFolder}>
               {isDeletingFolder ? "Deleting..." : "Delete from Disk"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete set */}
+      <Dialog open={confirmDeleteSetOpen} onOpenChange={setConfirmDeleteSetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Set</DialogTitle>
+            <DialogDescription>
+              Delete the set <strong>{sets.find((s) => s.id === selectedId)?.name ?? ""}</strong>?
+              The sounds in this set will not be deleted — they will just be removed from this set.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteSetOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSet}>
+              Delete Set
             </Button>
           </DialogFooter>
         </DialogContent>
