@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an issue where volume sliders on pad controls could get stuck in a dragging state if the mouse was released outside the slider bounds.
 - Performance improvement: pad volume is now read more efficiently during fade operations, reducing unnecessary re-renders
 - Added multi-pad fade mode: select multiple pads and fade them in or out simultaneously with configurable volume levels
 - Fade levels are independently adjustable per pad before executing the fade

@@ -85,6 +85,13 @@ function PadLiveControlContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying]); // intentionally omit padVolume — only sync on play/stop transitions
 
+  // Clear thumbsDragging when pointer released anywhere (handles out-of-bounds release)
+  useEffect(() => {
+    const handlePointerUp = () => setThumbsDragging([false, false]);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => window.removeEventListener("pointerup", handlePointerUp);
+  }, []);
+
   // Track active layers via RAF polling — only runs when pad is playing
   const [activeLayerIds, setActiveLayerIds] = useState<Set<string>>(new Set());
   const rafRef = useRef<number | null>(null);
