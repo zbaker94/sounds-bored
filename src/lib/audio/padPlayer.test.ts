@@ -2744,3 +2744,224 @@ describe("executeFadeTap — custom fromVolume and toVolume", () => {
     clearAllFadeTracking();
   });
 });
+
+// ─── setLayerVolume ───────────────────────────────────────────────────────────
+
+describe("setLayerVolume", () => {
+  it("is a no-op when the layer has no active gain node", async () => {
+    const { setLayerVolume } = await import("./padPlayer");
+    // No pad triggered, so no gain node exists for this layer
+    setLayerVolume("non-existent-layer", 0.5);
+    // Verify store is unaffected
+    expect(usePlaybackStore.getState().layerVolumes["non-existent-layer"]).toBeUndefined();
+  });
+
+  it("updates layerVolumes in playbackStore when the layer gain node exists", async () => {
+    const { triggerPad, setLayerVolume } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    setLayerVolume(layer.id, 0.5);
+
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(0.5);
+  });
+
+  it("updates the gain node value when the layer gain node exists", async () => {
+    const { triggerPad, setLayerVolume } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    setLayerVolume(layer.id, 0.75);
+
+    // gains[0] = padGain, gains[1] = layerGain, gains[2] = voiceGain
+    // The layerGain (gains[1]) should have setValueAtTime called with 0.75
+    const layerGain = gains[1];
+    expect(layerGain.gain.setValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
+  });
+});
+
+// ─── skipLayerForward ─────────────────────────────────────────────────────────
+
+describe("skipLayerForward", () => {
+  it("does nothing when the layer does not exist on the pad", async () => {
+    const { skipLayerForward } = await import("./padPlayer");
+    const pad = createMockPad({ layers: [] });
+    // Should not throw
+    expect(() => skipLayerForward(pad, "ghost-layer")).not.toThrow();
+  });
+
+  it("does nothing for simultaneous arrangement", async () => {
+    const { skipLayerForward } = await import("./padPlayer");
+    const layer = createMockLayer({ arrangement: "simultaneous" });
+    const pad = createMockPad({ layers: [layer] });
+    // Should not throw and playingPadIds should remain empty
+    skipLayerForward(pad, layer.id);
+    expect(usePlaybackStore.getState().playingPadIds.size).toBe(0);
+  });
+
+  it("does nothing when chain queue is empty (already at end)", async () => {
+    const { skipLayerForward } = await import("./padPlayer");
+    const { setLayerChain } = await import("./audioState");
+
+    const layer = createMockLayer({ arrangement: "sequential" });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Chain is empty — already at end
+    setLayerChain(layer.id, []);
+    skipLayerForward(pad, layer.id);
+
+    // No new playing pads should be added
+    expect(usePlaybackStore.getState().playingPadIds.size).toBe(0);
+  });
+
+  it("advances to next sound in chain and updates chain state", async () => {
+    const { triggerPad, skipLayerForward } = await import("./padPlayer");
+    const { getLayerChain } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger to start playback — first sound plays, chain has remaining 2
+    await triggerPad(pad);
+    await tick();
+
+    const chainBefore = getLayerChain(layer.id);
+    expect(chainBefore?.length).toBe(2);
+
+    // Skip forward: should consume first item from chain
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    const chainAfter = getLayerChain(layer.id);
+    // Chain should have advanced by 1 (one item consumed)
+    expect(chainAfter?.length).toBe(1);
+  });
+});
+
+// ─── skipLayerBack ────────────────────────────────────────────────────────────
+
+describe("skipLayerBack", () => {
+  it("does nothing when the layer does not exist on the pad", async () => {
+    const { skipLayerBack } = await import("./padPlayer");
+    const pad = createMockPad({ layers: [] });
+    expect(() => skipLayerBack(pad, "ghost-layer")).not.toThrow();
+  });
+
+  it("does nothing for simultaneous arrangement", async () => {
+    const { skipLayerBack } = await import("./padPlayer");
+    const layer = createMockLayer({ arrangement: "simultaneous" });
+    const pad = createMockPad({ layers: [layer] });
+    skipLayerBack(pad, layer.id);
+    expect(usePlaybackStore.getState().playingPadIds.size).toBe(0);
+  });
+
+  it("does nothing when playOrder is not set", async () => {
+    const { skipLayerBack } = await import("./padPlayer");
+    const layer = createMockLayer({ arrangement: "sequential" });
+    const pad = createMockPad({ layers: [layer] });
+    // No playOrder set, no chain set
+    skipLayerBack(pad, layer.id);
+    expect(usePlaybackStore.getState().playingPadIds.size).toBe(0);
+  });
+
+  it("stays at position 0 when already at start of play order", async () => {
+    const { triggerPad, skipLayerBack } = await import("./padPlayer");
+    const { getLayerCycleIndex, getLayerChain } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Trigger: first sound plays, chain = [soundB, soundC]
+    await triggerPad(pad);
+    await tick();
+
+    // We're at position 0 (playing soundA). Skip back should keep us at 0.
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    // cycleIndex should be 0 (stayed at start), chain rebuilt from index 1 onward
+    expect(getLayerCycleIndex(layer.id)).toBe(0);
+    const chain = getLayerChain(layer.id);
+    expect(chain?.length).toBe(2); // [soundB, soundC]
+  });
+
+  it("goes back one position when in the middle of play order", async () => {
+    const { skipLayerBack } = await import("./padPlayer");
+    const { getLayerCycleIndex, getLayerChain, setLayerChain, setLayerPlayOrder } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Simulate state at position 1: soundB is playing, chain has [soundC] remaining
+    // playOrder = [soundA, soundB, soundC], chain = [soundC]
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerChain(layer.id, [sounds[2]]); // [soundC]
+
+    // Skip back: currentPos = 3 - 1 - 1 = 1, prevIndex = max(0, 1-1) = 0
+    // Should go to position 0 (soundA), chain = [soundB, soundC]
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    expect(getLayerCycleIndex(layer.id)).toBe(0);
+    const chain = getLayerChain(layer.id);
+    expect(chain?.length).toBe(2); // [soundB, soundC]
+  });
+});

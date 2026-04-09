@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Added live layer volume control, allowing per-layer volume to be adjusted during playback
+- Added skip forward/back controls for sequential pad layers, enabling navigation through a layer's sound sequence while playing
 - Added comprehensive test coverage for the multi-pad fade mode feature, validating selection management, execution, and cancellation behavior.
 - Live volume control is now tracked per-layer, enabling real-time visual feedback for individual layer volume adjustments during playback.
 - Multi-fade mode state is now managed in a dedicated store, improving reliability and eliminating potential state sync issues between components
