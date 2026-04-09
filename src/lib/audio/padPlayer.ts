@@ -59,6 +59,10 @@ import {
   isPadFadingOut,
   isPadActive,
   stopLayerVoices,
+  setLayerPlayOrder,
+  getLayerPlayOrder,
+  deleteLayerPlayOrder,
+  clearAllLayerPlayOrders,
 } from "./audioState";
 
 // Re-export public query/clear functions for backward compatibility
@@ -421,11 +425,12 @@ export function syncLayerConfig(layer: Layer, original: Layer): void {
   }
 }
 
-/** Stop a single pad, clearing its layer chain queues and cycle cursors first so onended doesn't advance the chain. */
+/** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
   for (const layer of pad.layers) {
     deleteLayerChain(layer.id);
     deleteLayerCycleIndex(layer.id);
+    deleteLayerPlayOrder(layer.id);
   }
   stopPadVoices(pad.id);
 }
@@ -448,6 +453,7 @@ export function stopAllPads(): void {
   clearAllFadeTracking();
   clearAllLayerChains();
   clearAllLayerCycleIndexes();
+  clearAllLayerPlayOrders();
   clearAllLayerPending();
   // Null all onended callbacks — prevents loop restarts during ramp window
   nullAllOnEnded();
@@ -654,7 +660,7 @@ function rampStopLayerVoices(
   }, STOP_RAMP_S * 1000 + 5);
 }
 
-function stopLayerWithRamp(pad: Pad, layer: Layer): void {
+function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
   const voices = [...getLayerVoices(layer.id)];
   if (voices.length === 0) return;
   rampStopLayerVoices(pad.id, layer, voices);
@@ -694,7 +700,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
           // callback won't fire — delete the layer's streaming entry explicitly.
           clearLayerStreamingAudio(pad.id, layer.id);
-          stopLayerWithRamp(pad, layer);
+          stopLayerWithRampInternal(pad, layer);
           // Cycle mode: advance cursor so next trigger plays the next sound.
           if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
             const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
@@ -774,6 +780,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     setLayerPending(layer.id);
     try {
       const playOrder = buildPlayOrder(layer.arrangement, resolved);
+      setLayerPlayOrder(layer.id, playOrder);
 
       if (layer.cycleMode && isChained(layer.arrangement)) {
         // Cycle mode: play exactly one sound per trigger, advancing the cursor.
@@ -805,4 +812,216 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
       clearLayerPending(layer.id);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Per-layer live controls (volume, trigger, stop, skip)
+// ---------------------------------------------------------------------------
+
+/** Set the live volume for a layer's gain node and mirror to the playback store. No-op if the layer has no active gain node. */
+export function setLayerVolume(layerId: string, volume: number): void {
+  const gain = getLayerGain(layerId);
+  if (!gain) return;
+  const ctx = getAudioContext();
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(volume, ctx.currentTime);
+  usePlaybackStore.getState().updateLayerVolume(layerId, volume);
+}
+
+/** Trigger a single layer of a pad in isolation, respecting retrigger mode/arrangement/selection. */
+export async function triggerLayer(pad: Pad, layer: Layer): Promise<void> {
+  const { sounds } = useLibraryStore.getState();
+  const resolved = resolveSounds(layer, sounds);
+  if (resolved.length === 0) return;
+  if (isLayerPending(layer.id)) return;
+
+  const ctx = await ensureResumed();
+  const padGain = getPadGain(pad.id);
+  const isPlaying = isLayerActive(layer.id);
+  const layerGain = getOrCreateLayerGain(layer.id, layer.volume, padGain);
+
+  // -- Retrigger handling (same logic as triggerPad per-layer section) ---
+  switch (layer.retriggerMode) {
+    case "stop":
+      if (isPlaying) {
+        deleteLayerChain(layer.id);
+        clearLayerStreamingAudio(pad.id, layer.id);
+        stopLayerWithRampInternal(pad, layer);
+        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+          const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
+          if (nextIndex >= resolved.length) {
+            deleteLayerCycleIndex(layer.id);
+          } else {
+            setLayerCycleIndex(layer.id, nextIndex);
+          }
+        }
+        return;
+      }
+      break;
+
+    case "continue":
+      if (isPlaying) return;
+      break;
+
+    case "restart":
+      if (isPlaying) {
+        deleteLayerChain(layer.id);
+        stopLayerVoices(pad.id, layer.id);
+        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+          const cur = getLayerCycleIndex(layer.id) ?? 0;
+          setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
+        }
+      }
+      break;
+
+    case "next":
+      if (isPlaying) {
+        const remaining = [...(getLayerChain(layer.id) ?? [])];
+        for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
+        deleteLayerChain(layer.id);
+        clearLayerStreamingAudio(pad.id, layer.id);
+        stopLayerVoices(pad.id, layer.id);
+        clearPadProgressInfo(pad.id);
+
+        if (layer.cycleMode && isChained(layer.arrangement)) {
+          // Falls through to start-playback below
+        } else {
+          if (remaining.length > 0) {
+            const [next, ...rest] = remaining;
+            setLayerChain(layer.id, rest);
+            await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+          } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
+            const newOrder = buildPlayOrder(layer.arrangement, resolved);
+            if (newOrder.length > 0) {
+              const [first, ...rest] = newOrder;
+              setLayerChain(layer.id, rest);
+              await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+            }
+          }
+          usePlaybackStore.getState().addPlayingPad(pad.id);
+          return;
+        }
+      }
+      break;
+  }
+
+  // -- Start playback ---
+  clearPadProgressInfo(pad.id);
+  setLayerPending(layer.id);
+  try {
+    const playOrder = buildPlayOrder(layer.arrangement, resolved);
+    setLayerPlayOrder(layer.id, playOrder);
+
+    if (layer.cycleMode && isChained(layer.arrangement)) {
+      deleteLayerChain(layer.id);
+      const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
+      const sound = playOrder[cycleIndex % playOrder.length];
+      const nextIndex = cycleIndex + 1;
+      if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
+        deleteLayerCycleIndex(layer.id);
+      } else {
+        setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
+      }
+      await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+    } else if (isChained(layer.arrangement)) {
+      const [first, ...rest] = playOrder;
+      setLayerChain(layer.id, rest);
+      await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+    } else {
+      deleteLayerChain(layer.id);
+      for (const sound of playOrder) {
+        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      }
+    }
+  } finally {
+    clearLayerPending(layer.id);
+  }
+
+  usePlaybackStore.getState().addPlayingPad(pad.id);
+}
+
+/** Stop all voices for a specific layer with a short gain ramp. Cleans up pad playing state if no layers remain active. */
+export function stopLayerWithRamp(pad: Pad, layerId: string): void {
+  const layer = pad.layers.find((l) => l.id === layerId);
+  if (!layer) return;
+
+  deleteLayerChain(layerId);
+  deleteLayerPlayOrder(layerId);
+  clearLayerStreamingAudio(pad.id, layerId);
+
+  const voices = [...getLayerVoices(layerId)];
+  if (voices.length === 0) return;
+  rampStopLayerVoices(pad.id, layer, voices);
+
+  // After the ramp completes, check if any layers are still active for this pad
+  setTimeout(() => {
+    if (!isPadActive(pad.id)) {
+      usePlaybackStore.getState().removePlayingPad(pad.id);
+    }
+  }, STOP_RAMP_S * 1000 + 10);
+}
+
+/** Skip forward in a sequential/shuffled chain. No-op for simultaneous arrangement or if at end of chain. */
+export function skipLayerForward(pad: Pad, layerId: string): void {
+  const layer = pad.layers.find((l) => l.id === layerId);
+  if (!layer) return;
+  if (!isChained(layer.arrangement)) return;
+
+  // Pop next from chain queue — read BEFORE stop deletes the chain
+  const remaining = getLayerChain(layerId);
+
+  // Stop current voices
+  stopLayerWithRamp(pad, layerId);
+
+  if (!remaining || remaining.length === 0) return;
+
+  const [next, ...rest] = remaining;
+  setLayerChain(layerId, rest);
+
+  const { sounds } = useLibraryStore.getState();
+  const resolved = resolveSounds(layer, sounds);
+
+  ensureResumed().then((ctx) => {
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+    startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+    usePlaybackStore.getState().addPlayingPad(pad.id);
+  });
+}
+
+/** Skip back in a sequential/shuffled chain. No-op for simultaneous arrangement. */
+export function skipLayerBack(pad: Pad, layerId: string): void {
+  const layer = pad.layers.find((l) => l.id === layerId);
+  if (!layer) return;
+  if (!isChained(layer.arrangement)) return;
+
+  // Read BEFORE stop deletes them
+  const playOrder = getLayerPlayOrder(layerId);
+  const chain = getLayerChain(layerId);
+
+  // Stop current voices
+  stopLayerWithRamp(pad, layerId);
+
+  if (!playOrder || playOrder.length === 0) return;
+
+  // currentPos = how many sounds have already played in this cycle
+  const currentPos = Math.max(0, playOrder.length - (chain?.length ?? 0) - 1);
+  const prevIndex = Math.max(0, currentPos - 1);
+  setLayerCycleIndex(layerId, prevIndex);
+
+  const sound = playOrder[prevIndex % playOrder.length];
+
+  // Rebuild chain from prevIndex+1 onward
+  const newChain = playOrder.slice(prevIndex + 1);
+  setLayerChain(layerId, newChain);
+
+  const { sounds } = useLibraryStore.getState();
+  const resolved = resolveSounds(layer, sounds);
+
+  ensureResumed().then((ctx) => {
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+    startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+    usePlaybackStore.getState().addPlayingPad(pad.id);
+  });
 }

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Added live volume control for individual pad layers during playback
+- Added ability to trigger or stop a single layer independently without affecting other layers on the same pad
+- Added skip forward/back controls for sequential and shuffled sound arrangements within a layer
 - Right-clicking a pad now opens a live controls popover with quick access to fade and other per-pad actions
 - A new multi-fade mode lets you select multiple pads and execute a fade across all of them simultaneously
 - Selected pads in multi-fade mode show a volume range slider overlay to set start/end fade levels
