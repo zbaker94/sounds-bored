@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added comprehensive test suite for the multi-fade store, covering pad selection, volume level tracking, fade lifecycle (enter/cancel/reset), and state isolation.
 - No user-facing changes in this update — internal test coverage was added for audio playback reliability (fade transitions, layer stop behavior, retrigger modes).
 - Live volume fader now stays in sync with the pad's actual volume while the pad is playing
 - Pad live controls now manage their own popover state internally, removing the need for the scene to coordinate popover reopening after multi-fade mode exits
