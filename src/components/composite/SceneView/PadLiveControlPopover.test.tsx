@@ -8,6 +8,7 @@ import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useIsMd } from "@/hooks/useBreakpoint";
+import type { Layer } from "@/lib/schemas";
 
 // Mock popover and drawer UI wrappers to avoid Radix portal issues
 vi.mock("@/components/ui/popover", () => ({
@@ -77,6 +78,39 @@ function renderPopover(padOverrides: Partial<Parameters<typeof createMockPad>[0]
     />
   );
   return { pad, onOpenChange };
+}
+
+function renderPopoverWithSounds(
+  soundNames: string[],
+  arrangementOverride?: Layer["arrangement"]
+) {
+  const sounds = soundNames.map((name, i) =>
+    createMockSound({ id: `sound-${i}`, name })
+  );
+  useLibraryStore.setState({
+    ...initialLibraryState,
+    sounds,
+  });
+  const instances = sounds.map((s) =>
+    createMockSoundInstance({ soundId: s.id })
+  );
+  const layer = createMockLayer({
+    id: "layer-1",
+    selection: { type: "assigned", instances },
+    arrangement: arrangementOverride ?? "simultaneous",
+  });
+  const pad = createMockPad({ id: "pad-1", layers: [layer] });
+  const anchorRef = { current: null };
+  render(
+    <PadLiveControlPopover
+      pad={pad}
+      sceneId="scene-1"
+      open={true}
+      onOpenChange={vi.fn()}
+      anchorRef={anchorRef as React.RefObject<HTMLButtonElement | null>}
+    />
+  );
+  return { sounds, layer, pad };
 }
 
 describe("PadLiveControlPopover", () => {
@@ -213,6 +247,45 @@ describe("PadLiveControlPopover", () => {
       // Verify popover-content testid is NOT present (drawer should render instead)
       expect(screen.queryByTestId("popover-content")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("LayerRow sound display", () => {
+  it("shows all sound names joined by ' · ' when layer has multiple assigned sounds", () => {
+    renderPopoverWithSounds(["Kick", "Snare", "Hi-hat"]);
+    expect(screen.getByText("Kick · Snare · Hi-hat")).toBeInTheDocument();
+  });
+
+  it("shows a single sound name without separator", () => {
+    renderPopoverWithSounds(["Kick"]);
+    expect(screen.getByText("Kick")).toBeInTheDocument();
+  });
+
+  it("does not render the sound display row when layer has no sounds", () => {
+    renderPopoverWithSounds([]);
+    const displayRows = document.querySelectorAll("[data-testid='layer-sound-display']");
+    expect(displayRows).toHaveLength(0);
+  });
+
+  it("shows sounds from a tag selection", () => {
+    const s1 = createMockSound({ id: "s1", name: "Snare", tags: ["tag-drums"] });
+    const s2 = createMockSound({ id: "s2", name: "Kick", tags: ["tag-drums"] });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2] });
+    const layer = createMockLayer({
+      id: "layer-1",
+      selection: { type: "tag", tagIds: ["tag-drums"], matchMode: "any", defaultVolume: 100 },
+    });
+    const pad = createMockPad({ id: "pad-1", layers: [layer] });
+    render(
+      <PadLiveControlPopover
+        pad={pad}
+        sceneId="scene-1"
+        open={true}
+        onOpenChange={vi.fn()}
+        anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+      />
+    );
+    expect(screen.getByText("Snare · Kick")).toBeInTheDocument();
   });
 });
 

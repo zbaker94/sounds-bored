@@ -42,6 +42,7 @@ import {
 import { isLayerActive as checkLayerActive } from "@/lib/audio/audioState";
 import type { Pad, Sound, Layer } from "@/lib/schemas";
 import { toast } from "sonner";
+import { useLibraryStore } from "@/state/libraryStore";
 
 interface PadLiveControlPopoverProps {
   pad: Pad;
@@ -92,6 +93,20 @@ function LayerRow({
 }) {
   const layerVol = usePlaybackStore((s) => Math.round((s.layerVolumes[layer.id] ?? (layer.volume / 100)) * 100));
   const showSkip = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
+
+  const sounds = useLibraryStore((s) => s.sounds);
+  const allSounds = getSoundsForLayer(layer, sounds);
+  const displayText = allSounds.map((s) => s.name).join(" · ");
+
+  // Overflow detection for marquee animation
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isOverflow, setIsOverflow] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setIsOverflow(el.scrollWidth > el.clientWidth);
+  }, [displayText]);
 
   return (
     <motion.div
@@ -159,6 +174,24 @@ function LayerRow({
           </>
         )}
       </div>
+      {/* Sound display row */}
+      {allSounds.length > 0 && (
+        <div className="flex items-center gap-1" data-testid="layer-sound-display">
+          <div ref={containerRef} className="overflow-hidden flex-1 min-w-0">
+            {isOverflow ? (
+              <div
+                className="flex"
+                style={{ animation: "marquee 10s linear infinite", gap: "2rem" }}
+              >
+                <span className="whitespace-nowrap text-xs text-muted-foreground">{displayText}</span>
+                <span className="whitespace-nowrap text-xs text-muted-foreground" aria-hidden>{displayText}</span>
+              </div>
+            ) : (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">{displayText}</span>
+            )}
+          </div>
+        </div>
+      )}
       <Slider
         compact
         tooltipLabel={(v) => `${v}%`}
