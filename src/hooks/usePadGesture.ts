@@ -126,10 +126,6 @@ export function usePadGesture(pad: Pad, now = Date.now) {
           : hasHoldLayer ? 1.0 : 0;
         s.startVolume = vol;
         s.currentVolume = vol;
-        // Write to padVolumes so the display bar shows the correct starting height.
-        // Triggers never read this for non-playing pads — triggerVolume() guards that.
-        timerStore.updatePadVolume(pad.id, vol);
-        timerStore.startVolumeTransition(pad.id);
       }, HOLD_MS);
     }
 
@@ -143,7 +139,6 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
       if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
         s.phase = "drag";
-        usePlaybackStore.getState().startVolumeTransition(pad.id);
 
         if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
           triggerPad(pad, 0).catch(console.error);
@@ -166,16 +161,9 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
     function resetGesture() {
       const s = state.current;
-      const wasActive = s.phase !== "idle";
       if (hasHoldLayer) {
         releasePadHoldLayers(pad);
-        resetPadGain(pad.id); // → cancelPadFade → clearVolumeTransition
-      }
-      // Only clear the transition if this gesture hook actually started one.
-      // Guarding on wasActive prevents a stale pointerup (e.g. from a fade-mode tap that
-      // switched handlers mid-gesture) from wiping out a fade-triggered transition.
-      if (wasActive) {
-        usePlaybackStore.getState().clearVolumeTransition(pad.id);
+        resetPadGain(pad.id);
       }
       s.phase = "idle";
       s.cancelledFadeAtStart = false;

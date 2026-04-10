@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
-import { isLayerActive } from "./audioState";
+import { isLayerActive, isPadFading } from "./audioState";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
@@ -20,6 +20,11 @@ vi.mock("./audioContext", () => ({
   ensureResumed: vi.fn(() => Promise.resolve(mockCtx)),
   getAudioContext: vi.fn(() => mockCtx),
   getMasterGain: vi.fn(() => ({ connect: vi.fn() })),
+}));
+
+vi.mock("./audioTick", () => ({
+  startAudioTick: vi.fn(),
+  stopAudioTick: vi.fn(),
 }));
 
 const mockLoadBuffer = vi.fn();
@@ -139,7 +144,6 @@ beforeEach(async () => {
     masterVolume: 100,
     playingPadIds: new Set<string>(),
     padVolumes: {},
-    volumeTransitioningPadIds: new Set<string>(),
   });
   useProjectStore.setState({ ...initialProjectState });
   useLibraryStore.setState({
@@ -1160,26 +1164,26 @@ describe("fadePadOut", () => {
     vi.useRealTimers();
   });
 
-  it("adds pad to volumeTransitioningPadIds when fade starts", async () => {
+  it("marks pad as fading when fade starts", async () => {
     const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-vol-pad" });
 
     fadePadOut(pad, 1000);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 
-  it("clears volumeTransitioningPadIds after the fade duration", async () => {
+  it("clears fading state after the fade duration", async () => {
     vi.useFakeTimers();
     const { fadePadOut, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "fade-out-clear-pad" });
 
     fadePadOut(pad, 500);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
 
     vi.advanceTimersByTime(510);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(false);
+    expect(isPadFading(pad.id)).toBe(false);
     clearAllFadeTracking();
     vi.useRealTimers();
   });
@@ -1195,12 +1199,13 @@ describe("freezePadAtCurrentVolume", () => {
 
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
-    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.6);
+    // Tick reads the frozen gain value automatically — padVolumes not directly updated.
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBeUndefined();
   });
 });
 
 describe("resetPadGain", () => {
-  it("resets gain to 1.0 and updates store", async () => {
+  it("resets gain to 1.0 via the gain node", async () => {
     const { resetPadGain, getPadGain } = await import("./padPlayer");
     const gain = getPadGain("pad-1");
     gain.gain.value = 0.3;
@@ -1209,7 +1214,8 @@ describe("resetPadGain", () => {
 
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(1.0);
+    // Tick reads the reset gain value automatically — padVolumes not directly updated.
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBeUndefined();
   });
 });
 
@@ -1237,7 +1243,7 @@ describe("fadePadIn", () => {
     await fadePadIn(pad, 1000);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 });
@@ -1257,7 +1263,7 @@ describe("crossfadePads", () => {
 
     crossfadePads([padOut], [padIn]);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padOut.id)).toBe(true);
+    expect(isPadFading(padOut.id)).toBe(true);
     clearAllFadeTracking();
   });
 });
@@ -1284,7 +1290,7 @@ describe("executeFadeTap", () => {
     await triggerPad(pad);
     executeFadeTap(pad);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 
@@ -1307,12 +1313,12 @@ describe("executeFadeTap", () => {
     await triggerPad(pad);
     // First tap: starts fade-out
     executeFadeTap(pad);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
 
     // Second tap: reverses the fade-out
     executeFadeTap(pad);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 
@@ -1336,7 +1342,7 @@ describe("executeFadeTap", () => {
     executeFadeTap(pad);
 
     await vi.waitFor(() => {
-      expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+      expect(isPadFading(pad.id)).toBe(true);
     });
     clearAllFadeTracking();
   });
@@ -1414,9 +1420,9 @@ describe("executeCrossfadeSelection", () => {
     await triggerPad(padOut);
     executeCrossfadeSelection([padOut, padIn]);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padOut.id)).toBe(true);
+    expect(isPadFading(padOut.id)).toBe(true);
     await vi.waitFor(() => {
-      expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padIn.id)).toBe(true);
+      expect(isPadFading(padIn.id)).toBe(true);
     });
     clearAllFadeTracking();
   });
@@ -1429,8 +1435,8 @@ describe("executeCrossfadeSelection", () => {
     // Neither pad has active voices — both would be treated as fade-in targets
     executeCrossfadeSelection([padA, padB]);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padA.id)).toBe(false);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(padB.id)).toBe(false);
+    expect(isPadFading(padA.id)).toBe(false);
+    expect(isPadFading(padB.id)).toBe(false);
     clearAllFadeTracking();
   });
 
@@ -1482,9 +1488,9 @@ describe("executeCrossfadeSelection", () => {
     executeCrossfadeSelection([fadeablePad, mixedPad]);
 
     // fadeablePad is active — it should be faded out
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(fadeablePad.id)).toBe(true);
+    expect(isPadFading(fadeablePad.id)).toBe(true);
     // mixedPad is filtered by isFadeablePad — it should not be crossfaded
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(mixedPad.id)).toBe(false);
+    expect(isPadFading(mixedPad.id)).toBe(false);
     clearAllFadeTracking();
   });
 });
@@ -2127,16 +2133,16 @@ describe("stopAllPads clears fade tracking", () => {
     vi.useRealTimers();
   });
 
-  it("clears volumeTransitioningPadIds when stopAllPads is called mid-fade", async () => {
+  it("clears fading state when stopAllPads is called mid-fade", async () => {
     vi.useFakeTimers();
     const { fadePadOut, stopAllPads, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({ id: "stop-mid-fade-pad" });
 
     fadePadOut(pad, 500);
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
 
     stopAllPads();
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(false);
+    expect(isPadFading(pad.id)).toBe(false);
 
     clearAllFadeTracking();
     vi.useRealTimers();
@@ -2756,8 +2762,9 @@ describe("setLayerVolume", () => {
     expect(usePlaybackStore.getState().layerVolumes["non-existent-layer"]).toBe(0.5);
   });
 
-  it("updates layerVolumes in playbackStore when the layer gain node exists", async () => {
+  it("updates the gain node (not layerVolumes) when the layer gain node exists", async () => {
     const { triggerPad, setLayerVolume } = await import("./padPlayer");
+    const { getLayerGain } = await import("./audioState");
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
 
@@ -2772,7 +2779,9 @@ describe("setLayerVolume", () => {
 
     setLayerVolume(layer.id, 0.5);
 
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(0.5);
+    // When layer is playing, tick manages layerVolumes — setLayerVolume only sets the gain node.
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeUndefined();
+    expect(getLayerGain(layer.id)?.gain.setValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
   });
 
   it("updates the gain node value when the layer gain node exists", async () => {
@@ -2806,6 +2815,7 @@ describe("setLayerVolume", () => {
 
   it("clamps volume to [0, 1] range", async () => {
     const { triggerPad, setLayerVolume } = await import("./padPlayer");
+    const { getLayerGain } = await import("./audioState");
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
 
@@ -2818,19 +2828,23 @@ describe("setLayerVolume", () => {
     await triggerPad(pad);
     await tick();
 
-    // Test clamping values greater than 1
+    const layerGain = getLayerGain(layer.id);
+    expect(layerGain).not.toBeNull();
+
+    // Test clamping values greater than 1 — gain node is clamped, tick manages store
     setLayerVolume(layer.id, 1.5);
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeLessThanOrEqual(1.0);
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(1.0);
+    expect(layerGain?.gain.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
 
     // Test clamping values less than 0
     setLayerVolume(layer.id, -0.5);
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeGreaterThanOrEqual(0.0);
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(0.0);
+    expect(layerGain?.gain.setValueAtTime).toHaveBeenCalledWith(0.0, expect.any(Number));
 
-    // Test that values within range are not changed
+    // Test that values within range are passed through unchanged
     setLayerVolume(layer.id, 0.5);
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBe(0.5);
+    expect(layerGain?.gain.setValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
+
+    // Tick manages layerVolumes for playing layers — store is NOT directly updated
+    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeUndefined();
   });
 });
 
@@ -3174,7 +3188,7 @@ describe("fadePadWithLevels", () => {
     await triggerPad(pad);
     fadePadWithLevels(pad, 1000, 0.0, 1.0);
 
-    expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
   });
 
@@ -3224,7 +3238,7 @@ describe("fadePadWithLevels", () => {
 
     // fadePadIn path triggers the pad and starts a volume transition
     await vi.waitFor(() => {
-      expect(usePlaybackStore.getState().volumeTransitioningPadIds.has(pad.id)).toBe(true);
+      expect(isPadFading(pad.id)).toBe(true);
     });
     await expect(resultPromise).resolves.toBeUndefined();
     clearAllFadeTracking();

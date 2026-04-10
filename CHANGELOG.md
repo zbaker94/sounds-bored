@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Volume display on pads now only appears when actively dragging (not during the hold phase before any drag movement)
+- Volume bar correctly reflects real-time audio engine state, eliminating visual glitches where the bar would show stale or incorrect values
+- Fading indicators are now driven by the audio engine directly, improving accuracy when pads fade in or out
+- Internal cleanup: removed a redundant per-pad animation loop (`startFadeRaf`) in favor of the global audio tick, reducing overhead during fade transitions
 - Pad volume display and layer activity indicators now update via a shared audio engine tick, reducing CPU overhead from multiple per-pad animation loops
 - Progress tracking for playing pads is now driven by centralized store state, improving consistency across the UI
 - Active layer indicators on pad buttons now update via a centralized engine tick instead of per-pad animation loops, improving reliability and performance.

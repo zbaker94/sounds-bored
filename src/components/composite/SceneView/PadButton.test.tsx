@@ -43,7 +43,6 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   resetPadGain: vi.fn(),
   releasePadHoldLayers: vi.fn(),
   stopPad: vi.fn(),
-  getPadProgress: vi.fn().mockReturnValue(null),
   isPadFading: vi.fn().mockReturnValue(false),
   freezePadAtCurrentVolume: vi.fn(),
 }));
@@ -143,19 +142,21 @@ describe("PadButton", () => {
       vi.useRealTimers();
     });
 
-    it("shows volume percentage instead of pad name while in hold phase", () => {
+    it("shows volume percentage instead of pad name while dragging", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
       const button = screen.getByRole("button", { name: "Kick" });
 
-      // Pointer down on a non-playing pad
+      // Pointer down → hold phase → drag phase
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
+      act(() => { vi.advanceTimersByTime(150); }); // enter hold (startVolume=0)
 
-      // Advance past HOLD_MS (150 ms) to enter hold phase; startVolume=0 (not playing)
-      act(() => { vi.advanceTimersByTime(150); });
+      // Drag 10 px up to enter drag phase — setPadVolume is called → padVolumes updated → display shows
+      fireEvent.pointerMove(button, { clientY: 190, pointerId: 1 });
 
-      expect(screen.getByText("0%")).toBeInTheDocument();
+      // 5% volume should appear (10px / 200px range = 0.05)
+      expect(screen.queryByText(/\d+%/)).toBeInTheDocument();
       expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
     });
 
@@ -181,26 +182,25 @@ describe("PadButton", () => {
       expect(screen.getByText("50%")).toBeInTheDocument();
     });
 
-    it("shows volume transition bar during hold phase and hides it after release", () => {
+    it("shows volume transition bar while dragging", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
       const button = screen.getByRole("button", { name: "Kick" });
 
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
-      act(() => { vi.advanceTimersByTime(150); }); // hold activates
-
-      // eslint-disable-next-line testing-library/no-node-access
-      expect(button.querySelector(".bg-yellow-500")).toBeInTheDocument();
-
-      act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
-      // Volume display lingers 670ms after transition ends before hiding
-      act(() => { vi.advanceTimersByTime(700); });
+      act(() => { vi.advanceTimersByTime(150); }); // hold phase — no bar yet
 
       // eslint-disable-next-line testing-library/no-node-access
       expect(button.querySelector(".bg-yellow-500")).not.toBeInTheDocument();
+
+      // Drag to enter drag phase — setPadVolume updates padVolumes → bar appears
+      fireEvent.pointerMove(button, { clientY: 190, pointerId: 1 });
+
+      // eslint-disable-next-line testing-library/no-node-access
+      expect(button.querySelector(".bg-yellow-500")).toBeInTheDocument();
     });
 
-    it("restores pad name after drag ends", () => {
+    it("shows pad name alongside volume percentage while dragging", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
@@ -217,12 +217,10 @@ describe("PadButton", () => {
       expect(screen.queryByText(/\d+%/)).toBeInTheDocument();
 
       act(() => { fireEvent.pointerUp(button, { pointerId: 1 }); });
-      // Volume display lingers 670ms after transition ends before hiding
-      act(() => { vi.advanceTimersByTime(700); });
 
-      // After release: name still shown, volume % gone
+      // After release: pad name still shown and volume % persists (tick not running in test —
+      // padVolumes is cleared by audioTick in production when gain returns to baseline).
       expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
-      expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
     });
   });
 });

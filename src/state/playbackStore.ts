@@ -100,7 +100,7 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
     set((s) => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } })),
 
   setAudioTick: (snapshot) =>
-    set((s) => ({
+    set(() => ({
       ...(snapshot.padVolumes !== undefined ? { padVolumes: snapshot.padVolumes } : {}),
       ...(snapshot.layerVolumes !== undefined ? { layerVolumes: snapshot.layerVolumes } : {}),
       ...(snapshot.padProgress !== undefined ? { padProgress: snapshot.padProgress } : {}),
