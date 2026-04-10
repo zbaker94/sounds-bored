@@ -280,6 +280,7 @@ function LayerRow({
                 ref={listAnchorRef}
                 type="button"
                 aria-label="Show sound list"
+                onPointerDown={(e) => e.preventDefault()}
                 onClick={() => setListOpen((o) => !o)}
                 className="p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
               >

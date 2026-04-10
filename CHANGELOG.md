@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- The currently-playing sound is now shown in **bold** in the pad's sound list popover, making it easier to track which sound is active during playback.
+- Missing sounds in the sound list popover are now displayed in *italic* to visually distinguish unavailable files.
+- Fixed an interaction bug where clicking the "Show sound list" button could unexpectedly steal focus.
 - Layers with multiple sounds now show a list icon button that opens a popover with all available sounds numbered in order
 - The sound list popover displays a contextual title based on selection type: "Sounds" for assigned, "Tag: \<name\>" for tag-based, or "Set: \<name\>" for set-based layers
 - The currently playing sound is highlighted in the list; missing sounds are shown in italics
