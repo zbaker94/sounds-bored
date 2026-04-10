@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad edit controls (edit, duplicate, delete) on the back face in edit mode now use the same shared control panel as the live control popover, ensuring a consistent UI in both views
+- The layer count indicator (e.g., "1 layer") is no longer displayed on the pad's back face in edit mode
 - Moved `getSoundsForLayer` tests from `PadLiveControlPopover.test.tsx` to `PadControlContent.test.tsx` to better co-locate tests with the function they cover
 - Simplified `PadLiveControlPopover` tests by removing unnecessary mocks (audio, tooltip, store state) that were testing implementation details not relevant to the popover itself
 - Added a new test verifying the close button in the mobile drawer calls `onOpenChange(false)` correctly

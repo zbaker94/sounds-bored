@@ -4,18 +4,17 @@ import { Slider } from "@/components/ui/slider";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
-import { getPadProgress, stopPad, setPadVolume } from "@/lib/audio/padPlayer";
+import { getPadProgress, setPadVolume } from "@/lib/audio/padPlayer";
 import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { PencilEdit01Icon, Copy01Icon, Delete02Icon, Alert02Icon } from "@hugeicons/core-free-icons";
-import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { PadLiveControlPopover } from "./PadLiveControlPopover";
+import { PadControlContent } from "./PadControlContent";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -30,15 +29,12 @@ interface PadButtonProps {
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const editMode = useUiStore((s) => s.editMode);
-  const duplicatePad = useProjectStore((s) => s.duplicatePad);
-  const deletePad = useProjectStore((s) => s.deletePad);
   const { gestureHandlers } = usePadGesture(pad);
   const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.has(pad.id));
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
   const [volumeExiting, setVolumeExiting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const rafRef = useRef<number | null>(null);
   const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,8 +182,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [isPlaying, pad.id]);
-
-  const layerCount = pad.layers.length;
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const padSoundState = useMemo(
@@ -388,63 +382,26 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
               )}
             </div>
 
-            {/* Back face — edit overlay */}
+            {/* Back face — shared control panel */}
             <div
-              className="absolute inset-0 rounded-xl overflow-hidden bg-card flex flex-col items-center justify-between p-1.5 [backface-visibility:hidden]"
+              className="absolute inset-0 rounded-xl overflow-hidden [backface-visibility:hidden]"
               style={{ transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
               aria-hidden={!editMode || undefined}
             >
-              {/* Dark overlay for readability — sits on top of the pad color */}
+              {/* Dark overlay for readability */}
               <div className="absolute inset-0 bg-black/60" />
-              <div className="relative z-10 flex flex-col items-center gap-0.5">
-                <span className="text-white text-xs font-semibold line-clamp-2 text-center leading-tight">
-                  {pad.name}
-                </span>
-                <span className="text-white/70 text-xs">
-                  {layerCount} {layerCount === 1 ? "layer" : "layers"}
-                </span>
-              </div>
-              <div className="relative z-10 flex gap-1">
-                <button
-                  type="button"
-                  aria-label="Edit pad"
-                  onClick={(e) => { e.stopPropagation(); onEditClick?.(pad); }}
-                  className="p-1 rounded bg-white/20 hover:bg-white/40 transition-colors"
-                >
-                  <HugeiconsIcon icon={PencilEdit01Icon} size={14} className="text-white" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Duplicate pad"
-                  onClick={(e) => { e.stopPropagation(); duplicatePad(sceneId, pad.id); }}
-                  className="p-1 rounded bg-white/20 hover:bg-white/40 transition-colors"
-                >
-                  <HugeiconsIcon icon={Copy01Icon} size={14} className="text-white" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Delete pad"
-                  onClick={(e) => { e.stopPropagation(); setConfirmingDelete(true); }}
-                  className="p-1 rounded bg-white/20 hover:bg-red-500/80 transition-colors"
-                >
-                  <HugeiconsIcon icon={Delete02Icon} size={14} className="text-white" />
-                </button>
+              <div className="relative z-10 w-full h-full p-2">
+                <PadControlContent
+                  pad={pad}
+                  sceneId={sceneId}
+                  onClose={() => {}}
+                  onEditClick={onEditClick}
+                />
               </div>
             </div>
           </motion.div>
         </motion.div>
       </div>
-
-      <ConfirmDeletePadDialog
-        isOpen={confirmingDelete}
-        padName={pad.name}
-        onConfirm={() => {
-          setConfirmingDelete(false);
-          stopPad(pad);
-          deletePad(sceneId, pad.id);
-        }}
-        onCancel={() => setConfirmingDelete(false)}
-      />
 
       <PadLiveControlPopover
         pad={pad}

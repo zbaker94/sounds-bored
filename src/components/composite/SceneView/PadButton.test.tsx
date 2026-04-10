@@ -8,11 +8,33 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
-import { setPadVolume, stopPad } from "@/lib/audio/padPlayer";
+import { setPadVolume } from "@/lib/audio/padPlayer";
 
 vi.mock("./PadLiveControlPopover", () => ({
   PadLiveControlPopover: ({ open }: { open: boolean }) =>
     open ? <div data-testid="live-control-popover" /> : null,
+}));
+
+vi.mock("./PadControlContent", () => ({
+  PadControlContent: ({
+    pad,
+    onEditClick,
+    onClose,
+  }: {
+    pad: { name: string; id: string };
+    onEditClick?: (pad: { name: string; id: string }) => void;
+    onClose: () => void;
+  }) => (
+    <div data-testid="pad-control-content">
+      <button
+        type="button"
+        aria-label="Edit pad"
+        onClick={() => { onEditClick?.(pad); onClose(); }}
+      />
+      <button type="button" aria-label="Duplicate pad" />
+      <button type="button" aria-label="Delete pad" />
+    </div>
+  ),
 }));
 
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -87,10 +109,10 @@ describe("PadButton", () => {
       expect(screen.getByRole("button", { name: /delete pad/i })).toBeInTheDocument();
     });
 
-    it("shows layer count in overlay", () => {
+    it("renders PadControlContent on the back face in edit mode", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.getByText(/1 layer/i)).toBeInTheDocument();
+      expect(screen.getByTestId("pad-control-content")).toBeInTheDocument();
     });
 
     it("clicking edit button calls onEditClick with the pad", async () => {
@@ -102,40 +124,6 @@ describe("PadButton", () => {
       expect(onEditClick).toHaveBeenCalledWith(pad);
     });
 
-    it("clicking duplicate button calls duplicatePad", async () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
-      await userEvent.click(screen.getByRole("button", { name: /duplicate pad/i }));
-      const pads = useProjectStore.getState().project!.scenes[0].pads;
-      expect(pads).toHaveLength(2);
-      expect(pads[1].name).toBe("Kick");
-    });
-
-    it("clicking delete button shows confirm dialog", async () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
-      await userEvent.click(screen.getByRole("button", { name: /delete pad/i }));
-      expect(await screen.findByRole("dialog")).toBeInTheDocument();
-      expect(screen.getByText(/delete pad/i)).toBeInTheDocument();
-    });
-
-    it("confirming delete removes the pad", async () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
-      await userEvent.click(screen.getByRole("button", { name: /delete pad/i }));
-      const confirmBtn = await screen.findByRole("button", { name: /^delete$/i });
-      await userEvent.click(confirmBtn);
-      expect(useProjectStore.getState().project!.scenes[0].pads).toHaveLength(0);
-    });
-
-    it("confirming delete calls stopPad before removing the pad", async () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
-      await userEvent.click(screen.getByRole("button", { name: /delete pad/i }));
-      const confirmBtn = await screen.findByRole("button", { name: /^delete$/i });
-      await userEvent.click(confirmBtn);
-      expect(stopPad).toHaveBeenCalledWith(pad);
-    });
   });
 
   describe("volume drag label", () => {
