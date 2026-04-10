@@ -83,8 +83,11 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastVolumeRef = useRef(liveVolume ?? 1.0);
   if (liveVolume !== undefined) lastVolumeRef.current = liveVolume;
-  // Fallback chain: live tick value → gesture drag value (covers audio latency on first play) → last seen value
-  const displayVolume = liveVolume ?? dragVolume ?? lastVolumeRef.current;
+  // During a drag, prefer dragVolume (updated synchronously on every pointer move) over
+  // liveVolume (tick-driven, up to one RAF frame stale). Fallback to last seen tick value.
+  const displayVolume = (isDragging && dragVolume !== null)
+    ? dragVolume
+    : (liveVolume ?? dragVolume ?? lastVolumeRef.current);
 
   useEffect(() => {
     if (isVolumeActive) {

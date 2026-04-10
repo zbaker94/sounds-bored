@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Volume sliders now respond instantly while dragging, eliminating a subtle lag caused by audio timing updates.
 - Volume display on pads now updates immediately while dragging, eliminating the visual lag caused by audio processing latency
 - The volume indicator on pads now stays visible while dragging to adjust volume and hides cleanly after you finish, rather than disappearing prematurely during mid-drag pauses.
 - Volume display on pads now only appears when actively dragging (not during the hold phase before any drag movement)

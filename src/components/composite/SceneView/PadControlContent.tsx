@@ -100,6 +100,10 @@ function LayerRow({
   const layerVol = usePlaybackStore(
     (s) => Math.round((s.layerVolumes[layer.id] ?? (layer.volume / 100)) * 100)
   );
+  // Local slider value during drag — avoids tick-frame lag on the slider thumb.
+  // Cleared on commit (pointer up) so the store value takes over once stable.
+  const [localLayerVol, setLocalLayerVol] = useState<number | null>(null);
+  const sliderVol = localLayerVol ?? layerVol;
   const isChainedArrangement =
     layer.arrangement === "sequential" || layer.arrangement === "shuffled";
   const showSkip = isChainedArrangement;
@@ -348,9 +352,9 @@ function LayerRow({
       <Slider
         compact
         tooltipLabel={(v) => `${v}%`}
-        value={[layerVol]}
-        onValueChange={([v]) => setLayerVolume(layer.id, v / 100)}
-        onValueCommit={([v]) => commitLayerVolume(layer.id, v / 100)}
+        value={[sliderVol]}
+        onValueChange={([v]) => { setLocalLayerVol(v); setLayerVolume(layer.id, v / 100); }}
+        onValueCommit={([v]) => { setLocalLayerVol(null); commitLayerVolume(layer.id, v / 100); }}
         min={0}
         max={100}
         step={1}
