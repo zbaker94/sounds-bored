@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added internal design spec for layer sound display in the pad live control popover (upcoming feature)
 - Pad live control popover now includes a per-pad fade duration slider, letting you set a custom fade time (0.1s–10s) directly from the pad controls
 - A "Reset to default" option appears when a custom fade duration is set, reverting the pad to the global default fade time
 - When using the global default, the current global fade duration is displayed as a reference
