@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pad volume, layer volume, playback progress, and active layer tracking are now updated in a single batched operation each audio frame, reducing UI jitter and improving performance
+- Added per-pad playback progress indicator support (`padProgress`), enabling future progress bar display on pads
+- Added active layer tracking (`activeLayerIds`), replacing per-component polling for whether a layer is currently playing
 - Active pad playback progress is now tracked more efficiently — the audio engine computes progress for all playing pads in a single pass, reducing overhead during playback.
 - Fixed an issue where stopping a pad did not cancel an in-progress fade, preventing fade artifacts on stop.
 - Right-clicking an unplayable pad (one with no sounds assigned) no longer opens the live control popover

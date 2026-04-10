@@ -31,44 +31,55 @@ describe("addPlayingPad / removePlayingPad / clearAllPlayingPads", () => {
   });
 });
 
-describe("updateLayerVolume / removeLayerVolume / removeLayerVolumes", () => {
-  it("stores layer volume", () => {
+describe("setAudioTick", () => {
+  beforeEach(() => {
+    usePlaybackStore.setState({ ...initialPlaybackState });
+  });
+
+  it("updates padVolumes", () => {
+    usePlaybackStore.getState().setAudioTick({ padVolumes: { "pad-1": 0.5 } });
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.5);
+  });
+
+  it("updates layerVolumes", () => {
+    usePlaybackStore.getState().setAudioTick({ layerVolumes: { "layer-1": 0.7 } });
+    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.7);
+  });
+
+  it("updates padProgress", () => {
+    usePlaybackStore.getState().setAudioTick({ padProgress: { "pad-1": 0.42 } });
+    expect(usePlaybackStore.getState().padProgress["pad-1"]).toBe(0.42);
+  });
+
+  it("updates activeLayerIds", () => {
+    usePlaybackStore.getState().setAudioTick({ activeLayerIds: new Set(["layer-a", "layer-b"]) });
+    expect(usePlaybackStore.getState().activeLayerIds.has("layer-a")).toBe(true);
+    expect(usePlaybackStore.getState().activeLayerIds.has("layer-b")).toBe(true);
+  });
+
+  it("can update multiple fields in one call", () => {
+    usePlaybackStore.getState().setAudioTick({
+      padVolumes: { "pad-1": 0.3 },
+      padProgress: { "pad-1": 0.6 },
+    });
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.3);
+    expect(usePlaybackStore.getState().padProgress["pad-1"]).toBe(0.6);
+  });
+
+  it("partial update does not clobber unspecified fields", () => {
+    usePlaybackStore.getState().setAudioTick({ padVolumes: { "pad-1": 0.5 } });
+    usePlaybackStore.getState().setAudioTick({ padProgress: { "pad-1": 0.2 } });
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.5);
+  });
+});
+
+describe("updateLayerVolume (non-playing fallback)", () => {
+  beforeEach(() => {
+    usePlaybackStore.setState({ ...initialPlaybackState });
+  });
+
+  it("stores volume for non-playing layer", () => {
     usePlaybackStore.getState().updateLayerVolume("layer-1", 0.75);
     expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.75);
-  });
-
-  it("updates existing layer volume", () => {
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.5);
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.8);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.8);
-  });
-
-  it("removes a layer volume entry", () => {
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.6);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.6);
-    usePlaybackStore.getState().removeLayerVolume("layer-1");
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBeUndefined();
-  });
-
-  it("is a no-op when layerId does not exist", () => {
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.5);
-    usePlaybackStore.getState().removeLayerVolume("layer-2");
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.5);
-  });
-
-  it("removes multiple layer volume entries", () => {
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.5);
-    usePlaybackStore.getState().updateLayerVolume("layer-2", 0.6);
-    usePlaybackStore.getState().updateLayerVolume("layer-3", 0.7);
-    usePlaybackStore.getState().removeLayerVolumes(["layer-1", "layer-3"]);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBeUndefined();
-    expect(usePlaybackStore.getState().layerVolumes["layer-2"]).toBe(0.6);
-    expect(usePlaybackStore.getState().layerVolumes["layer-3"]).toBeUndefined();
-  });
-
-  it("is a no-op for non-existent keys in removeLayerVolumes", () => {
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.5);
-    usePlaybackStore.getState().removeLayerVolumes(["layer-2", "layer-3"]);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.5);
   });
 });

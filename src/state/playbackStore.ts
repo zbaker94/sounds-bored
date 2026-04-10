@@ -3,14 +3,25 @@ import { create } from "zustand";
 // NOTE: All non-serializable audio engine state (voiceMap, layerVoiceMap, GainNodes,
 // streaming audio, chain queues, fade tracking) lives in src/lib/audio/audioState.ts.
 // This store contains only reactive Zustand state that drives UI re-renders.
+//
+// Tick-managed fields (padVolumes, layerVolumes, padProgress, activeLayerIds) are
+// written by the single global audioTick RAF loop in src/lib/audio/audioTick.ts.
+// All other writes to these fields are bugs.
+
+interface AudioTickSnapshot {
+  padVolumes?: Record<string, number>;
+  layerVolumes?: Record<string, number>;
+  padProgress?: Record<string, number>;
+  activeLayerIds?: Set<string>;
+}
 
 interface PlaybackState {
   masterVolume: number; // 0–100
   setMasterVolume: (volume: number) => void;
 
   // Which pad IDs currently have active voices (for UI feedback)
+  // Push-based (discrete events), NOT tick-managed.
   playingPadIds: Set<string>;
-
   addPlayingPad: (padId: string) => void;
   removePlayingPad: (padId: string) => void;
   clearAllPlayingPads: () => void;
@@ -19,23 +30,27 @@ interface PlaybackState {
   isPreviewPlaying: boolean;
   setIsPreviewPlaying: (v: boolean) => void;
 
-  // Per-pad runtime volume (0–1), mirrored from padGainMap for React reactivity
-  padVolumes: Record<string, number>;
-  updatePadVolume: (padId: string, volume: number) => void;
+  // ---------------------------------------------------------------------------
+  // Tick-managed fields — written exclusively by audioTick.ts via setAudioTick()
+  // ---------------------------------------------------------------------------
 
-  // Per-layer runtime volume (0–1), mirrored from layerGainMap for React reactivity
+  /** Per-pad runtime volume (0–1). Entry exists only when gain < 0.999 (pad is fading/adjusted).
+   *  Absence of an entry means the pad is at full volume. Used to drive the fill bar in PadButton. */
+  padVolumes: Record<string, number>;
+
+  /** Per-layer runtime volume (0–1). Entry exists for playing layers with an active gain node.
+   *  updateLayerVolume() is kept as a fallback for non-playing layer gesture drags. */
   layerVolumes: Record<string, number>;
   updateLayerVolume: (layerId: string, volume: number) => void;
-  removeLayerVolume: (layerId: string) => void;
-  removeLayerVolumes: (layerIds: string[]) => void;
 
-  // Which pad IDs currently have an active automated or gesture-driven volume transition (drives the fill bar)
-  volumeTransitioningPadIds: Set<string>;
-  startVolumeTransition: (padId: string) => void;
-  clearVolumeTransition: (padId: string) => void;
-  clearAllVolumeTransitions: () => void;
-  /** Reset padVolumes to {} so stale values don't persist as the initial height on the next transition. */
-  resetAllPadVolumes: () => void;
+  /** Per-pad playback progress (0–1). Entry exists for playing pads with progress info. */
+  padProgress: Record<string, number>;
+
+  /** Set of layer IDs currently playing (have active voices). Replaces per-component RAF polling. */
+  activeLayerIds: Set<string>;
+
+  /** Batch-set any subset of tick-managed fields in a single Zustand mutation. */
+  setAudioTick: (snapshot: AudioTickSnapshot) => void;
 }
 
 // Factory ensures each spread gets fresh Set/object instances — prevents tests from sharing mutable state.
@@ -44,7 +59,8 @@ export const initialPlaybackState = {
   get playingPadIds() { return new Set<string>(); },
   get padVolumes() { return {} as Record<string, number>; },
   get layerVolumes() { return {} as Record<string, number>; },
-  get volumeTransitioningPadIds() { return new Set<string>(); },
+  get padProgress() { return {} as Record<string, number>; },
+  get activeLayerIds() { return new Set<string>(); },
   isPreviewPlaying: false,
 };
 
@@ -74,47 +90,20 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
 
   isPreviewPlaying: false,
   setIsPreviewPlaying: (v) => set({ isPreviewPlaying: v }),
+
   padVolumes: {},
-
-  updatePadVolume: (padId, volume) =>
-    set((s) => ({ padVolumes: { ...s.padVolumes, [padId]: volume } })),
-
   layerVolumes: {},
+  padProgress: {},
+  activeLayerIds: new Set<string>(),
 
   updateLayerVolume: (layerId, volume) =>
     set((s) => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } })),
 
-  removeLayerVolume: (layerId) =>
-    set((s) => {
-      const next = { ...s.layerVolumes };
-      delete next[layerId];
-      return { layerVolumes: next };
-    }),
-
-  removeLayerVolumes: (layerIds) =>
-    set((s) => {
-      const next = { ...s.layerVolumes };
-      for (const id of layerIds) {
-        delete next[id];
-      }
-      return { layerVolumes: next };
-    }),
-
-  volumeTransitioningPadIds: new Set<string>(),
-  startVolumeTransition: (padId) =>
-    set((s) => {
-      if (s.volumeTransitioningPadIds.has(padId)) return s;
-      const next = new Set(s.volumeTransitioningPadIds);
-      next.add(padId);
-      return { volumeTransitioningPadIds: next };
-    }),
-  clearVolumeTransition: (padId) =>
-    set((s) => {
-      if (!s.volumeTransitioningPadIds.has(padId)) return s;
-      const next = new Set(s.volumeTransitioningPadIds);
-      next.delete(padId);
-      return { volumeTransitioningPadIds: next };
-    }),
-  clearAllVolumeTransitions: () => set({ volumeTransitioningPadIds: new Set() }),
-  resetAllPadVolumes: () => set({ padVolumes: {} }),
+  setAudioTick: (snapshot) =>
+    set((s) => ({
+      ...(snapshot.padVolumes !== undefined ? { padVolumes: snapshot.padVolumes } : {}),
+      ...(snapshot.layerVolumes !== undefined ? { layerVolumes: snapshot.layerVolumes } : {}),
+      ...(snapshot.padProgress !== undefined ? { padProgress: snapshot.padProgress } : {}),
+      ...(snapshot.activeLayerIds !== undefined ? { activeLayerIds: snapshot.activeLayerIds } : {}),
+    })),
 }));
