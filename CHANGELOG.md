@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added a speech bubble-style arrow to pad live control popovers on desktop, making it clearer which pad a popover is attached to
 - Sliders now display a tooltip showing the current percentage value when hovering or dragging a thumb
 - The "Multi-Fade with Others" button has been renamed to "Synchronized Fades"
 - Compact slider variant introduced for tighter UI areas (smaller track and thumb size)
