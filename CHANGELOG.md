@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where the pad control panel didn't close automatically after duplicating or deleting a pad
 - Added a new pad control panel with playback controls (Start/Stop, Fade In/Out, per-layer play/stop) accessible directly from the pad
 - Pad controls now adapt their layout based on available space — full controls when space allows, compact popover-based controls when the pad is smaller
 - Individual layers can now be triggered and stopped independently from the pad control panel, with volume sliders per layer

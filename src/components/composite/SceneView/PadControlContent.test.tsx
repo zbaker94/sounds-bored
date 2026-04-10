@@ -96,10 +96,11 @@ describe("PadControlContent", () => {
     });
 
     it("clicking Duplicate calls duplicatePad and onClose", async () => {
-      renderContent();
+      const { onClose } = renderContent();
       await userEvent.click(screen.getByRole("button", { name: /duplicate pad/i }));
       const pads = useProjectStore.getState().project!.scenes[0].pads;
       expect(pads).toHaveLength(2);
+      expect(onClose).toHaveBeenCalled();
     });
 
     it("clicking Delete opens ConfirmDeletePadDialog", async () => {
@@ -109,12 +110,13 @@ describe("PadControlContent", () => {
     });
 
     it("confirming delete calls stopPad and deletePad", async () => {
-      renderContent();
+      const { onClose } = renderContent();
       await userEvent.click(screen.getByRole("button", { name: /delete pad/i }));
       const confirmBtn = await screen.findByRole("button", { name: /^delete$/i });
       await userEvent.click(confirmBtn);
       expect(stopPad).toHaveBeenCalled();
       expect(useProjectStore.getState().project!.scenes[0].pads).toHaveLength(0);
+      expect(onClose).toHaveBeenCalled();
     });
   });
 
