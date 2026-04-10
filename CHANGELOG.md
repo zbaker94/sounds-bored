@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Live volume adjustment: dragging the fade slider now updates the volume of a playing pad in real time
 - Right-clicking a pad now correctly toggles the live controls popover closed when it is already open, instead of reopening it
 - Dragging the volume slider in the live controls popover now updates pad volume in real time while dragging
 - Layer volume changes are applied live during drag and only saved to the project when you release the slider

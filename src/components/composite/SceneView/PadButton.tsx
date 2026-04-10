@@ -9,7 +9,7 @@ import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
-import { getPadProgress, stopPad } from "@/lib/audio/padPlayer";
+import { getPadProgress, stopPad, setPadVolume } from "@/lib/audio/padPlayer";
 import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -351,7 +351,14 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     >
                       <SliderPrimitive.Root
                         value={[multiFadeLevels[0], multiFadeLevels[1]]}
-                        onValueChange={(v) => setMultiFadeLevels(pad.id, [v[0], v[1]])}
+                        onValueChange={(v) => {
+                          if (isPlaying && v[1] !== multiFadeLevels[1]) {
+                            setPadVolume(pad.id, v[1] / 100);
+                            usePlaybackStore.getState().startVolumeTransition(pad.id);
+                          }
+                          setMultiFadeLevels(pad.id, [v[0], v[1]]);
+                        }}
+                        onPointerUp={() => usePlaybackStore.getState().clearVolumeTransition(pad.id)}
                         min={0}
                         max={100}
                         step={1}
