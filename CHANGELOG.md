@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad live control content extracted into a separate `PadControlContent` component, improving code organization and maintainability
+- Drawer header on mobile no longer shows a duplicate pad name; accessibility title is now screen-reader only
 - Improved test coverage for the pad control panel's responsive layout, verifying correct behavior across full, condensed, and compact display modes.
 - Improved reliability of pad control panel layout tests to correctly simulate component dimensions in the test environment
 - Added test coverage verifying the Layers section heading renders correctly in the pad control panel
