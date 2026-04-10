@@ -78,6 +78,11 @@ import {
   isPadActive,
   isLayerActive,
   startFadeRaf,
+  forEachActivePadGain,
+  getActivePadCount,
+  forEachActiveLayerGain,
+  getActiveLayerIdSet,
+  computeAllPadProgress,
 } from "./audioState";
 import type { AudioVoice } from "./audioVoice";
 
@@ -561,5 +566,117 @@ describe("startFadeRaf", () => {
     flushNextRaf();
     expect(mockPlaybackState.updatePadVolume).toHaveBeenLastCalledWith("pad-1", 1);
     expect(rafCallbacks.size).toBe(0);
+  });
+});
+
+// ── tick accessor functions ──────────────────────────────────────────────────
+
+describe("tick accessor functions", () => {
+  it("getActivePadCount returns 0 when no voices are active", () => {
+    expect(getActivePadCount()).toBe(0);
+  });
+
+  it("getActivePadCount returns correct count with voices recorded", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-2", "layer-2", makeVoice());
+    expect(getActivePadCount()).toBe(2);
+  });
+
+  it("forEachActivePadGain only iterates pads with both a voice AND a gain node", () => {
+    // pad-1: has both a gain node AND a voice
+    getPadGain("pad-1");
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+
+    // pad-2: has a gain node but NO voice (should not be iterated)
+    getPadGain("pad-2");
+
+    const visited: string[] = [];
+    forEachActivePadGain((padId) => visited.push(padId));
+    expect(visited).toEqual(["pad-1"]);
+  });
+
+  it("forEachActivePadGain passes the correct GainNode to fn", () => {
+    const gain = getPadGain("pad-1");
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+
+    let receivedGain: GainNode | undefined;
+    forEachActivePadGain((_padId, g) => { receivedGain = g; });
+    expect(receivedGain).toBe(gain);
+  });
+
+  it("forEachActiveLayerGain only iterates layers with both a voice AND a gain node", () => {
+    const padGain = getPadGain("pad-1");
+
+    // layer-1: has both a gain node AND a voice
+    getOrCreateLayerGain("layer-1", 100, padGain);
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+
+    // layer-2: has a gain node but NO voice (should not be iterated)
+    getOrCreateLayerGain("layer-2", 80, padGain);
+
+    const visited: string[] = [];
+    forEachActiveLayerGain((layerId) => visited.push(layerId));
+    expect(visited).toEqual(["layer-1"]);
+  });
+
+  it("forEachActiveLayerGain passes the correct GainNode to fn", () => {
+    const padGain = getPadGain("pad-1");
+    const layerGain = getOrCreateLayerGain("layer-1", 100, padGain);
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+
+    let receivedGain: GainNode | undefined;
+    forEachActiveLayerGain((_layerId, g) => { receivedGain = g; });
+    expect(receivedGain).toBe(layerGain);
+  });
+
+  it("getActiveLayerIdSet returns correct set of active layer IDs", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-1", "layer-2", makeVoice());
+    recordLayerVoice("pad-2", "layer-3", makeVoice());
+
+    const ids = getActiveLayerIdSet();
+    expect(ids).toBeInstanceOf(Set);
+    expect(ids.size).toBe(3);
+    expect(ids.has("layer-1")).toBe(true);
+    expect(ids.has("layer-2")).toBe(true);
+    expect(ids.has("layer-3")).toBe(true);
+  });
+
+  it("getActiveLayerIdSet returns empty set when no voices active", () => {
+    const ids = getActiveLayerIdSet();
+    expect(ids.size).toBe(0);
+  });
+
+  it("computeAllPadProgress returns empty object when no voices active", () => {
+    expect(computeAllPadProgress()).toEqual({});
+  });
+
+  it("computeAllPadProgress returns progress for pads that have progress info", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: false });
+    mockCtx.currentTime = 2;
+
+    const result = computeAllPadProgress();
+    expect(result["pad-1"]).toBeCloseTo(0.5);
+  });
+
+  it("computeAllPadProgress omits pads with no progress info", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    // no setPadProgressInfo or streaming audio for pad-1
+
+    const result = computeAllPadProgress();
+    expect(result["pad-1"]).toBeUndefined();
+  });
+
+  it("computeAllPadProgress handles multiple active pads", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-2", "layer-2", makeVoice());
+    setPadProgressInfo("pad-1", { startedAt: 0, duration: 10, isLooping: false });
+    setPadProgressInfo("pad-2", { startedAt: 0, duration: 4, isLooping: false });
+    mockCtx.currentTime = 2;
+
+    const result = computeAllPadProgress();
+    expect(result["pad-1"]).toBeCloseTo(0.2);
+    expect(result["pad-2"]).toBeCloseTo(0.5);
   });
 });

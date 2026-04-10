@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Active pad playback progress is now tracked more efficiently — the audio engine computes progress for all playing pads in a single pass, reducing overhead during playback.
 - Fixed an issue where stopping a pad did not cancel an in-progress fade, preventing fade artifacts on stop.
 - Right-clicking an unplayable pad (one with no sounds assigned) no longer opens the live control popover
 - Fixed the pad edit panel background so it correctly uses the card background color instead of a dark black overlay, improving readability when pads have custom colors.

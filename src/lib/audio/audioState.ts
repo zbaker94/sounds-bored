@@ -182,6 +182,46 @@ export function forEachPadGain(fn: (padId: string, gain: GainNode) => void): voi
   }
 }
 
+/** Iterate active pad gain nodes — only pads currently in voiceMap (with active voices). */
+export function forEachActivePadGain(fn: (padId: string, gain: GainNode) => void): void {
+  for (const padId of voiceMap.keys()) {
+    const gain = padGainMap.get(padId);
+    if (gain) fn(padId, gain);
+  }
+}
+
+/** Return the number of pads with active voices. Used by the tick to self-terminate. */
+export function getActivePadCount(): number {
+  return voiceMap.size;
+}
+
+/** Iterate active layer gain nodes — only layers currently in layerVoiceMap. */
+export function forEachActiveLayerGain(fn: (layerId: string, gain: GainNode) => void): void {
+  for (const layerId of layerVoiceMap.keys()) {
+    const gain = layerGainMap.get(layerId);
+    if (gain) fn(layerId, gain);
+  }
+}
+
+/** Return the Set of currently active layer IDs (layers with at least one voice). */
+export function getActiveLayerIdSet(): Set<string> {
+  return new Set(layerVoiceMap.keys());
+}
+
+/**
+ * Compute padProgress for all active pads in one pass.
+ * Returns a Record<padId, progress 0–1>. Pads with no progress info are omitted.
+ * Delegates to the existing getPadProgress(padId) for each active pad.
+ */
+export function computeAllPadProgress(): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const padId of voiceMap.keys()) {
+    const progress = getPadProgress(padId);
+    if (progress !== null) result[padId] = progress;
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Bulk clear functions (test isolation + stopAllPads)
 // ---------------------------------------------------------------------------
