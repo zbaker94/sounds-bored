@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Moved `getSoundsForLayer` tests from `PadLiveControlPopover.test.tsx` to `PadControlContent.test.tsx` to better co-locate tests with the function they cover
+- Simplified `PadLiveControlPopover` tests by removing unnecessary mocks (audio, tooltip, store state) that were testing implementation details not relevant to the popover itself
+- Added a new test verifying the close button in the mobile drawer calls `onOpenChange(false)` correctly
 - Pad live control content extracted into a separate `PadControlContent` component, improving code organization and maintainability
 - Drawer header on mobile no longer shows a duplicate pad name; accessibility title is now screen-reader only
 - Improved test coverage for the pad control panel's responsive layout, verifying correct behavior across full, condensed, and compact display modes.
