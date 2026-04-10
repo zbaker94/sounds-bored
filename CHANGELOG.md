@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved slider component indentation and code formatting for better readability (no functional changes)
 - The pad live control popover now displays a visual arrow pointing to the pad it belongs to
 - Slider tooltips now render correctly when used outside of a global tooltip provider
 - Popovers can now display a styled arrow pointing to their trigger element via a new `showArrow` option

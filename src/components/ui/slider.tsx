@@ -49,61 +49,61 @@ function Slider({
 
   return (
     <TooltipProvider>
-    <SliderPrimitive.Root
-      data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
-      min={min}
-      max={max}
-      className={cn(
-        "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
-        className
-      )}
-      {...props}
-    >
-      <SliderPrimitive.Track
-        data-slot="slider-track"
+      <SliderPrimitive.Root
+        data-slot="slider"
+        defaultValue={defaultValue}
+        value={value}
+        min={min}
+        max={max}
         className={cn(
-          "relative grow overflow-hidden rounded-4xl bg-muted data-vertical:h-full data-vertical:w-3",
-          compact ? "data-horizontal:h-2" : "data-horizontal:h-3"
+          "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
+          className
         )}
+        {...props}
       >
-        <SliderPrimitive.Range
-          data-slot="slider-range"
-          className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full"
-        />
-      </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => {
-        if (tooltipLabel) {
-          return (
-            <Tooltip key={index} open={hoveredIndex === index || draggingIndex === index}>
-              <TooltipTrigger asChild>
-                <SliderPrimitive.Thumb
-                  data-slot="slider-thumb"
-                  className={thumbClass}
-                  onPointerEnter={() => setHoveredIndex(index)}
-                  onPointerLeave={() => setHoveredIndex(null)}
-                  onPointerDown={() => {
-                    setDraggingIndex(index)
-                    onThumbPointerDown?.(index)
-                  }}
-                />
-              </TooltipTrigger>
-              <TooltipContent>{tooltipLabel(_values[index])}</TooltipContent>
-            </Tooltip>
-          )
-        }
-
-        return (
-          <SliderPrimitive.Thumb
-            data-slot="slider-thumb"
-            key={index}
-            className={thumbClass}
-            onPointerDown={onThumbPointerDown ? () => onThumbPointerDown(index) : undefined}
+        <SliderPrimitive.Track
+          data-slot="slider-track"
+          className={cn(
+            "relative grow overflow-hidden rounded-4xl bg-muted data-vertical:h-full data-vertical:w-3",
+            compact ? "data-horizontal:h-2" : "data-horizontal:h-3"
+          )}
+        >
+          <SliderPrimitive.Range
+            data-slot="slider-range"
+            className="absolute bg-primary select-none data-horizontal:h-full data-vertical:w-full"
           />
-        )
-      })}
-    </SliderPrimitive.Root>
+        </SliderPrimitive.Track>
+        {Array.from({ length: _values.length }, (_, index) => {
+          if (tooltipLabel) {
+            return (
+              <Tooltip key={index} open={hoveredIndex === index || draggingIndex === index}>
+                <TooltipTrigger asChild>
+                  <SliderPrimitive.Thumb
+                    data-slot="slider-thumb"
+                    className={thumbClass}
+                    onPointerEnter={() => setHoveredIndex(index)}
+                    onPointerLeave={() => setHoveredIndex(null)}
+                    onPointerDown={() => {
+                      setDraggingIndex(index)
+                      onThumbPointerDown?.(index)
+                    }}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{tooltipLabel(_values[index])}</TooltipContent>
+              </Tooltip>
+            )
+          }
+
+          return (
+            <SliderPrimitive.Thumb
+              data-slot="slider-thumb"
+              key={index}
+              className={thumbClass}
+              onPointerDown={onThumbPointerDown ? () => onThumbPointerDown(index) : undefined}
+            />
+          )
+        })}
+      </SliderPrimitive.Root>
     </TooltipProvider>
   )
 }
