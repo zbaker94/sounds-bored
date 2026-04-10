@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added internal design spec for the upcoming Pad Control Panel refactor, consolidating edit/duplicate/delete actions and live controls into a unified shared component with responsive layout modes
 - No user-facing changes (internal test update only)
 - Active shuffled layers now display only the currently playing sound name instead of the full sound list
 - The sound list popover for sequential/shuffled layers now shows sounds in actual play order
