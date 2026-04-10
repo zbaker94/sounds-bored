@@ -180,8 +180,8 @@ function LayerRow({
           <div ref={containerRef} className="overflow-hidden flex-1 min-w-0">
             {isOverflow ? (
               <div
-                className="flex"
-                style={{ animation: "marquee 10s linear infinite", gap: "2rem" }}
+                className="flex gap-8"
+                style={{ animation: "marquee 10s linear infinite" }}
               >
                 <span className="whitespace-nowrap text-xs text-muted-foreground">{displayText}</span>
                 <span className="whitespace-nowrap text-xs text-muted-foreground" aria-hidden>{displayText}</span>

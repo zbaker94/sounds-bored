@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed spacing between repeating text in the scrolling sound name display on pad controls
 - Each pad layer now shows the names of its assigned sounds (e.g. "Kick · Snare · Hi-hat") directly in the live control popover
 - When sound names are too long to fit, the display automatically scrolls with a marquee animation
 - Added sound display to pad live control popover layers, showing which sounds are assigned to each layer based on its selection type (assigned, tag, or set)
