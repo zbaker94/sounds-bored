@@ -22,6 +22,7 @@ interface PadLiveControlPopoverProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
+  onEditClick?: (pad: Pad) => void;
 }
 
 export const PadLiveControlPopover = memo(function PadLiveControlPopover({
@@ -30,6 +31,7 @@ export const PadLiveControlPopover = memo(function PadLiveControlPopover({
   open,
   onOpenChange,
   anchorRef,
+  onEditClick,
 }: PadLiveControlPopoverProps) {
   const isDesktop = useIsMd();
 
@@ -44,7 +46,7 @@ export const PadLiveControlPopover = memo(function PadLiveControlPopover({
           {/* sr-only title satisfies accessibility without duplicating the visible header */}
           <DrawerTitle className="sr-only">{pad.name}</DrawerTitle>
           <div className="px-4 pb-4 pt-2">
-            <PadControlContent pad={pad} sceneId={sceneId} onClose={handleClose} />
+            <PadControlContent pad={pad} sceneId={sceneId} onClose={handleClose} onEditClick={onEditClick} />
           </div>
         </DrawerContent>
       </Drawer>
@@ -59,7 +61,7 @@ export const PadLiveControlPopover = memo(function PadLiveControlPopover({
         }
       />
       <PopoverContent className="w-72" side="top" sideOffset={10} showArrow>
-        <PadControlContent pad={pad} sceneId={sceneId} onClose={handleClose} />
+        <PadControlContent pad={pad} sceneId={sceneId} onClose={handleClose} onEditClick={onEditClick} />
       </PopoverContent>
     </Popover>
   );

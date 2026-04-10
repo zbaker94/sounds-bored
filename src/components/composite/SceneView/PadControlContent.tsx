@@ -108,8 +108,7 @@ function LayerRow({
   const sounds = useLibraryStore((s) => s.sounds);
   const allSounds = useMemo(
     () => getSoundsForLayer(layer, sounds),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [layer.selection, sounds]
+    [layer, sounds]
   );
   const tags = useLibraryStore((s) => s.tags);
   const sets = useLibraryStore((s) => s.sets);

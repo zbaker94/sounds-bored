@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Tapping "Edit" on a pad's live control popover now navigates directly to the pad's full configuration panel instead of requiring you to close the popover first.
 - Pad buttons no longer show a close/dismiss action on the back face — exit edit mode using the global toggle instead
 - Pad edit controls (edit, duplicate, delete) on the back face in edit mode now use the same shared control panel as the live control popover, ensuring a consistent UI in both views
 - The layer count indicator (e.g., "1 layer") is no longer displayed on the pad's back face in edit mode

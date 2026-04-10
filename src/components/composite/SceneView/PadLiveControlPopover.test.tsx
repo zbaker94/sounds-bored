@@ -32,10 +32,11 @@ vi.mock("./PadControlContent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./PadControlContent")>();
   return {
     ...actual,
-    PadControlContent: ({ pad, onClose }: { pad: { name: string }; onClose: () => void }) => (
+    PadControlContent: ({ pad, onClose, onEditClick }: { pad: { name: string }; onClose: () => void; onEditClick?: (pad: { name: string }) => void }) => (
       <div data-testid="pad-control-content">
         <span>{pad.name}</span>
         <button type="button" onClick={onClose}>Close</button>
+        <button type="button" onClick={() => onEditClick?.(pad)}>Edit</button>
       </div>
     ),
   };
@@ -81,6 +82,27 @@ describe("PadLiveControlPopover", () => {
     const closeBtn = screen.getByRole("button", { name: /close/i });
     await userEvent.click(closeBtn);
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("passes onEditClick to PadControlContent", async () => {
+    const onEditClick = vi.fn();
+    const layer = createMockLayer({ id: "layer-1" });
+    const pad = createMockPad({ id: "pad-1", name: "Edit Test Pad", layers: [layer] });
+    const anchorRef = { current: null };
+    const onOpenChange = vi.fn();
+    render(
+      <PadLiveControlPopover
+        pad={pad}
+        sceneId="scene-1"
+        open={true}
+        onOpenChange={onOpenChange}
+        anchorRef={anchorRef as React.RefObject<HTMLButtonElement | null>}
+        onEditClick={onEditClick}
+      />
+    );
+    const editBtn = screen.getByRole("button", { name: /edit/i });
+    await userEvent.click(editBtn);
+    expect(onEditClick).toHaveBeenCalledWith(pad);
   });
 
   describe("mobile (drawer) path", () => {
