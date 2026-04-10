@@ -206,10 +206,10 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   // We record the open state at pointer-down because Radix fires onOpenChange(false)
   // before the contextMenu event, which would otherwise cause a naive toggle to reopen.
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    if (editMode || multiFadeActive) return;
+    if (editMode || multiFadeActive || isUnplayable) return;
     e.preventDefault();
     setPopoverOpen(popoverWasOpenRef.current ? false : true);
-  }, [editMode, multiFadeActive]);
+  }, [editMode, multiFadeActive, isUnplayable]);
 
   // Selection ring styling for multi-fade selected pads
   const multiFadeSelectionClass = useMemo(() => {

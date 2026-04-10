@@ -303,7 +303,10 @@ describe("right-click / context menu", () => {
   });
 
   it("right-clicking the pad button opens the live control popover", async () => {
-    const pad = loadPadInStore();
+    // tag layer → hasNonAssignedLayer = true → padSoundState !== "disabled"
+    const pad = loadPadInStore({
+      layers: [createMockLayer({ selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })],
+    });
     render(<PadButton pad={pad} sceneId="scene-1" />);
     // The context menu handler is on the outer div wrapper, not the button itself
     const button = screen.getByRole("button", { name: "Kick" });
@@ -332,6 +335,17 @@ describe("right-click / context menu", () => {
       selectedPads: new Map(),
       reopenPadId: null,
     });
+    const pad = loadPadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    const button = screen.getByRole("button", { name: "Kick" });
+    // eslint-disable-next-line testing-library/no-node-access
+    const wrapper = button.parentElement!.parentElement!.parentElement!.parentElement!;
+    fireEvent.contextMenu(wrapper);
+    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+  });
+
+  it("right-clicking does not open popover when pad is unplayable", async () => {
+    // createMockLayer defaults to empty instances → padSoundState === "disabled"
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
