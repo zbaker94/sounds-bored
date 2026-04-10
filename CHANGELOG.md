@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad volume display and layer activity indicators now update via a shared audio engine tick, reducing CPU overhead from multiple per-pad animation loops
+- Progress tracking for playing pads is now driven by centralized store state, improving consistency across the UI
 - Active layer indicators on pad buttons now update via a centralized engine tick instead of per-pad animation loops, improving reliability and performance.
 - Volume fade slider no longer tracks an intermediate "transitioning" state, simplifying volume adjustment behavior.
 - Pad volume fade bars and playback progress indicators now update more reliably during simultaneous pad activity, reducing missed or stuttering visual feedback.
