@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Added a sound display row in each layer's live control panel showing the names of assigned sounds (e.g., "Kick · Snare · Hi-hat"), with a scrolling marquee when the text overflows
+- For sequential and shuffled layers, the display updates in real-time to highlight the currently-playing sound while the layer is active
+- Added a list icon button (hidden for single-sound layers) that opens a popover showing all sounds numbered, with the current sound bolded and missing sounds shown in italics
 - Added internal design spec for layer sound display in the pad live control popover (upcoming feature)
 - Pad live control popover now includes a per-pad fade duration slider, letting you set a custom fade time (0.1s–10s) directly from the pad controls
 - A "Reset to default" option appears when a custom fade duration is set, reverting the pad to the global default fade time
