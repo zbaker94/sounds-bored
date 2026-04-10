@@ -2993,6 +2993,37 @@ describe("skipLayerBack", () => {
     const chain = getLayerChain(layer.id);
     expect(chain?.length).toBe(2); // [soundB, soundC]
   });
+
+  it("updates cycle index when layer has cycleMode enabled", async () => {
+    const { skipLayerBack } = await import("./padPlayer");
+    const { getLayerCycleIndex, setLayerChain, setLayerPlayOrder } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      cycleMode: true,
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Simulate state at position 1: soundB is playing, chain has [soundC] remaining
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerChain(layer.id, [sounds[2]]); // [soundC] remaining
+
+    // Skip back: currentPos = 3 - 1 - 1 = 1, prevIndex = max(0, 1-1) = 0
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    // With cycleMode, setLayerCycleIndex SHOULD be called with prevIndex=0
+    expect(getLayerCycleIndex(layer.id)).toBe(0);
+  });
 });
 
 // ─── fadePadWithLevels ────────────────────────────────────────────────────────

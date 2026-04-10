@@ -178,6 +178,24 @@ describe("PadLiveControlPopover", () => {
     expect(sliderThumbs[1]).toHaveAttribute("aria-valuenow", "75");
   });
 
+  it("clicking 'Multi-fade with others...' calls enterMultiFade and closes popover", async () => {
+    const mockEnterMultiFade = vi.fn();
+    useMultiFadeStore.setState({
+      active: false,
+      originPadId: null,
+      selectedPads: new Map(),
+      reopenPadId: null,
+      enterMultiFade: mockEnterMultiFade,
+    } as any);
+
+    const { onOpenChange } = renderPopover();
+    const multiFadeBtn = screen.getByRole("button", { name: /multi-fade with others/i });
+    await userEvent.click(multiFadeBtn);
+
+    expect(mockEnterMultiFade).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   describe("mobile (drawer) path", () => {
     it("renders a Drawer instead of Popover on mobile", () => {
       vi.mocked(useIsMd).mockReturnValue(false);

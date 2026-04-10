@@ -275,3 +275,46 @@ describe("useMultiFadeMode — auto-cancel side effects", () => {
     expect(result.current.active).toBe(false);
   });
 });
+
+describe("executeMultiFadeNow integration", () => {
+  it("dispatches fadePadWithLevels for each selected pad and resets store", async () => {
+    const { executeMultiFadeNow } = await import("./useMultiFadeMode");
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+
+    const pad1 = createMockPad({ id: "pad-exec-1" });
+    const pad2 = createMockPad({ id: "pad-exec-2" });
+    const scene = createMockScene({ pads: [pad1, pad2] });
+    const entry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "pad-exec-1",
+      selectedPads: new Map([
+        ["pad-exec-1", { padId: "pad-exec-1", levels: [0, 80] }],
+        ["pad-exec-2", { padId: "pad-exec-2", levels: [20, 100] }],
+      ]),
+      reopenPadId: null,
+    });
+
+    executeMultiFadeNow();
+
+    expect(fadePadWithLevels).toHaveBeenCalledTimes(2);
+    expect(fadePadWithLevels).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "pad-exec-1" }),
+      expect.any(Number),
+      0,       // levels[0] / 100
+      0.8,     // levels[1] / 100
+    );
+    expect(fadePadWithLevels).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "pad-exec-2" }),
+      expect.any(Number),
+      0.2,     // levels[0] / 100
+      1.0,     // levels[1] / 100
+    );
+
+    // Store should be reset after execute
+    expect(useMultiFadeStore.getState().active).toBe(false);
+    expect(useMultiFadeStore.getState().selectedPads.size).toBe(0);
+  });
+});

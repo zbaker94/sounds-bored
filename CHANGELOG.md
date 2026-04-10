@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Clicking "Multi-fade with others..." on a pad now correctly closes the pad popover after entering multi-fade mode
+- Multi-fade execution now applies the correct per-pad fade levels to each selected pad and resets the multi-fade state afterward
+- Skipping backward through a sequential layer with cycle mode enabled now correctly updates the cycle position
 - Fade execution button now triggers more reliably when clicked
 - Executing a multi-pad fade now uses a single shared code path, reducing the chance of inconsistent behavior between keyboard shortcut and button-triggered fades.
 - Added mobile support for pad live controls — on small screens, controls now appear in a drawer instead of a popover
