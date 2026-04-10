@@ -57,10 +57,13 @@ vi.mock("@/lib/audio/padPlayer", () => ({
 vi.mock("@/lib/audio/audioState", () => ({
   isPadActive: vi.fn().mockReturnValue(false),
   isLayerActive: vi.fn().mockReturnValue(false),
+  getLayerChain: vi.fn().mockReturnValue(undefined),
+  getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
 }));
 
 // Import after mocks are set up
 import { triggerPad, stopPad } from "@/lib/audio/padPlayer";
+import { isLayerActive, getLayerChain, getLayerPlayOrder } from "@/lib/audio/audioState";
 
 function renderPopover(padOverrides: Partial<Parameters<typeof createMockPad>[0]> = {}) {
   const layer = createMockLayer({ id: "layer-1" });
@@ -265,6 +268,84 @@ describe("LayerRow sound display", () => {
     renderPopoverWithSounds([]);
     const displayRows = document.querySelectorAll("[data-testid='layer-sound-display']");
     expect(displayRows).toHaveLength(0);
+  });
+
+  describe("currently-playing sound for sequential/shuffled layers", () => {
+    it("shows only the current sound name when layer is active and sequential", async () => {
+      const sounds = [
+        createMockSound({ id: "s1", name: "Kick" }),
+        createMockSound({ id: "s2", name: "Snare" }),
+        createMockSound({ id: "s3", name: "Hi-hat" }),
+      ];
+      useLibraryStore.setState({ ...initialLibraryState, sounds });
+      const instances = sounds.map((s) => createMockSoundInstance({ soundId: s.id }));
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "assigned", instances },
+        arrangement: "sequential",
+      });
+      const pad = createMockPad({ id: "pad-1", layers: [layer] });
+
+      // Layer is active and playing the second sound (chain has 1 remaining)
+      vi.mocked(isLayerActive).mockReturnValue(true);
+      vi.mocked(getLayerPlayOrder).mockReturnValue(sounds);
+      vi.mocked(getLayerChain).mockReturnValue([sounds[2]]); // 1 remaining → current is index 1 = "Snare"
+      usePlaybackStore.setState({
+        ...initialPlaybackState,
+        playingPadIds: new Set(["pad-1"]),
+      });
+
+      render(
+        <PadLiveControlPopover
+          pad={pad}
+          sceneId="scene-1"
+          open={true}
+          onOpenChange={vi.fn()}
+          anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+        />
+      );
+
+      // RAF fires asynchronously — wait for the poll to update state
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(screen.getByText("Snare")).toBeInTheDocument();
+      // Full list text should not be visible
+      expect(screen.queryByText("Kick · Snare · Hi-hat")).not.toBeInTheDocument();
+    });
+
+    it("shows all sounds when layer is simultaneous even if active", async () => {
+      const sounds = [
+        createMockSound({ id: "s1", name: "Kick" }),
+        createMockSound({ id: "s2", name: "Snare" }),
+      ];
+      useLibraryStore.setState({ ...initialLibraryState, sounds });
+      const instances = sounds.map((s) => createMockSoundInstance({ soundId: s.id }));
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "assigned", instances },
+        arrangement: "simultaneous",
+      });
+      const pad = createMockPad({ id: "pad-1", layers: [layer] });
+
+      vi.mocked(isLayerActive).mockReturnValue(true);
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
+
+      render(
+        <PadLiveControlPopover
+          pad={pad}
+          sceneId="scene-1"
+          open={true}
+          onOpenChange={vi.fn()}
+          anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+        />
+      );
+
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+      expect(screen.getByText("Kick · Snare")).toBeInTheDocument();
+    });
   });
 
   it("shows sounds from a tag selection", () => {

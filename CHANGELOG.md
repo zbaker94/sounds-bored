@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- When a pad with sequential or shuffled sounds is actively playing, the sound display now shows only the currently-playing sound name instead of the full list
+- Simultaneous layers continue to show all sound names regardless of playback state
 - Fixed spacing between repeating text in the scrolling sound name display on pad controls
 - Each pad layer now shows the names of its assigned sounds (e.g. "Kick · Snare · Hi-hat") directly in the live control popover
 - When sound names are too long to fit, the display automatically scrolls with a marquee animation

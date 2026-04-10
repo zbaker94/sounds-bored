@@ -26,7 +26,12 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
-import { isPadActive } from "@/lib/audio/audioState";
+import {
+  isPadActive,
+  isLayerActive as checkLayerActive,
+  getLayerChain,
+  getLayerPlayOrder,
+} from "@/lib/audio/audioState";
 import {
   triggerPad,
   stopPad,
@@ -39,7 +44,6 @@ import {
   skipLayerForward,
   skipLayerBack,
 } from "@/lib/audio/padPlayer";
-import { isLayerActive as checkLayerActive } from "@/lib/audio/audioState";
 import type { Pad, Sound, Layer } from "@/lib/schemas";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -96,7 +100,53 @@ function LayerRow({
 
   const sounds = useLibraryStore((s) => s.sounds);
   const allSounds = getSoundsForLayer(layer, sounds);
-  const displayText = allSounds.map((s) => s.name).join(" · ");
+  const isChainedArrangement = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
+
+  // ─── Current-sound RAF polling (sequential/shuffled while active) ───────────
+  const [currentSoundId, setCurrentSoundId] = useState<string | null>(null);
+  const soundRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!layerActive || !isChainedArrangement) {
+      setCurrentSoundId(null);
+      if (soundRafRef.current !== null) {
+        cancelAnimationFrame(soundRafRef.current);
+        soundRafRef.current = null;
+      }
+      return;
+    }
+
+    const poll = () => {
+      const playOrder = getLayerPlayOrder(layer.id);
+      const chain = getLayerChain(layer.id);
+      if (playOrder && playOrder.length > 0) {
+        const chainLength = chain?.length ?? 0;
+        const currentIdx = Math.max(0, playOrder.length - chainLength - 1);
+        const currentSound = playOrder[currentIdx];
+        const nextId = currentSound?.id ?? null;
+        setCurrentSoundId((prev) => (prev === nextId ? prev : nextId));
+      }
+      soundRafRef.current = requestAnimationFrame(poll);
+    };
+    soundRafRef.current = requestAnimationFrame(poll);
+
+    return () => {
+      if (soundRafRef.current !== null) {
+        cancelAnimationFrame(soundRafRef.current);
+        soundRafRef.current = null;
+      }
+      setCurrentSoundId(null);
+    };
+  }, [layerActive, isChainedArrangement, layer.id]);
+
+  // ─── Display text ────────────────────────────────────────────────────────────
+  const displayText = (() => {
+    if (layerActive && isChainedArrangement && currentSoundId) {
+      const current = allSounds.find((s) => s.id === currentSoundId);
+      return current?.name ?? allSounds.map((s) => s.name).join(" · ");
+    }
+    return allSounds.map((s) => s.name).join(" · ");
+  })();
 
   // Overflow detection for marquee animation
   const containerRef = useRef<HTMLDivElement>(null);
