@@ -315,6 +315,46 @@ describe("LayerRow sound display", () => {
       expect(screen.queryByText("Kick · Snare · Hi-hat")).not.toBeInTheDocument();
     });
 
+    it("shows only the current sound name when layer is active and shuffled", async () => {
+      const sounds = [
+        createMockSound({ id: "s1", name: "Kick" }),
+        createMockSound({ id: "s2", name: "Snare" }),
+        createMockSound({ id: "s3", name: "Hi-hat" }),
+      ];
+      useLibraryStore.setState({ ...initialLibraryState, sounds });
+      const instances = sounds.map((s) => createMockSoundInstance({ soundId: s.id }));
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "assigned", instances },
+        arrangement: "shuffled",
+      });
+      const pad = createMockPad({ id: "pad-1", layers: [layer] });
+
+      // Shuffled order: [Hi-hat, Kick, Snare]; chain has 1 remaining → current is index 1 = Kick
+      vi.mocked(isLayerActive).mockReturnValue(true);
+      vi.mocked(getLayerPlayOrder).mockReturnValue([sounds[2], sounds[0], sounds[1]]);
+      vi.mocked(getLayerChain).mockReturnValue([sounds[1]]);
+      usePlaybackStore.setState({
+        ...initialPlaybackState,
+        playingPadIds: new Set(["pad-1"]),
+      });
+
+      render(
+        <PadLiveControlPopover
+          pad={pad}
+          sceneId="scene-1"
+          open={true}
+          onOpenChange={vi.fn()}
+          anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+        />
+      );
+
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+      expect(screen.getByText("Kick")).toBeInTheDocument();
+      expect(screen.queryByText("Kick · Snare · Hi-hat")).not.toBeInTheDocument();
+    });
+
     it("shows all sounds when layer is simultaneous even if active", async () => {
       const sounds = [
         createMockSound({ id: "s1", name: "Kick" }),
@@ -383,6 +423,19 @@ describe("LayerRow sound display", () => {
     it("does not show the list icon when layer has no sounds", () => {
       renderPopoverWithSounds([]);
       expect(screen.queryByRole("button", { name: /show sound list/i })).not.toBeInTheDocument();
+    });
+
+    it("clicking list icon while popover is open closes it", async () => {
+      renderPopoverWithSounds(["Kick", "Snare"]);
+      const listBtn = screen.getByRole("button", { name: /show sound list/i });
+
+      // Open
+      await userEvent.click(listBtn);
+      expect(screen.getByText("1. Kick")).toBeInTheDocument();
+
+      // Click again to close
+      await userEvent.click(listBtn);
+      expect(screen.queryByText("1. Kick")).not.toBeInTheDocument();
     });
 
     it("clicking list icon opens a popover listing all sounds", async () => {
@@ -491,6 +544,47 @@ describe("LayerRow sound display", () => {
       // Other items should not be bold
       const kickItem = screen.getByText("1. Kick").closest("li");
       expect(kickItem).not.toHaveClass("font-semibold");
+    });
+
+    it("shows sounds in play order in the list popover for sequential layers", async () => {
+      const sounds = [
+        createMockSound({ id: "s1", name: "Kick" }),
+        createMockSound({ id: "s2", name: "Snare" }),
+        createMockSound({ id: "s3", name: "Hi-hat" }),
+      ];
+      useLibraryStore.setState({ ...initialLibraryState, sounds });
+      const instances = sounds.map((s) => createMockSoundInstance({ soundId: s.id }));
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "assigned", instances },
+        arrangement: "sequential",
+      });
+      const pad = createMockPad({ id: "pad-1", layers: [layer] });
+
+      // Play order differs from library order: Hi-hat first, then Kick, then Snare
+      vi.mocked(isLayerActive).mockReturnValue(true);
+      vi.mocked(getLayerPlayOrder).mockReturnValue([sounds[2], sounds[0], sounds[1]]);
+      vi.mocked(getLayerChain).mockReturnValue([sounds[1]]);
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
+
+      render(
+        <PadLiveControlPopover
+          pad={pad}
+          sceneId="scene-1"
+          open={true}
+          onOpenChange={vi.fn()}
+          anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+        />
+      );
+
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+
+      await userEvent.click(screen.getByRole("button", { name: /show sound list/i }));
+
+      const items = screen.getAllByRole("listitem");
+      expect(items[0]).toHaveTextContent("1. Hi-hat");
+      expect(items[1]).toHaveTextContent("2. Kick");
+      expect(items[2]).toHaveTextContent("3. Snare");
     });
 
     it("missing sounds are shown italic in the list popover", async () => {

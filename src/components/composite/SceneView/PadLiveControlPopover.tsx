@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -45,7 +45,7 @@ import {
   skipLayerForward,
   skipLayerBack,
 } from "@/lib/audio/padPlayer";
-import type { Pad, Sound, Layer, Tag, Set as SchemaSet } from "@/lib/schemas";
+import type { Pad, Sound, Layer } from "@/lib/schemas";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { cn } from "@/lib/utils";
@@ -102,9 +102,9 @@ function LayerRow({
   const showSkip = isChainedArrangement;
 
   const sounds = useLibraryStore((s) => s.sounds);
-  const allSounds = getSoundsForLayer(layer, sounds);
-  const tags = useLibraryStore((s) => s.tags as Tag[]);
-  const sets = useLibraryStore((s) => s.sets as SchemaSet[]);
+  const allSounds = useMemo(() => getSoundsForLayer(layer, sounds), [layer.selection, sounds]);
+  const tags = useLibraryStore((s) => s.tags);
+  const sets = useLibraryStore((s) => s.sets);
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
 
   const [listOpen, setListOpen] = useState(false);
@@ -287,6 +287,8 @@ function LayerRow({
                 ref={listAnchorRef}
                 type="button"
                 aria-label="Show sound list"
+                // Prevent Radix from treating this pointer-down as an "outside click" that
+                // would close the popover before onClick fires, causing an immediate reopen.
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => setListOpen((o) => !o)}
                 className="p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
