@@ -20,6 +20,7 @@ import {
   VolumeHighIcon,
   NextIcon,
   PreviousIcon,
+  ListMusicIcon,
 } from "@hugeicons/core-free-icons";
 import { useIsMd } from "@/hooks/useBreakpoint";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -44,9 +45,10 @@ import {
   skipLayerForward,
   skipLayerBack,
 } from "@/lib/audio/padPlayer";
-import type { Pad, Sound, Layer } from "@/lib/schemas";
+import type { Pad, Sound, Layer, Tag, Set as SchemaSet } from "@/lib/schemas";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
+import { cn } from "@/lib/utils";
 
 interface PadLiveControlPopoverProps {
   pad: Pad;
@@ -101,6 +103,35 @@ function LayerRow({
 
   const sounds = useLibraryStore((s) => s.sounds);
   const allSounds = getSoundsForLayer(layer, sounds);
+  const tags = useLibraryStore((s) => s.tags as Tag[]);
+  const sets = useLibraryStore((s) => s.sets as SchemaSet[]);
+  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
+
+  const [listOpen, setListOpen] = useState(false);
+  const listAnchorRef = useRef<HTMLButtonElement>(null);
+
+  const totalSoundCount =
+    layer.selection.type === "assigned"
+      ? layer.selection.instances.length
+      : allSounds.length;
+
+  const selectionTitle = (() => {
+    const sel = layer.selection;
+    switch (sel.type) {
+      case "assigned":
+        return "Sounds";
+      case "tag": {
+        const names = sel.tagIds
+          .map((id) => tags.find((t) => t.id === id)?.name ?? id)
+          .join(", ");
+        return `Tag: ${names}`;
+      }
+      case "set": {
+        const name = sets.find((s) => s.id === sel.setId)?.name ?? sel.setId;
+        return `Set: ${name}`;
+      }
+    }
+  })();
 
   // ─── Current-sound RAF polling (sequential/shuffled while active) ───────────
   const [currentSoundId, setCurrentSoundId] = useState<string | null>(null);
@@ -242,6 +273,43 @@ function LayerRow({
               <span className="whitespace-nowrap text-xs text-muted-foreground">{displayText}</span>
             )}
           </div>
+
+          {totalSoundCount > 1 && (
+            <>
+              <button
+                ref={listAnchorRef}
+                type="button"
+                aria-label="Show sound list"
+                onClick={() => setListOpen((o) => !o)}
+                className="p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+              >
+                <HugeiconsIcon icon={ListMusicIcon} size={12} />
+              </button>
+              <Popover open={listOpen} onOpenChange={setListOpen}>
+                <PopoverAnchor virtualRef={listAnchorRef as React.RefObject<{ getBoundingClientRect: () => DOMRect }>} />
+                <PopoverContent side="top" sideOffset={6} className="w-48 p-2">
+                  <p className="text-xs font-semibold mb-1.5">{selectionTitle}</p>
+                  <ol className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+                    {allSounds.map((sound, i) => (
+                      <li
+                        key={sound.id}
+                        className={cn(
+                          "text-xs py-0.5",
+                          currentSoundId === sound.id
+                            ? "font-semibold text-foreground"
+                            : missingSoundIds.has(sound.id)
+                            ? "text-muted-foreground italic"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {i + 1}. {sound.name}
+                      </li>
+                    ))}
+                  </ol>
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
         </div>
       )}
       <Slider

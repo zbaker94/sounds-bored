@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Layers with multiple sounds now show a list icon button that opens a popover with all available sounds numbered in order
+- The sound list popover displays a contextual title based on selection type: "Sounds" for assigned, "Tag: \<name\>" for tag-based, or "Set: \<name\>" for set-based layers
+- The currently playing sound is highlighted in the list; missing sounds are shown in italics
 - Fixed an issue where the current sound indicator in the pad live control popover would not reset when a layer became inactive
 - When a pad with sequential or shuffled sounds is actively playing, the sound display now shows only the currently-playing sound name instead of the full list
 - Simultaneous layers continue to show all sound names regardless of playback state

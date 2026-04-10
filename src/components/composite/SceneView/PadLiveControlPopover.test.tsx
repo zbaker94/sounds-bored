@@ -3,7 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { PadLiveControlPopover, getSoundsForLayer } from "./PadLiveControlPopover";
-import { createMockPad, createMockLayer, createMockSound, createMockSoundInstance } from "@/test/factories";
+import { createMockPad, createMockLayer, createMockSound, createMockSoundInstance, createMockTag, createMockSet } from "@/test/factories";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
@@ -15,6 +15,8 @@ vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
     open ? <div>{children}</div> : null,
   PopoverAnchor: () => null,
+  PopoverTrigger: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) =>
+    asChild ? <>{children}</> : <button type="button">{children}</button>,
   PopoverContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="popover-content">{children}</div>
   ),
@@ -367,6 +369,85 @@ describe("LayerRow sound display", () => {
       />
     );
     expect(screen.getByText("Snare · Kick")).toBeInTheDocument();
+  });
+
+  describe("list icon and popover", () => {
+    it("does not show the list icon when layer has only one sound", () => {
+      renderPopoverWithSounds(["Kick"]);
+      expect(screen.queryByRole("button", { name: /show sound list/i })).not.toBeInTheDocument();
+    });
+
+    it("shows the list icon when layer has multiple sounds", () => {
+      renderPopoverWithSounds(["Kick", "Snare"]);
+      expect(screen.getByRole("button", { name: /show sound list/i })).toBeInTheDocument();
+    });
+
+    it("does not show the list icon when layer has no sounds", () => {
+      renderPopoverWithSounds([]);
+      expect(screen.queryByRole("button", { name: /show sound list/i })).not.toBeInTheDocument();
+    });
+
+    it("clicking list icon opens a popover listing all sounds", async () => {
+      renderPopoverWithSounds(["Kick", "Snare", "Hi-hat"]);
+      const listBtn = screen.getByRole("button", { name: /show sound list/i });
+      await userEvent.click(listBtn);
+
+      expect(screen.getByText("1. Kick")).toBeInTheDocument();
+      expect(screen.getByText("2. Snare")).toBeInTheDocument();
+      expect(screen.getByText("3. Hi-hat")).toBeInTheDocument();
+    });
+
+    it("assigned selection shows 'Sounds' as popover title", async () => {
+      renderPopoverWithSounds(["Kick", "Snare"]);
+      await userEvent.click(screen.getByRole("button", { name: /show sound list/i }));
+      expect(screen.getByText("Sounds")).toBeInTheDocument();
+    });
+
+    it("tag selection shows 'Tag: <name>' as popover title", async () => {
+      const tag = createMockTag({ id: "tag-1", name: "Drums" });
+      const s1 = createMockSound({ id: "s1", name: "Kick", tags: ["tag-1"] });
+      const s2 = createMockSound({ id: "s2", name: "Snare", tags: ["tag-1"] });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2], tags: [tag] });
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "tag", tagIds: ["tag-1"], matchMode: "any", defaultVolume: 100 },
+      });
+      const pad = createMockPad({ id: "pad-1", layers: [layer] });
+      render(
+        <PadLiveControlPopover
+          pad={pad}
+          sceneId="scene-1"
+          open={true}
+          onOpenChange={vi.fn()}
+          anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+        />
+      );
+      await userEvent.click(screen.getByRole("button", { name: /show sound list/i }));
+      expect(screen.getByText("Tag: Drums")).toBeInTheDocument();
+    });
+
+    it("set selection shows 'Set: <name>' as popover title", async () => {
+      const set = createMockSet({ id: "set-1", name: "My Drums" });
+      const s1 = createMockSound({ id: "s1", name: "Kick", sets: ["set-1"] });
+      const s2 = createMockSound({ id: "s2", name: "Snare", sets: ["set-1"] });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2], sets: [set] });
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "set", setId: "set-1", defaultVolume: 100 },
+      });
+      const pad = createMockPad({ id: "pad-1", layers: [layer] });
+      render(
+        <PadLiveControlPopover
+          pad={pad}
+          sceneId="scene-1"
+          open={true}
+          onOpenChange={vi.fn()}
+          anchorRef={{ current: null } as React.RefObject<HTMLButtonElement | null>}
+        />
+      );
+      await userEvent.click(screen.getByRole("button", { name: /show sound list/i }));
+      expect(screen.getByText("Set: My Drums")).toBeInTheDocument();
+    });
   });
 });
 
