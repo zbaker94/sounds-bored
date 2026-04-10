@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When a pad's layer uses sequential or shuffled playback, the sound list in the live control popover now reflects the actual play order and updates when the sequence wraps or shuffles.
 - The currently-playing sound is now shown in **bold** in the pad's sound list popover, making it easier to track which sound is active during playback.
 - Missing sounds in the sound list popover are now displayed in *italic* to visually distinguish unavailable files.
 - Fixed an interaction bug where clicking the "Show sound list" button could unexpectedly steal focus.

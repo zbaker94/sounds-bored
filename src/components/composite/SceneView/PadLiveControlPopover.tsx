@@ -135,11 +135,14 @@ function LayerRow({
 
   // ─── Current-sound RAF polling (sequential/shuffled while active) ───────────
   const [currentSoundId, setCurrentSoundId] = useState<string | null>(null);
+  // Tracks the live play order so the list reflects shuffled/sequential order and updates on wrap
+  const [activePlayOrder, setActivePlayOrder] = useState<Sound[] | null>(null);
   const soundRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!layerActive || !isChainedArrangement) {
       setCurrentSoundId(null);
+      setActivePlayOrder(null);
       if (soundRafRef.current !== null) {
         cancelAnimationFrame(soundRafRef.current);
         soundRafRef.current = null;
@@ -151,12 +154,15 @@ function LayerRow({
       const playOrder = getLayerPlayOrder(layer.id);
       const chain = getLayerChain(layer.id);
       if (playOrder && playOrder.length > 0) {
+        // Use reference equality — getLayerPlayOrder returns the same array until a new order is set
+        setActivePlayOrder((prev) => (prev === playOrder ? prev : playOrder));
         const chainLength = chain?.length ?? 0;
         const currentIdx = Math.max(0, playOrder.length - chainLength - 1);
         const currentSound = playOrder[currentIdx];
         const nextId = currentSound?.id ?? null;
         setCurrentSoundId((prev) => (prev === nextId ? prev : nextId));
       } else {
+        setActivePlayOrder(null);
         setCurrentSoundId(null);
       }
       soundRafRef.current = requestAnimationFrame(poll);
@@ -169,6 +175,7 @@ function LayerRow({
         soundRafRef.current = null;
       }
       setCurrentSoundId(null);
+      setActivePlayOrder(null);
     };
   }, [layerActive, isChainedArrangement, layer.id]);
 
@@ -291,7 +298,7 @@ function LayerRow({
                 <PopoverContent side="top" sideOffset={6} className="w-48 p-2">
                   <p className="text-xs font-semibold mb-1.5">{selectionTitle}</p>
                   <ol className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
-                    {allSounds.map((sound, i) => (
+                    {(activePlayOrder ?? allSounds).map((sound, i) => (
                       <li
                         key={sound.id}
                         className={cn(
