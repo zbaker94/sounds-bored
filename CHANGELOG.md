@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- The pad live control popover now displays a visual arrow pointing to the pad it belongs to
+- Slider tooltips now render correctly when used outside of a global tooltip provider
 - Popovers can now display a styled arrow pointing to their trigger element via a new `showArrow` option
 - Added a speech bubble-style arrow to the pad live control popover, visually connecting it to the pad that triggered it
 - Added a speech bubble-style arrow to pad live control popovers on desktop, making it clearer which pad a popover is attached to

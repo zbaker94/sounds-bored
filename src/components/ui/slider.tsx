@@ -2,7 +2,7 @@ import * as React from "react"
 import { Slider as SliderPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 function Slider({
   className,
@@ -48,6 +48,7 @@ function Slider({
   )
 
   return (
+    <TooltipProvider>
     <SliderPrimitive.Root
       data-slot="slider"
       defaultValue={defaultValue}
@@ -103,6 +104,7 @@ function Slider({
         )
       })}
     </SliderPrimitive.Root>
+    </TooltipProvider>
   )
 }
 

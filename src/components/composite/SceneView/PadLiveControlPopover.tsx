@@ -418,7 +418,7 @@ export const PadLiveControlPopover = memo(function PadLiveControlPopover({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={anchorRef as React.RefObject<{ getBoundingClientRect: () => DOMRect }>} />
-      <PopoverContent className="w-72" side="top" sideOffset={8}>
+      <PopoverContent className="w-72" side="top" sideOffset={10} showArrow>
         <PadLiveControlContent
           pad={pad}
           onClose={handleClose}
