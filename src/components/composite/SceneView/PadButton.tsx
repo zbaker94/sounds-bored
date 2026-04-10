@@ -30,7 +30,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const progress = usePlaybackStore((s) => s.padProgress[pad.id] ?? 0);
   const editMode = useUiStore((s) => s.editMode);
-  const { gestureHandlers, isDragging } = usePadGesture(pad);
+  const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
   // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
 
@@ -83,7 +83,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastVolumeRef = useRef(liveVolume ?? 1.0);
   if (liveVolume !== undefined) lastVolumeRef.current = liveVolume;
-  const displayVolume = liveVolume ?? lastVolumeRef.current;
+  // Fallback chain: live tick value → gesture drag value (covers audio latency on first play) → last seen value
+  const displayVolume = liveVolume ?? dragVolume ?? lastVolumeRef.current;
 
   useEffect(() => {
     if (isVolumeActive) {
