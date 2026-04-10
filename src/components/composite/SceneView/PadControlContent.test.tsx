@@ -33,7 +33,6 @@ vi.mock("@/lib/audio/padPlayer", () => ({
 
 vi.mock("@/lib/audio/audioState", () => ({
   isPadActive: vi.fn().mockReturnValue(false),
-  isLayerActive: vi.fn().mockReturnValue(false),
   getLayerChain: vi.fn().mockReturnValue(undefined),
   getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
 }));

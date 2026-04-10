@@ -8,7 +8,7 @@ import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
-import { getPadProgress, setPadVolume } from "@/lib/audio/padPlayer";
+import { setPadVolume } from "@/lib/audio/padPlayer";
 import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -28,31 +28,22 @@ interface PadButtonProps {
 
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
+  const progress = usePlaybackStore((s) => s.padProgress[pad.id] ?? 0);
   const editMode = useUiStore((s) => s.editMode);
   const { gestureHandlers } = usePadGesture(pad);
-  const isVolumeTransitioning = usePlaybackStore((s) => s.volumeTransitioningPadIds.has(pad.id));
-  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
+  // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
+  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
+  const isVolumeActive = liveVolume !== undefined;
   const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
   const [volumeExiting, setVolumeExiting] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const rafRef = useRef<number | null>(null);
   const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks the last volume seen while transitioning; read synchronously during render on transition end
-  const lastTransitionVolumeRef = useRef(liveVolume);
-
-  // Update during render while actively transitioning — before the store resets to 1.0
-  if (isVolumeTransitioning) {
-    lastTransitionVolumeRef.current = liveVolume;
-  }
-
-  // During transition show the live value; when transition ends, read the snapshot directly from ref
-  // (avoids a 1-frame jump that would occur if we stored it in state and updated via useEffect)
-  const displayVolume = isVolumeTransitioning ? liveVolume : lastTransitionVolumeRef.current;
+  const lastVolumeRef = useRef(liveVolume ?? 1.0);
+  if (liveVolume !== undefined) lastVolumeRef.current = liveVolume;
+  const displayVolume = liveVolume ?? lastVolumeRef.current;
 
   useEffect(() => {
-    if (isVolumeTransitioning) {
-      // Cancel any pending linger/fade timers (re-triggered during hold)
+    if (isVolumeActive) {
       if (volumeFadeTimerRef.current !== null) {
         clearTimeout(volumeFadeTimerRef.current);
         volumeFadeTimerRef.current = null;
@@ -64,7 +55,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
       setShowVolumeDisplay(true);
       setVolumeExiting(false);
     } else {
-      // Linger at full opacity, then fade, then unmount
       volumeFadeTimerRef.current = setTimeout(() => {
         volumeFadeTimerRef.current = null;
         setVolumeExiting(true);
@@ -85,7 +75,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         volumeHideTimerRef.current = null;
       }
     };
-  }, [isVolumeTransitioning]);
+  }, [isVolumeActive]);
 
   // Multi-fade mode derived state — read from store directly
   const multiFadeActive = useMultiFadeStore((s) => s.active);
@@ -165,23 +155,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     mouseX.set(0);
     mouseY.set(0);
   }
-
-  useEffect(() => {
-    if (isPlaying) {
-      const animate = () => {
-        const p = getPadProgress(pad.id);
-        setProgress(p ?? 0);
-        rafRef.current = requestAnimationFrame(animate);
-      };
-      rafRef.current = requestAnimationFrame(animate);
-    } else {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      setProgress(0);
-    }
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [isPlaying, pad.id]);
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const padSoundState = useMemo(
@@ -350,11 +323,10 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                         onValueChange={(v) => {
                           if (isPlaying && v[1] !== multiFadeLevels[1]) {
                             setPadVolume(pad.id, v[1] / 100);
-                            usePlaybackStore.getState().startVolumeTransition(pad.id);
                           }
                           setMultiFadeLevels(pad.id, [v[0], v[1]]);
                         }}
-                        onPointerUp={() => usePlaybackStore.getState().clearVolumeTransition(pad.id)}
+                        onPointerUp={() => {}}
                         min={0}
                         max={100}
                         step={1}

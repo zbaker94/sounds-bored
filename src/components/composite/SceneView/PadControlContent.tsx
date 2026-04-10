@@ -27,7 +27,6 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
 import {
   isPadActive,
-  isLayerActive as checkLayerActive,
   getLayerChain,
   getLayerPlayOrder,
 } from "@/lib/audio/audioState";
@@ -381,6 +380,7 @@ export const PadControlContent = memo(function PadControlContent({
 
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
+  const activeLayerIds = usePlaybackStore((s) => s.activeLayerIds);
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
   const globalFadeDurationMs = useAppSettingsStore(
     (s) => s.settings?.globalFadeDurationMs ?? 2000
@@ -422,7 +422,6 @@ export const PadControlContent = memo(function PadControlContent({
     const handlePointerUp = () => {
       if (startThumbDraggingRef.current) {
         startThumbDraggingRef.current = false;
-        usePlaybackStore.getState().clearVolumeTransition(pad.id);
       }
     };
     window.addEventListener("pointerup", handlePointerUp);
@@ -430,44 +429,9 @@ export const PadControlContent = memo(function PadControlContent({
       window.removeEventListener("pointerup", handlePointerUp);
       if (startThumbDraggingRef.current) {
         startThumbDraggingRef.current = false;
-        usePlaybackStore.getState().clearVolumeTransition(pad.id);
       }
     };
-  }, [pad.id]);
-
-  // Track active layers via RAF while pad is playing
-  const [activeLayerIds, setActiveLayerIds] = useState<Set<string>>(new Set());
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!isPlaying) {
-      setActiveLayerIds((prev) => (prev.size === 0 ? prev : new Set()));
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      return;
-    }
-    const poll = () => {
-      const active = new Set<string>();
-      for (const layer of pad.layers) {
-        if (checkLayerActive(layer.id)) active.add(layer.id);
-      }
-      setActiveLayerIds((prev) => {
-        if (prev.size === active.size && [...active].every((id) => prev.has(id))) return prev;
-        return active;
-      });
-      rafRef.current = requestAnimationFrame(poll);
-    };
-    rafRef.current = requestAnimationFrame(poll);
-    return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      setActiveLayerIds(new Set());
-    };
-  }, [isPlaying, pad.layers]);
+  }, []);
 
   const handleStartStop = useCallback(() => {
     if (isPlaying) {
@@ -509,14 +473,12 @@ export const PadControlContent = memo(function PadControlContent({
           const next = v as [number, number];
           if (isPlaying && next[1] !== fadeLevels[1]) {
             setPadVolume(pad.id, next[1] / 100);
-            usePlaybackStore.getState().startVolumeTransition(pad.id);
           }
           setFadeLevels(next);
         }}
         onPointerUp={() => {
           if (startThumbDraggingRef.current) {
             startThumbDraggingRef.current = false;
-            usePlaybackStore.getState().clearVolumeTransition(pad.id);
           }
         }}
         onThumbPointerDown={(index) => {

@@ -80,7 +80,9 @@ describe("PadButton", () => {
     usePlaybackStore.setState({ ...initialPlaybackState });
     // Make setPadVolume mock update the store, matching real padPlayer behaviour
     vi.mocked(setPadVolume).mockImplementation((padId: string, volume: number) => {
-      usePlaybackStore.getState().updatePadVolume(padId, Math.max(0, Math.min(1, volume)));
+      const clamped = Math.max(0, Math.min(1, volume));
+      const current = usePlaybackStore.getState().padVolumes;
+      usePlaybackStore.getState().setAudioTick({ padVolumes: { ...current, [padId]: clamped } });
     });
   });
 

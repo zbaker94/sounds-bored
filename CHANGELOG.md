@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Active layer indicators on pad buttons now update via a centralized engine tick instead of per-pad animation loops, improving reliability and performance.
+- Volume fade slider no longer tracks an intermediate "transitioning" state, simplifying volume adjustment behavior.
 - Pad volume fade bars and playback progress indicators now update more reliably during simultaneous pad activity, reducing missed or stuttering visual feedback.
 - Volume fill bars now clear immediately when all pads are stopped, rather than lingering until the next animation frame.
 - Active layer indicators in the live pad controls panel now stay in sync with actual playback state without polling delays.
