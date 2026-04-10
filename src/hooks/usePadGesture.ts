@@ -1,4 +1,4 @@
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
@@ -32,6 +32,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     () => pad.layers.some((l) => l.playbackMode === "hold"),
     [pad.layers]
   );
+
+  const [isDragging, setIsDragging] = useState(false);
 
   const state = useRef<GestureState>({
     startY: 0,
@@ -139,6 +141,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
       if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
         s.phase = "drag";
+        setIsDragging(true);
 
         if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
           triggerPad(pad, 0).catch(console.error);
@@ -161,6 +164,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
     function resetGesture() {
       const s = state.current;
+      if (s.phase === "drag") setIsDragging(false);
       if (hasHoldLayer) {
         releasePadHoldLayers(pad);
         resetPadGain(pad.id);
@@ -211,5 +215,5 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu };
   }, [pad, hasHoldLayer, now]);
 
-  return { gestureHandlers };
+  return { gestureHandlers, isDragging };
 }

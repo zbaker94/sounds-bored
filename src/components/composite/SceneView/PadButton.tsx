@@ -30,10 +30,53 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const progress = usePlaybackStore((s) => s.padProgress[pad.id] ?? 0);
   const editMode = useUiStore((s) => s.editMode);
-  const { gestureHandlers } = usePadGesture(pad);
+  const { gestureHandlers, isDragging } = usePadGesture(pad);
   // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
-  const isVolumeActive = liveVolume !== undefined;
+
+  // liveVolumeChanging: true while an audio fade is actively running (liveVolume changing each frame).
+  // A stability timer fires 300ms after liveVolume stops changing — at that point the volume has
+  // settled and the bar should start its linger-then-hide sequence.
+  // isDragging suppresses the stability timer so a pause mid-drag doesn't prematurely hide the bar.
+  const [liveVolumeChanging, setLiveVolumeChanging] = useState(false);
+  const liveVolumeStabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isDragging) {
+      // Drag active — show bar, cancel any pending stability timer
+      setLiveVolumeChanging(true);
+      if (liveVolumeStabilityTimerRef.current !== null) {
+        clearTimeout(liveVolumeStabilityTimerRef.current);
+        liveVolumeStabilityTimerRef.current = null;
+      }
+      return;
+    }
+    if (liveVolume !== undefined) {
+      // Non-drag volume change (audio fade) — show bar, reset stability timer
+      setLiveVolumeChanging(true);
+      if (liveVolumeStabilityTimerRef.current !== null) clearTimeout(liveVolumeStabilityTimerRef.current);
+      liveVolumeStabilityTimerRef.current = setTimeout(() => {
+        liveVolumeStabilityTimerRef.current = null;
+        setLiveVolumeChanging(false);
+      }, 300);
+    } else {
+      // Volume returned to full or pad stopped — clear immediately
+      if (liveVolumeStabilityTimerRef.current !== null) {
+        clearTimeout(liveVolumeStabilityTimerRef.current);
+        liveVolumeStabilityTimerRef.current = null;
+      }
+      setLiveVolumeChanging(false);
+    }
+    return () => {
+      if (liveVolumeStabilityTimerRef.current !== null) {
+        clearTimeout(liveVolumeStabilityTimerRef.current);
+        liveVolumeStabilityTimerRef.current = null;
+      }
+    };
+  }, [liveVolume, isDragging]);
+
+  // isVolumeActive: true while volume is actively changing (drag or audio fade).
+  // Goes false when drag ends or volume stabilizes → triggers the linger-then-hide sequence.
+  const isVolumeActive = isDragging || liveVolumeChanging;
   const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
   const [volumeExiting, setVolumeExiting] = useState(false);
   const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

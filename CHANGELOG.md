@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- The volume indicator on pads now stays visible while dragging to adjust volume and hides cleanly after you finish, rather than disappearing prematurely during mid-drag pauses.
 - Volume display on pads now only appears when actively dragging (not during the hold phase before any drag movement)
 - Volume bar correctly reflects real-time audio engine state, eliminating visual glitches where the bar would show stale or incorrect values
 - Fading indicators are now driven by the audio engine directly, improving accuracy when pads fade in or out
