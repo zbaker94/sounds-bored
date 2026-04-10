@@ -74,4 +74,65 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
     cancelSpy.mockRestore();
   });
+
+  it("self-terminates and clears store when no pads are active", () => {
+    // Seed the store with some values
+    usePlaybackStore.getState().setAudioTick({
+      padVolumes: { "pad-1": 0.5 },
+      padProgress: { "pad-1": 0.3 },
+      activeLayerIds: new Set(["layer-1"]),
+    });
+
+    // getActivePadCount already mocked to return 0 in beforeEach
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    expect(capturedCallback).not.toBeNull();
+
+    // Invoke the tick callback manually — getActivePadCount returns 0, so it self-terminates
+    capturedCallback!(performance.now());
+
+    const state = usePlaybackStore.getState();
+    expect(state.padVolumes).toEqual({});
+    expect(state.padProgress).toEqual({});
+    expect(state.activeLayerIds.size).toBe(0);
+
+    // No further RAF should have been scheduled (tick exited)
+    expect(rafSpy).toHaveBeenCalledTimes(1); // only the initial startAudioTick call
+
+    rafSpy.mockRestore();
+  });
+
+  it("only emits padVolumes entries for gains below 0.999", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(2);
+    vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set());
+    vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
+
+    // Simulate: pad-1 has gain 0.5, pad-2 has gain 1.0 (should be excluded)
+    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+      fn("pad-1", { gain: { value: 0.5 } } as unknown as GainNode);
+      fn("pad-2", { gain: { value: 1.0 } } as unknown as GainNode);
+    });
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now());
+
+    const state = usePlaybackStore.getState();
+    expect(state.padVolumes["pad-1"]).toBe(0.5);
+    expect(state.padVolumes["pad-2"]).toBeUndefined(); // full volume excluded
+
+    rafSpy.mockRestore();
+  });
 });

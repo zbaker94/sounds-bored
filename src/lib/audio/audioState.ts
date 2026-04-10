@@ -47,7 +47,6 @@
  * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
  * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
  * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
- * padFadeRafs        | pad ID     | RAF ID                                    | Animated volume lerp loops during fades         | cancelPadFade(), clearAllFadeTracking()
  * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), clearAllFadeTracking()
  */
 
@@ -101,9 +100,6 @@ const layerPlayOrderMap = new Map<string, Sound[]>();
 
 /** Pending fade cleanup timeouts, keyed by pad ID. Used by both fadePadOut and fadePadIn. */
 const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-
-/** RAF IDs for animated volume lerp loops during fades, keyed by pad ID. */
-const padFadeRafs = new Map<string, number>();
 
 /** Tracks pads that are actively fading out (gain -> 0). Cleared when fade completes or is cancelled. */
 const fadingOutPadIds = new Set<string>();
@@ -252,16 +248,9 @@ export function clearAllVoices(): void {
 export function clearAllFadeTracking(): void {
   for (const id of fadePadTimeouts.values()) clearTimeout(id);
   fadePadTimeouts.clear();
-  for (const id of padFadeRafs.values()) cancelAnimationFrame(id);
-  padFadeRafs.clear();
   fadingOutPadIds.clear();
-  const store = usePlaybackStore.getState();
-  store.clearAllVolumeTransitions();
-  store.resetAllPadVolumes();
-  // NOTE: resetAllPadVolumes fires synchronously here, while stopAllVoices()
-  // is called later in the STOP_RAMP_S deferred timeout in stopAllPads(). There is
-  // a brief window where padVolumes are reset but voices are still ramping down.
-  // This is intentional — the fade bar should disappear immediately on stop.
+  // padFadeRafs removed — global audioTick owns padVolumes now.
+  // Store clearing is handled by stopAudioTick() in padPlayer.stopAllPads().
 }
 
 // ---------------------------------------------------------------------------
@@ -269,40 +258,17 @@ export function clearAllFadeTracking(): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Cancel all fade-related resources for a pad: RAF loop, pending timeout, and store signal.
+ * Cancel all fade-related resources for a pad: pending timeout and fadingOut tracking.
+ * The global audioTick handles padVolumes — no store call needed here.
  * Safe to call even if no fade is registered -- all operations are idempotent.
  */
 export function cancelPadFade(padId: string): void {
-  const rafId = padFadeRafs.get(padId);
-  if (rafId !== undefined) {
-    cancelAnimationFrame(rafId);
-    padFadeRafs.delete(padId);
-  }
   const tId = fadePadTimeouts.get(padId);
   if (tId !== undefined) {
     clearTimeout(tId);
     fadePadTimeouts.delete(padId);
   }
   fadingOutPadIds.delete(padId);
-  usePlaybackStore.getState().clearVolumeTransition(padId);
-}
-
-/** Animate padVolumes via requestAnimationFrame for the duration of a fade. */
-export function startFadeRaf(padId: string, fromVolume: number, toVolume: number, durationMs: number): void {
-  const startTime = performance.now();
-
-  function frame() {
-    const elapsed = performance.now() - startTime;
-    const t = Math.min(1, elapsed / durationMs);
-    usePlaybackStore.getState().updatePadVolume(padId, fromVolume + (toVolume - fromVolume) * t);
-    if (t < 1) {
-      padFadeRafs.set(padId, requestAnimationFrame(frame));
-    } else {
-      padFadeRafs.delete(padId);
-    }
-  }
-
-  padFadeRafs.set(padId, requestAnimationFrame(frame));
 }
 
 /** Mark a pad as fading out. */

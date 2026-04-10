@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pad volume fade bars and playback progress indicators now update more reliably during simultaneous pad activity, reducing missed or stuttering visual feedback.
+- Volume fill bars now clear immediately when all pads are stopped, rather than lingering until the next animation frame.
+- Active layer indicators in the live pad controls panel now stay in sync with actual playback state without polling delays.
 - Improved audio engine performance by consolidating multiple per-pad animation loops into a single global RAF loop, reducing CPU overhead during playback
 - Volume meters, progress bars, and active layer indicators now update from one unified tick rather than scattered individual polling loops
 - Pad volume, layer volume, playback progress, and active layer tracking are now updated in a single batched operation each audio frame, reducing UI jitter and improving performance

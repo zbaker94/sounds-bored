@@ -17,7 +17,6 @@ import { toast } from "sonner";
 
 import {
   cancelPadFade,
-  startFadeRaf,
   addFadingOutPad,
   removeFadingOutPad,
   setFadePadTimeout,
@@ -64,6 +63,7 @@ import {
   deleteLayerPlayOrder,
   clearAllLayerPlayOrders,
 } from "./audioState";
+import { startAudioTick, stopAudioTick } from "./audioTick";
 
 // Re-export public query/clear functions for backward compatibility
 export {
@@ -91,7 +91,7 @@ export function freezePadAtCurrentVolume(padId: string): void {
   cancelPadFade(padId);
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(currentValue, ctx.currentTime);
-  usePlaybackStore.getState().updatePadVolume(padId, currentValue);
+  // Tick reads the frozen gain value automatically — no store call needed.
 }
 
 export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): number {
@@ -116,23 +116,14 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
   // 3. Mark this pad as fading out so a reverse fade-in can be detected
   addFadingOutPad(pad.id);
 
-  // 4. Show the visual bar
-  usePlaybackStore.getState().startVolumeTransition(pad.id);
-
-  // 5. Animate padVolumes via RAF
-  startFadeRaf(pad.id, startVol, endVol, durationMs);
-
-  // 6. Schedule cleanup (stored in fadePadTimeouts so cancelPadFade can cancel it)
+  // 4. Schedule cleanup (stored in fadePadTimeouts so cancelPadFade can cancel it)
+  // Tick reads gain node values automatically — no RAF or store signal needed.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
     removeFadingOutPad(pad.id);
     if (endVol === 0) {
       stopPad(pad);
       resetPadGain(pad.id);
-    } else {
-      // Fade landed at a non-zero level — pad keeps playing, but the visual
-      // volume bar must be dismissed now that the transition is complete.
-      usePlaybackStore.getState().clearVolumeTransition(pad.id);
     }
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);
@@ -156,13 +147,8 @@ export function fadePadInFromCurrent(pad: Pad, durationMs: number, toVolume?: nu
   gain.gain.setValueAtTime(fromVolume, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
-  // 3. Show the visual bar
-  usePlaybackStore.getState().startVolumeTransition(pad.id);
-
-  // 4. Animate padVolumes via RAF
-  startFadeRaf(pad.id, fromVolume, endVol, durationMs);
-
-  // 5. Schedule cleanup
+  // 3. Schedule cleanup
+  // Tick reads gain node values automatically — no RAF or store signal needed.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
     cancelPadFade(pad.id);
@@ -177,7 +163,7 @@ export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: numbe
   const startVol = fromVolume ?? 0;
   const endVol = toVolume ?? 1.0;
 
-  // 2. Start pad at gain startVol (triggerPad also calls updatePadVolume(pad.id, startVol))
+  // 2. Start pad at gain startVol
   await triggerPad(pad, startVol);
 
   const ctx = getAudioContext();
@@ -188,16 +174,11 @@ export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: numbe
   gain.gain.setValueAtTime(startVol, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
-  // 4. Show the visual bar
-  usePlaybackStore.getState().startVolumeTransition(pad.id);
-
-  // 5. Animate padVolumes via RAF
-  startFadeRaf(pad.id, startVol, endVol, durationMs);
-
-  // 6. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
+  // 4. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
+  // Tick reads gain node values automatically — no RAF or store signal needed.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
-    cancelPadFade(pad.id); // clears RAF (already done) + clears store signal
+    cancelPadFade(pad.id);
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);
 }
@@ -255,17 +236,17 @@ export function setPadVolume(padId: string, volume: number): void {
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
-  usePlaybackStore.getState().updatePadVolume(padId, clamped);
+  // Tick reads the gain node value automatically — no store call needed.
 }
 
 export function resetPadGain(padId: string): void {
-  // Unified teardown: cancels RAF, pending fade timeout, and clears the store visual signal
+  // Unified teardown: cancels pending fade timeout and resets the gain node.
   cancelPadFade(padId);
   const gain = getPadGain(padId);
   const ctx = getAudioContext();
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(1.0, ctx.currentTime);
-  usePlaybackStore.getState().updatePadVolume(padId, 1.0);
+  // Tick reads the gain node value automatically — no store call needed.
 }
 
 /** Update a live layer gain node immediately (e.g. when pad config is saved mid-playback). No-op if the layer isn't active. */
@@ -462,6 +443,7 @@ export function stopAllPads(): void {
   clearAllLayerPending();
   // Null all onended callbacks — prevents loop restarts during ramp window
   nullAllOnEnded();
+  stopAudioTick(); // immediately clear bars before the STOP_RAMP_S window
 
   const ctx = getAudioContext();
   forEachPadGain((_padId, gain) => {
@@ -627,6 +609,7 @@ async function startLayerSound(
 
     await voice.start();
     recordLayerVoice(pad.id, layer.id, voice);
+    startAudioTick();
 
   } catch (err) {
     if (err instanceof MissingFileError) {
@@ -683,7 +666,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   // Both are cleared lazily below, once we know a layer will actually start new playback.
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
-  usePlaybackStore.getState().updatePadVolume(pad.id, startVolume);
+  // Tick reads gain node value automatically — no store call needed.
 
   let progressCleared = false;
 
@@ -827,15 +810,16 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
  *  Call commitLayerVolume on drag-end to persist to the project schema. */
 export function setLayerVolume(layerId: string, volume: number): void {
   const clamped = Math.max(0, Math.min(1, volume));
-  // Update gain node if currently playing
   const gain = getLayerGain(layerId);
   if (gain) {
+    // Layer is playing — update gain node. Tick reads the new value automatically.
     const ctx = getAudioContext();
     gain.gain.cancelScheduledValues(ctx.currentTime);
     gain.gain.setValueAtTime(clamped, ctx.currentTime);
+  } else {
+    // Layer not playing — tick has no gain node to read. Push directly to store.
+    usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
   }
-  // Mirror to playback store (runtime display)
-  usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
 }
 
 /** Persist the current layer volume to the project schema (call on drag-end / value commit). */

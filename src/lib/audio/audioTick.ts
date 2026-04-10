@@ -3,7 +3,7 @@
  *
  * Reads from audioState.ts Maps (gain nodes, voice map, progress) each animation frame
  * and emits one batched setAudioTick() call to playbackStore. Replaces:
- *   - Per-pad RAF loops (padFadeRafs / startFadeRaf in audioState.ts)
+ *   - Per-pad RAF loops (previously padFadeRafs / startFadeRaf, now removed from audioState.ts)
  *   - Per-PadButton RAF (progress polling)
  *   - Per-PadControlContent RAF (activeLayerIds polling)
  *   - Scattered updatePadVolume / updateLayerVolume calls from fade functions
@@ -38,6 +38,8 @@ function tick(): void {
   // Self-terminate when no pads are active.
   if (getActivePadCount() === 0) {
     rafId = null;
+    prevPadVolumes = {};
+    prevLayerVolumes = {};
     _clearAllTickFields();
     return;
   }
@@ -53,6 +55,8 @@ function tick(): void {
   });
 
   // --- Compute layerVolumes ---
+  // Emit all active layer gains (no threshold filter — layers always show their live volume).
+  // Epsilon diff in shallowEqualRecords avoids no-op store writes for stable values.
   const nextLayerVolumes: Record<string, number> = {};
   forEachActiveLayerGain((layerId, gain) => {
     nextLayerVolumes[layerId] = gain.gain.value;
@@ -109,10 +113,9 @@ function _clearAllTickFields(): void {
 
 function shallowEqualRecords(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) return false;
+  if (aKeys.length !== Object.keys(b).length) return false;
   for (const k of aKeys) {
-    if (Math.abs(a[k] - (b[k] ?? -1)) > VOLUME_EPSILON) return false;
+    if (!(k in b) || Math.abs(a[k] - b[k]) > VOLUME_EPSILON) return false;
   }
   return true;
 }
