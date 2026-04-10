@@ -129,6 +129,10 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
     if (endVol === 0) {
       stopPad(pad);
       resetPadGain(pad.id);
+    } else {
+      // Fade landed at a non-zero level — pad keeps playing, but the visual
+      // volume bar must be dismissed now that the transition is complete.
+      usePlaybackStore.getState().clearVolumeTransition(pad.id);
     }
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);
@@ -983,26 +987,57 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
   if (!layer) return;
   if (!isChained(layer.arrangement)) return;
 
-  // Pop next from chain queue — read BEFORE stop deletes the chain
-  const remaining = getLayerChain(layerId);
-
-  // Stop current voices
-  stopLayerWithRamp(pad, layerId);
-
-  if (!remaining || remaining.length === 0) return;
-
-  const [next, ...rest] = remaining;
-  setLayerChain(layerId, rest);
-
   const { sounds } = useLibraryStore.getState();
   const resolved = resolveSounds(layer, sounds);
+  if (resolved.length === 0) return;
 
-  ensureResumed().then((ctx) => {
-    const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
-    startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
-    usePlaybackStore.getState().addPlayingPad(pad.id);
-  });
+  if (layer.cycleMode) {
+    // Cycle mode uses cycleIndex, not the chain queue.
+    // Read playOrder before stop (stop deletes it).
+    const playOrder = getLayerPlayOrder(layerId) ?? buildPlayOrder(layer.arrangement, resolved);
+    const n = playOrder.length;
+    // cycleIndex points to the NEXT sound after the one currently playing.
+    const curCycleIdx = getLayerCycleIndex(layerId) ?? 0;
+    // "Next" is what cycleIndex currently points to; advance cursor past it.
+    const nextIdx = curCycleIdx % n;
+    const newCycleIdx = (curCycleIdx + 1) % n;
+
+    stopLayerWithRamp(pad, layerId);
+
+    // Re-persist playOrder so subsequent skip backs can calculate position correctly.
+    setLayerPlayOrder(layerId, playOrder);
+    setLayerCycleIndex(layerId, newCycleIdx);
+    const sound = playOrder[nextIdx];
+
+    ensureResumed().then((ctx) => {
+      const padGain = getPadGain(pad.id);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      usePlaybackStore.getState().addPlayingPad(pad.id);
+    });
+  } else {
+    // Regular chained mode: advance via the chain queue.
+    // Read both BEFORE stop (stop deletes them).
+    const playOrder = getLayerPlayOrder(layerId);
+    const remaining = getLayerChain(layerId);
+
+    stopLayerWithRamp(pad, layerId);
+
+    if (!remaining || remaining.length === 0) return;
+
+    const [next, ...rest] = remaining;
+
+    // Re-persist playOrder so subsequent skip backs can calculate position correctly.
+    if (playOrder) setLayerPlayOrder(layerId, playOrder);
+    setLayerChain(layerId, rest);
+
+    ensureResumed().then((ctx) => {
+      const padGain = getPadGain(pad.id);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+      usePlaybackStore.getState().addPlayingPad(pad.id);
+    });
+  }
 }
 
 /**
@@ -1044,36 +1079,61 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
   if (!layer) return;
   if (!isChained(layer.arrangement)) return;
 
-  // Read BEFORE stop deletes them
-  const playOrder = getLayerPlayOrder(layerId);
-  const chain = getLayerChain(layerId);
-
-  // Stop current voices
-  stopLayerWithRamp(pad, layerId);
-
-  if (!playOrder || playOrder.length === 0) return;
-
-  // currentPos = how many sounds have already played in this cycle
-  const currentPos = Math.max(0, playOrder.length - (chain?.length ?? 0) - 1);
-  const prevIndex = Math.max(0, currentPos - 1);
-  // Only update cycle index for cycle-mode layers
-  if (layer.cycleMode) {
-    setLayerCycleIndex(layerId, prevIndex);
-  }
-
-  const sound = playOrder[prevIndex % playOrder.length];
-
-  // Rebuild chain from prevIndex+1 onward
-  const newChain = playOrder.slice(prevIndex + 1);
-  setLayerChain(layerId, newChain);
-
   const { sounds } = useLibraryStore.getState();
   const resolved = resolveSounds(layer, sounds);
+  if (resolved.length === 0) return;
 
-  ensureResumed().then((ctx) => {
-    const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
-    startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
-    usePlaybackStore.getState().addPlayingPad(pad.id);
-  });
+  if (layer.cycleMode) {
+    // Cycle mode uses cycleIndex, not the chain queue.
+    // Read playOrder before stop (stop deletes it).
+    const playOrder = getLayerPlayOrder(layerId) ?? buildPlayOrder(layer.arrangement, resolved);
+    const n = playOrder.length;
+    // cycleIndex points to the NEXT sound after the one currently playing.
+    // Currently playing is at (cycleIndex - 1 + n) % n.
+    // Previous is at (cycleIndex - 2 + n) % n.
+    // After skip back, next trigger should replay current → set cycleIndex to (cycleIndex - 1 + n) % n.
+    const curCycleIdx = getLayerCycleIndex(layerId) ?? 0;
+    const prevIdx = (curCycleIdx - 2 + n) % n;
+    const newCycleIdx = (curCycleIdx - 1 + n) % n;
+
+    stopLayerWithRamp(pad, layerId);
+
+    // Re-persist playOrder so subsequent skips can calculate position correctly.
+    setLayerPlayOrder(layerId, playOrder);
+    setLayerCycleIndex(layerId, newCycleIdx);
+    const sound = playOrder[prevIdx];
+
+    ensureResumed().then((ctx) => {
+      const padGain = getPadGain(pad.id);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      usePlaybackStore.getState().addPlayingPad(pad.id);
+    });
+  } else {
+    // Regular chained mode: calculate position from playOrder + remaining chain.
+    // Read BEFORE stop (stop deletes both).
+    const playOrder = getLayerPlayOrder(layerId);
+    const chain = getLayerChain(layerId);
+
+    stopLayerWithRamp(pad, layerId);
+
+    if (!playOrder || playOrder.length === 0) return;
+
+    // currentPos = index of the sound that was playing (or last if chain exhausted)
+    const currentPos = Math.max(0, playOrder.length - (chain?.length ?? 0) - 1);
+    const prevIndex = Math.max(0, currentPos - 1);
+
+    // Re-persist playOrder so subsequent skips can calculate position correctly.
+    setLayerPlayOrder(layerId, playOrder);
+    // Rebuild chain from prevIndex+1 onward so the sequence continues naturally.
+    setLayerChain(layerId, playOrder.slice(prevIndex + 1));
+    const sound = playOrder[prevIndex];
+
+    ensureResumed().then((ctx) => {
+      const padGain = getPadGain(pad.id);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      usePlaybackStore.getState().addPlayingPad(pad.id);
+    });
+  }
 }

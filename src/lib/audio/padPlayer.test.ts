@@ -2901,6 +2901,65 @@ describe("skipLayerForward", () => {
     // Chain should have advanced by 1 (one item consumed)
     expect(chainAfter?.length).toBe(1);
   });
+
+  it("advances cycleIndex in cycle mode instead of using chain queue", async () => {
+    const { skipLayerForward } = await import("./padPlayer");
+    const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      cycleMode: true,
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Simulate: soundA (index 0) is playing. After trigger, cycleIndex was advanced to 1.
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerCycleIndex(layer.id, 1); // cursor points to B (next after A)
+
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    // Should advance to soundB (index 1 = curCycleIdx % n).
+    // New cycleIndex should be 2 so next trigger plays soundC.
+    expect(getLayerCycleIndex(layer.id)).toBe(2);
+  });
+
+  it("preserves playOrder after skip so subsequent skip back works", async () => {
+    const { triggerPad, skipLayerForward } = await import("./padPlayer");
+    const { getLayerPlayOrder } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    // playOrder must be preserved after skip forward so a subsequent skip back can use it
+    expect(getLayerPlayOrder(layer.id)).toHaveLength(3);
+  });
 });
 
 // ─── skipLayerBack ────────────────────────────────────────────────────────────
@@ -2994,9 +3053,9 @@ describe("skipLayerBack", () => {
     expect(chain?.length).toBe(2); // [soundB, soundC]
   });
 
-  it("updates cycle index when layer has cycleMode enabled", async () => {
+  it("uses cycleIndex (not chain) to determine position in cycle mode", async () => {
     const { skipLayerBack } = await import("./padPlayer");
-    const { getLayerCycleIndex, setLayerChain, setLayerPlayOrder } = await import("./audioState");
+    const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./audioState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3013,16 +3072,53 @@ describe("skipLayerBack", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
-    // Simulate state at position 1: soundB is playing, chain has [soundC] remaining
+    // Simulate: soundB (index 1) is playing. After trigger, cycleIndex was advanced to 2.
+    // No chain is set — cycle mode never uses it.
     setLayerPlayOrder(layer.id, sounds);
-    setLayerChain(layer.id, [sounds[2]]); // [soundC] remaining
+    setLayerCycleIndex(layer.id, 2); // cursor points to C (next after B)
 
-    // Skip back: currentPos = 3 - 1 - 1 = 1, prevIndex = max(0, 1-1) = 0
     skipLayerBack(pad, layer.id);
     await tick();
 
-    // With cycleMode, setLayerCycleIndex SHOULD be called with prevIndex=0
-    expect(getLayerCycleIndex(layer.id)).toBe(0);
+    // Should go back to soundA (index 0 = cycleIndex-2 = 0).
+    // New cycleIndex should be 1 so next trigger replays soundB.
+    expect(getLayerCycleIndex(layer.id)).toBe(1);
+  });
+
+  it("preserves playOrder after skip so subsequent skip back works", async () => {
+    const { triggerPad, skipLayerBack } = await import("./padPlayer");
+    const { getLayerChain, getLayerPlayOrder } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Skip forward to soundB
+    const { skipLayerForward } = await import("./padPlayer");
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    // Now skip back — playOrder must have been preserved for this to work correctly.
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    // playOrder should still be available and chain should be rebuilt from position 0
+    expect(getLayerPlayOrder(layer.id)).toHaveLength(3);
+    const chain = getLayerChain(layer.id);
+    expect(chain?.length).toBe(2); // [soundB, soundC] — went back to soundA
   });
 });
 

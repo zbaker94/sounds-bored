@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed skip forward/back controls for pads in cycle mode — they now correctly step through sounds in sequence without losing track of position
+- Fixed an issue where skipping forward then backward could fail because the play order wasn't preserved after a skip
+- Fixed a visual glitch where the volume bar could remain visible after a fade that doesn't go to silence
 - Improved slider component indentation and code formatting for better readability (no functional changes)
 - The pad live control popover now displays a visual arrow pointing to the pad it belongs to
 - Slider tooltips now render correctly when used outside of a global tooltip provider
