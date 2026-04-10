@@ -156,4 +156,72 @@ describe("PadControlContent", () => {
       expect(screen.getByText(/^layers$/i)).toBeInTheDocument();
     });
   });
+
+  describe("responsive display modes", () => {
+    function mockResizeObserverWithHeight(height: number) {
+      vi.stubGlobal(
+        "ResizeObserver",
+        vi.fn().mockImplementation(function (this: unknown, cb: ResizeObserverCallback) {
+          return {
+            observe: vi.fn().mockImplementation(() => {
+              cb(
+                [{ contentRect: { height } } as ResizeObserverEntry],
+                {} as ResizeObserver
+              );
+            }),
+            unobserve: vi.fn(),
+            disconnect: vi.fn(),
+          };
+        })
+      );
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("full mode (>=280px): renders fade section and layers section heading", () => {
+      mockResizeObserverWithHeight(300);
+      renderContent();
+      expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
+      expect(screen.getByText(/^layers$/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /synchronized fades/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /fade options/i })).not.toBeInTheDocument();
+    });
+
+    it("condensed mode (>=120px, <280px): renders compact action row with sub-popover buttons", () => {
+      mockResizeObserverWithHeight(150);
+      renderContent();
+      expect(screen.getByRole("button", { name: /fade (in|out)/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /fade options/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^layers$/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /synchronized fades/i })).toBeInTheDocument();
+      expect(screen.queryByText(/^layers$/i)).not.toBeInTheDocument();
+    });
+
+    it("scroll mode (<120px): renders condensed layout", () => {
+      mockResizeObserverWithHeight(80);
+      renderContent();
+      expect(screen.getByRole("button", { name: /fade options/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^layers$/i })).toBeInTheDocument();
+    });
+
+    it("condensed mode: clicking Fade Options button opens fade sub-popover", async () => {
+      mockResizeObserverWithHeight(150);
+      renderContent();
+      const fadeOptionsBtn = screen.getByRole("button", { name: /fade options/i });
+      await userEvent.click(fadeOptionsBtn);
+      const popoverContents = screen.getAllByTestId("popover-content");
+      expect(popoverContents.length).toBeGreaterThan(0);
+    });
+
+    it("condensed mode: clicking Layers button opens layers sub-popover", async () => {
+      mockResizeObserverWithHeight(150);
+      renderContent();
+      const layersBtn = screen.getByRole("button", { name: /^layers$/i });
+      await userEvent.click(layersBtn);
+      const popoverContents = screen.getAllByTestId("popover-content");
+      expect(popoverContents.length).toBeGreaterThan(0);
+    });
+  });
 });

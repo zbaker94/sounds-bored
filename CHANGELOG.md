@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved test coverage for the pad control panel's responsive layout, verifying correct behavior across full, condensed, and compact display modes.
 - Improved reliability of pad control panel layout tests to correctly simulate component dimensions in the test environment
 - Added test coverage verifying the Layers section heading renders correctly in the pad control panel
 - Fixed a bug where the pad control panel didn't close automatically after duplicating or deleting a pad
