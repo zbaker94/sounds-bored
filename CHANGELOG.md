@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Added a new pad control panel with playback controls (Start/Stop, Fade In/Out, per-layer play/stop) accessible directly from the pad
+- Pad controls now adapt their layout based on available space — full controls when space allows, compact popover-based controls when the pad is smaller
+- Individual layers can now be triggered and stopped independently from the pad control panel, with volume sliders per layer
+- Synchronized Fades button is now accessible directly from the pad control panel
+- Pad management actions (Edit, Duplicate, Delete) are available inline in the pad control panel
 - Added internal implementation plan for refactoring the pad control panel into a shared `PadControlContent` component (developer-facing only; no user-visible changes in this diff)
 - Added internal design spec for the upcoming Pad Control Panel refactor, consolidating edit/duplicate/delete actions and live controls into a unified shared component with responsive layout modes
 - No user-facing changes (internal test update only)
