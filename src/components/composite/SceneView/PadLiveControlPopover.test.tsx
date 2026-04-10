@@ -178,7 +178,7 @@ describe("PadLiveControlPopover", () => {
     expect(sliderThumbs[1]).toHaveAttribute("aria-valuenow", "75");
   });
 
-  it("clicking 'Multi-fade with others...' calls enterMultiFade and closes popover", async () => {
+  it("clicking 'Synchronized Fades' calls enterMultiFade and closes popover", async () => {
     const mockEnterMultiFade = vi.fn();
     useMultiFadeStore.setState({
       active: false,

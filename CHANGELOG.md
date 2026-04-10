@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Renamed "Multi-fade with others..." button to "Synchronized Fades" for clearer labeling
+- Updated button styles in the pad live control popover for improved visual hierarchy
 - Live volume adjustment: dragging the fade slider now updates the volume of a playing pad in real time
 - Right-clicking a pad now correctly toggles the live controls popover closed when it is already open, instead of reopening it
 - Dragging the volume slider in the live controls popover now updates pad volume in real time while dragging
@@ -12,7 +14,7 @@
 - Right-clicking a pad now toggles the context menu closed if it's already open, instead of forcing it open again
 - Layer volume changes made in the live controls panel are now saved to the project and stay in sync with the pad configuration dialog
 - Layer volume sliders now correctly show each layer's configured volume as the starting value instead of always defaulting to 100%
-- Clicking "Multi-fade with others..." on a pad now correctly closes the pad popover after entering multi-fade mode
+- Clicking "Synchronized Fades" on a pad now correctly closes the pad popover after entering multi-fade mode
 - Multi-fade execution now applies the correct per-pad fade levels to each selected pad and resets the multi-fade state afterward
 - Skipping backward through a sequential layer with cycle mode enabled now correctly updates the cycle position
 - Fade execution button now triggers more reliably when clicked
@@ -61,7 +63,7 @@
 - Fixed an issue where the volume slider in the pad live control popover could show a stale value after stopping and restarting playback
 - Added a live control popover for pads, letting you start/stop playback, fade in/out with adjustable start and end volume levels, and control individual layers — all without leaving the pad grid
 - Each layer in the popover shows its active state and has its own volume slider, plus skip forward/back controls for sequential and shuffled layers
-- Added a "Multi-fade with others..." option to initiate a synchronized fade across multiple pads at once
+- Added a "Synchronized Fades" option to initiate a synchronized fade across multiple pads at once
 - The popover adapts to screen size, appearing as a bottom drawer on smaller screens and a floating popover on desktop
 - Added live volume control for individual pad layers during playback
 - Added ability to trigger or stop a single layer independently without affecting other layers on the same pad

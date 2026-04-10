@@ -374,7 +374,7 @@ function PadLiveControlContent({
               </Tooltip>
             ))}
           </SliderPrimitive.Root>
-          <Button size="sm" variant="outline" onClick={handleFade} className="w-full gap-1.5">
+          <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
             <HugeiconsIcon icon={VolumeHighIcon} size={14} />
             {isPlaying ? "Fade Out" : "Fade In"}
           </Button>
@@ -413,8 +413,8 @@ function PadLiveControlContent({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, delay: STAGGER_DELAY * 3 }}
       >
-        <Button size="sm" variant="ghost" onClick={handleMultiFade} className="w-full text-xs">
-          Multi-fade with others...
+        <Button size="sm" variant="ghost" onClick={handleMultiFade} className="bg-yellow-500 w-full text-xs">
+          Synchronized Fades
         </Button>
       </motion.div>
     </div>
