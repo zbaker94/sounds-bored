@@ -69,6 +69,7 @@ function renderPopover(padOverrides: Partial<Parameters<typeof createMockPad>[0]
   render(
     <PadLiveControlPopover
       pad={pad}
+      sceneId="scene-1"
       open={true}
       onOpenChange={onOpenChange}
       anchorRef={anchorRef as React.RefObject<HTMLButtonElement | null>}

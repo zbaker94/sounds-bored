@@ -25,12 +25,12 @@ import { useIsMd } from "@/hooks/useBreakpoint";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useProjectStore } from "@/state/projectStore";
 import { isPadActive } from "@/lib/audio/audioState";
 import {
   triggerPad,
   stopPad,
   fadePadWithLevels,
-  resolveFadeDuration,
   triggerLayer,
   stopLayerWithRamp,
   setLayerVolume,
@@ -45,6 +45,7 @@ import { toast } from "sonner";
 
 interface PadLiveControlPopoverProps {
   pad: Pad;
+  sceneId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -148,14 +149,19 @@ function LayerRow({
 
 function PadLiveControlContent({
   pad,
+  sceneId,
   onClose,
 }: {
   pad: Pad;
+  sceneId: string;
   onClose: () => void;
 }) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
+  const updatePad = useProjectStore((s) => s.updatePad);
+  const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs ?? 2000);
+  const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
 
   // fadeLevels[0] = the "other end" thumb (end when playing, start when not playing).
   // fadeLevels[1] = the "start (current)" thumb = current pad volume.
@@ -249,17 +255,14 @@ function PadLiveControlContent({
   }, [isPlaying, pad]);
 
   const handleFade = useCallback(() => {
-    const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
-    const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-
     const fromLevel = fadeLevels[0] / 100;
     const toLevel = fadeLevels[1] / 100;
-    fadePadWithLevels(pad, duration, fromLevel, toLevel).catch((err: unknown) => {
+    fadePadWithLevels(pad, fadeDuration, fromLevel, toLevel).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Playback error: audio fade failed — ${message}`);
     });
     onClose();
-  }, [pad, fadeLevels, isPlaying, onClose]);
+  }, [pad, fadeLevels, fadeDuration, onClose]);
 
   const handleMultiFade = useCallback(() => {
     const playing = isPadActive(pad.id);
@@ -336,6 +339,40 @@ function PadLiveControlContent({
             max={100}
             step={1}
           />
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Fade Duration</span>
+              <span className="tabular-nums">{(fadeDuration / 1000).toFixed(1)}s</span>
+            </div>
+            <Slider
+              compact
+              tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
+              value={[fadeDuration]}
+              onValueChange={([v]) => {
+                const { id, ...config } = pad;
+                updatePad(sceneId, id, { ...config, fadeDurationMs: v });
+              }}
+              min={100}
+              max={10000}
+              step={100}
+            />
+            {pad.fadeDurationMs !== undefined ? (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline self-start"
+                onClick={() => {
+                  const { id, ...config } = pad;
+                  updatePad(sceneId, id, { ...config, fadeDurationMs: undefined });
+                }}
+              >
+                Reset to default
+              </button>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Global default ({(globalFadeDurationMs / 1000).toFixed(1)}s)
+              </p>
+            )}
+          </div>
           <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
             <HugeiconsIcon icon={VolumeHighIcon} size={14} />
             {isPlaying ? "Fade Out" : "Fade In"}
@@ -385,6 +422,7 @@ function PadLiveControlContent({
 
 export const PadLiveControlPopover = memo(function PadLiveControlPopover({
   pad,
+  sceneId,
   open,
   onOpenChange,
   anchorRef,
@@ -407,6 +445,7 @@ export const PadLiveControlPopover = memo(function PadLiveControlPopover({
           <div className="px-4 pb-4">
             <PadLiveControlContent
               pad={pad}
+              sceneId={sceneId}
               onClose={handleClose}
             />
           </div>
@@ -421,6 +460,7 @@ export const PadLiveControlPopover = memo(function PadLiveControlPopover({
       <PopoverContent className="w-72" side="top" sideOffset={10} showArrow>
         <PadLiveControlContent
           pad={pad}
+          sceneId={sceneId}
           onClose={handleClose}
         />
       </PopoverContent>

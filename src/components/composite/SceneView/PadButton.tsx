@@ -448,6 +448,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
 
       <PadLiveControlPopover
         pad={pad}
+        sceneId={sceneId}
         open={popoverOpen}
         onOpenChange={setPopoverOpen}
         anchorRef={buttonRef}

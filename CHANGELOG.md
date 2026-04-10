@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pad live control popover now includes a per-pad fade duration slider, letting you set a custom fade time (0.1s–10s) directly from the pad controls
+- A "Reset to default" option appears when a custom fade duration is set, reverting the pad to the global default fade time
+- When using the global default, the current global fade duration is displayed as a reference
 - Fixed skip forward/back controls for pads in cycle mode — they now correctly step through sounds in sequence without losing track of position
 - Fixed an issue where skipping forward then backward could fail because the play order wasn't preserved after a skip
 - Fixed a visual glitch where the volume bar could remain visible after a fade that doesn't go to silence
