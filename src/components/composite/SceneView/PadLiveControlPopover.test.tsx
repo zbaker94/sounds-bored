@@ -189,7 +189,7 @@ describe("PadLiveControlPopover", () => {
     } as any);
 
     const { onOpenChange } = renderPopover();
-    const multiFadeBtn = screen.getByRole("button", { name: /multi-fade with others/i });
+    const multiFadeBtn = screen.getByRole("button", { name: /Synchronized Fades/i });
     await userEvent.click(multiFadeBtn);
 
     expect(mockEnterMultiFade).toHaveBeenCalledTimes(1);

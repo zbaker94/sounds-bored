@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Slider as SliderPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import {
   Popover,
   PopoverAnchor,
@@ -21,11 +21,6 @@ import {
   NextIcon,
   PreviousIcon,
 } from "@hugeicons/core-free-icons";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useIsMd } from "@/hooks/useBreakpoint";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
@@ -137,20 +132,16 @@ function LayerRow({
           </>
         )}
       </div>
-      <SliderPrimitive.Root
+      <Slider
+        compact
+        tooltipLabel={(v) => `${v}%`}
         value={[layerVol]}
         onValueChange={([v]) => setLayerVolume(layer.id, v / 100)}
         onValueCommit={([v]) => commitLayerVolume(layer.id, v / 100)}
         min={0}
         max={100}
         step={1}
-        className="relative flex w-full touch-none items-center select-none"
-      >
-        <SliderPrimitive.Track className="relative grow overflow-hidden rounded-4xl bg-muted h-2 w-full">
-          <SliderPrimitive.Range className="absolute h-full bg-primary" />
-        </SliderPrimitive.Track>
-        <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm ring-ring/50 transition-colors select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden" />
-      </SliderPrimitive.Root>
+      />
     </motion.div>
   );
 }
@@ -190,10 +181,9 @@ function PadLiveControlContent({
     }
   }, [padVolume]);
 
-  // Clear thumbsDragging when pointer released anywhere (handles out-of-bounds release)
+  // Clear startThumbDraggingRef when pointer released anywhere (handles out-of-bounds release)
   useEffect(() => {
     const handlePointerUp = () => {
-      setThumbsDragging([false, false]);
       if (startThumbDraggingRef.current) {
         startThumbDraggingRef.current = false;
         usePlaybackStore.getState().clearVolumeTransition(pad.id);
@@ -246,16 +236,6 @@ function PadLiveControlContent({
       setActiveLayerIds(new Set()); // clear stale state on unmount/effect re-run
     };
   }, [isPlaying, pad.layers]);
-
-  // Tooltip state for two-thumb slider
-  const [thumbsHovered, setThumbsHovered] = useState<[boolean, boolean]>([false, false]);
-  const [thumbsDragging, setThumbsDragging] = useState<[boolean, boolean]>([false, false]);
-  function setHovered(i: number, v: boolean) {
-    setThumbsHovered((p) => [i === 0 ? v : p[0], i === 1 ? v : p[1]]);
-  }
-  function setDragging(i: number, v: boolean) {
-    setThumbsDragging((p) => [i === 0 ? v : p[0], i === 1 ? v : p[1]]);
-  }
 
   const handleStartStop = useCallback(() => {
     if (isPlaying) {
@@ -331,7 +311,8 @@ function PadLiveControlContent({
             <span>{isPlaying ? "end" : "start"}</span>
             <span>{isPlaying ? "start (current)" : "end"}</span>
           </div>
-          <SliderPrimitive.Root
+          <Slider
+            tooltipLabel={(v) => `${v}%`}
             value={fadeLevels}
             onValueChange={(v) => {
               const next = v as [number, number];
@@ -343,37 +324,18 @@ function PadLiveControlContent({
               setFadeLevels(next);
             }}
             onPointerUp={() => {
-              setThumbsDragging([false, false]);
               if (startThumbDraggingRef.current) {
                 startThumbDraggingRef.current = false;
                 usePlaybackStore.getState().clearVolumeTransition(pad.id);
               }
             }}
+            onThumbPointerDown={(index) => {
+              if (index === 1) startThumbDraggingRef.current = true;
+            }}
             min={0}
             max={100}
             step={1}
-            className="relative flex w-full touch-none items-center select-none"
-          >
-            <SliderPrimitive.Track className="relative grow overflow-hidden rounded-4xl bg-muted h-3 w-full">
-              <SliderPrimitive.Range className="absolute h-full bg-primary" />
-            </SliderPrimitive.Track>
-            {fadeLevels.map((val, index) => (
-              <Tooltip key={index} open={thumbsHovered[index] || thumbsDragging[index]}>
-                <TooltipTrigger asChild>
-                  <SliderPrimitive.Thumb
-                    className="block size-4 shrink-0 rounded-4xl border border-primary bg-white shadow-sm ring-ring/50 transition-colors select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden"
-                    onPointerEnter={() => setHovered(index, true)}
-                    onPointerLeave={() => setHovered(index, false)}
-                    onPointerDown={() => {
-                      setDragging(index, true);
-                      if (index === 1) startThumbDraggingRef.current = true;
-                    }}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{val}%</TooltipContent>
-              </Tooltip>
-            ))}
-          </SliderPrimitive.Root>
+          />
           <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
             <HugeiconsIcon icon={VolumeHighIcon} size={14} />
             {isPlaying ? "Fade Out" : "Fade In"}

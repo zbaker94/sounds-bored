@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Sliders now display a tooltip showing the current percentage value when hovering or dragging a thumb
+- The "Multi-Fade with Others" button has been renamed to "Synchronized Fades"
+- Compact slider variant introduced for tighter UI areas (smaller track and thumb size)
 - Renamed "Multi-fade with others..." button to "Synchronized Fades" for clearer labeling
 - Updated button styles in the pad live control popover for improved visual hierarchy
 - Live volume adjustment: dragging the fade slider now updates the volume of a playing pad in real time

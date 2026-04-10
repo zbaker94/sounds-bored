@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
-import { Slider as SliderPrimitive } from "radix-ui";
+import { Slider } from "@/components/ui/slider";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -349,7 +349,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                       transition={{ duration: 0.15 }}
                       onPointerDown={(e) => e.stopPropagation()}
                     >
-                      <SliderPrimitive.Root
+                      <Slider
+                        compact
+                        tooltipLabel={(v) => `${v}%`}
                         value={[multiFadeLevels[0], multiFadeLevels[1]]}
                         onValueChange={(v) => {
                           if (isPlaying && v[1] !== multiFadeLevels[1]) {
@@ -362,14 +364,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                         min={0}
                         max={100}
                         step={1}
-                        className="relative flex w-full touch-none items-center select-none"
-                      >
-                        <SliderPrimitive.Track className="relative grow overflow-hidden rounded-4xl bg-white/20 h-2 w-full">
-                          <SliderPrimitive.Range className="absolute h-full bg-primary" />
-                        </SliderPrimitive.Track>
-                        <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm transition-colors select-none" />
-                        <SliderPrimitive.Thumb className="block size-3 shrink-0 rounded-4xl border border-primary bg-white shadow-sm transition-colors select-none" />
-                      </SliderPrimitive.Root>
+                        className="[&_[data-slot=slider-track]]:bg-white/20"
+                      />
                       <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
                         <span>{isPlaying ? "end" : "start"}</span>
                         <span>{isPlaying ? "start" : "end"}</span>
