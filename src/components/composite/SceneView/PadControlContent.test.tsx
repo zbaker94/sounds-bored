@@ -121,6 +121,21 @@ describe("PadControlContent", () => {
   });
 
   describe("full mode content", () => {
+    beforeEach(() => {
+      // happy-dom returns 0 for getBoundingClientRect — override to force full mode (≥280px)
+      vi.spyOn(HTMLDivElement.prototype, "getBoundingClientRect").mockReturnValue({
+        height: 350,
+        width: 300,
+        top: 0, left: 0, bottom: 350, right: 300,
+        x: 0, y: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it("renders Start button when pad is not playing", () => {
       renderContent();
       expect(screen.getByRole("button", { name: /start/i })).toBeInTheDocument();
@@ -134,6 +149,11 @@ describe("PadControlContent", () => {
     it("renders Synchronized Fades button", () => {
       renderContent();
       expect(screen.getByRole("button", { name: /synchronized fades/i })).toBeInTheDocument();
+    });
+
+    it("renders Layers section heading", () => {
+      renderContent();
+      expect(screen.getByText(/^layers$/i)).toBeInTheDocument();
     });
   });
 });

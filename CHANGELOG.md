@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved reliability of pad control panel layout tests to correctly simulate component dimensions in the test environment
+- Added test coverage verifying the Layers section heading renders correctly in the pad control panel
 - Fixed a bug where the pad control panel didn't close automatically after duplicating or deleting a pad
 - Added a new pad control panel with playback controls (Start/Stop, Fade In/Out, per-layer play/stop) accessible directly from the pad
 - Pad controls now adapt their layout based on available space — full controls when space allows, compact popover-based controls when the pad is smaller

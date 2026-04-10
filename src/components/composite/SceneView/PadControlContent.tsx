@@ -190,10 +190,10 @@ function LayerRow({
     return allSounds.map((s) => s.name).join(" · ");
   })();
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const textContainerRef = useRef<HTMLDivElement>(null);
   const [isOverflow, setIsOverflow] = useState(false);
   useEffect(() => {
-    const el = containerRef.current;
+    const el = textContainerRef.current;
     if (!el) return;
     setIsOverflow(el.scrollWidth > el.clientWidth);
   }, [displayText]);
@@ -280,7 +280,7 @@ function LayerRow({
       </div>
       {allSounds.length > 0 && (
         <div className="flex items-center gap-1" data-testid="layer-sound-display">
-          <div ref={containerRef} className="overflow-hidden flex-1 min-w-0">
+          <div ref={textContainerRef} className="overflow-hidden flex-1 min-w-0">
             {isOverflow ? (
               <div
                 className="flex gap-8"
