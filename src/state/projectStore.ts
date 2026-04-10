@@ -33,6 +33,7 @@ interface ProjectActions {
   duplicatePad: (sceneId: string, padId: string) => void;
   reorderScenes: (fromIndex: number, toIndex: number) => void;
   reorderPads: (sceneId: string, fromIndex: number, toIndex: number) => void;
+  updateLayerVolume: (layerId: string, volumePct: number) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -207,6 +208,21 @@ export const useProjectStore = create<ProjectStore>()(
         const [moved] = scene.pads.splice(fromIndex, 1);
         scene.pads.splice(toIndex, 0, moved);
         draft.isDirty = true;
+      }),
+
+    updateLayerVolume: (layerId, volumePct) =>
+      set((draft) => {
+        if (!draft.project) return;
+        for (const scene of draft.project.scenes) {
+          for (const pad of scene.pads) {
+            const layer = pad.layers.find((l) => l.id === layerId);
+            if (layer) {
+              layer.volume = Math.max(0, Math.min(100, Math.round(volumePct * 100)));
+              draft.isDirty = true;
+              return;
+            }
+          }
+        }
       }),
   }))
 );

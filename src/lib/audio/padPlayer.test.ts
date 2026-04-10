@@ -2748,12 +2748,12 @@ describe("executeFadeTap — custom fromVolume and toVolume", () => {
 // ─── setLayerVolume ───────────────────────────────────────────────────────────
 
 describe("setLayerVolume", () => {
-  it("is a no-op when the layer has no active gain node", async () => {
+  it("updates stores even when the layer has no active gain node", async () => {
     const { setLayerVolume } = await import("./padPlayer");
     // No pad triggered, so no gain node exists for this layer
     setLayerVolume("non-existent-layer", 0.5);
-    // Verify store is unaffected
-    expect(usePlaybackStore.getState().layerVolumes["non-existent-layer"]).toBeUndefined();
+    // Playback store is still updated (runtime display)
+    expect(usePlaybackStore.getState().layerVolumes["non-existent-layer"]).toBe(0.5);
   });
 
   it("updates layerVolumes in playbackStore when the layer gain node exists", async () => {

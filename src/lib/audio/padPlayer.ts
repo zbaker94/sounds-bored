@@ -818,15 +818,20 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
 // Per-layer live controls (volume, trigger, stop, skip)
 // ---------------------------------------------------------------------------
 
-/** Set the live volume for a layer's gain node and mirror to the playback store. No-op if the layer has no active gain node. */
+/** Set the live volume for a layer's gain node, mirror to playback store, and persist to project schema. */
 export function setLayerVolume(layerId: string, volume: number): void {
-  const gain = getLayerGain(layerId);
-  if (!gain) return;
   const clamped = Math.max(0, Math.min(1, volume));
-  const ctx = getAudioContext();
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(clamped, ctx.currentTime);
+  // Update gain node if currently playing
+  const gain = getLayerGain(layerId);
+  if (gain) {
+    const ctx = getAudioContext();
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(clamped, ctx.currentTime);
+  }
+  // Mirror to playback store (runtime display)
   usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
+  // Persist to project schema so config dialog stays in sync
+  useProjectStore.getState().updateLayerVolume(layerId, clamped);
 }
 
 /** Trigger a single layer of a pad in isolation, respecting retrigger mode/arrangement/selection. */

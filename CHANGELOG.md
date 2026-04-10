@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Layer volume changes made in the live controls panel are now saved to the project and stay in sync with the pad configuration dialog
+- Layer volume sliders now correctly show each layer's configured volume as the starting value instead of always defaulting to 100%
 - Clicking "Multi-fade with others..." on a pad now correctly closes the pad popover after entering multi-fade mode
 - Multi-fade execution now applies the correct per-pad fade levels to each selected pad and resets the multi-fade state afterward
 - Skipping backward through a sequential layer with cycle mode enabled now correctly updates the cycle position

@@ -66,7 +66,7 @@ function LayerRow({
   idx: number;
   layerActive: boolean;
 }) {
-  const layerVol = usePlaybackStore((s) => Math.round((s.layerVolumes[layer.id] ?? 1.0) * 100));
+  const layerVol = usePlaybackStore((s) => Math.round((s.layerVolumes[layer.id] ?? (layer.volume / 100)) * 100));
   const showSkip = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
 
   return (
