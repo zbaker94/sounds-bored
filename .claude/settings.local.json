@@ -30,7 +30,8 @@
       "Bash(git log:*)",
       "Bash(cargo metadata:*)",
       "Bash(python -c \"import json,sys; m=json.load\\(sys.stdin\\); [print\\(p['manifest_path']\\) for p in m['packages'] if 'shell' in p['name']]\")",
-      "Bash(gh --version)"
+      "Bash(gh --version)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

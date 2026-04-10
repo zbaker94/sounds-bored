@@ -95,6 +95,10 @@ const layerCycleIndex = new Map<string, number>();
 /** Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger. */
 const layerPendingMap = new Set<string>();
 
+/** Stores the original play order for a layer chain so skip-back can derive the previous sound.
+ *  Keyed by layer ID. Set when a chain is started; cleared on stopAllPads / stopPad. */
+const layerPlayOrderMap = new Map<string, Sound[]>();
+
 /** Pending fade cleanup timeouts, keyed by pad ID. Used by both fadePadOut and fadePadIn. */
 const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -524,4 +528,34 @@ export function nullAllOnEnded(): void {
       voice.setOnEnded(null);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Layer play order tracking (for skip-back)
+// ---------------------------------------------------------------------------
+
+export function setLayerPlayOrder(layerId: string, sounds: Sound[]): void {
+  layerPlayOrderMap.set(layerId, sounds);
+}
+
+export function getLayerPlayOrder(layerId: string): Sound[] | undefined {
+  return layerPlayOrderMap.get(layerId);
+}
+
+export function deleteLayerPlayOrder(layerId: string): void {
+  layerPlayOrderMap.delete(layerId);
+}
+
+export function clearAllLayerPlayOrders(): void {
+  layerPlayOrderMap.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Layer volume accessor
+// ---------------------------------------------------------------------------
+
+/** Read the current gain value for a layer. Returns 1.0 if the layer has no active gain node. */
+export function getLayerVolume(layerId: string): number {
+  const gain = layerGainMap.get(layerId);
+  return gain ? gain.gain.value : 1.0;
 }

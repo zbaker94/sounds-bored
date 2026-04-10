@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Replaced the scene-level fade toolbar with per-pad live control popovers accessible via right-click
+- Added skip-back navigation for sequential and shuffled layers, allowing you to jump to the previous sound in a chain
+- Removed the Fade and Crossfade toolbar buttons; fade controls are now accessed directly from each pad's context menu
 - Fixed the multi-fade control pill layout so it renders centered within the scene view rather than using absolute positioning.
 - Right-clicking a pad now toggles the context menu closed if it's already open, instead of forcing it open again
 - Layer volume changes made in the live controls panel are now saved to the project and stay in sync with the pad configuration dialog
