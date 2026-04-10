@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed the pad edit panel background so it correctly uses the card background color instead of a dark black overlay, improving readability when pads have custom colors.
 - The layers list in pad controls now scrolls independently within full-size pads, keeping action buttons and header always visible instead of being pushed off screen.
 - Tapping "Edit" on a pad's live control popover now navigates directly to the pad's full configuration panel instead of requiring you to close the popover first.
 - Pad buttons no longer show a close/dismiss action on the back face — exit edit mode using the global toggle instead

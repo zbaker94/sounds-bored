@@ -384,13 +384,11 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
 
             {/* Back face — shared control panel */}
             <div
-              className="absolute inset-0 rounded-xl overflow-hidden [backface-visibility:hidden]"
+              className="absolute inset-0 rounded-xl overflow-hidden bg-card [backface-visibility:hidden]"
               style={{ transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
               aria-hidden={!editMode || undefined}
             >
-              {/* Dark overlay for readability */}
-              <div className="absolute inset-0 bg-black/60" />
-              <div className="relative z-10 w-full h-full p-2">
+              <div className="w-full h-full p-2">
                 <PadControlContent
                   pad={pad}
                   sceneId={sceneId}
