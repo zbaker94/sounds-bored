@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added internal implementation plan for refactoring the pad control panel into a shared `PadControlContent` component (developer-facing only; no user-visible changes in this diff)
 - Added internal design spec for the upcoming Pad Control Panel refactor, consolidating edit/duplicate/delete actions and live controls into a unified shared component with responsive layout modes
 - No user-facing changes (internal test update only)
 - Active shuffled layers now display only the currently playing sound name instead of the full sound list
