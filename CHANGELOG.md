@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed buttons inside the pad control panel being unclickable when dragging pads in edit mode
+- Fixed an issue where entering multi-fade mode while in edit mode would immediately cancel the multi-fade control
+- Pad option popovers now correctly close when edit mode is activated
 - Volume sliders now respond instantly while dragging, eliminating a subtle lag caused by audio timing updates.
 - Volume display on pads now updates immediately while dragging, eliminating the visual lag caused by audio processing latency
 - The volume indicator on pads now stays visible while dragging to adjust volume and hides cleanly after you finish, rather than disappearing prematurely during mid-drag pauses.

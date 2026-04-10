@@ -63,6 +63,10 @@ export interface PadControlContentProps {
   sceneId: string;
   onClose: () => void;
   onEditClick?: (pad: Pad) => void;
+  /** Called after enterMultiFade — allows the caller to exit edit mode in the same
+   *  event-handler flush so React 18 batches it with the store update, preventing
+   *  the useMultiFadeMode "cancel when editMode && active" effect from firing. */
+  onMultiFade?: () => void;
 }
 
 export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
@@ -370,6 +374,7 @@ export const PadControlContent = memo(function PadControlContent({
   sceneId,
   onClose,
   onEditClick,
+  onMultiFade,
 }: PadControlContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("full");
@@ -461,8 +466,9 @@ export const PadControlContent = memo(function PadControlContent({
   const handleMultiFade = useCallback(() => {
     const playing = isPadActive(pad.id);
     enterMultiFade(pad.id, playing, padVolume);
+    onMultiFade?.();
     onClose();
-  }, [pad.id, padVolume, enterMultiFade, onClose]);
+  }, [pad.id, padVolume, enterMultiFade, onMultiFade, onClose]);
 
   const fadeSection = (
     <div className="flex flex-col gap-1.5">

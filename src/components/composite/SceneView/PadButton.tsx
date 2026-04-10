@@ -30,6 +30,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const progress = usePlaybackStore((s) => s.padProgress[pad.id] ?? 0);
   const editMode = useUiStore((s) => s.editMode);
+  const toggleEditMode = useUiStore((s) => s.toggleEditMode);
   const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
   // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
@@ -145,12 +146,12 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   // handleContextMenu runs, popoverOpen is already false — making a naive toggle reopen it.
   const popoverWasOpenRef = useRef(false);
 
-  // Close popover when multi-fade mode activates
+  // Close popover when edit mode or multi-fade mode activates
   useEffect(() => {
-    if (multiFadeActive) {
+    if (editMode || multiFadeActive) {
       setPopoverOpen(false);
     }
-  }, [multiFadeActive]);
+  }, [editMode, multiFadeActive]);
 
   // Reopen popover when this pad is the reopenPadId after multi-fade cancel
   useEffect(() => {
@@ -226,8 +227,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   // We record the open state at pointer-down because Radix fires onOpenChange(false)
   // before the contextMenu event, which would otherwise cause a naive toggle to reopen.
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    if (editMode || multiFadeActive || isUnplayable) return;
     e.preventDefault();
+    if (editMode || multiFadeActive || isUnplayable) return;
     setPopoverOpen(popoverWasOpenRef.current ? false : true);
   }, [editMode, multiFadeActive, isUnplayable]);
 
@@ -252,8 +253,20 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         ref={setNodeRef}
         style={dndStyle}
         className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
-        {...(editMode ? { ...attributes, ...listeners } : {})}
-        onPointerDown={(e) => { if (e.button === 2) popoverWasOpenRef.current = popoverOpen; }}
+        {...(editMode ? attributes : {})}
+        onPointerDown={(e) => {
+          if (e.button === 2) popoverWasOpenRef.current = popoverOpen;
+          // Only start a dnd-kit drag when the pointer-down did NOT originate on an
+          // interactive child element (buttons inside PadControlContent on the back face).
+          // Calling listeners.onPointerDown on interactive targets causes dnd-kit to
+          // capture the pointer, which swallows the subsequent click event.
+          if (editMode && listeners?.onPointerDown) {
+            const target = e.target as HTMLElement;
+            if (!target.closest("button, input, a, select, textarea")) {
+              listeners.onPointerDown(e);
+            }
+          }
+        }}
         onContextMenu={handleContextMenu}
       >
         <motion.div
@@ -413,6 +426,10 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                   sceneId={sceneId}
                   // No dismiss action on back face — user exits edit mode via the global toggle
                   onClose={() => {}}
+                  // Exit edit mode when multi-fade is entered so both state changes land in the
+                  // same React render (editMode=false, active=true), preventing useMultiFadeMode
+                  // from immediately cancelling and reopening the live-control popover.
+                  onMultiFade={toggleEditMode}
                   onEditClick={onEditClick}
                 />
               </div>
