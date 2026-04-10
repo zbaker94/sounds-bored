@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- The layers list in pad controls now scrolls independently within full-size pads, keeping action buttons and header always visible instead of being pushed off screen.
 - Tapping "Edit" on a pad's live control popover now navigates directly to the pad's full configuration panel instead of requiring you to close the popover first.
 - Pad buttons no longer show a close/dismiss action on the back face — exit edit mode using the global toggle instead
 - Pad edit controls (edit, duplicate, delete) on the back face in edit mode now use the same shared control panel as the live control popover, ensuring a consistent UI in both views

@@ -55,7 +55,7 @@ type DisplayMode = "full" | "condensed" | "scroll";
 
 function getDisplayMode(height: number): DisplayMode {
   if (height >= 280) return "full";
-  if (height >= 120) return "condensed";
+  if (height >= 200) return "condensed";
   return "scroll";
 }
 
@@ -587,6 +587,7 @@ export const PadControlContent = memo(function PadControlContent({
         ref={containerRef}
         className={cn(
           "flex flex-col gap-3 w-full h-full",
+          displayMode === "full" && "overflow-hidden",
           displayMode === "scroll" && "overflow-y-auto"
         )}
       >
@@ -630,7 +631,7 @@ export const PadControlContent = memo(function PadControlContent({
         {displayMode === "full" && (
           <>
             <motion.div
-              className="flex flex-col gap-2"
+              className="flex flex-col gap-2 flex-shrink-0"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.15, delay: STAGGER_DELAY }}
@@ -678,18 +679,21 @@ export const PadControlContent = memo(function PadControlContent({
             </motion.div>
 
             <motion.div
-              className="flex flex-col gap-1.5"
+              className="flex flex-col gap-1.5 flex-1 min-h-0"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.15, delay: STAGGER_DELAY * 2 }}
             >
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex-shrink-0">
                 Layers
               </h4>
-              {layersSection}
+              <div className="overflow-y-auto flex-1 min-h-0">
+                {layersSection}
+              </div>
             </motion.div>
 
             <motion.div
+              className="flex-shrink-0"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.15, delay: STAGGER_DELAY * 3 }}
