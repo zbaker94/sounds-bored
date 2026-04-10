@@ -431,6 +431,7 @@ export function syncLayerConfig(layer: Layer, original: Layer): void {
 
 /** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
+  cancelPadFade(pad.id);
   for (const layer of pad.layers) {
     deleteLayerChain(layer.id);
     deleteLayerCycleIndex(layer.id);

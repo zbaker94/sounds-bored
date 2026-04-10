@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an issue where stopping a pad did not cancel an in-progress fade, preventing fade artifacts on stop.
 - Right-clicking an unplayable pad (one with no sounds assigned) no longer opens the live control popover
 - Fixed the pad edit panel background so it correctly uses the card background color instead of a dark black overlay, improving readability when pads have custom colors.
 - The layers list in pad controls now scrolls independently within full-size pads, keeping action buttons and header always visible instead of being pushed off screen.
