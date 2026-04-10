@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved audio engine performance by consolidating multiple per-pad animation loops into a single global RAF loop, reducing CPU overhead during playback
+- Volume meters, progress bars, and active layer indicators now update from one unified tick rather than scattered individual polling loops
 - Pad volume, layer volume, playback progress, and active layer tracking are now updated in a single batched operation each audio frame, reducing UI jitter and improving performance
 - Added per-pad playback progress indicator support (`padProgress`), enabling future progress bar display on pads
 - Added active layer tracking (`activeLayerIds`), replacing per-component polling for whether a layer is currently playing
