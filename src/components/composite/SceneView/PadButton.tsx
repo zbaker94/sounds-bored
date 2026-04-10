@@ -107,6 +107,10 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   // Popover (right-click live controls)
   const [popoverOpen, setPopoverOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // Capture popover state at pointer-down so contextMenu handler can close it:
+  // Radix fires onOpenChange(false) before the contextMenu event, so by the time
+  // handleContextMenu runs, popoverOpen is already false — making a naive toggle reopen it.
+  const popoverWasOpenRef = useRef(false);
 
   // Close popover when multi-fade mode activates
   useEffect(() => {
@@ -204,11 +208,13 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     },
   }), [toggleMultiFadePad, pad.id]);
 
-  // Right-click opens live control popover
+  // Right-click toggles live control popover.
+  // We record the open state at pointer-down because Radix fires onOpenChange(false)
+  // before the contextMenu event, which would otherwise cause a naive toggle to reopen.
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (editMode || multiFadeActive) return;
     e.preventDefault();
-    setPopoverOpen((prev) => !prev);
+    setPopoverOpen(popoverWasOpenRef.current ? false : true);
   }, [editMode, multiFadeActive]);
 
   // Selection ring styling for multi-fade selected pads
@@ -233,6 +239,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         style={dndStyle}
         className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
         {...(editMode ? { ...attributes, ...listeners } : {})}
+        onPointerDown={(e) => { if (e.button === 2) popoverWasOpenRef.current = popoverOpen; }}
         onContextMenu={handleContextMenu}
       >
         <motion.div

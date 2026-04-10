@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking a pad now correctly toggles the live controls popover closed when it is already open, instead of reopening it
+- Dragging the volume slider in the live controls popover now updates pad volume in real time while dragging
+- Layer volume changes are applied live during drag and only saved to the project when you release the slider
 - Replaced the scene-level fade toolbar with per-pad live control popovers accessible via right-click
 - Added skip-back navigation for sequential and shuffled layers, allowing you to jump to the previous sound in a chain
 - Removed the Fade and Crossfade toolbar buttons; fade controls are now accessed directly from each pad's context menu

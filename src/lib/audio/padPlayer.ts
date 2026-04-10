@@ -818,7 +818,8 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
 // Per-layer live controls (volume, trigger, stop, skip)
 // ---------------------------------------------------------------------------
 
-/** Set the live volume for a layer's gain node, mirror to playback store, and persist to project schema. */
+/** Set the live volume for a layer's gain node and mirror to the playback store.
+ *  Call commitLayerVolume on drag-end to persist to the project schema. */
 export function setLayerVolume(layerId: string, volume: number): void {
   const clamped = Math.max(0, Math.min(1, volume));
   // Update gain node if currently playing
@@ -830,7 +831,11 @@ export function setLayerVolume(layerId: string, volume: number): void {
   }
   // Mirror to playback store (runtime display)
   usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
-  // Persist to project schema so config dialog stays in sync
+}
+
+/** Persist the current layer volume to the project schema (call on drag-end / value commit). */
+export function commitLayerVolume(layerId: string, volume: number): void {
+  const clamped = Math.max(0, Math.min(1, volume));
   useProjectStore.getState().updateLayerVolume(layerId, clamped);
 }
 

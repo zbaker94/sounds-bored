@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Slider as SliderPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,8 @@ import {
   triggerLayer,
   stopLayerWithRamp,
   setLayerVolume,
+  commitLayerVolume,
+  setPadVolume,
   skipLayerForward,
   skipLayerBack,
 } from "@/lib/audio/padPlayer";
@@ -138,6 +140,7 @@ function LayerRow({
       <SliderPrimitive.Root
         value={[layerVol]}
         onValueChange={([v]) => setLayerVolume(layer.id, v / 100)}
+        onValueCommit={([v]) => commitLayerVolume(layer.id, v / 100)}
         min={0}
         max={100}
         step={1}
@@ -163,33 +166,49 @@ function PadLiveControlContent({
   const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
 
-  const [fadeLevels, setFadeLevels] = useState<[number, number]>(() => {
-    if (isPlaying) {
-      return [0, Math.round(padVolume * 100)];
-    }
-    return [0, 100];
-  });
+  // fadeLevels[0] = the "other end" thumb (end when playing, start when not playing).
+  // fadeLevels[1] = the "start (current)" thumb = current pad volume.
+  // Dragging fadeLevels[1] updates padVolume live; external padVolume changes
+  // (e.g. fades, vertical drag) sync back into fadeLevels[1] when not dragging.
+  const [fadeLevels, setFadeLevels] = useState<[number, number]>([0, 100]);
+  const startThumbDraggingRef = useRef(false);
 
-  // Sync fadeLevels with playback state:
-  // - On play/stop transitions: full reset
-  // - While playing: keep right thumb tracking current volume
+  // Reset the end thumb when the pad stops playing
   useEffect(() => {
-    if (isPlaying) {
+    if (!isPlaying) {
+      setFadeLevels([0, 100]);
+    }
+  }, [isPlaying]);
+
+  // Sync right thumb from padVolume when not actively dragging it
+  useEffect(() => {
+    if (!startThumbDraggingRef.current) {
       setFadeLevels((prev) => {
         const newRight = Math.round(padVolume * 100);
         return prev[1] === newRight ? prev : [prev[0], newRight];
       });
-    } else {
-      setFadeLevels([0, 100]);
     }
-  }, [isPlaying, padVolume]);
+  }, [padVolume]);
 
   // Clear thumbsDragging when pointer released anywhere (handles out-of-bounds release)
   useEffect(() => {
-    const handlePointerUp = () => setThumbsDragging([false, false]);
+    const handlePointerUp = () => {
+      setThumbsDragging([false, false]);
+      if (startThumbDraggingRef.current) {
+        startThumbDraggingRef.current = false;
+        usePlaybackStore.getState().clearVolumeTransition(pad.id);
+      }
+    };
     window.addEventListener("pointerup", handlePointerUp);
-    return () => window.removeEventListener("pointerup", handlePointerUp);
-  }, []);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerUp);
+      // If component unmounts while right thumb is mid-drag, ensure transition is cleared
+      if (startThumbDraggingRef.current) {
+        startThumbDraggingRef.current = false;
+        usePlaybackStore.getState().clearVolumeTransition(pad.id);
+      }
+    };
+  }, [pad.id]);
 
   // Track active layers via RAF polling — only runs when pad is playing
   const [activeLayerIds, setActiveLayerIds] = useState<Set<string>>(new Set());
@@ -253,12 +272,14 @@ function PadLiveControlContent({
     const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
     const duration = resolveFadeDuration(pad, globalFadeDurationMs);
 
-    fadePadWithLevels(pad, duration, fadeLevels[0] / 100, fadeLevels[1] / 100).catch((err: unknown) => {
+    const fromLevel = fadeLevels[0] / 100;
+    const toLevel = fadeLevels[1] / 100;
+    fadePadWithLevels(pad, duration, fromLevel, toLevel).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Playback error: audio fade failed — ${message}`);
     });
     onClose();
-  }, [pad, fadeLevels, onClose]);
+  }, [pad, fadeLevels, isPlaying, onClose]);
 
   const handleMultiFade = useCallback(() => {
     const playing = isPadActive(pad.id);
@@ -312,8 +333,22 @@ function PadLiveControlContent({
           </div>
           <SliderPrimitive.Root
             value={fadeLevels}
-            onValueChange={(v) => setFadeLevels(v as [number, number])}
-            onPointerUp={() => setThumbsDragging([false, false])}
+            onValueChange={(v) => {
+              const next = v as [number, number];
+              if (isPlaying && next[1] !== fadeLevels[1]) {
+                // Right thumb moved — update pad volume live
+                setPadVolume(pad.id, next[1] / 100);
+                usePlaybackStore.getState().startVolumeTransition(pad.id);
+              }
+              setFadeLevels(next);
+            }}
+            onPointerUp={() => {
+              setThumbsDragging([false, false]);
+              if (startThumbDraggingRef.current) {
+                startThumbDraggingRef.current = false;
+                usePlaybackStore.getState().clearVolumeTransition(pad.id);
+              }
+            }}
             min={0}
             max={100}
             step={1}
@@ -329,7 +364,10 @@ function PadLiveControlContent({
                     className="block size-4 shrink-0 rounded-4xl border border-primary bg-white shadow-sm ring-ring/50 transition-colors select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden"
                     onPointerEnter={() => setHovered(index, true)}
                     onPointerLeave={() => setHovered(index, false)}
-                    onPointerDown={() => setDragging(index, true)}
+                    onPointerDown={() => {
+                      setDragging(index, true);
+                      if (index === 1) startThumbDraggingRef.current = true;
+                    }}
                   />
                 </TooltipTrigger>
                 <TooltipContent>{val}%</TooltipContent>
@@ -383,7 +421,7 @@ function PadLiveControlContent({
   );
 }
 
-export function PadLiveControlPopover({
+export const PadLiveControlPopover = memo(function PadLiveControlPopover({
   pad,
   open,
   onOpenChange,
@@ -426,4 +464,4 @@ export function PadLiveControlPopover({
       </PopoverContent>
     </Popover>
   );
-}
+});
