@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an issue where the current sound indicator in the pad live control popover would not reset when a layer became inactive
 - When a pad with sequential or shuffled sounds is actively playing, the sound display now shows only the currently-playing sound name instead of the full list
 - Simultaneous layers continue to show all sound names regardless of playback state
 - Fixed spacing between repeating text in the scrolling sound name display on pad controls

@@ -96,11 +96,11 @@ function LayerRow({
   layerActive: boolean;
 }) {
   const layerVol = usePlaybackStore((s) => Math.round((s.layerVolumes[layer.id] ?? (layer.volume / 100)) * 100));
-  const showSkip = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
+  const isChainedArrangement = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
+  const showSkip = isChainedArrangement;
 
   const sounds = useLibraryStore((s) => s.sounds);
   const allSounds = getSoundsForLayer(layer, sounds);
-  const isChainedArrangement = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
 
   // ─── Current-sound RAF polling (sequential/shuffled while active) ───────────
   const [currentSoundId, setCurrentSoundId] = useState<string | null>(null);
@@ -125,6 +125,8 @@ function LayerRow({
         const currentSound = playOrder[currentIdx];
         const nextId = currentSound?.id ?? null;
         setCurrentSoundId((prev) => (prev === nextId ? prev : nextId));
+      } else {
+        setCurrentSoundId(null);
       }
       soundRafRef.current = requestAnimationFrame(poll);
     };
