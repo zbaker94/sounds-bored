@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { PadLiveControlPopover } from "./PadLiveControlPopover";
-import { createMockPad, createMockLayer } from "@/test/factories";
+import { PadLiveControlPopover, getSoundsForLayer } from "./PadLiveControlPopover";
+import { createMockPad, createMockLayer, createMockSound, createMockSoundInstance } from "@/test/factories";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useIsMd } from "@/hooks/useBreakpoint";
 
@@ -81,6 +82,7 @@ function renderPopover(padOverrides: Partial<Parameters<typeof createMockPad>[0]
 describe("PadLiveControlPopover", () => {
   beforeEach(() => {
     usePlaybackStore.setState({ ...initialPlaybackState });
+    useLibraryStore.setState({ ...initialLibraryState });
     useMultiFadeStore.setState({
       active: false,
       originPadId: null,
@@ -210,6 +212,85 @@ describe("PadLiveControlPopover", () => {
 
       // Verify popover-content testid is NOT present (drawer should render instead)
       expect(screen.queryByTestId("popover-content")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("getSoundsForLayer", () => {
+  describe("assigned selection", () => {
+    it("returns sounds matching instance soundIds in instance order", () => {
+      const s1 = createMockSound({ id: "s1", name: "Kick" });
+      const s2 = createMockSound({ id: "s2", name: "Snare" });
+      const s3 = createMockSound({ id: "s3", name: "Hi-hat" });
+      const inst1 = createMockSoundInstance({ soundId: "s2" });
+      const inst2 = createMockSoundInstance({ soundId: "s1" });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [inst1, inst2] },
+      });
+      expect(getSoundsForLayer(layer, [s1, s2, s3])).toEqual([s2, s1]);
+    });
+
+    it("excludes instances with no matching library sound", () => {
+      const s1 = createMockSound({ id: "s1", name: "Kick" });
+      const inst = createMockSoundInstance({ soundId: "missing-id" });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [inst] },
+      });
+      expect(getSoundsForLayer(layer, [s1])).toEqual([]);
+    });
+
+    it("returns empty array when no instances", () => {
+      const layer = createMockLayer({ selection: { type: "assigned", instances: [] } });
+      expect(getSoundsForLayer(layer, [])).toEqual([]);
+    });
+  });
+
+  describe("tag selection", () => {
+    it("returns sounds that have any of the specified tag IDs (matchMode: any)", () => {
+      const s1 = createMockSound({ id: "s1", name: "Kick", tags: ["tag-a"] });
+      const s2 = createMockSound({ id: "s2", name: "Snare", tags: ["tag-b"] });
+      const s3 = createMockSound({ id: "s3", name: "Hi-hat", tags: [] });
+      const layer = createMockLayer({
+        selection: { type: "tag", tagIds: ["tag-a"], matchMode: "any", defaultVolume: 100 },
+      });
+      expect(getSoundsForLayer(layer, [s1, s2, s3])).toEqual([s1]);
+    });
+
+    it("returns only sounds that have ALL tag IDs (matchMode: all)", () => {
+      const s1 = createMockSound({ id: "s1", name: "Kick", tags: ["tag-a", "tag-b"] });
+      const s2 = createMockSound({ id: "s2", name: "Snare", tags: ["tag-a"] });
+      const layer = createMockLayer({
+        selection: { type: "tag", tagIds: ["tag-a", "tag-b"], matchMode: "all", defaultVolume: 100 },
+      });
+      expect(getSoundsForLayer(layer, [s1, s2])).toEqual([s1]);
+    });
+
+    it("returns empty array when no sounds match", () => {
+      const s1 = createMockSound({ id: "s1", tags: ["tag-z"] });
+      const layer = createMockLayer({
+        selection: { type: "tag", tagIds: ["tag-a"], matchMode: "any", defaultVolume: 100 },
+      });
+      expect(getSoundsForLayer(layer, [s1])).toEqual([]);
+    });
+  });
+
+  describe("set selection", () => {
+    it("returns sounds that belong to the specified set", () => {
+      const s1 = createMockSound({ id: "s1", name: "Kick", sets: ["set-1"] });
+      const s2 = createMockSound({ id: "s2", name: "Snare", sets: ["set-2"] });
+      const s3 = createMockSound({ id: "s3", name: "Hi-hat", sets: [] });
+      const layer = createMockLayer({
+        selection: { type: "set", setId: "set-1", defaultVolume: 100 },
+      });
+      expect(getSoundsForLayer(layer, [s1, s2, s3])).toEqual([s1]);
+    });
+
+    it("returns empty array when no sounds match the set", () => {
+      const s1 = createMockSound({ id: "s1", sets: [] });
+      const layer = createMockLayer({
+        selection: { type: "set", setId: "set-1", defaultVolume: 100 },
+      });
+      expect(getSoundsForLayer(layer, [s1])).toEqual([]);
     });
   });
 });

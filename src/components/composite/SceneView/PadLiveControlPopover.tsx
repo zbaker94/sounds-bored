@@ -40,7 +40,7 @@ import {
   skipLayerBack,
 } from "@/lib/audio/padPlayer";
 import { isLayerActive as checkLayerActive } from "@/lib/audio/audioState";
-import type { Pad } from "@/lib/schemas";
+import type { Pad, Sound, Layer } from "@/lib/schemas";
 import { toast } from "sonner";
 
 interface PadLiveControlPopoverProps {
@@ -52,6 +52,32 @@ interface PadLiveControlPopoverProps {
 }
 
 const STAGGER_DELAY = 0.04;
+
+/**
+ * Resolves the set of sounds that will play for a layer, based on its selection type.
+ * For "assigned": maps instances to library sounds in instance order.
+ * For "tag": returns all library sounds matching the tag criteria.
+ * For "set": returns all library sounds that belong to the set.
+ * Sounds with no matching library entry are excluded.
+ */
+export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
+  const sel = layer.selection;
+  switch (sel.type) {
+    case "assigned":
+      return sel.instances
+        .map((inst) => sounds.find((s) => s.id === inst.soundId))
+        .filter((s): s is Sound => s !== undefined);
+    case "tag":
+      return sounds.filter((s) => {
+        if (sel.matchMode === "all") {
+          return sel.tagIds.every((id) => s.tags.includes(id));
+        }
+        return sel.tagIds.some((id) => s.tags.includes(id));
+      });
+    case "set":
+      return sounds.filter((s) => s.sets.includes(sel.setId));
+  }
+}
 
 function LayerRow({
   pad,

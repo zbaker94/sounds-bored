@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added sound display to pad live control popover layers, showing which sounds are assigned to each layer based on its selection type (assigned, tag, or set)
 - Added a sound display row in each layer's live control panel showing the names of assigned sounds (e.g., "Kick · Snare · Hi-hat"), with a scrolling marquee when the text overflows
 - For sequential and shuffled layers, the display updates in real-time to highlight the currently-playing sound while the layer is active
 - Added a list icon button (hidden for single-sound layers) that opens a popover showing all sounds numbered, with the current sound bolded and missing sounds shown in italics
