@@ -50,6 +50,7 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   triggerLayer: vi.fn().mockResolvedValue(undefined),
   stopLayerWithRamp: vi.fn(),
   setLayerVolume: vi.fn(),
+  commitLayerVolume: vi.fn(),
   skipLayerForward: vi.fn(),
   skipLayerBack: vi.fn(),
 }));
