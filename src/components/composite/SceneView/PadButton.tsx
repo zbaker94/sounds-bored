@@ -394,6 +394,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                 <PadControlContent
                   pad={pad}
                   sceneId={sceneId}
+                  // No dismiss action on back face — user exits edit mode via the global toggle
                   onClose={() => {}}
                   onEditClick={onEditClick}
                 />

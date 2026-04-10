@@ -60,6 +60,10 @@ vi.mock("@dnd-kit/sortable", () => ({
   verticalListSortingStrategy: {},
 }));
 
+vi.mock("@/lib/audio/audioState", () => ({
+  isPadActive: vi.fn().mockReturnValue(false),
+}));
+
 function loadPadInStore(padOverrides = {}) {
   const layer = createMockLayer({ id: "layer-1" });
   const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer], ...padOverrides });
@@ -261,13 +265,14 @@ describe("multi-fade mode", () => {
   it("clicking pad in multi-fade mode calls toggleMultiFadePad", async () => {
     const pad = loadPadInStore();
     const mockToggle = vi.fn();
-    useMultiFadeStore.setState({
+    useMultiFadeStore.setState((s) => ({
+      ...s,
       active: true,
       originPadId: "some-other-pad",
       selectedPads: new Map(),
       reopenPadId: null,
       toggleMultiFadePad: mockToggle,
-    } as any);
+    }));
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.pointerDown(button, { button: 0, pointerId: 1 });
