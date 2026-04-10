@@ -208,7 +208,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (editMode || multiFadeActive) return;
     e.preventDefault();
-    setPopoverOpen(true);
+    setPopoverOpen((prev) => !prev);
   }, [editMode, multiFadeActive]);
 
   // Selection ring styling for multi-fade selected pads
