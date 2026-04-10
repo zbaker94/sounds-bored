@@ -12,11 +12,6 @@ export function MultiFadePill() {
   const canExecute = active && count > 0;
   const cancelMultiFade = useMultiFadeStore((s) => s.cancelMultiFade);
 
-  const execute = useCallback(() => {
-    if (!canExecute) return;
-    executeMultiFadeNow();
-  }, [canExecute]);
-
   const cancel = useCallback(() => {
     cancelMultiFade();
   }, [cancelMultiFade]);
@@ -37,7 +32,7 @@ export function MultiFadePill() {
         size="sm"
         variant="default"
         disabled={!canExecute}
-        onClick={() => execute()}
+        onClick={executeMultiFadeNow}
         className="gap-1.5"
       >
         <HugeiconsIcon icon={PlayIcon} size={14} />

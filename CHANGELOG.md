@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fade execution button now triggers more reliably when clicked
 - Executing a multi-pad fade now uses a single shared code path, reducing the chance of inconsistent behavior between keyboard shortcut and button-triggered fades.
 - Added mobile support for pad live controls — on small screens, controls now appear in a drawer instead of a popover
 - Multi-fade mode now automatically cancels when edit mode is enabled or a dialog/overlay is opened, preventing conflicting UI states
