@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed the multi-fade control pill layout so it renders centered within the scene view rather than using absolute positioning.
 - Right-clicking a pad now toggles the context menu closed if it's already open, instead of forcing it open again
 - Layer volume changes made in the live controls panel are now saved to the project and stay in sync with the pad configuration dialog
 - Layer volume sliders now correctly show each layer's configured volume as the starting value instead of always defaulting to 100%

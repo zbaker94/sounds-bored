@@ -18,8 +18,7 @@ export function MultiFadePill() {
 
   return (
     <motion.div
-      className="absolute bottom-4 left-1/2 z-30 flex items-center gap-3 rounded-full bg-black/80 px-4 py-2 text-white shadow-lg border border-white/20 backdrop-blur-sm"
-      style={{ x: "-50%" }}
+      className="flex items-center gap-3 rounded-full bg-black/80 px-4 py-2 text-white shadow-lg border border-white/20 backdrop-blur-sm"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}

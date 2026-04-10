@@ -236,7 +236,9 @@ export function SceneView() {
 
       <AnimatePresence>
         {multiFadeActive && (
-          <MultiFadePill key="multi-fade-pill" />
+          <div key="multi-fade-pill" className="flex justify-center shrink-0">
+            <MultiFadePill />
+          </div>
         )}
       </AnimatePresence>
 
