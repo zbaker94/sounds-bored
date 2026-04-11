@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad volume display now stays perfectly in sync while dragging the volume knob, eliminating any lag between your gesture and the visual feedback.
 - The fade duration slider on pads now updates smoothly while dragging, only saving the value when you release the mouse
 - Fixed fade duration display to stay in sync when the slider value changes
 - Added a per-pad fade duration slider to the live controls popover, letting you set how long a pad's fade lasts independently from the global setting. Per-pad fade duration is saved with the project and persists across sessions.
