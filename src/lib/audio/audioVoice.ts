@@ -88,6 +88,7 @@ export function wrapStreamingElement(
       audio.pause();
       audio.currentTime = 0;
       audio.onended = null;
+      voiceGain.disconnect();
       const cb = endedCb;
       endedCb = null;
       cb?.();
@@ -100,6 +101,7 @@ export function wrapStreamingElement(
         audio.pause();
         audio.currentTime = 0;
         audio.onended = null;
+        voiceGain.disconnect();
         const cb = endedCb;
         endedCb = null;
         cb?.();

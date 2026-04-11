@@ -12,6 +12,7 @@ function makeMockGain() {
       linearRampToValueAtTime: vi.fn(),
     },
     connect: vi.fn(),
+    disconnect: vi.fn(),
   };
 }
 

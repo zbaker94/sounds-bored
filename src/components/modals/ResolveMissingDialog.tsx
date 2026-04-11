@@ -6,6 +6,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
+import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { Sound } from "@/lib/schemas";
@@ -127,6 +128,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       });
 
       evictBuffer(sound.id);
+      evictStreamingElement(sound.id);
 
       const settings = useAppSettingsStore.getState().settings;
       if (settings) {
@@ -154,6 +156,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
         draft.sounds = draft.sounds.filter((s) => s.id !== sound.id);
       });
       evictBuffer(sound.id);
+      evictStreamingElement(sound.id);
       const latest = useLibraryStore.getState();
       await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
       toast.success(`"${sound.name}" removed from library`);

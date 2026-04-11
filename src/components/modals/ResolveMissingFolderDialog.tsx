@@ -8,6 +8,7 @@ import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
+import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { GlobalFolder, Sound } from "@/lib/schemas";
 import {
@@ -314,6 +315,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
           draft.sounds = draft.sounds.filter((s) => s.id !== duplicateSound.id);
         });
         evictBuffer(duplicateSound.id);
+        evictStreamingElement(duplicateSound.id);
       }
 
       updateLibrary((draft) => {
@@ -328,6 +330,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       });
 
       evictBuffer(currentSound.id);
+      evictStreamingElement(currentSound.id);
 
       const latest = useLibraryStore.getState();
       await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
@@ -352,6 +355,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
         draft.sounds = draft.sounds.filter((s) => s.id !== currentSound.id);
       });
       evictBuffer(currentSound.id);
+      evictStreamingElement(currentSound.id);
       const latest = useLibraryStore.getState();
       await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
       const newRemoved = removedCount + 1;

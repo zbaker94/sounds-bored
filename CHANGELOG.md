@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Large audio files (20 MB+) are now pre-buffered when you switch to a scene, eliminating first-trigger latency on streaming sounds
+- Retriggering a streaming sound now reuses the same buffered audio element instead of creating a new one, making rapid retriggers faster
+- Removing or relocating sounds now properly cleans up streaming audio elements alongside buffer cache entries, preventing stale data buildup
 - Pad volume display now stays perfectly in sync while dragging the volume knob, eliminating any lag between your gesture and the visual feedback.
 - The fade duration slider on pads now updates smoothly while dragging, only saving the value when you release the mouse
 - Fixed fade duration display to stay in sync when the slider value changes

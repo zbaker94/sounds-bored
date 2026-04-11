@@ -11,6 +11,97 @@ export const LARGE_FILE_THRESHOLD_BYTES = 20 * 1024 * 1024;
 /** Cache: sound.id → isLarge. Avoids a HEAD request on every trigger. */
 const sizeCache = new Map<string, boolean>();
 
+// ---------------------------------------------------------------------------
+// Streaming element cache
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal entry. `sourceNode` is null until the first trigger because
+ * MediaElementAudioSourceNode requires an AudioContext that may not exist yet
+ * when we pre-load (e.g. before first user interaction).
+ */
+interface StreamingElementEntry {
+  audio: HTMLAudioElement;
+  sourceNode: MediaElementAudioSourceNode | null;
+}
+
+const streamingElementCache = new Map<string, StreamingElementEntry>();
+
+/**
+ * Pre-warm a streaming element by starting audio buffering before the first
+ * trigger. Does NOT require an AudioContext — the HTMLAudioElement buffers
+ * independently of the Web Audio graph.
+ *
+ * Call this when pads are rendered so the file is already in memory by the
+ * time the user presses the pad, eliminating first-trigger latency.
+ * No-op if an entry already exists for this sound.
+ */
+export function preloadStreamingAudio(sound: Sound): void {
+  if (!sound.filePath || streamingElementCache.has(sound.id)) return;
+
+  const url = convertFileSrc(sound.filePath);
+  const audio = new Audio();
+  audio.crossOrigin = "anonymous";
+  audio.preload = "auto";
+  audio.src = url;
+  streamingElementCache.set(sound.id, { audio, sourceNode: null });
+}
+
+/**
+ * Returns a pre-buffered HTMLAudioElement + MediaElementAudioSourceNode for
+ * the given sound, creating and caching an entry on first call.
+ *
+ * If `preloadStreamingAudio` was called earlier, the audio is already buffered
+ * and playback starts with near-zero latency. The MediaElementAudioSourceNode
+ * is created lazily here (requires an AudioContext).
+ *
+ * The caller must:
+ *   1. Call sourceNode.disconnect() to remove stale audio-graph connections.
+ *   2. Reset audio.currentTime before calling play().
+ *   3. Set audio.loop as needed.
+ */
+export function getOrCreateStreamingElement(
+  sound: Sound,
+  ctx: AudioContext,
+): { audio: HTMLAudioElement; sourceNode: MediaElementAudioSourceNode } {
+  let entry = streamingElementCache.get(sound.id);
+
+  if (!entry) {
+    const url = convertFileSrc(sound.filePath!);
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.preload = "auto";
+    audio.src = url;
+    entry = { audio, sourceNode: null };
+    streamingElementCache.set(sound.id, entry);
+  }
+
+  if (!entry.sourceNode) {
+    entry.sourceNode = ctx.createMediaElementSource(entry.audio);
+  }
+
+  return { audio: entry.audio, sourceNode: entry.sourceNode };
+}
+
+/** Remove a single entry when a sound file is replaced on disk. */
+export function evictStreamingElement(soundId: string): void {
+  const entry = streamingElementCache.get(soundId);
+  if (entry) {
+    entry.audio.pause();
+    entry.audio.src = "";
+    streamingElementCache.delete(soundId);
+  }
+}
+
+/** Clear the entire streaming element cache (call on app reset / tests). */
+export function clearAllStreamingElements(): void {
+  for (const entry of streamingElementCache.values()) {
+    entry.audio.pause();
+    entry.audio.src = "";
+  }
+  streamingElementCache.clear();
+}
+
 /**
  * Returns true when the sound's compressed file is at or above the 20 MB
  * threshold, meaning it should be played via the streaming path.

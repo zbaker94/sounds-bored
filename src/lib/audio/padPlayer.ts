@@ -1,6 +1,6 @@
 import { ensureResumed, getAudioContext } from "./audioContext";
 import { loadBuffer, MissingFileError } from "./bufferCache";
-import { checkIsLargeFile } from "./streamingCache";
+import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
 import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
@@ -10,7 +10,6 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { checkMissingStatus } from "@/lib/library.reconcile";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Layer, Pad, Scene, Sound } from "@/lib/schemas";
 import { isFadeablePad } from "@/lib/padUtils";
 import { toast } from "sonner";
@@ -529,17 +528,16 @@ async function startLayerSound(
 
     if (await checkIsLargeFile(sound)) {
       // -- Streaming path (large files) ---
-      // HTMLAudioElement streams from disk; browser manages buffering.
-      // padProgressInfo not used — duration is available via audio.duration after
-      // loadedmetadata fires; getPadProgress reads it directly from the element.
-      const url = convertFileSrc(sound.filePath!);
-      audio = new Audio();
-      audio.crossOrigin = 'anonymous';
-      audio.src = url;
-      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode)) {
-        audio.loop = true;
-      }
-      const sourceNode = ctx.createMediaElementSource(audio);
+      // Reuse a cached HTMLAudioElement so the browser only buffers the file
+      // once. The first trigger has normal load latency; all subsequent triggers
+      // are near-instant because the element is already buffered.
+      // Disconnect stale audio-graph connections before re-routing through a
+      // fresh voiceGain, then reset position so playback starts from the top.
+      const { audio: cachedAudio, sourceNode } = getOrCreateStreamingElement(sound, ctx);
+      audio = cachedAudio;
+      sourceNode.disconnect();
+      audio.currentTime = 0;
+      audio.loop = (layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode);
       voice = wrapStreamingElement(audio, sourceNode, ctx, layerGain, voiceVolume);
       registerStreamingAudio(pad.id, layer.id, audio);
     } else {

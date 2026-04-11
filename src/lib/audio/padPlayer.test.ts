@@ -34,10 +34,33 @@ vi.mock("./bufferCache", () => ({
 }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+
+// Streaming element cache shared by the mock — simulates the real cache's
+// behavior so tests can verify reuse vs. fresh-element creation.
+const mockStreamingElements = new Map<string, { audio: any; sourceNode: any }>();
+
 vi.mock("./streamingCache", () => ({
   checkIsLargeFile: vi.fn().mockResolvedValue(false), // default: small file → buffer path
   evictSizeCache: vi.fn(),
   clearAllSizeCache: vi.fn(),
+  preloadStreamingAudio: vi.fn(),
+  getOrCreateStreamingElement: vi.fn().mockImplementation((sound: any, ctx: any) => {
+    if (mockStreamingElements.has(sound.id)) return mockStreamingElements.get(sound.id)!;
+    const audio = new (globalThis.Audio as any)();
+    audio.crossOrigin = "anonymous";
+    audio.src = `asset://localhost/${sound.filePath ?? ""}`;
+    const sourceNode = { ...ctx.createMediaElementSource(audio), disconnect: vi.fn() };
+    const entry = { audio, sourceNode };
+    mockStreamingElements.set(sound.id, entry);
+    return entry;
+  }),
+  evictStreamingElement: vi.fn().mockImplementation((soundId: string) => {
+    mockStreamingElements.delete(soundId);
+  }),
+  clearAllStreamingElements: vi.fn().mockImplementation(() => {
+    mockStreamingElements.clear();
+  }),
+  LARGE_FILE_THRESHOLD_BYTES: 20 * 1024 * 1024,
 }));
 vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => `asset://localhost/${path}`,
@@ -156,6 +179,7 @@ beforeEach(async () => {
   } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
   mockAudioInstances.length = 0;
+  mockStreamingElements.clear();
   (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mockClear();
   mockCtx.createMediaElementSource.mockClear();
   clearAllSizeCache();
@@ -662,7 +686,7 @@ describe("streaming path (large files)", () => {
     expect(isLayerActive(layer.id)).toBe(true);
   });
 
-  it("streaming retrigger restart: stops old audio and starts a new one", async () => {
+  it("streaming retrigger restart: reuses cached element — one createMediaElementSource, play called twice", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sounds = [createMockSound({ filePath: "ambient.wav" })];
     setSounds(sounds);
@@ -674,11 +698,13 @@ describe("streaming path (large files)", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
-    await triggerPad(pad); // first trigger
-    await triggerPad(pad); // restart
+    await triggerPad(pad); // first trigger — creates element + sourceNode
+    await triggerPad(pad); // restart — reuses cached element
 
-    // Two Audio instances created, two createMediaElementSource calls
-    expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(2);
+    // Only one Audio element and one createMediaElementSource call (element is reused)
+    expect(mockCtx.createMediaElementSource).toHaveBeenCalledTimes(1);
+    expect(mockAudioInstances).toHaveLength(1);
+    expect(mockAudioInstances[0].play).toHaveBeenCalledTimes(2);
   });
 
   it("streaming chains via onended for sequential arrangement", async () => {

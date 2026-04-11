@@ -10,6 +10,7 @@ import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
+import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import {
   Dialog,
   DialogContent,
@@ -259,7 +260,7 @@ export function SoundsPanel() {
     setIsBulkRemoving(true);
     try {
       const idsToRemove = new globalThis.Set(allMissingSounds.map((s) => s.id));
-      for (const id of idsToRemove) evictBuffer(id);
+      for (const id of idsToRemove) { evictBuffer(id); evictStreamingElement(id); }
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !idsToRemove.has(s.id));
       });
@@ -301,7 +302,7 @@ export function SoundsPanel() {
       const soundIdsToRemove = new globalThis.Set(
         sounds.filter((s) => s.folderId && folderIdsToRemove.has(s.folderId)).map((s) => s.id),
       );
-      for (const id of soundIdsToRemove) evictBuffer(id);
+      for (const id of soundIdsToRemove) { evictBuffer(id); evictStreamingElement(id); }
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !soundIdsToRemove.has(s.id));
       });
@@ -345,7 +346,7 @@ export function SoundsPanel() {
       // Update store and persist before touching disk — if persistence fails,
       // the user retains their files and can retry.
       const folderSoundIds = sounds.filter((s) => s.folderId === folderId).map((s) => s.id);
-      for (const id of folderSoundIds) evictBuffer(id);
+      for (const id of folderSoundIds) { evictBuffer(id); evictStreamingElement(id); }
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => s.folderId !== folderId);
       });
@@ -396,6 +397,7 @@ export function SoundsPanel() {
           }
         }
         evictBuffer(sound.id);
+        evictStreamingElement(sound.id);
       }
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !selectedSoundIds.has(s.id));

@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkIsLargeFile, evictSizeCache, clearAllSizeCache, LARGE_FILE_THRESHOLD_BYTES } from "./streamingCache";
+import {
+  checkIsLargeFile,
+  evictSizeCache,
+  clearAllSizeCache,
+  LARGE_FILE_THRESHOLD_BYTES,
+  preloadStreamingAudio,
+  getOrCreateStreamingElement,
+  evictStreamingElement,
+  clearAllStreamingElements,
+} from "./streamingCache";
 import { createMockSound } from "@/test/factories";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -8,6 +17,22 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+
+// ── Audio element mock for streaming element cache tests ──────────────────────
+
+vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any) {
+  this.src = "";
+  this.crossOrigin = "";
+  this.preload = "";
+  this.pause = vi.fn();
+  this.currentTime = 0;
+}));
+
+function makeMockCtx() {
+  return {
+    createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
+  };
+}
 
 function headResponse(contentLength: number | null) {
   return {
@@ -139,5 +164,142 @@ describe("evictSizeCache", () => {
     evictSizeCache(sound.id);
     await checkIsLargeFile(sound);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── Streaming element cache ───────────────────────────────────────────────────
+
+describe("preloadStreamingAudio", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAllStreamingElements();
+  });
+
+  it("creates an Audio element with preload=auto and sets src", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    preloadStreamingAudio(sound);
+    const audio = (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(audio.preload).toBe("auto");
+    expect(audio.src).toBe("asset://localhost/big.wav");
+  });
+
+  it("is a no-op if the sound has no filePath", () => {
+    const sound = createMockSound({ filePath: undefined });
+    preloadStreamingAudio(sound);
+    expect(globalThis.Audio).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op for the same sound called twice — only one Audio element", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    preloadStreamingAudio(sound);
+    preloadStreamingAudio(sound);
+    expect(globalThis.Audio).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getOrCreateStreamingElement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAllStreamingElements();
+  });
+
+  it("creates an Audio element and sourceNode on first call", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx = makeMockCtx();
+    const { audio, sourceNode } = getOrCreateStreamingElement(sound, ctx as any);
+    expect(audio).toBeDefined();
+    expect(sourceNode).toBeDefined();
+    expect(ctx.createMediaElementSource).toHaveBeenCalledOnce();
+  });
+
+  it("returns the cached element on subsequent calls — no new Audio or sourceNode", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx = makeMockCtx();
+    const first = getOrCreateStreamingElement(sound, ctx as any);
+    const second = getOrCreateStreamingElement(sound, ctx as any);
+    expect(first.audio).toBe(second.audio);
+    expect(first.sourceNode).toBe(second.sourceNode);
+    expect(ctx.createMediaElementSource).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses a pre-warmed element from preloadStreamingAudio — no extra Audio constructor call", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    preloadStreamingAudio(sound);
+    const audioBeforeTrigger = (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+    const ctx = makeMockCtx();
+    const { audio } = getOrCreateStreamingElement(sound, ctx as any);
+
+    expect(audio).toBe(audioBeforeTrigger);
+    expect(globalThis.Audio).toHaveBeenCalledTimes(1); // no extra Audio created
+    expect(ctx.createMediaElementSource).toHaveBeenCalledOnce(); // sourceNode created lazily
+  });
+
+  it("sets crossOrigin=anonymous and preload=auto on the Audio element", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx = makeMockCtx();
+    getOrCreateStreamingElement(sound, ctx as any);
+    const audio = (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+    expect(audio.crossOrigin).toBe("anonymous");
+    expect(audio.preload).toBe("auto");
+  });
+});
+
+describe("evictStreamingElement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAllStreamingElements();
+  });
+
+  it("causes getOrCreateStreamingElement to create a fresh element after eviction", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx = makeMockCtx();
+    const first = getOrCreateStreamingElement(sound, ctx as any);
+    evictStreamingElement(sound.id);
+    const second = getOrCreateStreamingElement(sound, ctx as any);
+    expect(first.audio).not.toBe(second.audio);
+    expect(ctx.createMediaElementSource).toHaveBeenCalledTimes(2);
+  });
+
+  it("pauses and clears src on the evicted audio element", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx = makeMockCtx();
+    const { audio } = getOrCreateStreamingElement(sound, ctx as any);
+    evictStreamingElement(sound.id);
+    expect(audio.pause).toHaveBeenCalledOnce();
+    expect(audio.src).toBe("");
+  });
+
+  it("is a no-op for an unknown sound ID", () => {
+    expect(() => evictStreamingElement("nonexistent-id")).not.toThrow();
+  });
+});
+
+describe("clearAllStreamingElements", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAllStreamingElements();
+  });
+
+  it("causes fresh elements to be created after clearing", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx = makeMockCtx();
+    const first = getOrCreateStreamingElement(sound, ctx as any);
+    clearAllStreamingElements();
+    const second = getOrCreateStreamingElement(sound, ctx as any);
+    expect(first.audio).not.toBe(second.audio);
+  });
+
+  it("pauses all cached audio elements and clears their src", () => {
+    const soundA = createMockSound({ filePath: "a.wav" });
+    const soundB = createMockSound({ filePath: "b.wav" });
+    const ctx = makeMockCtx();
+    const { audio: audioA } = getOrCreateStreamingElement(soundA, ctx as any);
+    const { audio: audioB } = getOrCreateStreamingElement(soundB, ctx as any);
+    clearAllStreamingElements();
+    expect(audioA.pause).toHaveBeenCalledOnce();
+    expect(audioB.pause).toHaveBeenCalledOnce();
+    expect(audioA.src).toBe("");
+    expect(audioB.src).toBe("");
   });
 });
