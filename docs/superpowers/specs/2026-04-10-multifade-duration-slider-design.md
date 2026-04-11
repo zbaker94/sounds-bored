@@ -56,8 +56,7 @@ Inside the existing multi-fade overlay block (`isMultiFadeSelected && multiFadeL
 - `globalFadeDurationMs` from `useAppSettingsStore((s) => s.settings?.globalFadeDurationMs)` — used to show a resolved default when `pad.fadeDurationMs` is unset
 - `pad.fadeDurationMs` is already available via the `pad` prop
 
-**Tooltip on label:**
-- Wrap the `"fade"` label in a `<Tooltip>` with content: `"Per-pad fade duration. Overrides the global setting."` so the user understands the override hierarchy.
+**Tooltip:** thumb only, via `tooltipLabel={(v) => \`${(v / 1000).toFixed(1)}s\`}`. No label tooltip.
 
 **No change** to the show/hide logic — the duration slider shares the same `isMultiFadeSelected && multiFadeLevels` gate as the volume slider.
 

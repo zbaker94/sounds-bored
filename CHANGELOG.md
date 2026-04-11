@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Updated fade duration slider tooltip to display on the slider thumb only, showing the current value in seconds (e.g. "1.5s") instead of a label explaining the override hierarchy.
 - Added internal design spec for a per-pad fade duration slider in multi-fade mode (no user-facing changes yet)
 - Right-click live controls popover on pads now opens at the cursor position instead of anchored to the full pad cell, so it no longer clips off-screen on tall grids
 - On mobile/small screens, right-clicking a pad now opens the live controls in a bottom drawer instead of a floating popover
