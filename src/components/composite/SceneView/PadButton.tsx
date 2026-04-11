@@ -7,6 +7,8 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useProjectStore } from "@/state/projectStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { setPadVolume } from "@/lib/audio/padPlayer";
 import { isPadActive } from "@/lib/audio/audioState";
@@ -139,6 +141,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
   const reopenPadId = useMultiFadeStore((s) => s.reopenPadId);
   const clearReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
+
+  const setPadFadeDuration = useProjectStore((s) => s.setPadFadeDuration);
+  const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs);
 
   const isDesktop = useIsMd();
 
@@ -421,6 +426,23 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                       <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
                         <span>{isPlaying ? "end" : "start"}</span>
                         <span>{isPlaying ? "start" : "end"}</span>
+                      </div>
+                      <Slider
+                        compact
+                        tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
+                        value={[pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000]}
+                        onValueChange={(v) => {
+                          setPadFadeDuration(sceneId, pad.id, v[0]);
+                        }}
+                        onPointerUp={() => {}}
+                        min={100}
+                        max={10000}
+                        step={100}
+                        className="mt-1.5 [&_[data-slot=slider-track]]:bg-white/20"
+                      />
+                      <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
+                        <span>fade</span>
+                        <span>{((pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000) / 1000).toFixed(1)}s</span>
                       </div>
                     </motion.div>
                   )}
