@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
 import { Slider } from "@/components/ui/slider";
 import type { Pad } from "@/lib/schemas";
@@ -13,11 +13,13 @@ import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
-import { PadLiveControlPopover } from "./PadLiveControlPopover";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { PadControlContent } from "./PadControlContent";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useIsMd } from "@/hooks/useBreakpoint";
 
 interface PadButtonProps {
   pad: Pad;
@@ -138,13 +140,27 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const reopenPadId = useMultiFadeStore((s) => s.reopenPadId);
   const clearReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
 
+  const isDesktop = useIsMd();
+
   // Popover (right-click live controls)
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   // Capture popover state at pointer-down so contextMenu handler can close it:
   // Radix fires onOpenChange(false) before the contextMenu event, so by the time
   // handleContextMenu runs, popoverOpen is already false — making a naive toggle reopen it.
   const popoverWasOpenRef = useRef(false);
+
+  // Virtual anchor: a 0×0 point at the cursor position when right-clicked.
+  // Using a point anchor (instead of the full pad cell) gives avoidCollisions room
+  // to flip: the anchor height was ~818px leaving only ~43px above and ~13px below,
+  // so Radix correctly concluded neither side fit. A 0×0 cursor anchor has ~Y px
+  // above and ~(viewportH - Y) px below, giving the flip logic what it needs.
+  const contextMenuXY = useRef({ x: 0, y: 0 });
+  const virtualAnchorRef = useRef<{ getBoundingClientRect: () => DOMRect }>({
+    getBoundingClientRect() {
+      const { x, y } = contextMenuXY.current;
+      return new DOMRect(x, y, 0, 0);
+    },
+  });
 
   // Close popover when edit mode or multi-fade mode activates
   useEffect(() => {
@@ -229,6 +245,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (editMode || multiFadeActive || isUnplayable) return;
+    if (!popoverWasOpenRef.current) {
+      contextMenuXY.current = { x: e.clientX, y: e.clientY };
+    }
     setPopoverOpen(popoverWasOpenRef.current ? false : true);
   }, [editMode, multiFadeActive, isUnplayable]);
 
@@ -248,7 +267,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
        *   Plain div so motion never overwrites the dnd-kit transform string.
        * - Inner motion.div: owns tilt rotation + whileTap. Its transform is separate
        *   from dnd-kit's translate, so both compose correctly.
+       *
+       * PopoverAnchor uses virtualRef pointing to a 0×0 DOMRect at the cursor position
+       * recorded on right-click. This gives avoidCollisions real room to flip: wrapping
+       * the 818px-tall grid cell left only ~43px above and ~13px below, so Radix correctly
+       * chose "top" but still clipped. A point anchor has ~Y px above and ~(viewportH-Y)
+       * below, letting flip work correctly.
        */}
+      <Popover open={isDesktop && popoverOpen} onOpenChange={setPopoverOpen}>
+      <PopoverAnchor virtualRef={virtualAnchorRef as React.RefObject<{ getBoundingClientRect: () => DOMRect }>} />
       <div
         ref={setNodeRef}
         style={dndStyle}
@@ -300,7 +327,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
             {/* Front face — normal pad */}
             <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={editMode || undefined}>
               <button
-                ref={buttonRef}
                 aria-label={pad.name}
                 {...(multiFadeActive ? multiFadeHandlers : gestureHandlers)}
                 disabled={isUnplayable && !multiFadeActive}
@@ -437,15 +463,29 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
           </motion.div>
         </motion.div>
       </div>
+      <PopoverContent side="bottom" sideOffset={10} showArrow>
+        <PadControlContent
+          pad={pad}
+          sceneId={sceneId}
+          onClose={() => setPopoverOpen(false)}
+          onEditClick={onEditClick}
+        />
+      </PopoverContent>
+      </Popover>
 
-      <PadLiveControlPopover
-        pad={pad}
-        sceneId={sceneId}
-        open={popoverOpen}
-        onOpenChange={setPopoverOpen}
-        anchorRef={buttonRef}
-        onEditClick={onEditClick}
-      />
+      <Drawer open={!isDesktop && popoverOpen} onOpenChange={setPopoverOpen}>
+        <DrawerContent>
+          <DrawerTitle className="sr-only">{pad.name}</DrawerTitle>
+          <div className="px-4 pb-4 pt-2">
+            <PadControlContent
+              pad={pad}
+              sceneId={sceneId}
+              onClose={() => setPopoverOpen(false)}
+              onEditClick={onEditClick}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
     </>
   );
 });

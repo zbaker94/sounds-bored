@@ -10,9 +10,21 @@ import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio/padPlayer";
 
-vi.mock("./PadLiveControlPopover", () => ({
-  PadLiveControlPopover: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="live-control-popover" /> : null,
+// Popover always renders its children (the anchor div) regardless of `open`.
+// PopoverContent renders null — on desktop the popover is not exercised in these tests.
+vi.mock("@/components/ui/popover", () => ({
+  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverAnchor: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverContent: () => null,
+}));
+
+// In the test env useIsMd() returns false (no viewport), so the right-click path goes
+// through the Drawer. Render a detectable sentinel so the existing assertions work.
+vi.mock("@/components/ui/drawer", () => ({
+  Drawer: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
+    open ? <div data-testid="live-control-popover">{children}</div> : null,
+  DrawerContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DrawerTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("./PadControlContent", () => ({

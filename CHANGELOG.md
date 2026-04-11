@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Right-click live controls popover on pads now opens at the cursor position instead of anchored to the full pad cell, so it no longer clips off-screen on tall grids
+- On mobile/small screens, right-clicking a pad now opens the live controls in a bottom drawer instead of a floating popover
 - Fixed buttons inside the pad control panel being unclickable when dragging pads in edit mode
 - Fixed an issue where entering multi-fade mode while in edit mode would immediately cancel the multi-fade control
 - Pad option popovers now correctly close when edit mode is activated
