@@ -668,5 +668,12 @@ describe("projectStore", () => {
       const pad = getState().project?.scenes[0].pads[0];
       expect(pad?.fadeDurationMs).toBeUndefined();
     });
+
+    it("should do nothing if sceneId does not exist", () => {
+      loadWithPad();
+      getState().setPadFadeDuration("nonexistent-scene", "pad-1", 2000);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.fadeDurationMs).toBeUndefined();
+    });
   });
 });

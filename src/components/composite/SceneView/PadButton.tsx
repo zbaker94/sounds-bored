@@ -145,6 +145,12 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const setPadFadeDuration = useProjectStore((s) => s.setPadFadeDuration);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs);
 
+  const resolvedFadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
+  const [displayDuration, setDisplayDuration] = useState(resolvedFadeDuration);
+  useEffect(() => {
+    setDisplayDuration(resolvedFadeDuration);
+  }, [resolvedFadeDuration]);
+
   const isDesktop = useIsMd();
 
   // Popover (right-click live controls)
@@ -430,11 +436,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                       <Slider
                         compact
                         tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
-                        value={[pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000]}
-                        onValueChange={(v) => {
-                          setPadFadeDuration(sceneId, pad.id, v[0]);
-                        }}
-                        onPointerUp={() => {}}
+                        value={[displayDuration]}
+                        onValueChange={(v) => setDisplayDuration(v[0])}
+                        onPointerUp={() => setPadFadeDuration(sceneId, pad.id, displayDuration)}
                         min={100}
                         max={10000}
                         step={100}
@@ -442,7 +446,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                       />
                       <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
                         <span>fade</span>
-                        <span>{((pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000) / 1000).toFixed(1)}s</span>
+                        <span>{(displayDuration / 1000).toFixed(1)}s</span>
                       </div>
                     </motion.div>
                   )}

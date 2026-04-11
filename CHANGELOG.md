@@ -1,12 +1,9 @@
 # Changelog
 
 ## Current Changes
-- Pads now have a per-pad fade duration slider in the live controls popover, letting you override the global fade setting on a pad-by-pad basis
-- Individual pads can now have a custom fade duration override, separate from the global fade setting.
-- Added a per-pad fade duration slider to the multi-fade mode overlay, letting you set how long a pad's fade lasts independently from the global setting
-- Per-pad fade duration is saved with the project and persists across sessions
-- Updated fade duration slider tooltip to display on the slider thumb only, showing the current value in seconds (e.g. "1.5s") instead of a label explaining the override hierarchy.
-- Added internal design spec for a per-pad fade duration slider in multi-fade mode (no user-facing changes yet)
+- The fade duration slider on pads now updates smoothly while dragging, only saving the value when you release the mouse
+- Fixed fade duration display to stay in sync when the slider value changes
+- Added a per-pad fade duration slider to the live controls popover, letting you set how long a pad's fade lasts independently from the global setting. Per-pad fade duration is saved with the project and persists across sessions.
 - Right-click live controls popover on pads now opens at the cursor position instead of anchored to the full pad cell, so it no longer clips off-screen on tall grids
 - On mobile/small screens, right-clicking a pad now opens the live controls in a bottom drawer instead of a floating popover
 - Fixed buttons inside the pad control panel being unclickable when dragging pads in edit mode
