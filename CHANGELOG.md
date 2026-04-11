@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Individual pads can now have a custom fade duration override, separate from the global fade setting.
 - Added a per-pad fade duration slider to the multi-fade mode overlay, letting you set how long a pad's fade lasts independently from the global setting
 - Per-pad fade duration is saved with the project and persists across sessions
 - Updated fade duration slider tooltip to display on the slider thumb only, showing the current value in seconds (e.g. "1.5s") instead of a label explaining the override hierarchy.
