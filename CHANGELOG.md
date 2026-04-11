@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.5.0
+
+This release introduces a comprehensive live pad control system — right-click any pad to start/stop playback, fade in/out with adjustable volume levels, control individual layers, and set per-pad fade durations, all without leaving the pad grid. It also adds multi-pad synchronized fades, a sound library search bar, pre-buffering for large audio files to eliminate first-trigger latency, and a wide range of visual improvements including real-time volume meters, responsive layout adaption for mobile, and more accurate playback indicators.
+
 - Large audio files (20 MB+) are now pre-buffered when you switch to a scene, eliminating first-trigger latency on streaming sounds
 - Retriggering a streaming sound now reuses the same buffered audio element instead of creating a new one, making rapid retriggers faster
 - Removing or relocating sounds now properly cleans up streaming audio elements alongside buffer cache entries, preventing stale data buildup
