@@ -582,6 +582,13 @@ async function startLayerSound(
       } else if (remaining.length > 0) {
         const [next, ...rest] = remaining;
         setLayerChain(layer.id, rest);
+        // Clear stale progress so the bar resets to 0 during the async buffer load
+        // rather than freezing at 1.0 (the clamped value of the just-ended sound).
+        clearLayerProgressInfo(layer.id);
+        clearPadProgressInfo(pad.id);
+        // Keep the tick alive during the async gap — voiceMap is temporarily empty
+        // after clearLayerVoice and before the next recordLayerVoice.
+        startAudioTick();
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
       } else if (liveMode === "loop" || liveMode === "hold") {
         // Chain exhausted naturally — restart using the current live arrangement,
@@ -592,6 +599,12 @@ async function startLayerSound(
         const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
         const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
         const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
+        // Clear stale progress before the async restart so the bar resets to 0 during
+        // the buffer load gap rather than clamping to 1.0.
+        clearLayerProgressInfo(layer.id);
+        clearPadProgressInfo(pad.id);
+        // Keep the tick alive during the async gap.
+        startAudioTick();
         if (isChained(liveArr)) {
           const newOrder = buildPlayOrder(liveArr, liveSounds);
           if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
@@ -616,6 +629,10 @@ async function startLayerSound(
     startAudioTick();
 
   } catch (err) {
+    // Clear stale progress info so a failed load doesn't leave the bar permanently
+    // frozen at 1.0 (the clamped value of the sound that just ended in a loop chain).
+    clearLayerProgressInfo(layer.id);
+    clearPadProgressInfo(pad.id);
     if (err instanceof MissingFileError) {
       const settings = useAppSettingsStore.getState().settings;
       if (settings) {

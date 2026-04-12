@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Fixed a bug where progress bars would freeze at 100% between sounds in sequential/looping pad chains instead of resetting to 0%
+
 ## v1.5.2
 
 Playback progress bars now display a separate indicator for each active layer, giving you clearer visual feedback when multiple sounds are playing on a pad. This release also fixes an unintentional multi-trigger bug when dragging pads and improves performance for large scenes by eliminating unnecessary re-renders on idle pads.
