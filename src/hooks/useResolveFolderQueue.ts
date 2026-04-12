@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback } from "react";
 import type React from "react";
-import type { GlobalFolder, Sound } from "@/lib/schemas";
+import type { GlobalFolder } from "@/lib/schemas";
 
 /**
- * Manages the "resolve missing" dialog queues for both sounds and folders.
+ * Manages the "resolve missing folder" dialog queue.
  *
  * Queue semantics:
  *  - queue[0] is the currently active item; an empty queue means the dialog is closed.
@@ -12,34 +12,16 @@ import type { GlobalFolder, Sound } from "@/lib/schemas";
  *  - On resolve+close: slice the head (continue chain).
  *  - On close without resolve: clear the queue (break chain).
  */
-export function useRemoveMissing(): {
-  soundDialogQueue: Sound[];
-  setSoundDialogQueue: React.Dispatch<React.SetStateAction<Sound[]>>;
+export function useResolveFolderQueue(): {
   folderDialogQueue: GlobalFolder[];
   setFolderDialogQueue: React.Dispatch<React.SetStateAction<GlobalFolder[]>>;
-  handleSoundDialogResolved: () => void;
-  handleSoundDialogClose: () => void;
   handleFolderDialogResolved: () => void;
   handleFolderDialogClose: () => void;
 } {
-  const [soundDialogQueue, setSoundDialogQueue] = useState<Sound[]>([]);
-  const [folderDialogQueue, setFolderDialogQueue] = useState<GlobalFolder[]>([]);
-  const soundWasResolved = useRef(false);
+  const [folderDialogQueue, setFolderDialogQueue] = useState<GlobalFolder[]>(
+    [],
+  );
   const folderWasResolved = useRef(false);
-
-  const handleSoundDialogResolved = useCallback(() => {
-    soundWasResolved.current = true;
-  }, []);
-
-  const handleSoundDialogClose = useCallback(() => {
-    const resolved = soundWasResolved.current;
-    soundWasResolved.current = false;
-    if (resolved) {
-      setSoundDialogQueue((q) => q.slice(1));
-    } else {
-      setSoundDialogQueue([]);
-    }
-  }, []);
 
   const handleFolderDialogResolved = useCallback(() => {
     folderWasResolved.current = true;
@@ -56,12 +38,8 @@ export function useRemoveMissing(): {
   }, []);
 
   return {
-    soundDialogQueue,
-    setSoundDialogQueue,
     folderDialogQueue,
     setFolderDialogQueue,
-    handleSoundDialogResolved,
-    handleSoundDialogClose,
     handleFolderDialogResolved,
     handleFolderDialogClose,
   };

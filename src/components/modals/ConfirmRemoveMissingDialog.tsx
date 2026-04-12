@@ -16,11 +16,11 @@ import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 
 /**
  * Renders the two "Remove All Missing" confirmation dialogs triggered by
- * the amber banners in FolderBrowser / SoundList. Self-contained: pulls
+ * the amber banners in FoldersPanel / SoundList. Self-contained: pulls
  * bulk-remove state/handlers from useBulkRemove() and dialog open/close
  * flags from useUiStore directly — no prop threading.
  */
-export function BulkActions() {
+export function ConfirmRemoveMissingDialog() {
   const sounds = useLibraryStore((s) => s.sounds);
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);

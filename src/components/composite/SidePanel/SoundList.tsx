@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { remove } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -8,18 +8,9 @@ import {
   PlayIcon,
   StopIcon,
   Tag01Icon,
-  LockIcon,
   Alert02Icon,
   Delete02Icon,
 } from "@hugeicons/core-free-icons";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Item,
   ItemActions,
@@ -42,7 +33,7 @@ import { checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
-import { useRemoveMissing } from "@/hooks/useRemoveMissing";
+import { useResolveSoundQueue } from "@/hooks/useResolveSoundQueue";
 import { useDownloadStore } from "@/state/downloadStore";
 import { useDownloadEventListener } from "@/lib/ytdlp.queries";
 import { DownloadItem } from "@/components/composite/DownloadManager/DownloadItem";
@@ -51,57 +42,12 @@ import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
 import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
-import type { Tag } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
+import { SoundListItemTags } from "./SoundListItemTags";
+import { ConfirmDeleteSoundsDialog } from "./ConfirmDeleteSoundsDialog";
 
 const panelClass =
   "backdrop-blur-sm hover:backdrop-blur-lg bg-black/50 rounded-lg";
-
-interface SoundListItemTagsProps {
-  soundTagIds: string[];
-  allTags: Tag[];
-}
-
-const SoundListItemTags = memo(function SoundListItemTags({
-  soundTagIds,
-  allTags,
-}: SoundListItemTagsProps) {
-  const soundTags = useMemo(
-    () => allTags.filter((t) => soundTagIds.includes(t.id)),
-    [allTags, soundTagIds],
-  );
-  const systemTags = useMemo(
-    () => soundTags.filter((t) => t.isSystem),
-    [soundTags],
-  );
-  const userTags = useMemo(
-    () => soundTags.filter((t) => !t.isSystem),
-    [soundTags],
-  );
-  if (soundTagIds.length === 0) return null;
-  if (soundTags.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1 mt-0.5">
-      {systemTags.map((tag) => (
-        <span
-          key={tag.id}
-          className="inline-flex items-center gap-0.5 rounded-full bg-white/10 text-white/50 border border-white/20 drop-shadow-[0_2px_0px_rgba(255,255,255,0.05)] px-1.5 py-0 text-[10px] leading-4"
-        >
-          <HugeiconsIcon icon={LockIcon} size={8} />
-          {tag.name}
-        </span>
-      ))}
-      {userTags.map((tag) => (
-        <span
-          key={tag.id}
-          className="inline-flex items-center rounded-full bg-primary text-primary-foreground border border-primary-accent drop-shadow-[0_2px_0px_var(--color-primary-accent)] px-1.5 py-0 text-[10px] leading-4"
-        >
-          {tag.name}
-        </span>
-      ))}
-    </div>
-  );
-});
 
 interface SoundListProps {
   selectedId: string | null;
@@ -139,7 +85,7 @@ export function SoundList({
     setSoundDialogQueue,
     handleSoundDialogResolved,
     handleSoundDialogClose,
-  } = useRemoveMissing();
+  } = useResolveSoundQueue();
 
   const downloadJobs = useDownloadStore((s) => s.jobs);
   const downloadFolderId = settings?.downloadFolderId;
@@ -472,57 +418,14 @@ export function SoundList({
         onResolved={handleSoundDialogResolved}
         onClose={handleSoundDialogClose}
       />
-      <Dialog
+      <ConfirmDeleteSoundsDialog
         open={confirmDeleteSoundsFromDiskOpen}
         onOpenChange={setConfirmDeleteSoundsFromDiskOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Sounds from Disk</DialogTitle>
-            <DialogDescription>
-              This will permanently delete{" "}
-              <strong>{selectedSoundIds.size}</strong> sound
-              {selectedSoundIds.size > 1 ? " files" : " file"} from disk and
-              remove them from your library. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {affectedPadsForSoundsDelete.length > 0 && (
-            <div className="text-sm space-y-1">
-              <p className="font-medium text-amber-400">
-                Affects this project:
-              </p>
-              <ul className="space-y-0.5 text-muted-foreground">
-                {affectedPadsForSoundsDelete.map((ap, i) => (
-                  <li key={i}>
-                    <span className="text-foreground">"{ap.padName}"</span> (
-                    {ap.sceneName}) — Layer
-                    {ap.layerIndices.length > 1 ? "s" : ""}{" "}
-                    {ap.layerIndices.join(", ")}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDeleteSoundsFromDiskOpen(false)}
-              disabled={isDeletingSounds}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteSoundsFromDisk}
-              disabled={isDeletingSounds}
-            >
-              {isDeletingSounds
-                ? "Deleting..."
-                : `Delete ${selectedSoundIds.size} Sound${selectedSoundIds.size > 1 ? "s" : ""} from Disk`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        soundCount={selectedSoundIds.size}
+        affectedPads={affectedPadsForSoundsDelete}
+        isDeleting={isDeletingSounds}
+        onConfirm={handleDeleteSoundsFromDisk}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
@@ -10,7 +10,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettings } from "@/lib/appSettings.queries";
 import { useImportSounds } from "@/hooks/useImportSounds";
-import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
@@ -18,7 +17,7 @@ import { AddTagsDialog } from "./AddTagsDialog";
 import { DownloadDialog } from "@/components/modals/DownloadDialog";
 import { FolderBrowser } from "./FolderBrowser";
 import { SoundList } from "./SoundList";
-import { BulkActions } from "./BulkActions";
+import { ConfirmRemoveMissingDialog } from "@/components/modals/ConfirmRemoveMissingDialog";
 import guyWithTorch from "@/assets/guywithtorch.gif";
 
 export function SoundsPanel() {
@@ -41,15 +40,13 @@ export function SoundsPanel() {
   const [addTagsOpen, setAddTagsOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
-  const { reconcile } = useReconcileLibrary();
-
-  useEffect(() => {
-    reconcile();
-  }, []);
-
   useEffect(() => { setSelectedSoundIds(new globalThis.Set()); }, [selectedId]);
 
-  async function handleDropImport(paths: string[]) {
+  // handleDropImport only reads importSoundsRef.current (a ref, always fresh)
+  // and setIsImporting (a stable setState setter), so the empty dep array on
+  // the onDragDropEvent effect below is safe. useCallback with [] deps makes
+  // the stable-identity contract explicit.
+  const handleDropImport = useCallback(async (paths: string[]) => {
     setIsImporting(true);
     try {
       const count = await importSoundsRef.current(paths);
@@ -57,7 +54,7 @@ export function SoundsPanel() {
     } finally {
       setIsImporting(false);
     }
-  }
+  }, []);
 
   async function handleImportSounds() {
     if (!settings) return;
@@ -76,6 +73,8 @@ export function SoundsPanel() {
     }
   }
 
+  // handleDropImport is stable (useCallback with []), so the empty dep array
+  // is safe and registers the Tauri listener exactly once per mount.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -89,6 +88,7 @@ export function SoundsPanel() {
       })
       .then((fn) => { unlisten = fn; });
     return () => unlisten?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedSoundIdsArray = useMemo(() => [...selectedSoundIds], [selectedSoundIds]);
@@ -168,7 +168,7 @@ export function SoundsPanel() {
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
       <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={selectedSoundIdsArray} />
       <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={selectedSoundIdsArray} />
-      <BulkActions />
+      <ConfirmRemoveMissingDialog />
     </div>
   );
 }
