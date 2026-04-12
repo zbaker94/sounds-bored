@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Fixed an issue where dragging on a pad could trigger it to play multiple times unintentionally
+
 ## v1.5.0
 
 This release introduces a comprehensive live pad control system — right-click any pad to start/stop playback, fade in/out with adjustable volume levels, control individual layers, and set per-pad fade durations, all without leaving the pad grid. It also adds multi-pad synchronized fades, a sound library search bar, pre-buffering for large audio files to eliminate first-trigger latency, and a wide range of visual improvements including real-time volume meters, responsive layout adaption for mobile, and more accurate playback indicators.

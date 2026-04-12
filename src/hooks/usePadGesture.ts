@@ -25,6 +25,7 @@ interface GestureState {
   startVolume: number;
   currentVolume: number;
   cancelledFadeAtStart: boolean;
+  hasTriggeredDuringDrag: boolean;
 }
 
 export function usePadGesture(pad: Pad, now = Date.now) {
@@ -47,6 +48,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     startVolume: 1.0,
     currentVolume: 1.0,
     cancelledFadeAtStart: false,
+    hasTriggeredDuringDrag: false,
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -149,6 +151,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
           triggerPad(pad, 0).catch(console.error);
           justTriggered = true;
+          s.hasTriggeredDuringDrag = true;
         }
       }
 
@@ -157,8 +160,9 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         const newVolume = Math.max(0, Math.min(1, s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX));
         s.currentVolume = newVolume;
 
-        if (!justTriggered && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
+        if (!justTriggered && !s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
           triggerPad(pad, 0).catch(console.error);
+          s.hasTriggeredDuringDrag = true;
         }
 
         setPadVolume(pad.id, newVolume);
@@ -175,6 +179,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       }
       s.phase = "idle";
       s.cancelledFadeAtStart = false;
+      s.hasTriggeredDuringDrag = false;
     }
 
     function onPointerUp(_e: React.PointerEvent<HTMLButtonElement>) {
