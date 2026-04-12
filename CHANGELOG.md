@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.5.2
+
+Playback progress bars now display a separate indicator for each active layer, giving you clearer visual feedback when multiple sounds are playing on a pad. This release also fixes an unintentional multi-trigger bug when dragging pads and improves performance for large scenes by eliminating unnecessary re-renders on idle pads.
+
 - Playback progress bars now show a separate bar for each active layer on a pad, split vertically, instead of a single combined bar
 - Non-playing pads no longer re-render on every audio tick, improving performance for large scenes
 - Fixed an issue where dragging on a pad could trigger it to play multiple times unintentionally
