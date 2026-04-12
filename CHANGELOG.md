@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Playback progress bars now show a separate bar for each active layer on a pad, split vertically, instead of a single combined bar
+- Non-playing pads no longer re-render on every audio tick, improving performance for large scenes
 - Fixed an issue where dragging on a pad could trigger it to play multiple times unintentionally
 
 ## v1.5.0

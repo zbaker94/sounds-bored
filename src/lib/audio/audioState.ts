@@ -42,6 +42,7 @@
  * voiceMap           | pad ID     | AudioVoice[]                              | Active voices per pad (UI + stop tracking)      | clearAllVoices(), stopAllVoices()
  * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
  * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
+ * layerProgressInfo  | layer ID   | { startedAt, duration, isLooping }        | Per-layer progress info for per-layer bars      | clearLayerProgressInfo(), stopAllPads()
  * padStreamingAudio  | pad ID     | Map<layerId, Set<HTMLAudioElement>>        | Active streaming elements for progress/cleanup  | clearLayerStreamingAudio(), stopAllPads()
  * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
  * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
@@ -73,6 +74,9 @@ const layerGainMap = new Map<string, GainNode>();
 
 /** Tracks the longest-duration voice per pad for playback progress display (buffer path). */
 const padProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
+
+/** Tracks per-layer progress info for buffer path voices. One entry per active layer. */
+const layerProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
 
 /**
  * Tracks all active streaming elements per pad per layer for progress display and cleanup.
@@ -215,6 +219,49 @@ export function computeAllPadProgress(): Record<string, number> {
     const progress = getPadProgress(padId);
     if (progress !== null) result[padId] = progress;
   }
+  return result;
+}
+
+/**
+ * Compute layerProgress for all active layers in one pass.
+ * Returns a Record<layerId, progress 0–1>.
+ * Buffer layers are tracked via layerProgressInfo; streaming layers via padStreamingAudio.
+ */
+export function computeAllLayerProgress(): Record<string, number> {
+  const result: Record<string, number> = {};
+
+  // Buffer layers — tracked in layerProgressInfo
+  if (layerProgressInfo.size > 0) {
+    const ctx = getAudioContext();
+    for (const [layerId, info] of layerProgressInfo) {
+      const elapsed = ctx.currentTime - info.startedAt;
+      if (info.isLooping && info.duration > 0) {
+        result[layerId] = (elapsed % info.duration) / info.duration;
+      } else {
+        result[layerId] = Math.min(1, Math.max(0, elapsed / info.duration));
+      }
+    }
+  }
+
+  // Streaming layers — tracked in padStreamingAudio (pad -> layer -> audio set)
+  for (const [, layerMap] of padStreamingAudio) {
+    for (const [layerId, audioSet] of layerMap) {
+      if (layerId in result) continue; // already from buffer path
+      let best: HTMLAudioElement | null = null;
+      for (const audio of audioSet) {
+        if (!best || (isFinite(audio.duration) && audio.duration > (best.duration || 0))) {
+          best = audio;
+        }
+      }
+      if (!best) {
+        result[layerId] = 0;
+      } else {
+        const d = best.duration;
+        result[layerId] = d > 0 && isFinite(d) ? Math.min(1, Math.max(0, best.currentTime / d)) : 0;
+      }
+    }
+  }
+
   return result;
 }
 
@@ -376,6 +423,22 @@ export function clearPadProgressInfo(padId: string): void {
 /** Clear all pad progress info. */
 export function clearAllPadProgressInfo(): void {
   padProgressInfo.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Layer progress tracking (per-layer progress bars, buffer path only)
+// ---------------------------------------------------------------------------
+
+export function setLayerProgressInfo(layerId: string, info: { startedAt: number; duration: number; isLooping: boolean }): void {
+  layerProgressInfo.set(layerId, info);
+}
+
+export function clearLayerProgressInfo(layerId: string): void {
+  layerProgressInfo.delete(layerId);
+}
+
+export function clearAllLayerProgressInfo(): void {
+  layerProgressInfo.clear();
 }
 
 // ---------------------------------------------------------------------------

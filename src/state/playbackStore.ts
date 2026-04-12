@@ -12,6 +12,7 @@ interface AudioTickSnapshot {
   padVolumes?: Record<string, number>;
   layerVolumes?: Record<string, number>;
   padProgress?: Record<string, number>;
+  layerProgress?: Record<string, number>;
   activeLayerIds?: Set<string>;
 }
 
@@ -46,6 +47,9 @@ interface PlaybackState {
   /** Per-pad playback progress (0–1). Entry exists for playing pads with progress info. */
   padProgress: Record<string, number>;
 
+  /** Per-layer playback progress (0–1). Entry exists for each active layer. */
+  layerProgress: Record<string, number>;
+
   /** Set of layer IDs currently playing (have active voices). Replaces per-component RAF polling. */
   activeLayerIds: Set<string>;
 
@@ -60,6 +64,7 @@ export const initialPlaybackState = {
   get padVolumes() { return {} as Record<string, number>; },
   get layerVolumes() { return {} as Record<string, number>; },
   get padProgress() { return {} as Record<string, number>; },
+  get layerProgress() { return {} as Record<string, number>; },
   get activeLayerIds() { return new Set<string>(); },
   isPreviewPlaying: false,
 };
@@ -94,6 +99,7 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
   padVolumes: {},
   layerVolumes: {},
   padProgress: {},
+  layerProgress: {},
   activeLayerIds: new Set<string>(),
 
   updateLayerVolume: (layerId, volume) =>
@@ -104,6 +110,7 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
       ...(snapshot.padVolumes !== undefined ? { padVolumes: snapshot.padVolumes } : {}),
       ...(snapshot.layerVolumes !== undefined ? { layerVolumes: snapshot.layerVolumes } : {}),
       ...(snapshot.padProgress !== undefined ? { padProgress: snapshot.padProgress } : {}),
+      ...(snapshot.layerProgress !== undefined ? { layerProgress: snapshot.layerProgress } : {}),
       ...(snapshot.activeLayerIds !== undefined ? { activeLayerIds: snapshot.activeLayerIds } : {}),
     })),
 }));

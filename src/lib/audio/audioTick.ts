@@ -24,6 +24,7 @@ import {
   forEachActiveLayerGain,
   getActiveLayerIdSet,
   computeAllPadProgress,
+  computeAllLayerProgress,
 } from "./audioState";
 
 const VOLUME_EPSILON = 0.001;
@@ -65,6 +66,9 @@ function tick(): void {
   // --- Compute padProgress (always emit for playing pads) ---
   const nextPadProgress = computeAllPadProgress();
 
+  // --- Compute layerProgress (always emit for active layers) ---
+  const nextLayerProgress = computeAllLayerProgress();
+
   // --- Compute activeLayerIds (always emit) ---
   const nextActiveLayerIds = getActiveLayerIdSet();
 
@@ -79,6 +83,7 @@ function tick(): void {
     ...(padVolumesChanged ? { padVolumes: nextPadVolumes } : {}),
     ...(layerVolumesChanged ? { layerVolumes: nextLayerVolumes } : {}),
     padProgress: nextPadProgress,
+    layerProgress: nextLayerProgress,
     activeLayerIds: nextActiveLayerIds,
   });
 
@@ -107,6 +112,7 @@ function _clearAllTickFields(): void {
     padVolumes: {},
     layerVolumes: {},
     padProgress: {},
+    layerProgress: {},
     activeLayerIds: new Set(),
   });
 }

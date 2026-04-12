@@ -11,6 +11,7 @@ vi.mock("./audioState", async (importOriginal) => {
     forEachActiveLayerGain: vi.fn(),
     getActiveLayerIdSet: vi.fn().mockReturnValue(new Set()),
     computeAllPadProgress: vi.fn().mockReturnValue({}),
+    computeAllLayerProgress: vi.fn().mockReturnValue({}),
   };
 });
 
@@ -20,6 +21,7 @@ import {
   forEachActiveLayerGain,
   getActiveLayerIdSet,
   computeAllPadProgress,
+  computeAllLayerProgress,
 } from "./audioState";
 
 describe("audioTick", () => {
@@ -30,6 +32,7 @@ describe("audioTick", () => {
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
     vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set());
     vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
   });
 
   afterEach(() => {
@@ -111,6 +114,7 @@ describe("audioTick", () => {
   it("only emits padVolumes entries for gains below 0.999", () => {
     vi.mocked(getActivePadCount).mockReturnValue(2);
     vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
     vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set());
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
 

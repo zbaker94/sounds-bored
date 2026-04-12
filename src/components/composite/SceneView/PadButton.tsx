@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
 import { Slider } from "@/components/ui/slider";
 import type { Pad } from "@/lib/schemas";
@@ -32,7 +33,25 @@ interface PadButtonProps {
 
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
-  const progress = usePlaybackStore((s) => s.padProgress[pad.id] ?? 0);
+
+  // useShallow so these only cause re-renders when their specific values change, not every tick.
+  // activePadLayers: stable array reference while the same layers are active — only changes on
+  //   layer start/stop, not every RAF frame.
+  // layerProgressForPad: only re-renders THIS pad when ITS layer progress changes. Non-playing
+  //   pads return {} (stable via shallow equality) and never re-render on audio ticks.
+  const activePadLayers = usePlaybackStore(
+    useShallow((s) => pad.layers.filter((l) => s.activeLayerIds.has(l.id)))
+  );
+  const layerProgressForPad = usePlaybackStore(
+    useShallow((s) => {
+      const result: Record<string, number> = {};
+      for (const l of pad.layers) {
+        const p = s.layerProgress[l.id];
+        if (p !== undefined) result[l.id] = p;
+      }
+      return result;
+    })
+  );
   const editMode = useUiStore((s) => s.editMode);
   const toggleEditMode = useUiStore((s) => s.toggleEditMode);
   const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
@@ -376,12 +395,21 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
                   />
                 )}
-                {/* Playback progress */}
-                {isPlaying && (
-                  <div
-                    className="absolute top-0 left-0 bottom-0 pointer-events-none bg-white/20"
-                    style={{ width: `${progress * 100}%` }}
-                  />
+                {/* Playback progress — one bar per active layer, split vertically */}
+                {isPlaying && activePadLayers.length > 0 && (
+                  <div className="absolute inset-0 pointer-events-none flex flex-col">
+                    {activePadLayers.map((layer) => (
+                      <div
+                        key={layer.id}
+                        className="relative overflow-hidden flex-1"
+                      >
+                        <div
+                          className="absolute top-0 left-0 bottom-0 bg-white/20 border border-white rounded-r"
+                          style={{ width: `${(layerProgressForPad[layer.id] ?? 0) * 100}%` }}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 )}
                 {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
                 <div className="relative z-10 flex flex-col items-center gap-0.5">

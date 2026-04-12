@@ -32,6 +32,9 @@ import {
   getPadProgressInfo,
   clearPadProgressInfo,
   clearAllPadProgressInfo,
+  setLayerProgressInfo,
+  clearLayerProgressInfo,
+  clearAllLayerProgressInfo,
   isLayerPending,
   setLayerPending,
   clearLayerPending,
@@ -453,6 +456,7 @@ export function stopAllPads(): void {
   setTimeout(() => {
     clearAllStreamingAudio();
     clearAllPadProgressInfo();
+    clearAllLayerProgressInfo();
     clearAllLayerGains();
     clearAllPadGains();
     stopAllVoices();
@@ -557,6 +561,8 @@ async function startLayerSound(
       if (isChained(layer.arrangement) || !existing || buffer.duration > existing.duration) {
         setPadProgressInfo(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
       }
+      // Per-layer progress always tracks the most recent sound for this layer.
+      setLayerProgressInfo(layer.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
     }
 
     voice.setOnEnded(() => {
@@ -732,6 +738,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
           // buffer loads. Without this, stale padProgressInfo keeps advancing
           // during the async gap and the bar shows the old sound's position.
           clearPadProgressInfo(pad.id);
+          clearLayerProgressInfo(layer.id);
 
           if (layer.cycleMode && isChained(layer.arrangement)) {
             // Cycle mode + next: stop current sound, advance cycle cursor, play next.
@@ -763,6 +770,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
       clearPadProgressInfo(pad.id);
       progressCleared = true;
     }
+    clearLayerProgressInfo(layer.id);
     setLayerPending(layer.id);
     try {
       const playOrder = buildPlayOrder(layer.arrangement, resolved);
@@ -885,6 +893,7 @@ export async function triggerLayer(pad: Pad, layer: Layer): Promise<void> {
         clearLayerStreamingAudio(pad.id, layer.id);
         stopLayerVoices(pad.id, layer.id);
         clearPadProgressInfo(pad.id);
+        clearLayerProgressInfo(layer.id);
 
         if (layer.cycleMode && isChained(layer.arrangement)) {
           // Falls through to start-playback below
@@ -910,6 +919,7 @@ export async function triggerLayer(pad: Pad, layer: Layer): Promise<void> {
 
   // -- Start playback ---
   clearPadProgressInfo(pad.id);
+  clearLayerProgressInfo(layer.id);
   setLayerPending(layer.id);
   try {
     const playOrder = buildPlayOrder(layer.arrangement, resolved);
