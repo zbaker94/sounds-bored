@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- The sound library panel has been refactored into focused sub-components (`FolderBrowser`, `SoundList`, `BulkActions`), improving maintainability without changing visible behavior.
+- "Remove All Missing Sounds" and "Remove All Missing Folders" confirmation dialogs are now coordinated through a shared UI store, so any component in the panel can trigger them without prop-threading.
+- Added folder management logic (`useAddFolder`) and bulk-remove logic (`useBulkRemove`) as standalone hooks with full test coverage.
+- Missing-item resolution dialog queues (review-one-by-one flow) extracted into a dedicated `useRemoveMissing` hook and tested independently.
 - No user-facing changes in this release.
 - Pad icons are now validated to ensure they use a proper identifier format (alphanumeric, starting with a letter, max 64 characters)
 - Fixed a bug where the pad icon setting was lost when saving pad configuration changes

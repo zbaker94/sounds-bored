@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SoundsPanel } from "./SoundsPanel";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import {
   createMockSound,
   createMockGlobalFolder,
@@ -40,6 +41,20 @@ vi.mock("@/lib/library.reconcile", () => ({
   reconcileGlobalLibrary: vi.fn(() =>
     Promise.resolve({ sounds: [], changed: false })
   ),
+  checkMissingStatus: vi.fn(() =>
+    Promise.resolve({
+      missingSoundIds: new globalThis.Set<string>(),
+      missingFolderIds: new globalThis.Set<string>(),
+    })
+  ),
+}));
+
+vi.mock("@/lib/audio/bufferCache", () => ({
+  evictBuffer: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/streamingCache", () => ({
+  evictStreamingElement: vi.fn(),
 }));
 
 const mockMutateAsync = vi.fn(() => Promise.resolve());
@@ -92,6 +107,7 @@ function renderPanel(queryClient?: QueryClient) {
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useProjectStore.setState({ ...initialProjectState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState });
   vi.mocked(useAppSettings).mockReturnValue({
     data: createMockAppSettings(),
     isLoading: false,
