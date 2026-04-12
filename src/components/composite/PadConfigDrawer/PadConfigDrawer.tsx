@@ -130,6 +130,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
       layers: data.layers.map(toLayer),
       muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
       fadeDurationMs: data.fadeDurationMs,
+      icon: initialConfig?.icon,
     };
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);
