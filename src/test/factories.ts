@@ -174,6 +174,7 @@ export function createMockPad(overrides?: Partial<Pad>): Pad {
     name: "Test Pad",
     layers: [],
     muteTargetPadIds: [],
+    fadeDurationMs: undefined,
     ...overrides,
   };
 }
