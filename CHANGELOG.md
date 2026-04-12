@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release.
 - Pad icons are now validated to ensure they use a proper identifier format (alphanumeric, starting with a letter, max 64 characters)
 - Fixed a bug where the pad icon setting was lost when saving pad configuration changes
 - Fixed a bug where progress bars would freeze at 100% between sounds in sequential/looping pad chains instead of resetting to 0%
