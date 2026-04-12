@@ -173,7 +173,7 @@ export const PadSchema = z.object({
   muteTargetPadIds: z.array(z.string()),
   muteGroupId: z.string().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  icon: z.string().optional(),
+  icon: z.string().min(1).max(64).regex(/^[A-Za-z][A-Za-z0-9]*$/, { message: "icon must be an alphanumeric identifier starting with a letter" }).optional(),
   fadeDurationMs: z.number().min(100).max(10000).optional(),
 });
 

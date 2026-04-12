@@ -811,6 +811,65 @@ describe("PadSchema — color field round-trip via ProjectSchema", () => {
   });
 });
 
+describe("PadSchema — icon field", () => {
+  const basePad = {
+    id: "pad-1",
+    name: "Kick",
+    layers: [],
+    muteTargetPadIds: [],
+  };
+
+  it("accepts a pad with no icon", () => {
+    const result = PadSchema.safeParse(basePad);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a PascalCase icon identifier", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "Loading03Icon" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts an icon identifier starting with uppercase", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "Cancel01Icon" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an empty string icon", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a whitespace-only icon", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an icon starting with a digit", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "3dIcon" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an icon with spaces", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "some icon" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an icon exceeding 64 characters", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: "A".repeat(65) });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects null icon", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: null });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a non-string icon", () => {
+    const result = PadSchema.safeParse({ ...basePad, icon: 42 });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("TagSchema", () => {
   it("accepts a valid tag", () => {
     const result = TagSchema.safeParse({ id: "t1", name: "drums" });
