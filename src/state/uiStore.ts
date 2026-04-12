@@ -22,6 +22,8 @@ export const OVERLAY_ID = {
 interface UiState {
   overlayStack: OverlayEntry[];
   editMode: boolean;
+  confirmRemoveMissingSoundsOpen: boolean;
+  confirmRemoveMissingFoldersOpen: boolean;
 }
 
 interface UiActions {
@@ -39,6 +41,10 @@ interface UiActions {
   hasOpenOverlay: () => boolean;
   /** Toggle edit mode on/off. */
   toggleEditMode: () => void;
+  /** Open/close the "Remove All Missing Sounds" confirmation dialog. */
+  setConfirmRemoveMissingSoundsOpen: (open: boolean) => void;
+  /** Open/close the "Remove All Missing Folders" confirmation dialog. */
+  setConfirmRemoveMissingFoldersOpen: (open: boolean) => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -46,6 +52,8 @@ export type UiStore = UiState & UiActions;
 export const initialUiState: UiState = {
   overlayStack: [],
   editMode: false,
+  confirmRemoveMissingSoundsOpen: false,
+  confirmRemoveMissingFoldersOpen: false,
 };
 
 export const useUiStore = create<UiStore>()((set, get) => ({
@@ -86,6 +94,12 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   toggleEditMode: () =>
     set((state) => ({ editMode: !state.editMode })),
+
+  setConfirmRemoveMissingSoundsOpen: (open) =>
+    set(() => ({ confirmRemoveMissingSoundsOpen: open })),
+
+  setConfirmRemoveMissingFoldersOpen: (open) =>
+    set(() => ({ confirmRemoveMissingFoldersOpen: open })),
 }));
 
 // Standalone selector factories for reactive subscriptions via useUiStore().

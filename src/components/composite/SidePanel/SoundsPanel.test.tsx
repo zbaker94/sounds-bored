@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SoundsPanel } from "./SoundsPanel";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import {
   createMockSound,
   createMockGlobalFolder,
@@ -40,6 +41,20 @@ vi.mock("@/lib/library.reconcile", () => ({
   reconcileGlobalLibrary: vi.fn(() =>
     Promise.resolve({ sounds: [], changed: false })
   ),
+  checkMissingStatus: vi.fn(() =>
+    Promise.resolve({
+      missingSoundIds: new globalThis.Set<string>(),
+      missingFolderIds: new globalThis.Set<string>(),
+    })
+  ),
+}));
+
+vi.mock("@/lib/audio/bufferCache", () => ({
+  evictBuffer: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/streamingCache", () => ({
+  evictStreamingElement: vi.fn(),
 }));
 
 const mockMutateAsync = vi.fn(() => Promise.resolve());
@@ -67,6 +82,9 @@ vi.mock("./AddToSetDialog", () => ({
 // Pull in the mocked modules so tests can configure return values
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAppSettings } from "@/lib/appSettings.queries";
+// plugin-fs is globally mocked by src/test/tauri-mocks.ts; pull the
+// auto-mocked `remove` so we can assert/clear it per-test.
+import { remove as fsRemove, exists as fsExists } from "@tauri-apps/plugin-fs";
 
 // ---------- helpers ----------
 
@@ -92,6 +110,7 @@ function renderPanel(queryClient?: QueryClient) {
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useProjectStore.setState({ ...initialProjectState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState });
   vi.mocked(useAppSettings).mockReturnValue({
     data: createMockAppSettings(),
     isLoading: false,
@@ -101,6 +120,10 @@ beforeEach(() => {
   mockOnFileDropEvent.mockReturnValue(Promise.resolve(() => {}));
   vi.mocked(open).mockReset();
   mockMutateAsync.mockClear();
+  vi.mocked(fsRemove).mockReset();
+  vi.mocked(fsRemove).mockResolvedValue(undefined);
+  vi.mocked(fsExists).mockReset();
+  vi.mocked(fsExists).mockResolvedValue(true);
 });
 
 // ---------- tests ----------
@@ -530,6 +553,82 @@ describe("SoundsPanel", () => {
     expect(addToSetBtn).not.toBeDisabled();
   });
 
+  // 15b. Select None toggle-back: starting with all selectable sounds already selected,
+  //      a single click on the toggle button deselects everything (handleSelectAllNone path).
+  it("toggles back to deselect all when everything is already selected", async () => {
+    const sound1 = createMockSound({ name: "Kick" });
+    const sound2 = createMockSound({ name: "Snare" });
+    useLibraryStore.setState({
+      ...initialLibraryState,
+      sounds: [sound1, sound2],
+    });
+
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useAppSettings>);
+
+    renderPanel();
+
+    // Pre-select both sounds by clicking their checkboxes
+    const checkboxes = screen.getAllByRole("checkbox");
+    await act(async () => { fireEvent.click(checkboxes[0]); });
+    await act(async () => { fireEvent.click(checkboxes[1]); });
+
+    // Button label should now be "Select None" — clicking it should deselect all
+    const selectNoneBtn = screen.getByRole("button", { name: /select none/i });
+    await act(async () => { fireEvent.click(selectNoneBtn); });
+
+    const updatedCheckboxes = screen.getAllByRole("checkbox");
+    expect(updatedCheckboxes[0]).not.toBeChecked();
+    expect(updatedCheckboxes[1]).not.toBeChecked();
+    // And the button should flip back to "Select All"
+    expect(screen.getByRole("button", { name: /select all/i })).toBeInTheDocument();
+  });
+
+  // 15c. If the currently-selected folder disappears from app settings (e.g. it
+  //      was removed elsewhere), the panel should not crash and should gracefully
+  //      render with no selection.
+  it("handles a stale selectedId when the selected folder is removed from settings", async () => {
+    const folder = createMockGlobalFolder({ id: "soon-to-be-gone", name: "Gone" });
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other", importFolderId: "other2" },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useAppSettings>);
+
+    const { rerender } = renderPanel();
+
+    // Initial render auto-selects the only folder — panel mounts without error
+    expect(screen.getByText("Gone")).toBeInTheDocument();
+
+    // Simulate the folder being removed from settings (e.g. deleted from disk,
+    // or removed by another flow). The selectedId in local state still points
+    // at the now-gone folder — the panel should not crash.
+    vi.mocked(useAppSettings).mockReturnValue({
+      data: { ...createMockAppSettings(), globalFolders: [], downloadFolderId: "", importFolderId: "" },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useAppSettings>);
+
+    const qc = makeQueryClient();
+    await act(async () => {
+      rerender(
+        <QueryClientProvider client={qc}>
+          <TooltipProvider>
+            <SoundsPanel />
+          </TooltipProvider>
+        </QueryClientProvider>,
+      );
+    });
+
+    // Folder list is now empty — empty-state buttons should render instead of
+    // the previous folder row, and the panel should still be operational.
+    expect(screen.queryByText("Gone")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /add folder/i }).length).toBeGreaterThan(0);
+  });
+
   describe("impact preview in delete dialogs", () => {
     it("shows affected pads in folder delete dialog when project references folder sounds", async () => {
       const folder = createMockGlobalFolder({ id: "folder-1", name: "Drums" });
@@ -638,6 +737,45 @@ describe("SoundsPanel", () => {
       });
 
       expect(screen.queryByText("Affects this project:")).not.toBeInTheDocument();
+    });
+
+    it("calls saveLibrary and fs.remove when the Delete from Disk button is confirmed", async () => {
+      const folder = createMockGlobalFolder({ id: "folder-1", name: "Drums" });
+      const sound = createMockSound({
+        id: "kick-id",
+        name: "Kick",
+        folderId: "folder-1",
+        filePath: "/music/SoundsBored/drums/kick.wav",
+      });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      // Select the folder so the sound is disk-deletable, but use a distinct
+      // downloadFolderId / importFolderId so delete isn't blocked.
+      vi.mocked(useAppSettings).mockReturnValue({
+        data: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other", importFolderId: "other2" },
+        isLoading: false,
+        isError: false,
+      } as unknown as ReturnType<typeof useAppSettings>);
+
+      renderPanel();
+
+      // Select the sound via its checkbox
+      const checkbox = screen.getByRole("checkbox");
+      await act(async () => { fireEvent.click(checkbox); });
+
+      // Open the delete dialog
+      const deleteFromDiskBtn = screen.getByRole("button", { name: /delete from disk/i });
+      await act(async () => { fireEvent.click(deleteFromDiskBtn); });
+
+      // Confirm — the dialog's footer button has the count in its label
+      const confirmBtn = screen.getByRole("button", { name: /delete 1 sound from disk/i });
+      await act(async () => { fireEvent.click(confirmBtn); });
+
+      // fs.remove should have been called for the sound's filePath
+      expect(fsRemove).toHaveBeenCalledWith("/music/SoundsBored/drums/kick.wav");
+      // saveLibrary (mockMutateAsync) should have been invoked to persist
+      // the library after deletion.
+      expect(mockMutateAsync).toHaveBeenCalled();
     });
   });
 });

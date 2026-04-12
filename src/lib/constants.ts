@@ -2,6 +2,8 @@
  * Application-wide constants
  */
 
+import type { GlobalFolder } from "@/lib/schemas";
+
 // Application identifiers
 export const APP_NAME = "SoundsBored";
 export const APP_FOLDER = "SoundsBored";
@@ -35,3 +37,7 @@ export const SYSTEM_TAG_IMPORTED = "imported";
 
 // Download events
 export const DOWNLOAD_EVENT = "download://progress";
+
+// Shared empty-reference sentinels — use to keep useMemo/useCallback deps stable
+// when `settings?.globalFolders` is undefined. DO NOT mutate.
+export const EMPTY_GLOBAL_FOLDERS: GlobalFolder[] = [];
