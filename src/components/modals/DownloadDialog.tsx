@@ -30,8 +30,6 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
 
   const { data: settings } = useAppSettings();
   const { mutateAsync: startDownload, isPending } = useStartDownload();
-  const downloadJobs = useDownloadStore((s) => s.jobs);
-  const sounds = useLibraryStore((s) => s.sounds);
 
   const downloadFolderId = settings?.downloadFolderId;
   const downloadFolder = settings?.globalFolders.find(
@@ -71,13 +69,19 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
       setNameError("Output name is required");
       valid = false;
     } else {
-      const activeJobWithSameName = Object.values(downloadJobs).some(
+      // Read live store state to avoid stale React render-cycle snapshots.
+      // Two rapid submits would both pass if we relied on the subscribed values,
+      // because the first job does not appear in the React snapshot until the
+      // next render cycle.
+      const latestJobs = useDownloadStore.getState().jobs;
+      const latestSounds = useLibraryStore.getState().sounds;
+      const activeJobWithSameName = Object.values(latestJobs).some(
         (j) =>
           j.outputName === outputName &&
           j.status !== "failed" &&
           j.status !== "cancelled",
       );
-      const libraryHasSameName = sounds.some(
+      const libraryHasSameName = latestSounds.some(
         (s) => s.folderId === downloadFolderId && s.name === outputName,
       );
       if (activeJobWithSameName) {
