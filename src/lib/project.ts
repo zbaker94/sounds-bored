@@ -4,7 +4,7 @@ import { join, appLocalDataDir } from "@tauri-apps/api/path";
 import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
-import { migrateProject } from "./migrations";
+import { migrateProject, MigrationError } from "./migrations";
 
 export class ProjectNotFoundError extends Error {
   constructor() {
@@ -80,6 +80,9 @@ export async function loadProjectFile(
       throw new ProjectValidationError(
         `${PROJECT_FILE_NAME} is missing required fields`
       );
+    }
+    if (error instanceof MigrationError) {
+      throw new ProjectValidationError(error.message);
     }
     throw error;
   }
