@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Projects created with a newer version of SoundsBored can no longer be silently corrupted when opened — the app now shows a clear error asking you to update instead.
+- Projects with unknown or unsupported version numbers are now rejected with an informative error rather than being loaded in a potentially broken state.
+- Unversioned (legacy) projects are now correctly migrated to the current format on load.
 - Fixed a race condition where submitting two downloads with the same name in quick succession could bypass duplicate name validation
 - Files and folders that can't be checked due to permission errors are now tracked as "unknown" instead of being silently treated as present
 - Sounds in a missing folder are now correctly flagged as missing (previously only the folder was flagged)

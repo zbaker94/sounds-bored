@@ -9,7 +9,41 @@ interface Migration {
 
 export const CURRENT_VERSION = "1.2.0";
 
+/** Thrown by migrateProject when the project version is unresolvable. */
+export class MigrationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MigrationError";
+  }
+}
+
+const UNVERSIONED_DEFAULT = "0.0.0";
+
+/** Compare two "X.Y.Z" version strings. Returns <0, 0, or >0. Throws MigrationError for malformed input. */
+function compareVersions(a: string, b: string): number {
+  const parse = (v: string): [number, number, number] => {
+    const parts = v.split(".").map((s) => Number.parseInt(s, 10));
+    if (parts.length !== 3 || parts.some(Number.isNaN)) {
+      throw new MigrationError(`Invalid version string: "${v}"`);
+    }
+    return [parts[0], parts[1], parts[2]];
+  };
+  const [aMaj, aMin, aPat] = parse(a);
+  const [bMaj, bMin, bPat] = parse(b);
+  if (aMaj !== bMaj) return aMaj - bMaj;
+  if (aMin !== bMin) return aMin - bMin;
+  return aPat - bPat;
+}
+
 const MIGRATIONS: Migration[] = [
+  {
+    // Seed migration: projects saved before versioning was introduced default to
+    // UNVERSIONED_DEFAULT. Their data model is identical to 1.0.0, so we just
+    // bump the version.
+    fromVersion: UNVERSIONED_DEFAULT,
+    toVersion: "1.0.0",
+    migrate: (raw) => ({ ...raw }),
+  },
   {
     fromVersion: "1.0.0",
     toVersion: "1.1.0",
@@ -78,7 +112,16 @@ const MIGRATIONS: Migration[] = [
 
 export function migrateProject(raw: RawProject): RawProject {
   let current = { ...raw };
-  let version = (current.version as string | undefined) ?? "0.0.0";
+  let version = (current.version as string | undefined) ?? UNVERSIONED_DEFAULT;
+
+  // Future-version guard: refuse to open files from a newer app version to
+  // prevent silent data loss from Zod stripping unknown fields on next save.
+  if (compareVersions(version, CURRENT_VERSION) > 0) {
+    throw new MigrationError(
+      `This project was created with a newer version of SoundsBored (${version}). ` +
+      `Please update the app to open it.`
+    );
+  }
 
   for (const migration of MIGRATIONS) {
     if (version === migration.fromVersion) {
@@ -88,13 +131,12 @@ export function migrateProject(raw: RawProject): RawProject {
     }
   }
 
-  const finalVersion = version;
-  // Deliberate diagnostic exception: version mismatch is developer-facing info,
-  // not a user-facing error. No toast is appropriate here.
-  if (finalVersion !== CURRENT_VERSION) {
-    console.warn(
-      `Project version "${finalVersion}" does not match app version "${CURRENT_VERSION}". ` +
-      `The project may have been created with a different version of SoundsBored.`
+  // If the version is still not current after running all applicable migrations,
+  // there is no migration path for this version (unknown past version).
+  if (version !== CURRENT_VERSION) {
+    throw new MigrationError(
+      `No migration path found for project version "${version}". ` +
+      `The project may be from an unsupported version of SoundsBored.`
     );
   }
 

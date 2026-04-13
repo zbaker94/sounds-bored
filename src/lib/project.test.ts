@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { migrateProject } from "./migrations";
+import { migrateProject, CURRENT_VERSION } from "./migrations";
 import { ProjectSchema } from "./schemas";
 import {
   ProjectNotFoundError,
@@ -135,13 +135,14 @@ describe("loadProjectFile", () => {
     expect(error.message).toContain("missing required fields");
   });
 
-  it("should handle project with only name field", async () => {
+  it("should handle project with only name field (migrates from 0.0.0 to current version)", async () => {
     mockFs.readTextFile.mockResolvedValue(JSON.stringify({ name: "Minimal Project" }));
 
     const result = await loadProjectFile("/test/path/project.json");
 
     expect(result.name).toBe("Minimal Project");
-    expect(result.version).toBeUndefined();
+    // Unversioned projects are migrated through the 0.0.0 → CURRENT_VERSION chain
+    expect(result.version).toBe(CURRENT_VERSION);
   });
 
   it("should default scenes and favoritedSetIds to empty arrays after migration", () => {

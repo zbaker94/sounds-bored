@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { migrateProject, CURRENT_VERSION } from "./migrations";
+import { migrateProject, CURRENT_VERSION, MigrationError } from "./migrations";
 
 describe("migrateProject", () => {
   it("should pass through a project already at CURRENT_VERSION unchanged", () => {
@@ -8,10 +8,11 @@ describe("migrateProject", () => {
     expect(result).toEqual({ name: "My Project", version: CURRENT_VERSION });
   });
 
-  it("should handle a project with no version field", () => {
+  it("should migrate a project with no version field (0.0.0 seed) to CURRENT_VERSION", () => {
     const raw = { name: "Old Project" };
     const result = migrateProject(raw);
     expect(result.name).toBe("Old Project");
+    expect(result.version).toBe(CURRENT_VERSION);
   });
 
   it("should not mutate the original object", () => {
@@ -177,26 +178,50 @@ describe("migrateProject — 1.1.0 → 1.2.0", () => {
   });
 });
 
-describe("migrateProject — version warnings", () => {
-  it("should warn when final version does not match CURRENT_VERSION", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const result = migrateProject({ name: "Future Project", version: "99.0.0" });
-    expect(result.version).toBe("99.0.0");
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("99.0.0"));
-    warnSpy.mockRestore();
+describe("migrateProject — future-version guard", () => {
+  it("throws MigrationError when project version is newer than CURRENT_VERSION", () => {
+    expect(() => migrateProject({ name: "Future Project", version: "99.0.0" })).toThrow(MigrationError);
+    expect(() => migrateProject({ name: "Future Project", version: "99.0.0" })).toThrow(
+      /newer version/i,
+    );
   });
 
-  it("should not warn when version matches CURRENT_VERSION", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    migrateProject({ name: "Current Project", version: CURRENT_VERSION });
-    expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
+  it("throws MigrationError with version number in the message", () => {
+    expect(() => migrateProject({ name: "Future Project", version: "2.0.0" })).toThrow("2.0.0");
   });
 
-  it("should warn when version is absent (defaults to 0.0.0)", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    migrateProject({ name: "Old Project" });
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("0.0.0"));
-    warnSpy.mockRestore();
+  it("throws MigrationError for one patch ahead of CURRENT_VERSION", () => {
+    const [maj, min, pat] = CURRENT_VERSION.split(".").map(Number);
+    const oneAhead = `${maj}.${min}.${pat + 1}`;
+    expect(() => migrateProject({ name: "X", version: oneAhead })).toThrow(MigrationError);
+  });
+
+  it("does not throw for a project at CURRENT_VERSION", () => {
+    expect(() => migrateProject({ name: "Current Project", version: CURRENT_VERSION })).not.toThrow();
+  });
+
+  it("does not throw for a project at a previous known version", () => {
+    expect(() => migrateProject({ name: "Old Project", version: "1.0.0" })).not.toThrow();
+  });
+
+  it("does not throw for a project with no version field (uses 0.0.0 seed)", () => {
+    expect(() => migrateProject({ name: "Old Project" })).not.toThrow();
+  });
+
+  it("migrates a project with explicit version '0.0.0' to CURRENT_VERSION", () => {
+    const result = migrateProject({ name: "X", version: "0.0.0" });
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it("throws MigrationError for a version not in the migration chain (unknown past version)", () => {
+    expect(() => migrateProject({ name: "X", version: "1.0.5" })).toThrow(MigrationError);
+    expect(() => migrateProject({ name: "X", version: "0.5.0" })).toThrow(MigrationError);
+  });
+
+  it("throws MigrationError for malformed version strings", () => {
+    expect(() => migrateProject({ name: "X", version: "1.2" })).toThrow(MigrationError);
+    expect(() => migrateProject({ name: "X", version: "v1.0.0" })).toThrow(MigrationError);
+    expect(() => migrateProject({ name: "X", version: "1.2.0-beta" })).toThrow(MigrationError);
+    expect(() => migrateProject({ name: "X", version: "" })).toThrow(MigrationError);
   });
 });
