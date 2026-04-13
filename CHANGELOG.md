@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pads now support smooth volume fade-in and fade-out transitions, including mid-fade reversal (re-triggering a fading pad ramps volume back up without restarting audio)
+- Per-pad fade duration can override the global fade setting; falls back to 2000ms if neither is configured
 - Added real-time volume control for pads and layers, with smooth gain ramping to prevent audio clicks when adjusting volume mid-playback.
 - The SidePanel's folder browser and sets panel have been split into separate, focused components for improved reliability and maintainability
 - Missing sound folders are now automatically scanned on panel open, so the missing-folder warning appears immediately without requiring a manual Refresh
