@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed unnecessary UI re-renders during audio playback by only updating active layer state when it actually changes
 - Internal audio engine refactored: `padPlayer.ts` split into focused modules (`fadeMixer`, `gainManager`, `layerTrigger`) for easier maintenance — no behavior changes.
 - Duplicate retrigger logic consolidated into a single shared helper, reducing the risk of inconsistent behavior between pad and layer triggers.
 - Project close now instantly releases all audio state and stops the audio tick, preventing potential resource leaks on unmount.

@@ -31,9 +31,18 @@ const VOLUME_EPSILON = 0.001;
 
 let rafId: number | null = null;
 
-// Track previous values to skip no-op store updates for pad/layer volumes.
+// Track previous values to skip no-op store updates for pad/layer volumes and activeLayerIds.
 let prevPadVolumes: Record<string, number> = {};
 let prevLayerVolumes: Record<string, number> = {};
+let prevActiveLayerIds = new Set<string>();
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const k of a) {
+    if (!b.has(k)) return false;
+  }
+  return true;
+}
 
 function tick(): void {
   // Self-terminate when no pads are active.
@@ -41,6 +50,7 @@ function tick(): void {
     rafId = null;
     prevPadVolumes = {};
     prevLayerVolumes = {};
+    prevActiveLayerIds = new Set();
     _clearAllTickFields();
     return;
   }
@@ -69,8 +79,12 @@ function tick(): void {
   // --- Compute layerProgress (always emit for active layers) ---
   const nextLayerProgress = computeAllLayerProgress();
 
-  // --- Compute activeLayerIds (always emit) ---
+  // --- Compute activeLayerIds — diff to skip no-op store updates ---
+  // getActiveLayerIdSet() always returns a new Set object; without diffing,
+  // every subscriber (e.g. PadControlContent) would re-render every RAF frame.
   const nextActiveLayerIds = getActiveLayerIdSet();
+  const activeLayerIdsChanged = !setsEqual(nextActiveLayerIds, prevActiveLayerIds);
+  if (activeLayerIdsChanged) prevActiveLayerIds = nextActiveLayerIds;
 
   // Diff padVolumes and layerVolumes to skip no-op updates.
   const padVolumesChanged = !shallowEqualRecords(nextPadVolumes, prevPadVolumes);
@@ -84,7 +98,7 @@ function tick(): void {
     ...(layerVolumesChanged ? { layerVolumes: nextLayerVolumes } : {}),
     padProgress: nextPadProgress,
     layerProgress: nextLayerProgress,
-    activeLayerIds: nextActiveLayerIds,
+    ...(activeLayerIdsChanged ? { activeLayerIds: nextActiveLayerIds } : {}),
   });
 
   rafId = requestAnimationFrame(tick);
@@ -105,6 +119,7 @@ export function stopAudioTick(): void {
   _clearAllTickFields();
   prevPadVolumes = {};
   prevLayerVolumes = {};
+  prevActiveLayerIds = new Set();
 }
 
 function _clearAllTickFields(): void {
