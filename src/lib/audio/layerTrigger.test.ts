@@ -49,6 +49,10 @@ function makeMockGain() {
   };
 }
 
+function makeMinimalVoice() {
+  return { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() };
+}
+
 describe("layerTrigger", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -273,7 +277,7 @@ describe("layerTrigger", () => {
     it("'next' mode with remaining sounds returns 'chain-advanced' and plays next", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { loadBuffer } = await import("./bufferCache");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-next-rem");
       const layerGain = getOrCreateLayerGain("layer-next-rem", 100, padGain);
       const pad = createMockPad({ id: "pad-next-rem" });
@@ -288,18 +292,24 @@ describe("layerTrigger", () => {
           { id: "i2", soundId: "s2", volume: 100 },
         ]},
       });
+      // Register an active voice to verify it gets stopped
+      const mockVoice = makeMinimalVoice();
+      recordLayerVoice("pad-next-rem", "layer-next-rem", mockVoice as unknown as import("./audioVoice").AudioVoice);
       // Simulate that s2 is queued as the next sound
       setLayerChain("layer-next-rem", [s2]);
 
       const result = await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1, s2]);
 
       expect(result).toBe("chain-advanced");
-      expect(loadBuffer).toHaveBeenCalled(); // next sound was loaded
+      expect(mockVoice.stop).toHaveBeenCalled(); // prior voice was stopped
+      // Layer is still active because startLayerSound added a new voice for s2
+      expect(isLayerActive("layer-next-rem")).toBe(true);
+      expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "s2" })); // next sound loaded
     });
 
     it("'next' mode with exhausted one-shot queue returns 'chain-advanced' (stops only)", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-next-exhaust");
       const layerGain = getOrCreateLayerGain("layer-next-exhaust", 100, padGain);
       const pad = createMockPad({ id: "pad-next-exhaust" });
@@ -310,18 +320,23 @@ describe("layerTrigger", () => {
         arrangement: "sequential",
         playbackMode: "one-shot",
       });
+      // Register an active voice to verify it gets stopped
+      const mockVoice = makeMinimalVoice();
+      recordLayerVoice("pad-next-exhaust", "layer-next-exhaust", mockVoice as unknown as import("./audioVoice").AudioVoice);
       // Empty chain — queue exhausted
       setLayerChain("layer-next-exhaust", []);
 
       const result = await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1]);
 
       expect(result).toBe("chain-advanced");
+      expect(mockVoice.stop).toHaveBeenCalled(); // voice was stopped
+      expect(isLayerActive("layer-next-exhaust")).toBe(false);
     });
 
     it("'next' mode with loop + exhausted queue loops back to beginning", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { loadBuffer } = await import("./bufferCache");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-next-loop");
       const layerGain = getOrCreateLayerGain("layer-next-loop", 100, padGain);
       const pad = createMockPad({ id: "pad-next-loop" });
@@ -333,13 +348,19 @@ describe("layerTrigger", () => {
         arrangement: "sequential",
         playbackMode: "loop",
       });
+      // Register an active voice to verify it gets stopped
+      const mockVoice = makeMinimalVoice();
+      recordLayerVoice("pad-next-loop", "layer-next-loop", mockVoice as unknown as import("./audioVoice").AudioVoice);
       // Empty chain — exhausted, but loop mode means restart from beginning
       setLayerChain("layer-next-loop", []);
 
       const result = await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1, s2]);
 
       expect(result).toBe("chain-advanced");
-      expect(loadBuffer).toHaveBeenCalled(); // restarted from beginning
+      expect(mockVoice.stop).toHaveBeenCalled(); // prior voice was stopped
+      // Layer is still active because startLayerSound added a new voice for s1 (loop restart)
+      expect(isLayerActive("layer-next-loop")).toBe(true);
+      expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" })); // loops back to s1
     });
 
     it("'next' mode with cycleMode + chained returns 'proceed'", async () => {
@@ -411,6 +432,7 @@ describe("layerTrigger", () => {
 
     it("cycle-mode: plays first sound by index and advances cursor", async () => {
       const { startLayerPlayback } = await import("./layerTrigger");
+      const { loadBuffer } = await import("./bufferCache");
       const { getPadGain, getOrCreateLayerGain, isLayerActive, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cycle");
       const layerGain = getOrCreateLayerGain("layer-cycle", 100, padGain);
@@ -432,6 +454,8 @@ describe("layerTrigger", () => {
       await startLayerPlayback(pad, layer, mockCtx as unknown as AudioContext, layerGain, [s1, s2]);
 
       expect(isLayerActive("layer-cycle")).toBe(true);
+      // Should have played s1 (index 0), not s2
+      expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }));
       // Cursor should advance to 1 (next trigger plays s2)
       expect(getLayerCycleIndex("layer-cycle")).toBe(1);
     });

@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where pending stop timers were not cancelled when clearing all audio state, preventing ghost stop actions after scene changes
+- Fixed streaming audio not being cleared when `clearAllAudioState` was called, which could leave stale audio elements registered
+- Fixed "next" retrigger mode to correctly stop the currently playing voice before advancing to the next sound in the sequence
+- Fixed fade-out cleanup to properly clear layer play order state alongside chain and cycle index state
 - Fixed a bug where closing a project while audio was fading out could cause sounds from the previous session to bleed into the next session
 - Fixed a race condition where rapidly triggering a pad could start multiple overlapping sounds unexpectedly
 - Fixed sounds incorrectly continuing to chain to the next track during a fade-out

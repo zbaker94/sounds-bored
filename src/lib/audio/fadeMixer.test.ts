@@ -103,10 +103,11 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer = createMockLayer({ id: "layer-fadeout-stop" });
-      const { getPadGain, setLayerChain, getLayerChain, getLayerCycleIndex, setLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, setLayerChain, getLayerChain, getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder, getLayerPlayOrder } = await import("./audioState");
       getPadGain("pad-fadeout-stop");
       setLayerChain("layer-fadeout-stop", []);
       setLayerCycleIndex("layer-fadeout-stop", 1);
+      setLayerPlayOrder("layer-fadeout-stop", []);
       const { fadePadOut } = await import("./fadeMixer");
       const { resetPadGain } = await import("./gainManager");
       const pad = createMockPad({ id: "pad-fadeout-stop", layers: [layer] });
@@ -114,9 +115,10 @@ describe("fadeMixer", () => {
       fadePadOut(pad, 500);
       vi.advanceTimersByTime(600);
 
-      // Verifies the inline-stopPad contract: chain, cycle, play-order, voices all cleared
+      // Verifies the full inline-stopPad contract: chain + cycle + play-order + voices all cleared
       expect(getLayerChain("layer-fadeout-stop")).toBeUndefined();
       expect(getLayerCycleIndex("layer-fadeout-stop")).toBeUndefined();
+      expect(getLayerPlayOrder("layer-fadeout-stop")).toBeUndefined();
       expect(resetPadGain).toHaveBeenCalledWith("pad-fadeout-stop");
     });
 

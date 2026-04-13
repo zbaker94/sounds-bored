@@ -560,6 +560,7 @@ describe("tick accessor functions", () => {
 
 describe("clearAllAudioState", () => {
   it("clears all runtime audio state in a single call", async () => {
+    vi.useFakeTimers();
     const {
       clearAllAudioState,
       getPadGain,
@@ -578,6 +579,9 @@ describe("clearAllAudioState", () => {
       isLayerPending,
       isPadActive,
       getLayerGain,
+      registerStreamingAudio,
+      isPadStreaming,
+      setGlobalStopTimeout,
     } = await import("./audioState");
 
     const padGain = getPadGain("pad-clearall");
@@ -589,6 +593,16 @@ describe("clearAllAudioState", () => {
     setLayerPending("layer-clearall");
     addFadingOutPad("pad-clearall");
 
+    // Register a streaming audio element so isPadStreaming returns true before clear
+    const mockAudio = { pause: vi.fn(), currentTime: 0 } as unknown as HTMLAudioElement;
+    registerStreamingAudio("pad-clearall", "layer-clearall", mockAudio);
+    expect(isPadStreaming("pad-clearall")).toBe(true);
+
+    // Schedule a timeout (simulates stopAllPads post-ramp cleanup)
+    const spy = vi.fn();
+    const timeoutId = setTimeout(spy, 9999);
+    setGlobalStopTimeout(timeoutId);
+
     clearAllAudioState();
 
     expect(isPadFadingOut("pad-clearall")).toBe(false);          // fade tracking cleared
@@ -599,5 +613,12 @@ describe("clearAllAudioState", () => {
     expect(getPadProgressInfo("pad-clearall")).toBeUndefined();  // progress info cleared
     expect(isPadActive("pad-clearall")).toBe(false);             // voices cleared
     expect(getLayerGain("layer-clearall")).toBeUndefined();      // layer gains disconnected & cleared
+    expect(isPadStreaming("pad-clearall")).toBe(false);          // streaming audio cleared
+
+    // Global stop timeout should be cancelled — spy must NOT fire
+    vi.runAllTimers();
+    expect(spy).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 });
