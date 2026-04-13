@@ -1,81 +1,107 @@
-# Manual Test: Fade and Crossfade mode
+# Manual Test: Fade and Synchronized Fades
 
-**Feature area:** `useFadeMode.ts`, `PadButton.tsx` (fade visuals), `useGlobalHotkeys.ts`  
-**Risk area:** Any change to fade mode state, keyboard shortcuts, or pad button visual classes
+**Feature area:** `PadControlContent.tsx` (fade popover), `useMultiFadeMode.ts`, `multiFadeStore.ts`, `padPlayer.ts` (`fadePadWithLevels`)  
+**Risk area:** Any change to fade level controls, fade duration, multi-fade store, or the Synchronized Fades flow
 
 ---
 
 ## Background
 
-Fade mode (F key) lets you fade a playing pad out over a configured duration. Crossfade mode (X key) simultaneously fades one pad out and another in. These modes are activated by hotkeys and require a playing pad to be meaningful.
+Each pad's control popover (click the pad name/card) contains a **Fade In / Fade Out** section with:
+- A **fade level range slider** — the two thumbs set from-volume and to-volume (0–100%)
+- A **Fade Duration slider** — per-pad override (100 ms – 10 s); when unset, uses the global default from Settings
+- A **Reset to default** link — clears the per-pad duration override
+- A **Fade In** (pad stopped) or **Fade Out** (pad playing) execute button
+
+**Synchronized Fades** button in the same popover enters a multi-pad mode where multiple pads can be faded simultaneously. Hotkeys in this mode: **Enter** to execute, **Escape** to cancel.
 
 ---
 
-## Setup
+## Test A: Single-pad Fade Out (pad is playing)
 
-1. Load a project with at least 2 pads, each with a looping sound.
-2. Open **Settings** and confirm a fade duration is set (e.g., 2 seconds).
-
----
-
-## Test A: Basic Fade
-
-1. Trigger a pad so it loops.
-2. Press **F** to enter fade mode.
-3. Click the playing pad.
+1. Trigger a pad so it plays.
+2. Click the pad to open its control popover.
+3. Adjust the fade level slider if needed (default: 100% → 0% for a fade-out).
+4. Click **Fade Out**.
 
 **Expected:**
 - The pad fades out over the configured fade duration.
-- The pad button visual changes (amber border) during the fade.
-- After fade completes, the pad is no longer playing.
+- After the fade completes, the pad is no longer playing.
 
 ---
 
-## Test B: Fade cancellation
+## Test B: Single-pad Fade In (pad is stopped)
 
-1. Enter fade mode (F).
-2. Press **Escape** before clicking any pad.
-
-**Expected:** Fade mode exits. No pads are affected. All visual states return to normal.
-
----
-
-## Test C: Crossfade between two pads
-
-1. Trigger Pad A so it loops.
-2. Press **X** to enter crossfade mode.
-3. Click Pad A (the playing one — it becomes the "fade out" pad, amber border).
-4. Click Pad B (non-playing — it becomes the "fade in" pad, green border).
-5. Press **Enter** (or click the execute button) to execute the crossfade.
+1. Ensure a pad is not playing.
+2. Open its control popover.
+3. Set the fade level slider start thumb to 0% and end thumb to 100%.
+4. Click **Fade In**.
 
 **Expected:**
-- Pad A fades out over the fade duration.
-- Pad B starts playing and fades in simultaneously.
-- After the crossfade, only Pad B is playing.
+- The pad starts at near-silence and fades up to full volume over the fade duration.
+- The pad continues playing (at full volume) after the fade-in completes.
 
 ---
 
-## Test D: Invalid pad in crossfade mode
+## Test C: Per-pad fade duration override
 
-1. Enter crossfade mode (X).
-2. Attempt to click a pad that has only hold-mode layers or no sounds.
+1. Open a pad's popover — note the current fade duration shown.
+2. Drag the **Fade Duration** slider to a very short value (e.g., 0.1 s).
+3. Execute a Fade Out.
 
-**Expected:** The pad is grayed out (opacity-40) and non-interactive during crossfade mode.
+**Expected:** Fade completes in ~0.1 s — noticeably faster than the global default.
 
----
+4. Click **Reset to default**.
 
-## Test E: Fade mode with non-default fade duration
-
-1. Open **Settings**, set fade duration to **0.5 seconds**.
-2. Trigger a pad, press F, click the pad.
-
-**Expected:** Fade completes in about half a second — noticeably fast compared to the default.
+**Expected:** The per-pad override is removed; the slider shows the global default duration.
 
 ---
 
-## Test F: Crossfade mode exits on Escape
+## Test D: Fade level slider — partial fade
 
-1. Enter crossfade mode (X), select the fade-out pad (amber).
-2. Press **Escape** before selecting the fade-in pad.
+1. Set the fade level slider to **50% → 0%** while the pad is playing.
+2. Execute Fade Out.
 
-**Expected:** Crossfade mode cancelled. No pads are faded or started.
+**Expected:** The pad fades from 50% down to silence (not from 100%). The start volume jump to 50% is audible before the fade begins.
+
+---
+
+## Test E: Synchronized Fades — multi-pad fade
+
+1. Trigger two pads so both are playing.
+2. Open one pad's popover and click **Synchronized Fades**.
+3. The popover closes and the scene enters multi-fade mode (a pill/banner appears at the bottom of the scene).
+4. Click the second playing pad — it joins the fade selection (both pads are now highlighted).
+5. Press **Enter** (or use the execute button in the multi-fade pill).
+
+**Expected:**
+- Both pads fade out simultaneously over their respective fade durations.
+- Multi-fade mode exits after execution.
+
+---
+
+## Test F: Synchronized Fades — cancel with Escape
+
+1. Enter multi-fade mode (click Synchronized Fades on a pad).
+2. Optionally select additional pads.
+3. Press **Escape**.
+
+**Expected:** Multi-fade mode cancelled. No pads are faded. All visual states return to normal.
+
+---
+
+## Test G: Synchronized Fades — auto-cancel on edit mode
+
+1. Enter multi-fade mode.
+2. Toggle edit mode (Mod+E or the edit button).
+
+**Expected:** Multi-fade mode exits automatically. No fade is executed.
+
+---
+
+## Test H: Synchronized Fades — auto-cancel on overlay open
+
+1. Enter multi-fade mode.
+2. Open any overlay (e.g., Settings dialog).
+
+**Expected:** Multi-fade mode cancels automatically when the overlay opens.

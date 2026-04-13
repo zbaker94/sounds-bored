@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Playback mode changes (loop → one-shot) now let the current buffer finish naturally instead of stopping immediately; no toast notification is shown
+- Arrangement changes mid-playback silently rebuild the chain queue instead of showing a toast notification
+- Fade controls moved from global hotkeys (F/X keys) to a per-pad control popover with fade level sliders, duration override, and a "Synchronized Fades" multi-pad mode
+- New pad control popover accessible by clicking a pad, with start/stop, duplicate, delete, per-layer play, skip forward/back, and sound list controls
+- New keyboard shortcuts documented: Esc, Ctrl+S/Shift+S, Mod+E (edit mode), number keys 1–9 (scene jump), arrow keys (scene navigation), and Enter/Escape in Synchronized Fades mode
 - Fixed a blank screen bug where hot-reloading during development would wipe the app state and leave the editor empty
 - The main editor now automatically redirects to the home screen if no project is loaded, instead of showing a blank page
 - Updated "New Project" flow: projects are now created instantly with an auto-generated name — no name entry dialog required
