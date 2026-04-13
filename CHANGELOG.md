@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where invalid download progress values (negative percentages, values above 100%, NaN, or Infinity) could cause incorrect behavior in the download manager
 - Download progress events that fail schema validation now log a diagnostic error instead of silently dropping, making stuck or stalled downloads easier to diagnose.
 - Projects created with a newer version of SoundsBored can no longer be silently corrupted when opened — the app now shows a clear error asking you to update instead.
 - Projects with unknown or unsupported version numbers are now rejected with an informative error rather than being loaded in a potentially broken state.

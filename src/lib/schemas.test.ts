@@ -16,6 +16,7 @@ import {
   PadConfigSchema,
   PadSchema,
   TagSchema,
+  DownloadProgressEventSchema,
   type ProjectHistoryEntry,
   type ProjectHistory,
   type Project,
@@ -867,6 +868,49 @@ describe("PadSchema — icon field", () => {
   it("rejects a non-string icon", () => {
     const result = PadSchema.safeParse({ ...basePad, icon: 42 });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("DownloadProgressEventSchema — percent validation", () => {
+  const baseEvent = {
+    id: "job-1",
+    status: "downloading",
+  };
+
+  it("accepts percent = 0", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: 0 }).success).toBe(true);
+  });
+
+  it("accepts percent = 42", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: 42 }).success).toBe(true);
+  });
+
+  it("accepts percent = 100", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: 100 }).success).toBe(true);
+  });
+
+  it("rejects percent = -1 (negative)", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: -1 }).success).toBe(false);
+  });
+
+  it("rejects percent = 100.1 (above 100)", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: 100.1 }).success).toBe(false);
+  });
+
+  it("rejects percent = 150 (out of range)", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: 150 }).success).toBe(false);
+  });
+
+  it("rejects percent = Infinity", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: Infinity }).success).toBe(false);
+  });
+
+  it("rejects percent = -Infinity", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: -Infinity }).success).toBe(false);
+  });
+
+  it("rejects percent = NaN", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: NaN }).success).toBe(false);
   });
 });
 
