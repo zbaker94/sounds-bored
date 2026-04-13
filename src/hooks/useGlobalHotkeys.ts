@@ -2,6 +2,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { useProjectStore } from "@/state/projectStore";
+import { useMultiFadeStore } from "@/state/multiFadeStore";
 
 /**
  * All keyboard shortcuts for the main editor in one place.
@@ -14,7 +15,10 @@ export function useGlobalHotkeys() {
   // enableOnFormTags: the global Esc handler owns escape for all overlays, including dialogs
   // with focused inputs (e.g. PadConfigDrawer's name field).
   // Exception: EXPORT_PROGRESS_DIALOG is non-dismissible — it owns its own Esc handling.
+  // Also: Multi-fade mode owns escape — its useHotkeys handler in useMultiFadeMode
+  // cancels the fade. Don't also open the menu drawer.
   useHotkeys("esc", () => {
+    if (useMultiFadeStore.getState().active) return;
     const { overlayStack, closeOverlay, toggleOverlay } = useUiStore.getState();
     const top = overlayStack[overlayStack.length - 1];
     if (top) {
@@ -57,6 +61,18 @@ export function useGlobalHotkeys() {
   // Mod+E: toggle edit mode.
   useHotkeys("mod+e", () => {
     useUiStore.getState().toggleEditMode();
+  });
+
+  // F or X in edit mode: exit edit mode and enter multi-fade with no pre-selected pad.
+  // Both store mutations happen in the same synchronous call so React 18 batches them —
+  // the useMultiFadeMode "cancel when editMode && active" effect sees editMode=false
+  // in the same render and does not cancel.
+  useHotkeys("f,x", () => {
+    const { editMode, toggleEditMode } = useUiStore.getState();
+    const { active: multiFadeActive, enterMultiFadeEmpty } = useMultiFadeStore.getState();
+    if (!editMode || multiFadeActive) return;
+    toggleEditMode();
+    enterMultiFadeEmpty();
   });
 
   // Mod+Shift+N: open the pad config drawer for the active scene.
