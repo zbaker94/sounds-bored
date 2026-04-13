@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added MCP bridge integration (debug builds only) to enable AI assistant tooling support during development
 - Fixed sound preview not recovering when playback fails — the app now correctly resets preview state instead of getting stuck
 - Previewing a missing or unloadable sound now shows a specific error message in the notification bar
 - Previewing a sound that fails for any other reason (e.g. unsupported codec, decode error) now shows an informative "Preview failed: ..." error instead of silently failing
