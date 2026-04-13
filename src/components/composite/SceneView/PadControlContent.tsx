@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Kbd } from "@/components/ui/kbd";
 import { Slider } from "@/components/ui/slider";
 import {
   Popover,
@@ -67,6 +70,10 @@ export interface PadControlContentProps {
    *  event-handler flush so React 18 batches it with the store update, preventing
    *  the useMultiFadeMode "cancel when editMode && active" effect from firing. */
   onMultiFade?: () => void;
+  /** "popover": f=fade, x=multi-fade; tooltip hints shown per-key.
+   *  "backface": no local hotkeys (global f/x in useGlobalHotkeys handle edit mode);
+   *  tooltip on Synchronized Fades shows both keys. */
+  context: "popover" | "backface";
 }
 
 export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
@@ -375,6 +382,7 @@ export const PadControlContent = memo(function PadControlContent({
   onClose,
   onEditClick,
   onMultiFade,
+  context,
 }: PadControlContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("full");
@@ -470,6 +478,11 @@ export const PadControlContent = memo(function PadControlContent({
     onClose();
   }, [pad.id, padVolume, enterMultiFade, onMultiFade, onClose]);
 
+  // Popover-scoped hotkeys: only active when this component is mounted as a popover/drawer.
+  // In backface context, f/x are handled globally by useGlobalHotkeys (edit-mode handler).
+  useHotkeys("f", handleFade,      { enabled: context === "popover" }, [handleFade, context]);
+  useHotkeys("x", handleMultiFade, { enabled: context === "popover" }, [handleMultiFade, context]);
+
   const fadeSection = (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between text-xs text-muted-foreground">
@@ -532,10 +545,24 @@ export const PadControlContent = memo(function PadControlContent({
           </p>
         )}
       </div>
-      <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
-        <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-        {isPlaying ? "Fade Out" : "Fade In"}
-      </Button>
+      {context === "popover" ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
+              <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+              {isPlaying ? "Fade Out" : "Fade In"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <Kbd>F</Kbd>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
+          <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+          {isPlaying ? "Fade Out" : "Fade In"}
+        </Button>
+      )}
     </div>
   );
 
@@ -670,14 +697,25 @@ export const PadControlContent = memo(function PadControlContent({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.15, delay: STAGGER_DELAY * 3 }}
             >
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleMultiFade}
-                className="bg-yellow-500 w-full text-xs"
-              >
-                Synchronized Fades
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleMultiFade}
+                    className="bg-yellow-500 w-full text-xs"
+                  >
+                    Synchronized Fades
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {context === "popover" ? (
+                    <Kbd>X</Kbd>
+                  ) : (
+                    <><Kbd>F</Kbd> / <Kbd>X</Kbd></>
+                  )}
+                </TooltipContent>
+              </Tooltip>
             </motion.div>
           </>
         )}
@@ -729,15 +767,34 @@ export const PadControlContent = memo(function PadControlContent({
             {/* Compact action row */}
             <div className="flex items-center gap-1">
               {/* Fade In/Out — fires with default levels */}
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleFade}
-                className="flex-1 gap-1 text-xs"
-              >
-                <HugeiconsIcon icon={VolumeHighIcon} size={12} />
-                {isPlaying ? "Fade Out" : "Fade In"}
-              </Button>
+              {context === "popover" ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleFade}
+                      className="flex-1 gap-1 text-xs"
+                    >
+                      <HugeiconsIcon icon={VolumeHighIcon} size={12} />
+                      {isPlaying ? "Fade Out" : "Fade In"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <Kbd>F</Kbd>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleFade}
+                  className="flex-1 gap-1 text-xs"
+                >
+                  <HugeiconsIcon icon={VolumeHighIcon} size={12} />
+                  {isPlaying ? "Fade Out" : "Fade In"}
+                </Button>
+              )}
 
               {/* Fade options sub-popover anchor */}
               <Button
@@ -768,15 +825,26 @@ export const PadControlContent = memo(function PadControlContent({
               </Button>
 
               {/* Synchronized Fades — fires directly */}
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label="Synchronized Fades"
-                className="bg-yellow-500"
-                onClick={handleMultiFade}
-              >
-                <HugeiconsIcon icon={PlayIcon} size={12} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label="Synchronized Fades"
+                    className="bg-yellow-500"
+                    onClick={handleMultiFade}
+                  >
+                    <HugeiconsIcon icon={PlayIcon} size={12} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {context === "popover" ? (
+                    <Kbd>X</Kbd>
+                  ) : (
+                    <><Kbd>F</Kbd> / <Kbd>X</Kbd></>
+                  )}
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Fade options sub-popover */}

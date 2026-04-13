@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -8,6 +8,7 @@ import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
@@ -49,15 +50,23 @@ function loadPadInStore(padOverrides = {}) {
   return pad;
 }
 
-function renderContent(padOverrides = {}, onEditClick = vi.fn(), onClose = vi.fn()) {
+function renderContent(
+  padOverrides = {},
+  onEditClick = vi.fn(),
+  onClose = vi.fn(),
+  context: "popover" | "backface" = "popover"
+) {
   const pad = loadPadInStore(padOverrides);
   render(
-    <PadControlContent
-      pad={pad}
-      sceneId="scene-1"
-      onClose={onClose}
-      onEditClick={onEditClick}
-    />
+    <TooltipProvider>
+      <PadControlContent
+        pad={pad}
+        sceneId="scene-1"
+        onClose={onClose}
+        onEditClick={onEditClick}
+        context={context}
+      />
+    </TooltipProvider>
   );
   return { pad, onEditClick, onClose };
 }
@@ -222,6 +231,114 @@ describe("PadControlContent", () => {
       const popoverContents = screen.getAllByTestId("popover-content");
       expect(popoverContents.length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe("PadControlContent — hotkeys", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useLibraryStore.setState({ ...initialLibraryState });
+    useMultiFadeStore.setState({
+      active: false, originPadId: null, selectedPads: new Map(), reopenPadId: null,
+    });
+    vi.clearAllMocks();
+    vi.mocked(stopPad).mockReturnValue(undefined as unknown as ReturnType<typeof stopPad>);
+  });
+
+  it("pressing f in popover context triggers fade", async () => {
+    renderContent({}, vi.fn(), vi.fn(), "popover");
+    await userEvent.keyboard("f");
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    expect(fadePadWithLevels).toHaveBeenCalled();
+  });
+
+  it("pressing x in popover context enters multi-fade mode", async () => {
+    renderContent({}, vi.fn(), vi.fn(), "popover");
+    await userEvent.keyboard("x");
+    expect(useMultiFadeStore.getState().active).toBe(true);
+  });
+
+  it("pressing f in backface context does NOT trigger fade", async () => {
+    renderContent({}, vi.fn(), vi.fn(), "backface");
+    await userEvent.keyboard("f");
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    expect(fadePadWithLevels).not.toHaveBeenCalled();
+  });
+
+  it("pressing x in backface context does NOT enter multi-fade mode", async () => {
+    renderContent({}, vi.fn(), vi.fn(), "backface");
+    await userEvent.keyboard("x");
+    expect(useMultiFadeStore.getState().active).toBe(false);
+  });
+});
+
+describe("PadControlContent — tooltips", () => {
+  function mockResizeObserverWithHeight(height: number) {
+    // Mock getBoundingClientRect so the initial height read in the effect also matches,
+    // preventing a scroll→full mode transition that can leave stale tooltip portals.
+    vi.spyOn(HTMLDivElement.prototype, "getBoundingClientRect").mockReturnValue({
+      height,
+      width: 300,
+      top: 0, left: 0, bottom: height, right: 300,
+      x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    vi.stubGlobal(
+      "ResizeObserver",
+      vi.fn().mockImplementation(function (this: unknown, cb: ResizeObserverCallback) {
+        return {
+          observe: vi.fn().mockImplementation(() => {
+            cb([{ contentRect: { height } } as ResizeObserverEntry], {} as ResizeObserver);
+          }),
+          unobserve: vi.fn(),
+          disconnect: vi.fn(),
+        };
+      })
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("Fade In button shows [F] tooltip in popover context (full mode)", async () => {
+    mockResizeObserverWithHeight(300);
+    renderContent({}, vi.fn(), vi.fn(), "popover");
+    await userEvent.hover(screen.getByRole("button", { name: /fade in/i }));
+    const fKeys = await screen.findAllByText("F", {}, { timeout: 2000 });
+    expect(fKeys.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("Synchronized Fades button shows [X] tooltip in popover context (full mode)", async () => {
+    mockResizeObserverWithHeight(300);
+    renderContent({}, vi.fn(), vi.fn(), "popover");
+    await userEvent.hover(screen.getByRole("button", { name: /synchronized fades/i }));
+    const xKeys = await screen.findAllByText("X", {}, { timeout: 2000 });
+    expect(xKeys.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("Synchronized Fades button shows [F] / [X] tooltip in backface context (full mode)", async () => {
+    mockResizeObserverWithHeight(300);
+    renderContent({}, vi.fn(), vi.fn(), "backface");
+    await userEvent.hover(screen.getByRole("button", { name: /synchronized fades/i }));
+    // Both Kbd elements appear in the tooltip
+    const fKeys = await screen.findAllByText("F", {}, { timeout: 2000 });
+    expect(fKeys.length).toBeGreaterThanOrEqual(1);
+    const xKeys = await screen.findAllByText("X", {}, { timeout: 2000 });
+    expect(xKeys.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("Fade In button has no tooltip in backface context (full mode)", async () => {
+    mockResizeObserverWithHeight(300);
+    renderContent({}, vi.fn(), vi.fn(), "backface");
+    await userEvent.hover(screen.getByRole("button", { name: /fade in/i }));
+    // Wait a tick to give tooltip time to appear if it were going to
+    await new Promise((r) => setTimeout(r, 50));
+    // "F" should not appear as a standalone kbd since there's no tooltip on the fade button
+    const kbdElements = document.querySelectorAll("[data-slot='kbd']");
+    expect(kbdElements.length).toBe(0);
   });
 });
 

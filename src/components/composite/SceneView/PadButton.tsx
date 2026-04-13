@@ -505,6 +505,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                 <PadControlContent
                   pad={pad}
                   sceneId={sceneId}
+                  context="backface"
                   // No dismiss action on back face — user exits edit mode via the global toggle
                   onClose={() => {}}
                   // Exit edit mode when multi-fade is entered so both state changes land in the
@@ -522,6 +523,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         <PadControlContent
           pad={pad}
           sceneId={sceneId}
+          context="popover"
           onClose={() => setPopoverOpen(false)}
           onEditClick={onEditClick}
         />
@@ -535,6 +537,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
             <PadControlContent
               pad={pad}
               sceneId={sceneId}
+              context="popover"
               onClose={() => setPopoverOpen(false)}
               onEditClick={onEditClick}
             />

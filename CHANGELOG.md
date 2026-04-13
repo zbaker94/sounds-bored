@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Keyboard shortcuts added: press **F** to fade a pad in/out and **X** to enter Synchronized Fades mode when a pad's control popover is open
+- Tooltips on the Fade In/Out and Synchronized Fades buttons now show the corresponding keyboard shortcut keys
 - Pressing **F** or **X** while in edit mode now exits edit mode and enters multi-fade mode with no pad pre-selected
 - **Escape** no longer conflicts with multi-fade mode — when a multi-fade is active, Escape is handled by the fade (to cancel it) rather than toggling the menu drawer
 - Added `f` then `x` as an alternative keyboard shortcut to confirm a multi-fade action (in addition to the existing `Enter` key)
