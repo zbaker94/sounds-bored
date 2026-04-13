@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Added keyboard shortcuts to the pad context menu: press `F` to fade a pad or `X` to enter synchronized fade mode
+- In edit mode, pressing `F` or `X` now exits edit mode and launches synchronized fade with no pad pre-selected
+- During synchronized fade mode, `F` and `X` can now execute the fade (in addition to the existing `Enter` key)
+- Fixed an issue where pressing `Escape` to cancel a synchronized fade would also incorrectly open the side menu drawer
+- Pad buttons now show keyboard shortcut tooltips so the available hotkeys are visible on hover
 - Playback mode changes (loop → one-shot) now let the current buffer finish naturally instead of stopping immediately; no toast notification is shown
 - Arrangement changes mid-playback silently rebuild the chain queue instead of showing a toast notification
 - Fade controls moved from global hotkeys (F/X keys) to a per-pad control popover with fade level sliders, duration override, and a "Synchronized Fades" multi-pad mode
