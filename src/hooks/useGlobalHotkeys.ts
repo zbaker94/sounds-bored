@@ -159,12 +159,14 @@ export function useGlobalHotkeys() {
     if (idx < scenes.length) setActiveSceneId(scenes[idx].id);
   });
 
-  // Shift+Left/Right: navigate between scenes with wrapping.
+  // Left/Right: navigate between scenes with wrapping.
+  // Guard idx === -1: when activeSceneId is null or stale, fall back to the first scene.
   useHotkeys("left", () => {
     const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
+    if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
     setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id);
   }, { preventDefault: true });
 
@@ -173,6 +175,7 @@ export function useGlobalHotkeys() {
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
+    if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
     setActiveSceneId(scenes[(idx + 1) % scenes.length].id);
   }, { preventDefault: true });
 }
