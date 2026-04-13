@@ -88,6 +88,15 @@ pub fn start_download(
     job_id: String,
 ) -> Result<(), String> {
 
+    // Defense-in-depth: reject non-http/https schemes before passing to yt-dlp.
+    // Trim whitespace and lowercase the scheme portion for case-insensitive matching,
+    // then use the trimmed form for all downstream work.
+    let url = url.trim().to_string();
+    let url_lower = url.to_ascii_lowercase();
+    if !url_lower.starts_with("http://") && !url_lower.starts_with("https://") {
+        return Err("URL must use http:// or https://".to_string());
+    }
+
     // Emit initial queued event
     let _ = app.emit(
         "download://progress",

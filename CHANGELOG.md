@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Download URL validation is now stricter: only `http://` and `https://` URLs are accepted — `ftp://`, `file://`, `javascript:`, `data:`, and other schemes are blocked with a clear error message
+- Leading and trailing whitespace in the URL field is automatically trimmed before validation and submission
 - Missing sound/folder detection is now more reliable — the app correctly refreshes missing-file status after resolving files, removing sounds, previewing audio, and on auto-save
 - Resolving a missing file or folder now always updates the missing-file indicators immediately, regardless of app settings load order
 - Stale "missing" indicators are now properly cleared when files become available again

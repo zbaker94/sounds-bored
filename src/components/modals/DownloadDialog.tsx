@@ -52,11 +52,19 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
     if (!url.trim()) {
       setUrlError("URL is required");
       valid = false;
-    } else if (!url.startsWith("http")) {
-      setUrlError("URL must start with http");
-      valid = false;
     } else {
-      setUrlError(null);
+      try {
+        const parsed = new URL(url.trim());
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          setUrlError("URL must use http:// or https://");
+          valid = false;
+        } else {
+          setUrlError(null);
+        }
+      } catch {
+        setUrlError("URL must use http:// or https://");
+        valid = false;
+      }
     }
 
     if (!outputName) {
