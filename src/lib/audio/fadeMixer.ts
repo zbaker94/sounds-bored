@@ -10,6 +10,7 @@ import {
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
+  nullPadOnEnded,
   stopPadVoices,
 } from "./audioState";
 import { resetPadGain } from "./gainManager";
@@ -51,15 +52,20 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
   const startVol = fromVolume ?? currentGain;
   const endVol = toVolume ?? 0;
 
-  // 2. Schedule Web Audio ramp
+  // 2. Null onended callbacks on active pad voices so a chained voice ending
+  //    naturally during the fade window does not start the next sound at the
+  //    faded-down volume. Compare stopAllPads which also calls nullAllOnEnded.
+  nullPadOnEnded(pad.id);
+
+  // 3. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(startVol, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
-  // 3. Mark this pad as fading out so a reverse fade-in can be detected
+  // 4. Mark this pad as fading out so a reverse fade-in can be detected
   addFadingOutPad(pad.id);
 
-  // 4. Schedule cleanup. Inlines stopPad behavior via audioState functions directly
+  // 5. Schedule cleanup. Inlines stopPad behavior via audioState functions directly
   //    to avoid a circular dependency on padPlayer.ts.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);

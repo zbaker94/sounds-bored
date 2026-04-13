@@ -231,7 +231,11 @@ export async function startLayerSound(
         clearLayerProgressInfo(layer.id);
         clearPadProgressInfo(pad.id);
         startAudioTick(); // keep tick alive during the async gap
-        startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
+        startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds).catch(
+          // startLayerSound handles errors internally (toast + progress clear);
+          // the catch here prevents unhandled-rejection if it throws synchronously.
+          () => {},
+        );
       } else if (liveMode === "loop" || liveMode === "hold") {
         // Chain exhausted naturally — restart using live store values so mid-playback
         // config changes (arrangement, playback mode, selection) take effect.
@@ -247,11 +251,15 @@ export async function startLayerSound(
           if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
           const [first, ...rest] = newOrder;
           setLayerChain(layer.id, rest);
-          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds);
+          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
+            () => {},
+          );
         } else {
           deleteLayerChain(layer.id);
           for (const snd of liveSounds) {
-            startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds);
+            startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
+              () => {},
+            );
           }
         }
       } else {

@@ -79,6 +79,18 @@ describe("gainManager", () => {
 
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
     });
+
+    it("clamps NaN to 0 (guards against malformed data)", async () => {
+      const mockGain = makeMockGain();
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain } = await import("./audioState");
+      getPadGain("pad-nan");
+      const { setPadVolume } = await import("./gainManager");
+
+      setPadVolume("pad-nan", NaN);
+
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+    });
   });
 
   describe("resetPadGain", () => {
@@ -115,6 +127,34 @@ describe("gainManager", () => {
       const { syncLayerVolume } = await import("./gainManager");
       expect(() => syncLayerVolume("nonexistent-layer", 80)).not.toThrow();
     });
+
+    it("clamps values above 100 to 1.0", async () => {
+      const mockPadGain = makeMockGain();
+      const mockLayerGain = makeMockGain();
+      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const padGain = getPadGain("pad-sync-hi");
+      getOrCreateLayerGain("layer-sync-hi", 80, padGain);
+      const { syncLayerVolume } = await import("./gainManager");
+
+      syncLayerVolume("layer-sync-hi", 150);
+
+      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
+    });
+
+    it("clamps NaN to 1.0 (safe default, matches schema 100% default volume)", async () => {
+      const mockPadGain = makeMockGain();
+      const mockLayerGain = makeMockGain();
+      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const padGain = getPadGain("pad-sync-nan");
+      getOrCreateLayerGain("layer-sync-nan", 80, padGain);
+      const { syncLayerVolume } = await import("./gainManager");
+
+      syncLayerVolume("layer-sync-nan", NaN);
+
+      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
+    });
   });
 
   describe("setLayerVolume", () => {
@@ -142,6 +182,19 @@ describe("gainManager", () => {
 
       expect(mockUpdate).toHaveBeenCalledWith("inactive-layer", 0.6);
     });
+
+    it("clamps out-of-range values (above 1.0 → 1.0, below 0 → 0)", async () => {
+      const { usePlaybackStore } = await import("@/state/playbackStore");
+      const mockUpdate = vi.fn();
+      vi.mocked(usePlaybackStore.getState).mockReturnValue({ updateLayerVolume: mockUpdate } as unknown as ReturnType<typeof usePlaybackStore.getState>);
+      const { setLayerVolume } = await import("./gainManager");
+
+      setLayerVolume("inactive-hi", 1.5);
+      setLayerVolume("inactive-lo", -0.2);
+
+      expect(mockUpdate).toHaveBeenCalledWith("inactive-hi", 1.0);
+      expect(mockUpdate).toHaveBeenCalledWith("inactive-lo", 0);
+    });
   });
 
   describe("commitLayerVolume", () => {
@@ -154,6 +207,19 @@ describe("gainManager", () => {
       commitLayerVolume("layer-commit", 0.9);
 
       expect(mockUpdate).toHaveBeenCalledWith("layer-commit", 0.9);
+    });
+
+    it("clamps out-of-range values (1.5 → 1.0, -0.1 → 0)", async () => {
+      const { useProjectStore } = await import("@/state/projectStore");
+      const mockUpdate = vi.fn();
+      vi.mocked(useProjectStore.getState).mockReturnValue({ updateLayerVolume: mockUpdate } as unknown as ReturnType<typeof useProjectStore.getState>);
+      const { commitLayerVolume } = await import("./gainManager");
+
+      commitLayerVolume("layer-hi", 1.5);
+      commitLayerVolume("layer-lo", -0.1);
+
+      expect(mockUpdate).toHaveBeenCalledWith("layer-hi", 1.0);
+      expect(mockUpdate).toHaveBeenCalledWith("layer-lo", 0);
     });
   });
 });

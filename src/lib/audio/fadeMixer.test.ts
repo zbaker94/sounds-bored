@@ -102,16 +102,38 @@ describe("fadeMixer", () => {
     it("stops pad voices and resets gain after fade-to-0 completes", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const layer = createMockLayer({ id: "layer-fadeout-stop" });
+      const { getPadGain, setLayerChain, getLayerChain, getLayerCycleIndex, setLayerCycleIndex } = await import("./audioState");
       getPadGain("pad-fadeout-stop");
+      setLayerChain("layer-fadeout-stop", []);
+      setLayerCycleIndex("layer-fadeout-stop", 1);
       const { fadePadOut } = await import("./fadeMixer");
       const { resetPadGain } = await import("./gainManager");
-      const pad = createMockPad({ id: "pad-fadeout-stop", layers: [createMockLayer()] });
+      const pad = createMockPad({ id: "pad-fadeout-stop", layers: [layer] });
 
       fadePadOut(pad, 500);
       vi.advanceTimersByTime(600);
 
+      // Verifies the inline-stopPad contract: chain, cycle, play-order, voices all cleared
+      expect(getLayerChain("layer-fadeout-stop")).toBeUndefined();
+      expect(getLayerCycleIndex("layer-fadeout-stop")).toBeUndefined();
       expect(resetPadGain).toHaveBeenCalledWith("pad-fadeout-stop");
+    });
+
+    it("nulls onended callbacks on active pad voices at fade start", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain, recordLayerVoice } = await import("./audioState");
+      getPadGain("pad-null-ended");
+      const mockVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() };
+      recordLayerVoice("pad-null-ended", "layer-null-ended", mockVoice as unknown as import("./audioVoice").AudioVoice);
+      const { fadePadOut } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-null-ended" });
+
+      fadePadOut(pad, 1000);
+
+      // Prevents chain-continuation callbacks from firing during the fade window
+      expect(mockVoice.setOnEnded).toHaveBeenCalledWith(null);
     });
 
     it("does not stop pad when fading to a non-zero volume", async () => {
@@ -130,15 +152,20 @@ describe("fadeMixer", () => {
     });
 
     it("uses fromVolume parameter instead of current gain", async () => {
-      const mockGain = makeMockGain(0.8);
+      const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
       const { getPadGain } = await import("./audioState");
       getPadGain("pad-from-vol");
+      // getPadGain sets gain.gain.value = 1.0 — override to a different value to confirm
+      // that fromVolume wins over the current gain node value.
+      mockGain.gain.value = 0.8;
+      mockGain.gain.setValueAtTime.mockClear();
       const { fadePadOut } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-from-vol" });
 
       fadePadOut(pad, 1000, 0.5);
 
+      // Should use fromVolume=0.5 even though current gain is 0.8
       expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 0);
     });
   });

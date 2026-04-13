@@ -10,6 +10,7 @@ import { stopAudioTick } from "./audioTick";
 
 import {
   cancelPadFade,
+  cancelGlobalStopTimeout,
   clearAllFadeTracking,
   clearAllLayerChains,
   clearAllLayerCycleIndexes,
@@ -20,6 +21,7 @@ import {
   clearAllStreamingAudio,
   clearAllPadProgressInfo,
   clearAllLayerProgressInfo,
+  clearLayerPending,
   clearLayerStreamingAudio,
   clearPadProgressInfo,
   deleteLayerChain,
@@ -39,8 +41,10 @@ import {
   isPadFadingOut,
   nullAllOnEnded,
   setFadePadTimeout,
+  setGlobalStopTimeout,
   setLayerChain,
   setLayerCycleIndex,
+  setLayerPending,
   setLayerPlayOrder,
   stopAllVoices,
   stopPadVoices,
@@ -317,7 +321,11 @@ export function stopAllPads(): void {
     gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + STOP_RAMP_S);
   });
-  setTimeout(() => {
+  // Track this timeout so clearAllAudioState() can cancel it if project close
+  // fires before the ramp completes — prevents stale cleanup from touching a
+  // new audio session.
+  const stopTimeoutId = setTimeout(() => {
+    cancelGlobalStopTimeout(); // clear the tracker (timeout already fired)
     clearAllStreamingAudio();
     clearAllPadProgressInfo();
     clearAllLayerProgressInfo();
@@ -325,6 +333,7 @@ export function stopAllPads(): void {
     clearAllPadGains();
     stopAllVoices();
   }, STOP_RAMP_S * 1000 + 5);
+  setGlobalStopTimeout(stopTimeoutId);
 }
 
 export function releasePadHoldLayers(pad: Pad): void {
@@ -359,8 +368,11 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     const resolved = resolveSounds(layer, sounds);
     if (resolved.length === 0) continue;
 
-    // Leading debounce — if startLayerSound is in-flight for this layer, ignore the trigger
+    // Leading debounce — if startLayerSound is in-flight for this layer, ignore the trigger.
+    // Set pending synchronously BEFORE any await to close the race window between the
+    // check and the first await point.
     if (isLayerPending(layer.id)) continue;
+    setLayerPending(layer.id);
 
     const isLayerPlaying = isLayerActive(layer.id);
     const layerGain = getOrCreateLayerGain(layer.id, layer.volume, padGain);
@@ -368,13 +380,17 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
     // triggerPad does not pass afterStopCleanup — pad-level playback store state
     // is managed globally (stopAllPads / clearVoice).
-    if (action === "skip" || action === "chain-advanced") continue;
+    if (action === "skip" || action === "chain-advanced") {
+      clearLayerPending(layer.id);
+      continue;
+    }
 
     if (!progressCleared) {
       clearPadProgressInfo(pad.id);
       progressCleared = true;
     }
     await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
+    // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
   }
 }
 
@@ -383,7 +399,10 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
   const { sounds } = useLibraryStore.getState();
   const resolved = resolveSounds(layer, sounds);
   if (resolved.length === 0) return;
+  // Set pending synchronously BEFORE any await to close the race window between
+  // the check and the first await point.
   if (isLayerPending(layer.id)) return;
+  setLayerPending(layer.id);
 
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
@@ -401,8 +420,12 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
     }, STOP_RAMP_S * 1000 + 10),
   );
 
-  if (action === "skip") return;
+  if (action === "skip") {
+    clearLayerPending(layer.id);
+    return;
+  }
   if (action === "chain-advanced") {
+    clearLayerPending(layer.id);
     usePlaybackStore.getState().addPlayingPad(pad.id);
     return;
   }

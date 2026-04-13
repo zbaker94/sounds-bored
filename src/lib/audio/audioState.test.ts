@@ -559,29 +559,45 @@ describe("tick accessor functions", () => {
 });
 
 describe("clearAllAudioState", () => {
-  it("clears fade tracking, chain queues, voices, gains, and progress in one call", async () => {
+  it("clears all runtime audio state in a single call", async () => {
     const {
       clearAllAudioState,
       getPadGain,
       getOrCreateLayerGain,
       setPadProgressInfo,
+      getPadProgressInfo,
       setLayerChain,
+      setLayerCycleIndex,
+      setLayerPlayOrder,
+      setLayerPending,
       addFadingOutPad,
       isPadFadingOut,
       getLayerChain,
+      getLayerCycleIndex,
+      getLayerPlayOrder,
+      isLayerPending,
       isPadActive,
+      getLayerGain,
     } = await import("./audioState");
 
     const padGain = getPadGain("pad-clearall");
     getOrCreateLayerGain("layer-clearall", 80, padGain);
     setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
     setLayerChain("layer-clearall", []);
+    setLayerCycleIndex("layer-clearall", 2);
+    setLayerPlayOrder("layer-clearall", []);
+    setLayerPending("layer-clearall");
     addFadingOutPad("pad-clearall");
 
     clearAllAudioState();
 
-    expect(isPadFadingOut("pad-clearall")).toBe(false);
-    expect(getLayerChain("layer-clearall")).toBeUndefined();
-    expect(isPadActive("pad-clearall")).toBe(false);
+    expect(isPadFadingOut("pad-clearall")).toBe(false);          // fade tracking cleared
+    expect(getLayerChain("layer-clearall")).toBeUndefined();     // layer chains cleared
+    expect(getLayerCycleIndex("layer-clearall")).toBeUndefined(); // cycle indexes cleared
+    expect(getLayerPlayOrder("layer-clearall")).toBeUndefined(); // play orders cleared
+    expect(isLayerPending("layer-clearall")).toBe(false);        // pending set cleared
+    expect(getPadProgressInfo("pad-clearall")).toBeUndefined();  // progress info cleared
+    expect(isPadActive("pad-clearall")).toBe(false);             // voices cleared
+    expect(getLayerGain("layer-clearall")).toBeUndefined();      // layer gains disconnected & cleared
   });
 });

@@ -108,6 +108,12 @@ const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 /** Tracks pads that are actively fading out (gain -> 0). Cleared when fade completes or is cancelled. */
 const fadingOutPadIds = new Set<string>();
 
+/**
+ * The timeout ID from stopAllPads()'s post-ramp cleanup setTimeout.
+ * Tracked so clearAllAudioState() can cancel it and prevent cross-session contamination.
+ */
+let _globalStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
 // ---------------------------------------------------------------------------
 // Public query functions
 // ---------------------------------------------------------------------------
@@ -599,6 +605,14 @@ export function nullAllOnEnded(): void {
   }
 }
 
+/** Null onended callbacks for all voices belonging to a specific pad. */
+export function nullPadOnEnded(padId: string): void {
+  const voices = voiceMap.get(padId) ?? [];
+  for (const voice of voices) {
+    voice.setOnEnded(null);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Layer play order tracking (for skip-back)
 // ---------------------------------------------------------------------------
@@ -630,6 +644,29 @@ export function getLayerVolume(layerId: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Global stop timeout tracking (stopAllPads post-ramp cleanup)
+// ---------------------------------------------------------------------------
+
+/**
+ * Record the setTimeout ID from stopAllPads's post-ramp cleanup.
+ * Must be cancelled by clearAllAudioState to prevent cross-session contamination.
+ */
+export function setGlobalStopTimeout(id: ReturnType<typeof setTimeout>): void {
+  _globalStopTimeoutId = id;
+}
+
+/**
+ * Cancel the pending post-ramp cleanup from stopAllPads, if any.
+ * Called by clearAllAudioState on project close.
+ */
+export function cancelGlobalStopTimeout(): void {
+  if (_globalStopTimeoutId !== null) {
+    clearTimeout(_globalStopTimeoutId);
+    _globalStopTimeoutId = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Consolidated cleanup — instant, no gain ramp (for project close)
 // ---------------------------------------------------------------------------
 
@@ -644,6 +681,8 @@ export function getLayerVolume(layerId: string): number {
  *   3. Voices stopped, then gains cleared
  */
 export function clearAllAudioState(): void {
+  // Cancel any pending stopAllPads post-ramp setTimeout to prevent cross-session contamination.
+  cancelGlobalStopTimeout();
   clearAllFadeTracking();
   clearAllLayerChains();
   clearAllLayerCycleIndexes();
@@ -653,7 +692,9 @@ export function clearAllAudioState(): void {
   clearAllStreamingAudio();
   clearAllPadProgressInfo();
   clearAllLayerProgressInfo();
+  // Stop voices BEFORE disconnecting gain nodes so onended callbacks (already nulled above)
+  // do not fire against disconnected nodes, and voice.stop() completes with a valid graph.
+  stopAllVoices();
   clearAllLayerGains();
   clearAllPadGains();
-  stopAllVoices();
 }

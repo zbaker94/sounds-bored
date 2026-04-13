@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where closing a project while audio was fading out could cause sounds from the previous session to bleed into the next session
+- Fixed a race condition where rapidly triggering a pad could start multiple overlapping sounds unexpectedly
+- Fixed sounds incorrectly continuing to chain to the next track during a fade-out
+- Fixed volume controls silently ignoring invalid values (NaN or out-of-range numbers) instead of applying a safe default
 - Improved audio cleanup when leaving the main editor — all active sounds and audio state are now fully stopped on exit.
 - Internal audio engine code has been reorganized into smaller, focused modules with no change to playback behavior.
 - Improved reliability when closing a project — all active audio state is now cleared instantly and in the correct order, preventing sounds from restarting or callbacks from firing after close.

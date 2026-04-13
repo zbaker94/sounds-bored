@@ -11,7 +11,7 @@ import { useProjectStore } from "@/state/projectStore";
 export function setPadVolume(padId: string, volume: number): void {
   const ctx = getAudioContext();
   const gain = getPadGain(padId);
-  const clamped = Math.max(0, Math.min(1, volume));
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
@@ -39,8 +39,10 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
   const ctx = getAudioContext();
+  // Clamp to 0–100 (schema range) and guard against NaN/Infinity from malformed project data.
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : 100;
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
+  gain.gain.setValueAtTime(clamped / 100, ctx.currentTime);
 }
 
 /**
@@ -48,7 +50,7 @@ export function syncLayerVolume(layerId: string, volume: number): void {
  * Pass volume in 0–1 range. Call commitLayerVolume on drag-end to persist to schema.
  */
 export function setLayerVolume(layerId: string, volume: number): void {
-  const clamped = Math.max(0, Math.min(1, volume));
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   const gain = getLayerGain(layerId);
   if (gain) {
     // Layer is playing — update gain node. Tick reads the new value automatically.
@@ -63,6 +65,6 @@ export function setLayerVolume(layerId: string, volume: number): void {
 
 /** Persist the current layer volume to the project schema (call on drag-end / value commit). */
 export function commitLayerVolume(layerId: string, volume: number): void {
-  const clamped = Math.max(0, Math.min(1, volume));
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   useProjectStore.getState().updateLayerVolume(layerId, clamped);
 }
