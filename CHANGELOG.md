@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved audio cleanup when leaving the main editor — all active sounds and audio state are now fully stopped on exit.
 - Internal audio engine code has been reorganized into smaller, focused modules with no change to playback behavior.
 - Improved reliability when closing a project — all active audio state is now cleared instantly and in the correct order, preventing sounds from restarting or callbacks from firing after close.
 - Improved audio engine reliability by refactoring layer trigger logic into a dedicated module, reducing the risk of playback bugs
