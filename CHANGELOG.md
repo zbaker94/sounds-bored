@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a false "No project loaded" error that appeared when intentionally saving or discarding changes before closing a project
 - Pressing **F** while hovering a pad now immediately fades that pad out (single fade), without needing to open the context menu first
 - Pressing **X** while hovering a pad now enters multi-fade mode with that pad pre-selected
 - Both **F** and **X** are now context-aware: they do nothing if a pad's context popover is open, and they exit edit mode first if edit mode is active
