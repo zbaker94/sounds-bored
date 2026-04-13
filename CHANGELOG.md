@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+The PR #214 for issue #190 is already open. The work was completed in the previous session - the deprecated `clearFadePadTimeouts` alias was removed from `padPlayer.ts` and a CHANGELOG entry was added.
+
+PR zbaker94/sounds-bored#214 is open and ready for review/merge.
 - Removed deprecated internal audio API alias (`clearFadePadTimeouts`); use `clearAllFadeTracking` directly for any custom integrations.
 - Library files are now saved with a centralized version constant instead of a hardcoded `"1.0.0"` string, ensuring version numbers stay consistent across all save operations.
 - Fixed a bug where pressing the left or right arrow keys to navigate scenes could jump to an unexpected scene if the active scene ID was missing or stale — the app now correctly falls back to the first scene in that case.
