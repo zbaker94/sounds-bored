@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed a blank screen bug where hot-reloading during development would wipe the app state and leave the editor empty
+- The main editor now automatically redirects to the home screen if no project is loaded, instead of showing a blank page
+- Updated "New Project" flow: projects are now created instantly with an auto-generated name — no name entry dialog required
+- New projects start with no scenes, showing an "Add Scene" prompt instead of a pre-populated empty scene
 - Added MCP bridge integration (debug builds only) to enable AI assistant tooling support during development
 - Fixed sound preview not recovering when playback fails — the app now correctly resets preview state instead of getting stuck
 - Previewing a missing or unloadable sound now shows a specific error message in the notification bar

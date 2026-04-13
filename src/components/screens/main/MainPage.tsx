@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { useProjectStore } from "@/state/projectStore";
 import { clearAllAudioState } from "@/lib/audio/audioState";
 import { stopAudioTick } from "@/lib/audio/audioTick";
@@ -16,7 +17,7 @@ export function MainPage() {
   const project = useProjectStore((s) => s.project);
 
   if (!project) {
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   return (

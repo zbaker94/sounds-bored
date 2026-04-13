@@ -36,7 +36,16 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(ls -la /c/Repos/sounds-bored/src/lib/audio/fadeMixer.* /c/Repos/sounds-bored/src/lib/audio/gainManager.* /c/Repos/sounds-bored/src/lib/audio/progressTracker.* /c/Repos/sounds-bored/src/lib/audio/layerChain.*)",
       "Bash(cat)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp___hypothesi_tauri-mcp-server__webview_screenshot",
+      "mcp___hypothesi_tauri-mcp-server__webview_wait_for",
+      "mcp___hypothesi_tauri-mcp-server__read_logs",
+      "mcp___hypothesi_tauri-mcp-server__webview_dom_snapshot",
+      "mcp___hypothesi_tauri-mcp-server__ipc_get_backend_state",
+      "mcp___hypothesi_tauri-mcp-server__webview_execute_js",
+      "mcp___hypothesi_tauri-mcp-server__webview_interact",
+      "mcp___hypothesi_tauri-mcp-server__webview_find_element",
+      "mcp___hypothesi_tauri-mcp-server__webview_keyboard"
     ]
   },
   "enableAllProjectMcpServers": true,

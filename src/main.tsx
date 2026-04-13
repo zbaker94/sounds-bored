@@ -6,7 +6,19 @@ import { queryClient } from "@/lib/queryClient";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip"
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+const rootEl = document.getElementById("root") as HTMLElement;
+
+// Reuse the existing React root across Vite HMR cycles to prevent full
+// unmount/remount. Without this, each HMR fallback-reload (e.g. after hook
+// additions that break Fast Refresh) calls createRoot again, wipes React
+// state, and leaves /main blank because MainPage's project guard fires before
+// useProjectLifecycle can redirect.
+if (!(rootEl as any).__reactRoot) {
+  (rootEl as any).__reactRoot = ReactDOM.createRoot(rootEl);
+}
+const root = (rootEl as any).__reactRoot as ReturnType<typeof ReactDOM.createRoot>;
+
+root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light">

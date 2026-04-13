@@ -310,6 +310,25 @@ All domain model types are fully defined in `src/lib/schemas.ts`.
 - ❌ Don't add emojis to code or output unless explicitly requested
 - ❌ Don't use `CurrentProjectProvider` or `useCurrentProject` — deleted; use `useProjectStore` instead
 
+### Vite HMR Blank Screen (fixed)
+
+When Vite HMR falls back to a full module reload (e.g. hook additions/removals that break Fast Refresh), `main.tsx` was re-run, calling `ReactDOM.createRoot` again. This unmounted the old React tree; on `/main` with `project === null`, `MainPage` returned `null` (blank screen).
+
+**Fixes applied (2026-04-13):**
+- `src/main.tsx` — caches the React root on `rootEl.__reactRoot` and reuses it across HMR cycles
+- `src/components/screens/main/MainPage.tsx` — returns `<Navigate to="/" replace />` instead of `null` when `project` is null
+
+Recovery if app is blank: navigate to `http://localhost:1420/` (JS or address bar) — the app will redirect automatically now.
+
+### MCP / Automated Testing
+
+The `tauri-plugin-mcp-bridge` is configured for debug builds. Connect via the Hypothesi MCP server tools (`driver_session`, `webview_screenshot`, etc.).
+
+Key notes:
+- Pads use `pointerdown`/`pointerup` — simulate with `dispatchEvent(new PointerEvent(...))` from JS
+- Native OS dialogs (`plugin-dialog`) are outside the webview — MCP cannot interact with them
+- Manual tests live in `docs/manual-tests/` (18 test docs)
+
 ### Remaining TODOs
 
 - `src/components/composite/MenuBar/` — rename to `SceneTabBar/`

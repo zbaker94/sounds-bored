@@ -7,13 +7,12 @@
 
 ## Test A: New project creation
 
-1. From the Start Screen, click **New Project**.
-2. Enter a project name and confirm.
+1. From the Start Screen, click **Create New Project**.
 
 **Expected:**
-- Main editor opens with one empty scene.
-- Title bar / project name reflects the new name.
-- Project is marked as temporary (no file path yet).
+- Main editor opens immediately with **no scenes** ("No scenes yet" prompt and an **Add Scene** button are shown).
+- The project is given an auto-generated name (`Untitled_XXXXXX_<timestamp>`); no name-entry dialog appears.
+- Project is marked as **temporary** (no permanent file path yet — toolbar shows the unsaved indicator).
 
 ---
 
