@@ -100,6 +100,7 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
   }, [clearMultiFadeReopenPadId]);
 
   useHotkeys("enter", execute, { enabled: active && canExecute }, [active, canExecute, execute]);
+  useHotkeys("f,x", execute, { enabled: active && canExecute }, [active, canExecute, execute]);
   useHotkeys("escape", cancel, { enabled: active }, [active, cancel]);
 
   return {

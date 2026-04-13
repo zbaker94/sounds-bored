@@ -5,6 +5,7 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { createMockProject, createMockScene, createMockPad, createMockHistoryEntry } from "@/test/factories";
+import { useHotkeys } from "react-hotkeys-hook";
 
 // Mock audio functions
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -140,6 +141,58 @@ describe("useMultiFadeMode — cancel()", () => {
       result.current.cancel();
     });
     expect(result.current.reopenPadId).toBe("pad-0");
+  });
+});
+
+describe("useMultiFadeMode — f/x hotkey registration", () => {
+  it("registers f,x hotkeys with useHotkeys", () => {
+    loadPadsInStore(1);
+    renderHook(() => useMultiFadeMode());
+
+    const calls = vi.mocked(useHotkeys).mock.calls;
+    const fxCall = calls.find((c) => c[0] === "f,x");
+    expect(fxCall).toBeDefined();
+  });
+
+  it("f,x handler executes multi-fade when canExecute is true", async () => {
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    const pads = loadPadsInStore(1);
+
+    // Set up active multi-fade state with a selected pad before rendering
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: pads[0].id,
+      selectedPads: new Map([[pads[0].id, { padId: pads[0].id, levels: [0, 80] as [number, number] }]]),
+      reopenPadId: null,
+    });
+
+    renderHook(() => useMultiFadeMode());
+
+    const calls = vi.mocked(useHotkeys).mock.calls;
+    const fxCall = calls.find((c) => c[0] === "f,x");
+    const handler = fxCall?.[1] as (() => void) | undefined;
+    expect(handler).toBeDefined();
+
+    act(() => { handler!(); });
+
+    expect(fadePadWithLevels).toHaveBeenCalled();
+  });
+
+  it("f,x handler is a no-op when canExecute is false", async () => {
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    loadPadsInStore(1);
+
+    // Not active, no selected pads
+    renderHook(() => useMultiFadeMode());
+
+    const calls = vi.mocked(useHotkeys).mock.calls;
+    const fxCall = calls.find((c) => c[0] === "f,x");
+    const handler = fxCall?.[1] as (() => void) | undefined;
+    expect(handler).toBeDefined();
+
+    act(() => { handler!(); });
+
+    expect(fadePadWithLevels).not.toHaveBeenCalled();
   });
 });
 
