@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Improved audio engine reliability by refactoring layer trigger logic into a dedicated module, reducing the risk of playback bugs
+- Retrigger behavior (stop, continue, restart, next) is now handled by a single consolidated code path, ensuring consistent behavior across all trigger scenarios
+- Added test coverage for core audio layer functions including sound resolution, volume calculation, and retrigger modes
 - Pads now support smooth volume fade-in and fade-out transitions, including mid-fade reversal (re-triggering a fading pad ramps volume back up without restarting audio)
 - Per-pad fade duration can override the global fade setting; falls back to 2000ms if neither is configured
 - Added real-time volume control for pads and layers, with smooth gain ramping to prevent audio clicks when adjusting volume mid-playback.
