@@ -97,9 +97,6 @@ export {
   commitLayerVolume,
 } from "./gainManager";
 
-/** @deprecated Use clearAllFadeTracking instead. */
-export const clearFadePadTimeouts = clearAllFadeTracking;
-
 export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): Promise<void> {
   // 1. Cancel any prior fade for this pad
   cancelPadFade(pad.id);
