@@ -24,6 +24,10 @@ interface UiState {
   editMode: boolean;
   confirmRemoveMissingSoundsOpen: boolean;
   confirmRemoveMissingFoldersOpen: boolean;
+  /** The pad currently under the mouse cursor, or null if none. */
+  hoveredPadId: string | null;
+  /** The pad whose context popover is currently open, or null if none. */
+  padPopoverOpenId: string | null;
 }
 
 interface UiActions {
@@ -45,6 +49,10 @@ interface UiActions {
   setConfirmRemoveMissingSoundsOpen: (open: boolean) => void;
   /** Open/close the "Remove All Missing Folders" confirmation dialog. */
   setConfirmRemoveMissingFoldersOpen: (open: boolean) => void;
+  /** Set the currently hovered pad id, or null to clear. */
+  setHoveredPadId: (id: string | null) => void;
+  /** Set the pad whose context popover is open, or null to clear. */
+  setPadPopoverOpenId: (id: string | null) => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -54,6 +62,8 @@ export const initialUiState: UiState = {
   editMode: false,
   confirmRemoveMissingSoundsOpen: false,
   confirmRemoveMissingFoldersOpen: false,
+  hoveredPadId: null,
+  padPopoverOpenId: null,
 };
 
 export const useUiStore = create<UiStore>()((set, get) => ({
@@ -100,6 +110,10 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setConfirmRemoveMissingFoldersOpen: (open) =>
     set(() => ({ confirmRemoveMissingFoldersOpen: open })),
+
+  setHoveredPadId: (id) => set({ hoveredPadId: id }),
+
+  setPadPopoverOpenId: (id) => set({ padPopoverOpenId: id }),
 }));
 
 // Standalone selector factories for reactive subscriptions via useUiStore().

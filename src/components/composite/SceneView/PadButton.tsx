@@ -205,6 +205,27 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     }
   }, [editMode, multiFadeActive]);
 
+  // Sync popover open state to uiStore so hotkey handlers can guard against it.
+  // Only clear the stored ID when this pad is the current owner — prevents a race where
+  // pad A's close effect runs after pad B has already set its own ID, zeroing it out.
+  useEffect(() => {
+    if (popoverOpen) {
+      useUiStore.getState().setPadPopoverOpenId(pad.id);
+    } else if (useUiStore.getState().padPopoverOpenId === pad.id) {
+      useUiStore.getState().setPadPopoverOpenId(null);
+    }
+  }, [popoverOpen, pad.id]);
+
+  // Clear hover/popover state if this pad unmounts while it owns either slot
+  useEffect(() => {
+    return () => {
+      const { hoveredPadId, padPopoverOpenId, setHoveredPadId, setPadPopoverOpenId } = useUiStore.getState();
+      if (hoveredPadId === pad.id) setHoveredPadId(null);
+      if (padPopoverOpenId === pad.id) setPadPopoverOpenId(null);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pad.id]);
+
   // Reopen popover when this pad is the reopenPadId after multi-fade cancel
   useEffect(() => {
     if (reopenPadId === pad.id) {
@@ -317,6 +338,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
         style={dndStyle}
         className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
         {...(editMode ? attributes : {})}
+        onMouseEnter={() => useUiStore.getState().setHoveredPadId(pad.id)}
+        onMouseLeave={() => useUiStore.getState().setHoveredPadId(null)}
         onPointerDown={(e) => {
           if (e.button === 2) popoverWasOpenRef.current = popoverOpen;
           // Only start a dnd-kit drag when the pointer-down did NOT originate on an

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pressing **F** while hovering a pad now immediately fades that pad out (single fade), without needing to open the context menu first
+- Pressing **X** while hovering a pad now enters multi-fade mode with that pad pre-selected
+- Both **F** and **X** are now context-aware: they do nothing if a pad's context popover is open, and they exit edit mode first if edit mode is active
 - Pad flip and enter animations now use CSS transitions instead of JavaScript springs, making the scene grid smoother and more responsive when toggling edit mode with many pads visible.
 - Volume drag on pads is throttled to one UI update per animation frame, preventing unnecessary re-renders while keeping audio adjustments glitch-free.
 - Master volume changes no longer trigger redundant audio graph updates when the value hasn't actually changed.
