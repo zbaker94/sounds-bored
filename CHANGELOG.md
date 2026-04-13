@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where saving pad configuration would apply layer volume at 100× the correct level during active playback (the 0–100 schema value was being passed directly to the audio gain node instead of being normalized to 0–1)
 - Fixed a bug where invalid download progress values (negative percentages, values above 100%, NaN, or Infinity) could cause incorrect behavior in the download manager
 - Download progress events that fail schema validation now log a diagnostic error instead of silently dropping, making stuck or stalled downloads easier to diagnose.
 - Projects created with a newer version of SoundsBored can no longer be silently corrupted when opened — the app now shows a clear error asking you to update instead.
