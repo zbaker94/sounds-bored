@@ -131,6 +131,15 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
       muteTargetPadIds: initialConfig?.muteTargetPadIds ?? [],
       fadeDurationMs: data.fadeDurationMs,
       icon: initialConfig?.icon,
+      // Round-trip muteGroupId and color from the existing pad so they are
+      // always present (or explicitly undefined) in the config object.
+      // Object.assign in updatePad only clears a field when the config
+      // explicitly includes it as undefined; omitting the key entirely would
+      // silently preserve the old value even if the user intended to clear it.
+      // In create mode, initialConfig is undefined so these evaluate to undefined
+      // (no-op for a new pad; both fields are optional in PadSchema).
+      muteGroupId: initialConfig?.muteGroupId,
+      color: initialConfig?.color,
     };
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);

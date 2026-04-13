@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where pad settings (mute group, color, icon) could silently persist after being cleared in the pad config drawer
+- Saving pad configuration now correctly clears optional fields like mute group and color when they are not set
 - Fixed a bug where saving pad configuration would apply layer volume at 100× the correct level during active playback (the 0–100 schema value was being passed directly to the audio gain node instead of being normalized to 0–1)
 - Fixed a bug where invalid download progress values (negative percentages, values above 100%, NaN, or Infinity) could cause incorrect behavior in the download manager
 - Download progress events that fail schema validation now log a diagnostic error instead of silently dropping, making stuck or stalled downloads easier to diagnose.

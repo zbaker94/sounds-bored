@@ -152,6 +152,10 @@ export const useProjectStore = create<ProjectStore>()(
         if (!scene) return;
         const pad = scene.pads.find((p) => p.id === padId);
         if (!pad) return;
+        // Object.assign performs a partial merge — keys absent from `config` retain
+        // their previous values. Callers MUST include every optional PadConfig field
+        // explicitly (set to `undefined` to clear) so that values can be cleared.
+        // See issue #172 — omitting muteGroupId/color silently preserved stale values.
         Object.assign(pad, config);
         draft.isDirty = true;
       }),
