@@ -27,3 +27,5 @@ src-tauri/binaries/ffmpeg-*
 *.sln
 *.sw?
 .worktrees/
+
+coverage/
