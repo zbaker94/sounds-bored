@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Download progress events that fail schema validation now log a diagnostic error instead of silently dropping, making stuck or stalled downloads easier to diagnose.
 - Projects created with a newer version of SoundsBored can no longer be silently corrupted when opened — the app now shows a clear error asking you to update instead.
 - Projects with unknown or unsupported version numbers are now rejected with an informative error rather than being loaded in a potentially broken state.
 - Unversioned (legacy) projects are now correctly migrated to the current format on load.
