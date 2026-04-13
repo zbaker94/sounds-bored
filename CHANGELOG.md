@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Automated changelog generation is now active: commits will automatically update CHANGELOG.md with AI-generated summaries of changes.
 I need your permission to edit `CHANGELOG.md`. The file currently has stale status notes accidentally added to it (lines 4–7):
 
 ```

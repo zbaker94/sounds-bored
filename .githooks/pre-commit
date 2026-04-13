@@ -25,20 +25,20 @@ if ! command -v claude &>/dev/null; then
   exit 0
 fi
 
-# echo "[changelog] Generating entry with Claude..."
+echo "[changelog] Generating entry with Claude..."
 
-# SUMMARY=$(claude -p "Summarize the following git diff as 1-5 concise bullet points for a customer-facing changelog. Focus on what changed from a user perspective. Output ONLY bullet points starting with '- ', no preamble or explanation." < "$TMPFILE") || {
-#   echo "[changelog] Claude error — skipping CHANGELOG update"
-#   exit 0
-# }
+SUMMARY=$(claude -p "Summarize the following git diff as 1-5 concise bullet points for a customer-facing changelog. Focus on what changed from a user perspective. Output ONLY bullet points starting with '- ', no preamble or explanation." < "$TMPFILE") || {
+  echo "[changelog] Claude error — skipping CHANGELOG update"
+  exit 0
+}
 
-# if [ -z "$SUMMARY" ]; then
-#   echo "[changelog] Empty summary — skipping CHANGELOG update"
-#   exit 0
-# fi
+if [ -z "$SUMMARY" ]; then
+  echo "[changelog] Empty summary — skipping CHANGELOG update"
+  exit 0
+fi
 
-# # Update CHANGELOG.md: insert bullets under '## Current Changes', creating the section if needed
-# SUMMARY="$SUMMARY" node scripts/changelog-entry.cjs
+# Update CHANGELOG.md: insert bullets under '## Current Changes', creating the section if needed
+SUMMARY="$SUMMARY" node scripts/changelog-entry.cjs
 
-# git add "$CHANGELOG"
-# echo "[changelog] CHANGELOG.md updated"
+git add "$CHANGELOG"
+echo "[changelog] CHANGELOG.md updated"
