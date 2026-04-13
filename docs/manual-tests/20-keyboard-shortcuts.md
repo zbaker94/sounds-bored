@@ -100,15 +100,65 @@
 
 ---
 
-## Test I: Enter / Escape in Synchronized Fades mode
+## Test I: Enter / Escape / F / X in Synchronized Fades mode
 
 *(See also test doc 11 — Fade and Synchronized Fades)*
 
 1. Enter multi-fade mode (click Synchronized Fades on a pad popover).
-2. Press **Enter**.
+2. Select one or more pads, then press **Enter**.
 
 **Expected:** Multi-fade executes on all selected pads.
 
-3. Enter multi-fade mode again. Press **Escape**.
+3. Enter multi-fade mode again. Select pads, then press **F** or **X**.
 
-**Expected:** Multi-fade cancels with no pads faded.
+**Expected:** Multi-fade executes (same as Enter).
+
+4. Enter multi-fade mode again. Press **Escape** without executing.
+
+**Expected:** Multi-fade cancels with no pads faded. The hamburger menu drawer does NOT open.
+
+---
+
+## Test J: F / X — fade or enter multi-fade from pad popover
+
+1. Right-click a pad to open its control popover.
+2. Press **F**.
+
+**Expected:** The pad fades (same as clicking the Fade In/Out button). Popover closes.
+
+3. Right-click a pad. Press **X**.
+
+**Expected:** Multi-fade mode activates with this pad pre-selected. Popover closes.
+
+---
+
+## Test K: F / X — enter multi-fade from edit mode (no pad pre-selected)
+
+1. Press **Ctrl+E** to enter edit mode.
+2. Press **F** (or **X**).
+
+**Expected:**
+- Edit mode exits.
+- Multi-fade mode activates with **no pad pre-selected** (yellow pill shows, pads are not highlighted until clicked).
+
+---
+
+## Test L: Escape in multi-fade mode — no menu drawer
+
+1. Enter multi-fade mode via any method.
+2. Press **Escape**.
+
+**Expected:**
+- Multi-fade mode cancels.
+- The hamburger menu drawer does **not** open.
+- If multi-fade was entered from a pad popover, the pad's popover reopens.
+
+---
+
+## Test M: F / X execute multi-fade
+
+1. Enter multi-fade mode.
+2. Select one or more pads by clicking them.
+3. Press **F** (or **X**).
+
+**Expected:** Multi-fade executes on all selected pads (same as pressing Enter).

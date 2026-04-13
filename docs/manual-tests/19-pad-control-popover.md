@@ -100,3 +100,46 @@ Clicking a pad (short press) opens its control popover. The popover shows the pa
 2. Open another overlay (e.g., Settings dialog via Ctrl+Shift+M or Settings button).
 
 **Expected:** The pad popover closes automatically.
+
+---
+
+## Test I: Hotkey F — fade from popover
+
+1. Right-click any playing pad to open its control popover.
+2. Press **F**.
+
+**Expected:** The pad fades using the current fade levels and duration. The popover closes.
+
+3. Right-click a non-playing pad to open its control popover.
+4. Press **F**.
+
+**Expected:** The pad fades in (triggers then ramps volume). The popover closes.
+
+---
+
+## Test J: Hotkey X — enter Synchronized Fades from popover
+
+1. Right-click any pad to open its control popover.
+2. Press **X**.
+
+**Expected:**
+- The popover closes.
+- Multi-fade mode activates (the yellow MultiFade pill appears).
+- The origin pad is pre-selected (ring visible on it).
+
+---
+
+## Test K: Tooltip hints visible on hover
+
+1. Right-click any pad to open its control popover.
+2. Hover over the **Fade In / Fade Out** button.
+
+**Expected:** A tooltip appears showing **F**.
+
+3. Hover over the **Synchronized Fades** button.
+
+**Expected:** A tooltip appears showing **X**.
+
+4. Enter edit mode (Ctrl+E). Hover over the **Synchronized Fades** button on any pad's back face.
+
+**Expected:** A tooltip appears showing **F / X**.
