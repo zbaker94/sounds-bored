@@ -4,10 +4,9 @@ import { basename } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { Sound } from "@/lib/schemas";
 import {
@@ -48,7 +47,6 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
 
   const sounds = useLibraryStore((s) => s.sounds);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const setMissingState = useLibraryStore((s) => s.setMissingState);
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
 
   function handleClose() {
@@ -130,12 +128,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       evictBuffer(sound.id);
       evictStreamingElement(sound.id);
 
-      const settings = useAppSettingsStore.getState().settings;
-      if (settings) {
-        const { sounds: currentSounds } = useLibraryStore.getState();
-        const result = await checkMissingStatus(settings.globalFolders, currentSounds);
-        setMissingState(result.missingSoundIds, result.missingFolderIds);
-      }
+      await refreshMissingState();
 
       const latest = useLibraryStore.getState();
       await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });

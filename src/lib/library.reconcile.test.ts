@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reconcileGlobalLibrary, checkMissingStatus } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState } from "./library.reconcile";
 import { mockFs, mockPath } from "@/test/tauri-mocks";
-import { createMockGlobalFolder } from "@/test/factories";
+import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
+import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 
 // Extend mockFs with stat (not in the shared mock yet)
 const mockStat = vi.fn();
@@ -537,5 +539,130 @@ describe("reconcileGlobalLibrary", () => {
 
       expect(result.sounds[0].name).toBe("My.cool.sound");
     });
+  });
+});
+
+describe("refreshMissingState", () => {
+  beforeEach(() => {
+    useAppSettingsStore.setState({ ...initialAppSettingsState });
+    useLibraryStore.setState({ ...initialLibraryState });
+    mockFs.exists.mockResolvedValue(true);
+  });
+
+  it("does nothing when no settings are loaded", async () => {
+    const sentinel = new globalThis.Set(["sentinel"]);
+    useLibraryStore.setState({ missingSoundIds: sentinel, missingFolderIds: sentinel });
+    await refreshMissingState();
+    // Store was not mutated — setMissingState was not called
+    expect(useLibraryStore.getState().missingSoundIds).toBe(sentinel);
+    expect(useLibraryStore.getState().missingFolderIds).toBe(sentinel);
+  });
+
+  it("uses store settings and sounds to detect missing files", async () => {
+    const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+    const presentSound = createMockSound({ id: "s1", filePath: "/music/kick.wav", folderId: "f1" });
+    const missingSound = createMockSound({ id: "s2", filePath: "/music/ghost.wav", folderId: "f1" });
+
+    useAppSettingsStore.setState({
+      settings: createMockAppSettings({ globalFolders: [folder] }),
+    });
+    useLibraryStore.setState({ sounds: [presentSound, missingSound] });
+
+    mockFs.exists.mockImplementation((path: string) => {
+      if (path === "/music/ghost.wav") return Promise.resolve(false);
+      return Promise.resolve(true);
+    });
+
+    await refreshMissingState();
+
+    const { missingSoundIds, missingFolderIds } = useLibraryStore.getState();
+    expect(missingSoundIds).toContain("s2");
+    expect(missingSoundIds).not.toContain("s1");
+    expect(missingFolderIds.size).toBe(0);
+  });
+
+  it("uses globalFolders override instead of store settings when provided", async () => {
+    const storeFolder = createMockGlobalFolder({ id: "store-f", path: "/store-music" });
+    const overrideFolder = createMockGlobalFolder({ id: "override-f", path: "/new-music" });
+    const sound = createMockSound({ id: "s1", filePath: "/new-music/kick.wav", folderId: "override-f" });
+
+    useAppSettingsStore.setState({
+      settings: createMockAppSettings({ globalFolders: [storeFolder] }),
+    });
+    useLibraryStore.setState({ sounds: [sound] });
+
+    // /new-music exists; if we used store folder (/store-music), the check would differ
+    mockFs.exists.mockImplementation((path: string) => {
+      if (path === "/store-music") return Promise.resolve(false);
+      return Promise.resolve(true);
+    });
+
+    await refreshMissingState([overrideFolder]);
+
+    const { missingSoundIds, missingFolderIds } = useLibraryStore.getState();
+    // With the override, /new-music is the folder — sound and folder both present
+    expect(missingSoundIds.size).toBe(0);
+    expect(missingFolderIds.size).toBe(0);
+  });
+
+  it("marks sounds as missing when their file does not exist", async () => {
+    const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+    const sound = createMockSound({ id: "s1", filePath: "/music/missing.wav", folderId: "f1" });
+
+    useAppSettingsStore.setState({
+      settings: createMockAppSettings({ globalFolders: [folder] }),
+    });
+    useLibraryStore.setState({ sounds: [sound] });
+
+    mockFs.exists.mockResolvedValue(false);
+
+    await refreshMissingState();
+
+    const { missingSoundIds, missingFolderIds } = useLibraryStore.getState();
+    expect(missingSoundIds).toContain("s1");
+    expect(missingFolderIds).toContain("f1");
+  });
+
+  it("clears previously stale missing ids when files become present again", async () => {
+    const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+    const sound = createMockSound({ id: "s1", filePath: "/music/kick.wav", folderId: "f1" });
+
+    useAppSettingsStore.setState({
+      settings: createMockAppSettings({ globalFolders: [folder] }),
+    });
+    // Simulate stale missing state from a prior check
+    useLibraryStore.setState({
+      sounds: [sound],
+      missingSoundIds: new globalThis.Set(["s1"]),
+      missingFolderIds: new globalThis.Set(["f1"]),
+    });
+
+    // Now files are present
+    mockFs.exists.mockResolvedValue(true);
+
+    await refreshMissingState();
+
+    const { missingSoundIds, missingFolderIds } = useLibraryStore.getState();
+    expect(missingSoundIds.size).toBe(0);
+    expect(missingFolderIds.size).toBe(0);
+  });
+
+  it("accepts an empty globalFolders override (all-folders-removed scenario)", async () => {
+    const sound = createMockSound({ id: "s1", filePath: "/music/kick.wav", folderId: "f1" });
+
+    useAppSettingsStore.setState({
+      settings: createMockAppSettings({
+        globalFolders: [createMockGlobalFolder({ id: "f1", path: "/music" })],
+      }),
+    });
+    useLibraryStore.setState({ sounds: [sound] });
+
+    // Pass empty override — simulates all folders having been removed
+    await refreshMissingState([]);
+
+    const { missingSoundIds, missingFolderIds } = useLibraryStore.getState();
+    // No folders to check against, so nothing is flagged missing
+    expect(missingFolderIds.size).toBe(0);
+    expect(missingSoundIds.size).toBe(0);
   });
 });

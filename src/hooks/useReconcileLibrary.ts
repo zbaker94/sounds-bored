@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
+import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
 import { useProjectStore } from "@/state/projectStore";
 
@@ -19,7 +19,6 @@ export function useReconcileLibrary(): {
 
   const settings = useAppSettingsStore((s) => s.settings);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const setMissingState = useLibraryStore((s) => s.setMissingState);
   const { mutate: saveLibrary } = useSaveGlobalLibrary();
 
   // Ref-wrap saveLibrary so we always call the latest mutation handle
@@ -69,11 +68,7 @@ export function useReconcileLibrary(): {
 
       // Always refresh missing-file/folder state so UI reflects the current
       // filesystem regardless of whether new sounds were discovered.
-      const missingResult = await checkMissingStatus(
-        settings.globalFolders,
-        useLibraryStore.getState().sounds,
-      );
-      setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
+      await refreshMissingState();
 
       // Auto-clean orphan soundIds from any loaded project.
       // Reads state imperatively to avoid stale closure over project/sounds.
@@ -97,7 +92,7 @@ export function useReconcileLibrary(): {
       _reconcileInFlight = false;
       setIsReconciling(false);
     }
-  }, [settings, updateLibrary, setMissingState]);
+  }, [settings, updateLibrary]);
 
   return { reconcile, isReconciling };
 }

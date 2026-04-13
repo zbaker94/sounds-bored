@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
+import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
@@ -70,7 +70,6 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
 
   const sounds = useLibraryStore((s) => s.sounds);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const setMissingState = useLibraryStore((s) => s.setMissingState);
   const { data: settings } = useAppSettings();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
   const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
@@ -94,12 +93,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
     const nextIndex = currentSoundIndex + 1;
     if (nextIndex >= stillMissingSounds.length) {
       // All done — final missing state refresh and close
-      if (settings) {
-        const { sounds: currentSounds } = useLibraryStore.getState();
-        checkMissingStatus(settings.globalFolders, currentSounds).then((result) => {
-          setMissingState(result.missingSoundIds, result.missingFolderIds);
-        });
-      }
+      void refreshMissingState();
       const total = stillMissingSounds.length;
       toast.success(
         `Folder re-linked. ${resolved} resolved, ${removed} removed, ${skipped} skipped (of ${total} missing files).`,
@@ -155,17 +149,16 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
         });
       }
 
-      const latestSounds = useLibraryStore.getState().sounds;
-      const missingResult = await checkMissingStatus(updatedSettings.globalFolders, latestSounds);
-      setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
+      await refreshMissingState(updatedSettings.globalFolders);
 
       // Save reconciled library
       const latest = useLibraryStore.getState();
       await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
 
-      // Find sounds from this folder that are still missing
+      // Find sounds from this folder that are still missing (read updated state from store)
+      const { sounds: latestSounds, missingSoundIds } = useLibraryStore.getState();
       const stillMissing = latestSounds.filter(
-        (s) => s.folderId === folder.id && missingResult.missingSoundIds.has(s.id),
+        (s) => s.folderId === folder.id && missingSoundIds.has(s.id),
       );
 
       if (stillMissing.length === 0) {
@@ -201,8 +194,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       const latest = useLibraryStore.getState();
       await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
 
-      const missingResult = await checkMissingStatus(updatedSettings.globalFolders, latest.sounds);
-      setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
+      await refreshMissingState(updatedSettings.globalFolders);
 
       toast.success(`Folder "${folder.name}" removed`);
       onResolved?.();

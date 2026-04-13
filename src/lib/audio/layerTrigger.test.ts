@@ -38,7 +38,7 @@ vi.mock("@/state/projectStore", () => ({
   useProjectStore: { getState: vi.fn(() => ({ project: null })) },
 }));
 vi.mock("@/lib/library.reconcile", () => ({
-  checkMissingStatus: vi.fn(),
+  refreshMissingState: vi.fn().mockResolvedValue(undefined),
 }));
 
 function makeMockGain() {

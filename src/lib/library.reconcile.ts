@@ -2,6 +2,8 @@ import { readDir, exists, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
 import { Sound, GlobalFolder } from "./schemas";
 import { AUDIO_EXTENSIONS } from "./constants";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useLibraryStore } from "@/state/libraryStore";
 
 /**
  * Result of reconciling the global library against the file system.
@@ -269,4 +271,26 @@ export async function checkMissingStatus(
   }
 
   return { missingSoundIds, missingFolderIds };
+}
+
+// ─── Store-coupled orchestrators ─────────────────────────────────────────────
+// These functions read from / write to Zustand stores directly.
+// Pure reconciliation and detection logic remains above.
+
+/**
+ * Convenience utility: run `checkMissingStatus` against current store state
+ * and commit the result into the library store in one call.
+ *
+ * @param globalFolders - Optional override for the folder list. Pass this when
+ *   settings were just saved to disk but the Zustand store hasn't yet received
+ *   the updated data (e.g. immediately after `saveSettings`). Defaults to
+ *   `useAppSettingsStore.getState().settings?.globalFolders`.
+ */
+export async function refreshMissingState(globalFolders?: GlobalFolder[]): Promise<void> {
+  const settings = useAppSettingsStore.getState().settings;
+  const folders = globalFolders ?? settings?.globalFolders;
+  if (!folders) return;
+  const { sounds } = useLibraryStore.getState();
+  const result = await checkMissingStatus(folders, sounds);
+  useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
 }

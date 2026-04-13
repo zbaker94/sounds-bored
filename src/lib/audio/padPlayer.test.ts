@@ -70,9 +70,9 @@ vi.mock("@/state/appSettingsStore", () => ({
   useAppSettingsStore: { getState: () => mockGetAppSettings() },
 }));
 
-const mockCheckMissingStatus = vi.fn();
+const mockRefreshMissingState = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/library.reconcile", () => ({
-  checkMissingStatus: (...args: unknown[]) => mockCheckMissingStatus(...args),
+  refreshMissingState: (...args: unknown[]) => mockRefreshMissingState(...args),
 }));
 
 // ── Audio global mock (streaming path) ───────────────────────────────────────
@@ -2614,36 +2614,16 @@ describe("startLayerSound error handling", () => {
 });
 
 describe("startLayerSound MissingFileError handling", () => {
-  it("shows a file-not-found toast when settings are absent", async () => {
-    const { MissingFileError } = await import("./bufferCache");
-    const { triggerPad } = await import("./padPlayer");
-    const pad = createMockPad({
-      id: "missing-no-settings-pad",
-      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
-    });
-    setSounds([createMockSound({ id: "s1", name: "kick", filePath: "sounds/kick.wav" })]);
-    mockLoadBuffer.mockRejectedValue(new MissingFileError("not found"));
-    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
-    mockCtx.createGain.mockReturnValue(makeMockGain());
-
-    await triggerPad(pad);
-
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("file not found"));
-    expect(mockCheckMissingStatus).not.toHaveBeenCalled();
-  });
-
-  it("calls checkMissingStatus and updates missing state when settings exist", async () => {
+  it("shows a file-not-found toast and calls refreshMissingState on MissingFileError", async () => {
     const { MissingFileError } = await import("./bufferCache");
     const { triggerPad } = await import("./padPlayer");
     const sound = createMockSound({ id: "s1", name: "kick", filePath: "sounds/kick.wav" });
     setSounds([sound]);
-    mockGetAppSettings.mockReturnValueOnce({ settings: { globalFolders: ["/sounds"] } });
-    mockCheckMissingStatus.mockResolvedValue({ missingSoundIds: new Set(["s1"]), missingFolderIds: new Set() });
     mockLoadBuffer.mockRejectedValue(new MissingFileError("not found"));
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
     mockCtx.createGain.mockReturnValue(makeMockGain());
     const pad = createMockPad({
-      id: "missing-with-settings-pad",
+      id: "missing-pad",
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
 
@@ -2651,7 +2631,9 @@ describe("startLayerSound MissingFileError handling", () => {
     await tick();
 
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("file not found"));
-    expect(mockCheckMissingStatus).toHaveBeenCalledWith(["/sounds"], expect.any(Array));
+    // refreshMissingState is always called on MissingFileError; it handles the
+    // no-settings case internally (early return). Settings guard is tested in library.reconcile.test.ts.
+    expect(mockRefreshMissingState).toHaveBeenCalledTimes(1);
   });
 });
 

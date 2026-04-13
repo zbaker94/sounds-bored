@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveProject } from "@/lib/project.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import { AUTOSAVE_INTERVAL, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 
 /**
@@ -69,24 +68,14 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       );
     };
 
-    const refreshMissingState = () => {
-      const settingsSnapshot = useAppSettingsStore.getState().settings;
-      if (settingsSnapshot) {
-        const { sounds } = useLibraryStore.getState();
-        checkMissingStatus(settingsSnapshot.globalFolders, sounds).then((result) => {
-          useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
-        });
-      }
-    };
-
     saveCurrentProject();
     saveLibrary();
-    refreshMissingState();
+    void refreshMissingState();
 
     const intervalId = setInterval(() => {
       saveCurrentProject();
       saveLibrary();
-      refreshMissingState();
+      void refreshMissingState();
     }, interval);
     return () => clearInterval(intervalId);
   }, [folderPath, isTemporary, interval]);

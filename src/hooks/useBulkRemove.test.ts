@@ -13,7 +13,7 @@ import {
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/library.reconcile", () => ({
-  checkMissingStatus: vi.fn(),
+  refreshMissingState: vi.fn(),
 }));
 
 vi.mock("@/lib/audio/bufferCache", () => ({
@@ -46,12 +46,12 @@ vi.mock("sonner", () => ({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { toast } from "sonner";
 
-const mockCheckMissing = checkMissingStatus as ReturnType<typeof vi.fn>;
+const mockRefreshMissingState = refreshMissingState as ReturnType<typeof vi.fn>;
 const mockEvictBuffer = evictBuffer as ReturnType<typeof vi.fn>;
 const mockEvictStreaming = evictStreamingElement as ReturnType<typeof vi.fn>;
 const mockToastSuccess = toast.success as ReturnType<typeof vi.fn>;
@@ -65,17 +65,14 @@ beforeEach(() => {
   mockSaveLibrary.mockReset();
   mockSaveSettings.mockReset();
   mockUseAppSettings.mockReset();
-  mockCheckMissing.mockReset();
+  mockRefreshMissingState.mockReset();
   mockEvictBuffer.mockReset();
   mockEvictStreaming.mockReset();
   mockToastSuccess.mockReset();
   mockToastWarning.mockReset();
   mockToastError.mockReset();
 
-  mockCheckMissing.mockResolvedValue({
-    missingSoundIds: new globalThis.Set<string>(),
-    missingFolderIds: new globalThis.Set<string>(),
-  });
+  mockRefreshMissingState.mockResolvedValue(undefined);
 });
 
 describe("useBulkRemove", () => {
@@ -107,7 +104,9 @@ describe("useBulkRemove", () => {
       expect(mockEvictStreaming).toHaveBeenCalledTimes(2);
 
       expect(mockSaveLibrary).toHaveBeenCalledTimes(1);
-      expect(mockCheckMissing).toHaveBeenCalledTimes(1);
+      // Must pass explicit globalFolders so the check uses current settings, not Zustand store
+      expect(mockRefreshMissingState).toHaveBeenCalledTimes(1);
+      expect(mockRefreshMissingState).toHaveBeenCalledWith([]);
       expect(mockToastSuccess).toHaveBeenCalledWith("2 missing sounds removed");
     });
 
@@ -163,6 +162,12 @@ describe("useBulkRemove", () => {
       expect(mockToastWarning).toHaveBeenCalledWith(
         "2 folders skipped — assigned as download or import destination",
       );
+      // Must pass updatedSettings.globalFolders (not store) since settings were just saved
+      expect(mockRefreshMissingState).toHaveBeenCalledTimes(1);
+      const passedFolders = mockRefreshMissingState.mock.calls[0][0] as Array<{ id: string }>;
+      expect(passedFolders.map((f) => f.id)).toContain("dl");
+      expect(passedFolders.map((f) => f.id)).toContain("imp");
+      expect(passedFolders.map((f) => f.id)).not.toContain("reg");
     });
 
     it("early-returns with a warning when every missing folder is assigned", async () => {
