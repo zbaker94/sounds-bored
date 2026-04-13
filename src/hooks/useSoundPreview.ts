@@ -27,6 +27,9 @@ export function useSoundPreview() {
         if (err instanceof MissingFileError) {
           toast.error(`"${sound.name}" not found — check the Sounds panel`);
           void refreshMissingState();
+        } else {
+          console.error("[useSoundPreview]", err);
+          toast.error(`Preview failed: ${err instanceof Error ? err.message : "Unknown error"}`);
         }
       }
     },

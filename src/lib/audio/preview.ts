@@ -27,38 +27,56 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
   const ctx = await ensureResumed();
   usePlaybackStore.getState().setIsPreviewPlaying(true);
 
-  if (await checkIsLargeFile(sound)) {
-    // -- Streaming path -------------------------------------------------------
-    if (!sound.filePath) throw new MissingFileError(`Sound "${sound.name}" has no file path`);
-    const url = convertFileSrc(sound.filePath);
-    const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    audio.src = url;
-    const sourceNode = ctx.createMediaElementSource(audio);
-    sourceNode.connect(getMasterGain());
-    currentStreamingAudio = audio;
-    audio.onended = () => {
-      if (currentStreamingAudio === audio) {
-        currentStreamingAudio = null;
-        usePlaybackStore.getState().setIsPreviewPlaying(false);
+  try {
+    if (await checkIsLargeFile(sound)) {
+      // -- Streaming path -------------------------------------------------------
+      if (!sound.filePath) throw new MissingFileError(`Sound "${sound.name}" has no file path`);
+      const url = convertFileSrc(sound.filePath);
+      const audio = new Audio();
+      audio.crossOrigin = 'anonymous';
+      audio.src = url;
+      const sourceNode = ctx.createMediaElementSource(audio);
+      sourceNode.connect(getMasterGain());
+      currentStreamingAudio = audio;
+      audio.onended = () => {
+        if (currentStreamingAudio === audio) {
+          currentStreamingAudio = null;
+          usePlaybackStore.getState().setIsPreviewPlaying(false);
+        }
+        onEnded?.();
+      };
+      try {
+        await audio.play();
+      } catch (err) {
+        // play() rejected (autoplay policy, decode error, permission denied, etc.).
+        // Tear down the partial audio graph so we don't leak the source node or
+        // leave isPreviewPlaying=true with no active voice.
+        try { sourceNode.disconnect(); } catch { /* already disconnected */ }
+        if (currentStreamingAudio === audio) {
+          currentStreamingAudio = null;
+        }
+        throw err;
       }
-      onEnded?.();
-    };
-    await audio.play();
-  } else {
-    // -- Buffer path ----------------------------------------------------------
-    const buffer = await loadBuffer(sound);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(getMasterGain());
-    source.onended = () => {
-      if (currentSource === source) {
-        currentSource = null;
-        usePlaybackStore.getState().setIsPreviewPlaying(false);
-      }
-      onEnded?.();
-    };
-    source.start();
-    currentSource = source;
+    } else {
+      // -- Buffer path ----------------------------------------------------------
+      const buffer = await loadBuffer(sound);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(getMasterGain());
+      source.onended = () => {
+        if (currentSource === source) {
+          currentSource = null;
+          usePlaybackStore.getState().setIsPreviewPlaying(false);
+        }
+        onEnded?.();
+      };
+      source.start();
+      currentSource = source;
+    }
+  } catch (err) {
+    // Any failure (loadBuffer, checkIsLargeFile, play rejection, etc.) must not
+    // leave isPreviewPlaying=true with no active voice.
+    usePlaybackStore.getState().setIsPreviewPlaying(false);
+    throw err;
   }
 }

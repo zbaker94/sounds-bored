@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed sound preview not recovering when playback fails — the app now correctly resets preview state instead of getting stuck
+- Previewing a missing or unloadable sound now shows a specific error message in the notification bar
+- Previewing a sound that fails for any other reason (e.g. unsupported codec, decode error) now shows an informative "Preview failed: ..." error instead of silently failing
 - Fixed a bug where pad settings (mute group, color, icon) could silently persist after being cleared in the pad config drawer
 - Saving pad configuration now correctly clears optional fields like mute group and color when they are not set
 - Fixed a bug where saving pad configuration would apply layer volume at 100× the correct level during active playback (the 0–100 schema value was being passed directly to the audio gain node instead of being normalized to 0–1)
