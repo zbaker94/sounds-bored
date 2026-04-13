@@ -37,6 +37,9 @@ fn parse_progress(line: &str) -> Option<(f64, Option<String>, Option<String>)> {
         .last()?
         .parse::<f64>()
         .ok()?;
+    if !percent.is_finite() || percent < 0.0 || percent > 100.0 {
+        return None;
+    }
 
     let speed = if line.contains(" at ") {
         line.split(" at ")
@@ -551,6 +554,58 @@ mod tests {
         let line = "[ffmpeg] Merging formats into something";
         let result = parse_progress(line);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_progress_negative_percent() {
+        let line = "[download]  -5.0% of  3.45MiB at  1.23MiB/s ETA 00:02";
+        let result = parse_progress(line);
+        assert!(result.is_none(), "negative percent should return None");
+    }
+
+    #[test]
+    fn test_parse_progress_over_100_percent() {
+        let line = "[download]  150.0% of  3.45MiB at  1.23MiB/s ETA 00:02";
+        let result = parse_progress(line);
+        assert!(result.is_none(), "percent > 100 should return None");
+    }
+
+    #[test]
+    fn test_parse_progress_boundary_zero() {
+        let line = "[download]   0.0% of   53.65MiB at  1.00MiB/s ETA 00:53";
+        let result = parse_progress(line);
+        assert!(result.is_some());
+        let (percent, _, _) = result.unwrap();
+        assert!((percent - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_parse_progress_nan() {
+        let line = "[download]  NaN% of  3.45MiB at  1.23MiB/s ETA 00:02";
+        let result = parse_progress(line);
+        assert!(result.is_none(), "NaN percent should return None");
+    }
+
+    #[test]
+    fn test_parse_progress_infinity() {
+        let line = "[download]  inf% of  3.45MiB at  1.23MiB/s ETA 00:02";
+        let result = parse_progress(line);
+        assert!(result.is_none(), "infinite percent should return None");
+    }
+
+    #[test]
+    fn test_parse_progress_boundary_100_exact() {
+        let line = "[download] 100.0% of  3.45MiB in 00:02";
+        let result = parse_progress(line);
+        assert!(result.is_some());
+        assert!((result.unwrap().0 - 100.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_parse_progress_just_over_100() {
+        let line = "[download] 100.01% of  3.45MiB at  1.23MiB/s ETA 00:02";
+        let result = parse_progress(line);
+        assert!(result.is_none(), "percent just over 100 should return None");
     }
 
     #[test]

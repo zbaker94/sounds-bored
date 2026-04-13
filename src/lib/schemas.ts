@@ -249,7 +249,7 @@ export type DownloadStatus = "queued" | "downloading" | "processing" | "complete
 
 export const DownloadProgressEventSchema = z.object({
   id: z.string(),
-  percent: z.number(),
+  percent: z.number().min(0).max(100),
   speed: z.string().optional(),
   eta: z.string().optional(),
   status: z.enum(["queued", "downloading", "processing", "completed", "failed", "cancelled"]),
@@ -263,7 +263,7 @@ export const DownloadJobSchema = z.object({
   url: z.string(),
   outputName: z.string(),
   status: z.enum(["queued", "downloading", "processing", "completed", "failed", "cancelled"]),
-  percent: z.number().default(0),
+  percent: z.number().min(0).max(100).default(0),
   speed: z.string().optional(),
   eta: z.string().optional(),
   error: z.string().optional(),

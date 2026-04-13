@@ -106,4 +106,40 @@ describe("listenToDownloadEvents", () => {
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });
+
+  it("rejects a payload with percent out of range (negative)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onEvent = vi.fn();
+    await listenToDownloadEvents(onEvent);
+
+    await emitPayload({ id: "job-1", percent: -5, status: "downloading" });
+
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("rejects a payload with percent out of range (above 100)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onEvent = vi.fn();
+    await listenToDownloadEvents(onEvent);
+
+    await emitPayload({ id: "job-1", percent: 150, status: "downloading" });
+
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("rejects a payload with percent = Infinity", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onEvent = vi.fn();
+    await listenToDownloadEvents(onEvent);
+
+    await emitPayload({ id: "job-1", percent: Infinity, status: "downloading" });
+
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
 });
