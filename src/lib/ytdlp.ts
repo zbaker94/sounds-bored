@@ -24,6 +24,10 @@ export async function listenToDownloadEvents(
     const parsed = DownloadProgressEventSchema.safeParse(event.payload);
     if (parsed.success) {
       onEvent(parsed.data);
+    } else {
+      // Schema drift between Rust and TS — log the failure so it surfaces in
+      // dev tools / crash reports instead of silently sticking jobs as "pending".
+      console.error("[DownloadProgressEvent] Schema parse failure:", parsed.error, "payload:", event.payload);
     }
   });
 }
