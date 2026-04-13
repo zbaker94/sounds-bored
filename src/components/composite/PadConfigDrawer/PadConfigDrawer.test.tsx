@@ -368,6 +368,39 @@ describe("PadConfigDrawer", () => {
     });
   });
 
+  describe("syncLayerVolume on save", () => {
+    it("calls syncLayerVolume with volume divided by 100 (schema [0,100] → normalized [0,1])", async () => {
+      const { syncLayerVolume } = await import("@/lib/audio/padPlayer");
+      const layer = createMockLayer({
+        id: "layer-1",
+        volume: 80,
+        selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+      const sound = createMockSound({ id: "s1", name: "FX Sound" });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer sceneId="scene-1" padId="pad-1" initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }} />
+        </TooltipProvider>,
+      );
+      openDrawer();
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(syncLayerVolume).toHaveBeenCalledWith("layer-1", 80 / 100);
+      });
+    });
+  });
+
   describe("FadeDurationField", () => {
     it("renders a Fade Duration info icon tooltip", () => {
       renderDrawer();

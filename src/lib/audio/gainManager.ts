@@ -33,16 +33,20 @@ export function resetPadGain(padId: string): void {
 
 /**
  * Update a live layer gain node immediately (e.g. when pad config is saved mid-playback).
- * No-op if the layer isn't active. Pass volume in 0–100 range (matches layer.volume schema).
+ * No-op if the layer isn't active.
+ * @param volume - [0,1] normalized gain. Callers reading from project schema (which stores [0,100]) must divide by 100 before passing.
  */
 export function syncLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
   const ctx = getAudioContext();
-  // Clamp to 0–100 (schema range) and guard against NaN/Infinity from malformed project data.
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(100, volume)) : 100;
+  // Guard against NaN/Infinity. Default to 1.0 (full volume) rather than 0 — syncing mid-playback
+  // to silence would be more disruptive than staying audible, and makes malformed data detectable.
+  // setLayerVolume/commitLayerVolume default NaN to 0 because they are user-driven drag operations
+  // where silent failure is a safer fallback.
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(clamped / 100, ctx.currentTime);
+  gain.gain.setValueAtTime(clamped, ctx.currentTime);
 }
 
 /**
@@ -63,7 +67,10 @@ export function setLayerVolume(layerId: string, volume: number): void {
   }
 }
 
-/** Persist the current layer volume to the project schema (call on drag-end / value commit). */
+/**
+ * Persist the current layer volume to the project schema (call on drag-end / value commit).
+ * @param volume - [0,1] normalized gain. The store multiplies by 100 for [0,100] persistence.
+ */
 export function commitLayerVolume(layerId: string, volume: number): void {
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   useProjectStore.getState().updateLayerVolume(layerId, clamped);

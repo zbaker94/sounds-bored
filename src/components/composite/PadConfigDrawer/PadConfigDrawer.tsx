@@ -135,7 +135,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);
       config.layers.forEach((l) => {
-        syncLayerVolume(l.id, l.volume);
+        syncLayerVolume(l.id, l.volume / 100);
         const originalLayer = initialConfig?.layers?.find((ol) => ol.id === l.id);
         if (originalLayer) syncLayerConfig(l, originalLayer);
       });

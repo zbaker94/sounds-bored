@@ -109,26 +109,28 @@ describe("gainManager", () => {
   });
 
   describe("syncLayerVolume", () => {
-    it("updates an active layer gain node immediately (0–100 scale)", async () => {
+    it("updates an active layer gain node immediately (0–1 normalized scale)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync");
+      // getOrCreateLayerGain uses the legacy [0,100] API (separate concern); 80 here is just
+      // the initial-volume argument and is unrelated to the [0,1] value under test below.
       getOrCreateLayerGain("layer-sync", 80, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
-      syncLayerVolume("layer-sync", 50);
+      syncLayerVolume("layer-sync", 0.5);
 
       expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 0);
     });
 
     it("is a no-op if the layer has no active gain node", async () => {
       const { syncLayerVolume } = await import("./gainManager");
-      expect(() => syncLayerVolume("nonexistent-layer", 80)).not.toThrow();
+      expect(() => syncLayerVolume("nonexistent-layer", 0.8)).not.toThrow();
     });
 
-    it("clamps values above 100 to 1.0", async () => {
+    it("clamps values above 1 to 1.0", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
@@ -137,12 +139,26 @@ describe("gainManager", () => {
       getOrCreateLayerGain("layer-sync-hi", 80, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
-      syncLayerVolume("layer-sync-hi", 150);
+      syncLayerVolume("layer-sync-hi", 1.5);
 
       expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
     });
 
-    it("clamps NaN to 1.0 (safe default, matches schema 100% default volume)", async () => {
+    it("clamps values below 0 to 0", async () => {
+      const mockPadGain = makeMockGain();
+      const mockLayerGain = makeMockGain();
+      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const padGain = getPadGain("pad-sync-lo");
+      getOrCreateLayerGain("layer-sync-lo", 80, padGain);
+      const { syncLayerVolume } = await import("./gainManager");
+
+      syncLayerVolume("layer-sync-lo", -0.5);
+
+      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(0, 0);
+    });
+
+    it("clamps NaN to 1.0 (safe default, full volume)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
