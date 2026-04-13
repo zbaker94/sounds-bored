@@ -4,7 +4,7 @@ import { useGlobalLibrary, useSaveGlobalLibrary } from "@/lib/library.queries";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
+import { SYSTEM_TAG_IMPORTED, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 
 /**
  * Loads appSettings and globalLibrary from disk into their respective
@@ -85,7 +85,7 @@ export function useBootLoader() {
         if (useLibraryStore.getState().isDirty) {
           const latest = useLibraryStore.getState();
           saveLibraryMutation.mutate({
-            version: "1.0.0",
+            version: CURRENT_LIBRARY_VERSION,
             sounds: latest.sounds,
             tags: latest.tags,
             sets: latest.sets,

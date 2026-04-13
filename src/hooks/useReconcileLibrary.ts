@@ -6,6 +6,7 @@ import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
 import { useProjectStore } from "@/state/projectStore";
+import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 
 // Module-level singleton: ensures at most one reconcile runs at a time across
 // all hook instances (e.g. MainPage and SoundsPanel both mount concurrently).
@@ -83,7 +84,7 @@ export function useReconcileLibrary(): {
 
       if (useLibraryStore.getState().isDirty) {
         const latest = useLibraryStore.getState();
-        saveLibraryRef.current({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+        saveLibraryRef.current({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
         // useSaveGlobalLibrary.onSuccess clears the dirty flag after a successful
         // write. Do not clear it here — clearing before save completes means a
         // failed save would silently drop changes.

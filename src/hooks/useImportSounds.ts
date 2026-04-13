@@ -3,6 +3,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { copyFilesToFolder, tagImportedSounds } from "@/lib/import";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import type { GlobalFolder } from "@/lib/schemas";
 
 /**
@@ -47,7 +48,7 @@ export function useImportSounds(
 
         const latest = useLibraryStore.getState();
         await saveLibrary({
-          version: "1.0.0",
+          version: CURRENT_LIBRARY_VERSION,
           sounds: latest.sounds,
           tags: latest.tags,
           sets: latest.sets,
