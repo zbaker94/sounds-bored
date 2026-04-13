@@ -392,4 +392,42 @@ describe("multiFadeStore", () => {
       expect(map2.size).toBe(2);
     });
   });
+
+  describe("enterMultiFadeEmpty", () => {
+    it("should set active to true", () => {
+      const { enterMultiFadeEmpty } = useMultiFadeStore.getState();
+      enterMultiFadeEmpty();
+      expect(useMultiFadeStore.getState().active).toBe(true);
+    });
+
+    it("should set originPadId to null", () => {
+      const { enterMultiFadeEmpty } = useMultiFadeStore.getState();
+      enterMultiFadeEmpty();
+      expect(useMultiFadeStore.getState().originPadId).toBeNull();
+    });
+
+    it("should start with empty selectedPads", () => {
+      const { enterMultiFadeEmpty } = useMultiFadeStore.getState();
+      enterMultiFadeEmpty();
+      expect(useMultiFadeStore.getState().selectedPads.size).toBe(0);
+    });
+
+    it("should set reopenPadId to null", () => {
+      useMultiFadeStore.setState({ reopenPadId: "pad-1" });
+      const { enterMultiFadeEmpty } = useMultiFadeStore.getState();
+      enterMultiFadeEmpty();
+      expect(useMultiFadeStore.getState().reopenPadId).toBeNull();
+    });
+
+    it("should clear any existing selectedPads", () => {
+      useMultiFadeStore.setState({
+        selectedPads: new Map<string, SelectedPadFade>([
+          ["pad-1", { padId: "pad-1", levels: [0, 80] as [number, number] }],
+        ]),
+      });
+      const { enterMultiFadeEmpty } = useMultiFadeStore.getState();
+      enterMultiFadeEmpty();
+      expect(useMultiFadeStore.getState().selectedPads.size).toBe(0);
+    });
+  });
 });

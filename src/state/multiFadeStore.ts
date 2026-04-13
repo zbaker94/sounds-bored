@@ -14,6 +14,7 @@ interface MultiFadeState {
 
 interface MultiFadeActions {
   enterMultiFade: (originPadId: string, playing: boolean, initialVolume?: number) => void;
+  enterMultiFadeEmpty: () => void;
   toggleMultiFadePad: (padId: string, playing: boolean, currentVolume: number) => void;
   setMultiFadeLevels: (padId: string, levels: [number, number]) => void;
   cancelMultiFade: () => void;
@@ -46,6 +47,14 @@ export const useMultiFadeStore = create<MultiFadeState & MultiFadeActions>((set)
         selectedPads,
         reopenPadId: null,
       };
+    }),
+
+  enterMultiFadeEmpty: () =>
+    set({
+      active: true,
+      originPadId: null,
+      selectedPads: new Map(),
+      reopenPadId: null,
     }),
 
   toggleMultiFadePad: (padId, playing, currentVolume) =>

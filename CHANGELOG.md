@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added ability to enter multi-fade mode without a triggering pad, allowing fade controls to be opened independently
 - Added **F** and **X** keyboard shortcuts to the pad control popover: press **F** to fade a pad, press **X** to enter Synchronized Fades (multi-fade) mode with that pad pre-selected.
 - Keyboard shortcut hints now appear as tooltips when hovering the Fade and Synchronized Fades buttons in the pad popover.
 - Pressing **F** or **X** in edit mode now exits edit mode and enters multi-fade with no pad pre-selected, making it faster to start a synchronized fade from the keyboard.
