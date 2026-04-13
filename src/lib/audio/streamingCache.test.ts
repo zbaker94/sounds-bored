@@ -30,7 +30,7 @@ vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any) {
 
 function makeMockCtx() {
   return {
-    createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
+    createMediaElementSource: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
   };
 }
 
@@ -242,6 +242,67 @@ describe("getOrCreateStreamingElement", () => {
     const audio = (globalThis.Audio as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
     expect(audio.crossOrigin).toBe("anonymous");
     expect(audio.preload).toBe("auto");
+  });
+});
+
+describe("getOrCreateStreamingElement — stale context rebuild", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAllStreamingElements();
+  });
+
+  it("creates a fresh Audio element and sourceNode when called with a different AudioContext", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx1 = makeMockCtx();
+    const ctx2 = makeMockCtx();
+
+    const first = getOrCreateStreamingElement(sound, ctx1 as any);
+
+    // Simulate a context change (e.g. HMR module reload recreated the AudioContext).
+    const second = getOrCreateStreamingElement(sound, ctx2 as any);
+
+    // A fresh Audio element must be created for the new context.
+    expect(second.audio).not.toBe(first.audio);
+    // createMediaElementSource must be called on the new context, not the old one.
+    expect(ctx2.createMediaElementSource).toHaveBeenCalledTimes(1);
+    expect(ctx1.createMediaElementSource).toHaveBeenCalledTimes(1); // only the original call
+  });
+
+  it("preserves the audio src on the fresh element after a context change", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx1 = makeMockCtx();
+    const ctx2 = makeMockCtx();
+
+    getOrCreateStreamingElement(sound, ctx1 as any);
+    const { audio: freshAudio } = getOrCreateStreamingElement(sound, ctx2 as any);
+
+    expect(freshAudio.src).toBe("asset://localhost/big.wav");
+  });
+
+  it("pauses and clears the old Audio element during a context change rebuild", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx1 = makeMockCtx();
+    const ctx2 = makeMockCtx();
+
+    const { audio: oldAudio } = getOrCreateStreamingElement(sound, ctx1 as any);
+    getOrCreateStreamingElement(sound, ctx2 as any);
+
+    expect(oldAudio.pause).toHaveBeenCalledOnce();
+    expect(oldAudio.src).toBe("");
+  });
+
+  it("returns the same element on repeated calls with the same context after a rebuild", () => {
+    const sound = createMockSound({ filePath: "big.wav" });
+    const ctx1 = makeMockCtx();
+    const ctx2 = makeMockCtx();
+
+    getOrCreateStreamingElement(sound, ctx1 as any);
+    const second = getOrCreateStreamingElement(sound, ctx2 as any);
+    const third = getOrCreateStreamingElement(sound, ctx2 as any);
+
+    expect(third.audio).toBe(second.audio);
+    expect(third.sourceNode).toBe(second.sourceNode);
+    expect(ctx2.createMediaElementSource).toHaveBeenCalledTimes(1);
   });
 });
 

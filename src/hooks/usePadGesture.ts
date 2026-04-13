@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
@@ -51,6 +51,20 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     hasTriggeredDuringDrag: false,
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Throttle dragVolume display updates to one React setState per animation frame.
+  // setPadVolume (Web Audio) still fires immediately on every pointermove for glitch-free audio.
+  const dragRafRef = useRef<number | null>(null);
+  const pendingDragVolume = useRef<number | null>(null);
+
+  // Cancel any pending drag-volume RAF on unmount so setState is never called on
+  // an unmounted component (e.g. when the scene changes mid-drag).
+  useEffect(() => {
+    return () => {
+      if (dragRafRef.current !== null) {
+        cancelAnimationFrame(dragRafRef.current);
+      }
+    };
+  }, []);
 
   // All handlers and their helpers are co-located in a single useMemo so that:
   // 1. Helper functions share the same closure scope as the handlers that call them,
@@ -166,13 +180,34 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         }
 
         setPadVolume(pad.id, newVolume);
-        setDragVolume(newVolume);
+        // Throttle the React display update to one setState per animation frame.
+        pendingDragVolume.current = newVolume;
+        if (dragRafRef.current === null) {
+          dragRafRef.current = requestAnimationFrame(() => {
+            // Read the ref inside the callback so multiple pointermove events that
+            // arrived within the same frame use the latest value, not the one at
+            // scheduling time. resetGesture cancels this RAF before nulling the ref,
+            // so the null branch is a safety net rather than the expected path.
+            if (pendingDragVolume.current !== null) {
+              setDragVolume(pendingDragVolume.current);
+            }
+            dragRafRef.current = null;
+          });
+        }
       }
     }
 
     function resetGesture() {
       const s = state.current;
-      if (s.phase === "drag") { setIsDragging(false); setDragVolume(null); }
+      if (s.phase === "drag") {
+        setIsDragging(false);
+        setDragVolume(null);
+        if (dragRafRef.current !== null) {
+          cancelAnimationFrame(dragRafRef.current);
+          dragRafRef.current = null;
+        }
+        pendingDragVolume.current = null;
+      }
       if (hasHoldLayer) {
         releasePadHoldLayers(pad);
         resetPadGain(pad.id);

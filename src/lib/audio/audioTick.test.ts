@@ -10,6 +10,7 @@ vi.mock("./audioState", async (importOriginal) => {
     forEachActivePadGain: vi.fn(),
     forEachActiveLayerGain: vi.fn(),
     getActiveLayerIdSet: vi.fn().mockReturnValue(new Set()),
+    getLayerVoiceVersion: vi.fn().mockReturnValue(0),
     computeAllPadProgress: vi.fn().mockReturnValue({}),
     computeAllLayerProgress: vi.fn().mockReturnValue({}),
   };
@@ -20,6 +21,7 @@ import {
   forEachActivePadGain,
   forEachActiveLayerGain,
   getActiveLayerIdSet,
+  getLayerVoiceVersion,
   computeAllPadProgress,
   computeAllLayerProgress,
 } from "./audioState";
@@ -31,6 +33,7 @@ describe("audioTick", () => {
     vi.mocked(forEachActivePadGain).mockImplementation(() => {});
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
     vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set());
+    vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
     vi.mocked(computeAllPadProgress).mockReturnValue({});
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
   });
@@ -107,6 +110,57 @@ describe("audioTick", () => {
 
     // No further RAF should have been scheduled (tick exited)
     expect(rafSpy).toHaveBeenCalledTimes(1); // only the initial startAudioTick call
+
+    rafSpy.mockRestore();
+  });
+
+  it("does not call getActiveLayerIdSet when layerVoiceVersion is unchanged", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    // Version stays at 0 across both ticks
+    vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // first tick — version seen for first time (version 0 vs prev -1 → changed)
+    vi.mocked(getActiveLayerIdSet).mockClear();
+
+    capturedCallback!(performance.now()); // second tick — same version → should skip
+    expect(getActiveLayerIdSet).not.toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+  });
+
+  it("calls getActiveLayerIdSet and updates store when layerVoiceVersion changes", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
+
+    const newActiveIds = new Set(["layer-1"]);
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(newActiveIds);
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // first tick — version 0 vs prev -1 → changed
+
+    // Simulate a voice being added: version bumps to 1
+    vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+    capturedCallback!(performance.now()); // second tick — version changed → must call getActiveLayerIdSet
+
+    expect(getActiveLayerIdSet).toHaveBeenCalled();
+    expect(usePlaybackStore.getState().activeLayerIds).toBe(newActiveIds);
 
     rafSpy.mockRestore();
   });

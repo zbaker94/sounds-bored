@@ -15,8 +15,8 @@ export function getMasterGain(): GainNode {
     masterGain.gain.value = usePlaybackStore.getState().masterVolume / 100;
     masterGain.connect(c.destination);
 
-    usePlaybackStore.subscribe((state) => {
-      if (masterGain) {
+    usePlaybackStore.subscribe((state, prevState) => {
+      if (masterGain && state.masterVolume !== prevState.masterVolume) {
         masterGain.gain.value = state.masterVolume / 100;
       }
     });

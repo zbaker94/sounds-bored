@@ -4,6 +4,7 @@ import type { Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
+import { PAD_STAGGER_MS, padEnterAnimation } from "./padAnimations";
 import { MultiFadePill } from "./MultiFadePill";
 import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
 import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
@@ -233,12 +234,12 @@ export function SceneView() {
             isDraggingPad && "overflow-y-auto",
           )}>
             {displayPads.map((pad, i) => (
-              <motion.div
+              <div
                 key={pad.id}
                 className="w-full h-full"
-                initial={isDraggingPad ? false : { opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: isDraggingPad ? 0 : i * 0.03 }}
+                style={isDraggingPad ? undefined : {
+                  animation: padEnterAnimation(i * PAD_STAGGER_MS),
+                }}
               >
                 <PadButton
                   pad={pad}
@@ -246,14 +247,12 @@ export function SceneView() {
                   index={i}
                   onEditClick={handleEditClick}
                 />
-              </motion.div>
+              </div>
             ))}
             {isLastPage && !isDraggingPad && (
-              <motion.div
+              <div
                 className="w-full h-full"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: displayPads.length * 0.03 }}
+                style={{ animation: padEnterAnimation(displayPads.length * PAD_STAGGER_MS) }}
               >
                 <button
                   onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
@@ -266,7 +265,7 @@ export function SceneView() {
                     className="text-foreground/60"
                   />
                 </button>
-              </motion.div>
+              </div>
             )}
           </div>
         </SortableContext>

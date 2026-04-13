@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Pad flip and enter animations now use CSS transitions instead of JavaScript springs, making the scene grid smoother and more responsive when toggling edit mode with many pads visible.
+- Volume drag on pads is throttled to one UI update per animation frame, preventing unnecessary re-renders while keeping audio adjustments glitch-free.
+- Master volume changes no longer trigger redundant audio graph updates when the value hasn't actually changed.
+- Streaming audio elements are now rebuilt correctly when the audio context is recreated (e.g. after a hot reload), preventing silent playback failures.
+- Audio tick loop now skips Zustand store updates entirely on frames where pad volumes, layer volumes, progress, and active layer IDs are all unchanged, reducing CPU usage during stable playback.
 - Added **F** and **X** keyboard shortcuts to trigger fade and enter Synchronized Fades mode from a pad's control popover
 - **F** and **X** now also execute a multi-fade when pressed while in Synchronized Fades mode (same as pressing Enter)
 - Pressing **F** or **X** in edit mode exits edit mode and enters multi-fade with no pad pre-selected

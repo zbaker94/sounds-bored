@@ -23,6 +23,8 @@ const sizeCache = new Map<string, boolean>();
 interface StreamingElementEntry {
   audio: HTMLAudioElement;
   sourceNode: MediaElementAudioSourceNode | null;
+  /** The AudioContext that owns sourceNode. Used to detect stale entries after a context change. */
+  ownerCtx: AudioContext | null;
 }
 
 const streamingElementCache = new Map<string, StreamingElementEntry>();
@@ -36,15 +38,20 @@ const streamingElementCache = new Map<string, StreamingElementEntry>();
  * time the user presses the pad, eliminating first-trigger latency.
  * No-op if an entry already exists for this sound.
  */
-export function preloadStreamingAudio(sound: Sound): void {
-  if (!sound.filePath || streamingElementCache.has(sound.id)) return;
-
-  const url = convertFileSrc(sound.filePath);
+function createStreamingAudioElement(url: string): HTMLAudioElement {
   const audio = new Audio();
   audio.crossOrigin = "anonymous";
   audio.preload = "auto";
   audio.src = url;
-  streamingElementCache.set(sound.id, { audio, sourceNode: null });
+  return audio;
+}
+
+export function preloadStreamingAudio(sound: Sound): void {
+  if (!sound.filePath || streamingElementCache.has(sound.id)) return;
+
+  const url = convertFileSrc(sound.filePath);
+  const audio = createStreamingAudioElement(url);
+  streamingElementCache.set(sound.id, { audio, sourceNode: null, ownerCtx: null });
 }
 
 /**
@@ -68,16 +75,27 @@ export function getOrCreateStreamingElement(
 
   if (!entry) {
     const url = convertFileSrc(sound.filePath!);
-    const audio = new Audio();
-    audio.crossOrigin = "anonymous";
-    audio.preload = "auto";
-    audio.src = url;
-    entry = { audio, sourceNode: null };
+    const audio = createStreamingAudioElement(url);
+    entry = { audio, sourceNode: null, ownerCtx: null };
     streamingElementCache.set(sound.id, entry);
+  }
+
+  // If the sourceNode was created for a different AudioContext (e.g. after a dev HMR
+  // reload), it can never be reused — MediaElementAudioSourceNode is permanently
+  // bound to its context. Create a fresh HTMLAudioElement + sourceNode.
+  if (entry.sourceNode && entry.ownerCtx !== ctx) {
+    entry.sourceNode.disconnect();
+    const existingSrc = entry.audio.src;
+    entry.audio.pause();
+    entry.audio.src = "";
+    entry.audio = createStreamingAudioElement(existingSrc);
+    entry.sourceNode = null;
+    entry.ownerCtx = null;
   }
 
   if (!entry.sourceNode) {
     entry.sourceNode = ctx.createMediaElementSource(entry.audio);
+    entry.ownerCtx = ctx;
   }
 
   return { audio: entry.audio, sourceNode: entry.sourceNode };

@@ -69,6 +69,17 @@ const voiceMap = new Map<string, AudioVoice[]>();
 /** Active voices per layer. */
 const layerVoiceMap = new Map<string, AudioVoice[]>();
 
+/**
+ * Incremented whenever a layer voice is added or removed. The audioTick loop
+ * reads this to skip `new Set(layerVoiceMap.keys())` on frames where the active
+ * layer set is unchanged — avoids one per-frame Set allocation during stable playback.
+ */
+let layerVoiceVersion = 0;
+
+export function getLayerVoiceVersion(): number {
+  return layerVoiceVersion;
+}
+
 /** Keyed by layer ID. One GainNode per active layer, connects to its padGain. */
 const layerGainMap = new Map<string, GainNode>();
 
@@ -296,6 +307,7 @@ export function clearAllLayerCycleIndexes(): void {
 export function clearAllVoices(): void {
   voiceMap.clear();
   layerVoiceMap.clear();
+  layerVoiceVersion++;
 }
 
 export function clearAllFadeTracking(): void {
@@ -540,6 +552,7 @@ export function stopPadVoices(padId: string): void {
       layerVoiceMap.set(layerId, remaining);
     }
   }
+  layerVoiceVersion++;
   for (const voice of voices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -552,6 +565,7 @@ export function stopAllVoices(): void {
   const allVoices = [...voiceMap.values()].flat();
   voiceMap.clear();
   layerVoiceMap.clear();
+  layerVoiceVersion++;
   usePlaybackStore.getState().clearAllPlayingPads();
   for (const voice of allVoices) {
     try { voice.stop(); } catch { /* already ended */ }
@@ -560,6 +574,7 @@ export function stopAllVoices(): void {
 
 export function recordLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
   layerVoiceMap.set(layerId, [...(layerVoiceMap.get(layerId) ?? []), voice]);
+  layerVoiceVersion++;
   recordVoice(padId, voice);
 }
 
@@ -570,6 +585,7 @@ export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoic
   } else {
     layerVoiceMap.set(layerId, updated);
   }
+  layerVoiceVersion++;
   clearVoice(padId, voice);
 }
 
@@ -580,6 +596,7 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   // Clean up maps BEFORE calling stop() — wrapStreamingElement.stop()
   // fires onended synchronously, so clearing first makes clearLayerVoice a safe no-op.
   layerVoiceMap.delete(layerId);
+  layerVoiceVersion++;
   const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
   if (padVoices.length === 0) {
     voiceMap.delete(padId);

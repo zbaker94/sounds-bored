@@ -76,6 +76,7 @@ import {
   getActivePadCount,
   forEachActiveLayerGain,
   getActiveLayerIdSet,
+  getLayerVoiceVersion,
   computeAllPadProgress,
 } from "./audioState";
 import type { AudioVoice } from "./audioVoice";
@@ -410,6 +411,39 @@ describe("voice tracking", () => {
     nullAllOnEnded();
     expect(v1.setOnEnded).toHaveBeenCalledWith(null);
     expect(v2.setOnEnded).toHaveBeenCalledWith(null);
+  });
+});
+
+// ── layerVoiceVersion ────────────────────────────────────────────────────────
+
+describe("getLayerVoiceVersion", () => {
+  it("increments when a layer voice is recorded", () => {
+    const before = getLayerVoiceVersion();
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    expect(getLayerVoiceVersion()).toBe(before + 1);
+  });
+
+  it("increments when a layer voice is cleared", () => {
+    const voice = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", voice);
+    const before = getLayerVoiceVersion();
+    clearLayerVoice("pad-1", "layer-1", voice);
+    expect(getLayerVoiceVersion()).toBe(before + 1);
+  });
+
+  it("increments when clearAllVoices is called", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    const before = getLayerVoiceVersion();
+    clearAllVoices();
+    expect(getLayerVoiceVersion()).toBe(before + 1);
+  });
+
+  it("increments once per recorded voice, not once per call", () => {
+    const before = getLayerVoiceVersion();
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-1", "layer-2", makeVoice());
+    recordLayerVoice("pad-2", "layer-3", makeVoice());
+    expect(getLayerVoiceVersion()).toBe(before + 3);
   });
 });
 

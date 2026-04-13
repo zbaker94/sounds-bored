@@ -190,6 +190,8 @@ describe("PadButton", () => {
 
       // Drag 100 px up: startVolume=0, rampFactor=1.0, delta=100, range=200 → 50%
       fireEvent.pointerMove(button, { clientY: 100, pointerId: 1 });
+      // setDragVolume is RAF-throttled — flush the pending frame so the display updates.
+      act(() => { vi.runAllTimers(); });
 
       expect(screen.getByText("50%")).toBeInTheDocument();
     });

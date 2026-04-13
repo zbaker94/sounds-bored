@@ -23,34 +23,42 @@ import {
   forEachActivePadGain,
   forEachActiveLayerGain,
   getActiveLayerIdSet,
+  getLayerVoiceVersion,
   computeAllPadProgress,
   computeAllLayerProgress,
 } from "./audioState";
 
 const VOLUME_EPSILON = 0.001;
+// Progress bars advance every frame while audio plays; a tolerance just below
+// 1 pixel of displayed movement skips duplicate frames without visible stall.
+// At 60 fps a 10 s sound advances ~0.0017/frame, so 0.001 skips at most 1 frame.
+const PROGRESS_EPSILON = 0.001;
 
 let rafId: number | null = null;
 
-// Track previous values to skip no-op store updates for pad/layer volumes and activeLayerIds.
+// Per-frame previous values — diffed each tick to suppress no-op store updates.
 let prevPadVolumes: Record<string, number> = {};
 let prevLayerVolumes: Record<string, number> = {};
 let prevActiveLayerIds = new Set<string>();
+let prevLayerVoiceVersion = -1;
+let prevPadProgress: Record<string, number> = {};
+let prevLayerProgress: Record<string, number> = {};
 
-function setsEqual(a: Set<string>, b: Set<string>): boolean {
-  if (a.size !== b.size) return false;
-  for (const k of a) {
-    if (!b.has(k)) return false;
-  }
-  return true;
+/** Reset all per-frame tracker state. Called on start, self-terminate, and stop. */
+function resetTrackers(): void {
+  prevPadVolumes = {};
+  prevLayerVolumes = {};
+  prevActiveLayerIds = new Set();
+  prevLayerVoiceVersion = -1;
+  prevPadProgress = {};
+  prevLayerProgress = {};
 }
 
 function tick(): void {
   // Self-terminate when no pads are active.
   if (getActivePadCount() === 0) {
     rafId = null;
-    prevPadVolumes = {};
-    prevLayerVolumes = {};
-    prevActiveLayerIds = new Set();
+    resetTrackers();
     _clearAllTickFields();
     return;
   }
@@ -67,37 +75,61 @@ function tick(): void {
 
   // --- Compute layerVolumes ---
   // Emit all active layer gains (no threshold filter — layers always show their live volume).
-  // Epsilon diff in shallowEqualRecords avoids no-op store writes for stable values.
+  // volumesEqual avoids no-op store writes for stable values.
   const nextLayerVolumes: Record<string, number> = {};
   forEachActiveLayerGain((layerId, gain) => {
     nextLayerVolumes[layerId] = gain.gain.value;
   });
 
-  // --- Compute padProgress (always emit for playing pads) ---
+  // --- Compute padProgress — diff to skip no-op store updates ---
   const nextPadProgress = computeAllPadProgress();
+  const padProgressChanged = !progressEqual(nextPadProgress, prevPadProgress);
+  if (padProgressChanged) prevPadProgress = nextPadProgress;
 
-  // --- Compute layerProgress (always emit for active layers) ---
+  // --- Compute layerProgress — diff to skip no-op store updates ---
   const nextLayerProgress = computeAllLayerProgress();
+  const layerProgressChanged = !progressEqual(nextLayerProgress, prevLayerProgress);
+  if (layerProgressChanged) prevLayerProgress = nextLayerProgress;
 
-  // --- Compute activeLayerIds — diff to skip no-op store updates ---
-  // getActiveLayerIdSet() always returns a new Set object; without diffing,
-  // every subscriber (e.g. PadControlContent) would re-render every RAF frame.
-  const nextActiveLayerIds = getActiveLayerIdSet();
-  const activeLayerIdsChanged = !setsEqual(nextActiveLayerIds, prevActiveLayerIds);
-  if (activeLayerIdsChanged) prevActiveLayerIds = nextActiveLayerIds;
+  // --- Compute activeLayerIds — version-gated to avoid allocating a Set every frame ---
+  // layerVoiceVersion increments only when a voice is added or removed. On frames
+  // where the version is unchanged (the common steady-state case during playback),
+  // getActiveLayerIdSet() is never called and no Set is allocated.
+  const currentLayerVoiceVersion = getLayerVoiceVersion();
+  const activeLayerIdsChanged = currentLayerVoiceVersion !== prevLayerVoiceVersion;
+  let nextActiveLayerIds = prevActiveLayerIds;
+  if (activeLayerIdsChanged) {
+    nextActiveLayerIds = getActiveLayerIdSet();
+    prevActiveLayerIds = nextActiveLayerIds;
+    prevLayerVoiceVersion = currentLayerVoiceVersion;
+  }
 
   // Diff padVolumes and layerVolumes to skip no-op updates.
-  const padVolumesChanged = !shallowEqualRecords(nextPadVolumes, prevPadVolumes);
-  const layerVolumesChanged = !shallowEqualRecords(nextLayerVolumes, prevLayerVolumes);
+  const padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
+  const layerVolumesChanged = !volumesEqual(nextLayerVolumes, prevLayerVolumes);
 
   if (padVolumesChanged) prevPadVolumes = nextPadVolumes;
   if (layerVolumesChanged) prevLayerVolumes = nextLayerVolumes;
 
+  // Only call setAudioTick if at least one field actually changed.
+  // When nothing changed, skip the Zustand update entirely — this prevents
+  // all playbackStore subscribers from running their selector functions every frame.
+  if (
+    !padVolumesChanged &&
+    !layerVolumesChanged &&
+    !padProgressChanged &&
+    !layerProgressChanged &&
+    !activeLayerIdsChanged
+  ) {
+    rafId = requestAnimationFrame(tick);
+    return;
+  }
+
   usePlaybackStore.getState().setAudioTick({
     ...(padVolumesChanged ? { padVolumes: nextPadVolumes } : {}),
     ...(layerVolumesChanged ? { layerVolumes: nextLayerVolumes } : {}),
-    padProgress: nextPadProgress,
-    layerProgress: nextLayerProgress,
+    ...(padProgressChanged ? { padProgress: nextPadProgress } : {}),
+    ...(layerProgressChanged ? { layerProgress: nextLayerProgress } : {}),
     ...(activeLayerIdsChanged ? { activeLayerIds: nextActiveLayerIds } : {}),
   });
 
@@ -117,9 +149,7 @@ export function stopAudioTick(): void {
     rafId = null;
   }
   _clearAllTickFields();
-  prevPadVolumes = {};
-  prevLayerVolumes = {};
-  prevActiveLayerIds = new Set();
+  resetTrackers();
 }
 
 function _clearAllTickFields(): void {
@@ -132,11 +162,22 @@ function _clearAllTickFields(): void {
   });
 }
 
-function shallowEqualRecords(a: Record<string, number>, b: Record<string, number>): boolean {
+/** True when two pad/layer volume records are equal within VOLUME_EPSILON. */
+function volumesEqual(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
   for (const k of aKeys) {
     if (!(k in b) || Math.abs(a[k] - b[k]) > VOLUME_EPSILON) return false;
+  }
+  return true;
+}
+
+/** True when two progress records are equal within PROGRESS_EPSILON. */
+function progressEqual(a: Record<string, number>, b: Record<string, number>): boolean {
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  for (const k of aKeys) {
+    if (!(k in b) || Math.abs(a[k] - b[k]) > PROGRESS_EPSILON) return false;
   }
   return true;
 }

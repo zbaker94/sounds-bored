@@ -19,6 +19,7 @@ import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { PadControlContent } from "./PadControlContent";
+import { PAD_FLIP_DURATION_MS, PAD_FLIP_EASE, PAD_STAGGER_MS } from "./padAnimations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -30,6 +31,10 @@ interface PadButtonProps {
   index?: number;
   onEditClick?: (pad: Pad) => void;
 }
+
+// Overdamped spring config: settles in ~5 frames instead of 22+, reducing the
+// RAF tail while preserving the smooth tilt feel.
+const TILT_SPRING = { stiffness: 1200, damping: 80 } as const;
 
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
@@ -230,8 +235,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   const tiltEnabled = !editMode && !isSortableDragging && !multiFadeActive;
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [4, -4]), { stiffness: 300, damping: 30 });
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-4, 4]), { stiffness: 300, damping: 30 });
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [4, -4]), TILT_SPRING);
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-4, 4]), TILT_SPRING);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     if (!tiltEnabled) return;
@@ -348,12 +353,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
               />
             )}
           </AnimatePresence>
-          {/* Flip container — rotates to reveal back face (edit overlay) */}
-          <motion.div
+          {/* Flip container — CSS transition instead of JS spring to avoid RAF overload
+               when 12 pads flip simultaneously. GPU-composited; zero main-thread cost. */}
+          <div
             className="relative w-full h-full"
-            animate={{ rotateY: editMode ? 180 : 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22, delay: index * 0.03 }}
-            style={{ transformStyle: 'preserve-3d' }}
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: `rotateY(${editMode ? 180 : 0}deg)`,
+              transition: `transform ${PAD_FLIP_DURATION_MS}ms ${PAD_FLIP_EASE} ${index * PAD_STAGGER_MS}ms`,
+            }}
           >
             {/* Front face — normal pad */}
             <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={editMode || undefined}>
@@ -506,8 +514,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                   pad={pad}
                   sceneId={sceneId}
                   context="backface"
-                  // No dismiss action on back face — user exits edit mode via the global toggle
-                  onClose={() => {}}
+                  // No onClose on the back face — user exits edit mode via the global toggle.
                   // Exit edit mode when multi-fade is entered so both state changes land in the
                   // same React render (editMode=false, active=true), preventing useMultiFadeMode
                   // from immediately cancelling and reopening the live-control popover.
@@ -516,7 +523,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                 />
               </div>
             </div>
-          </motion.div>
+          </div>
         </motion.div>
       </div>
       <PopoverContent side="bottom" sideOffset={10} showArrow>

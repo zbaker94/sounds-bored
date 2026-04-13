@@ -64,7 +64,7 @@ function getDisplayMode(height: number): DisplayMode {
 export interface PadControlContentProps {
   pad: Pad;
   sceneId: string;
-  onClose: () => void;
+  onClose?: () => void;
   onEditClick?: (pad: Pad) => void;
   /** Called after enterMultiFade — allows the caller to exit edit mode in the same
    *  event-handler flush so React 18 batches it with the store update, preventing
@@ -468,14 +468,14 @@ export const PadControlContent = memo(function PadControlContent({
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Playback error: audio fade failed — ${message}`);
     });
-    onClose();
+    onClose?.();
   }, [pad, fadeLevels, fadeDuration, onClose]);
 
   const handleMultiFade = useCallback(() => {
     const playing = isPadActive(pad.id);
     enterMultiFade(pad.id, playing, padVolume);
     onMultiFade?.();
-    onClose();
+    onClose?.();
   }, [pad.id, padVolume, enterMultiFade, onMultiFade, onClose]);
 
   // Popover-scoped hotkeys: only active when this component is mounted as a popover/drawer.
@@ -604,7 +604,7 @@ export const PadControlContent = memo(function PadControlContent({
             size="icon-xs"
             variant="default"
             aria-label="Edit pad"
-            onClick={() => { onEditClick?.(pad); onClose(); }}
+            onClick={() => { onEditClick?.(pad); onClose?.(); }}
           >
             <HugeiconsIcon icon={PencilEdit01Icon} size={12} />
           </Button>
@@ -612,7 +612,7 @@ export const PadControlContent = memo(function PadControlContent({
             size="icon-xs"
             variant="secondary"
             aria-label="Duplicate pad"
-            onClick={() => { duplicatePad(sceneId, pad.id); onClose(); }}
+            onClick={() => { duplicatePad(sceneId, pad.id); onClose?.(); }}
           >
             <HugeiconsIcon icon={Copy01Icon} size={12} />
           </Button>
@@ -894,7 +894,7 @@ export const PadControlContent = memo(function PadControlContent({
           setConfirmingDelete(false);
           stopPad(pad);
           deletePad(sceneId, pad.id);
-          onClose();
+          onClose?.();
         }}
         onCancel={() => setConfirmingDelete(false)}
       />
