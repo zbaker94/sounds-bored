@@ -10,6 +10,9 @@ interface LibraryState {
   // Runtime-only — never persisted to disk
   missingSoundIds: globalThis.Set<string>;
   missingFolderIds: globalThis.Set<string>;
+  /** IDs whose existence could not be determined (permission denied, out-of-scope). */
+  unknownSoundIds: globalThis.Set<string>;
+  unknownFolderIds: globalThis.Set<string>;
 }
 
 type LibraryData = Pick<LibraryState, "sounds" | "tags" | "sets">;
@@ -31,7 +34,12 @@ interface LibraryActions {
   /** Like assignTagsToSounds but bypasses the system tag guard. For internal use (import, bootloader). */
   systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
   /** Update runtime missing-file state. Not persisted. */
-  setMissingState: (missingSoundIds: globalThis.Set<string>, missingFolderIds: globalThis.Set<string>) => void;
+  setMissingState: (
+    missingSoundIds: globalThis.Set<string>,
+    missingFolderIds: globalThis.Set<string>,
+    unknownSoundIds: globalThis.Set<string>,
+    unknownFolderIds: globalThis.Set<string>,
+  ) => void;
 }
 
 export type LibraryStore = LibraryState & LibraryActions;
@@ -43,6 +51,8 @@ export const initialLibraryState: LibraryState = {
   isDirty: false,
   missingSoundIds: new globalThis.Set<string>(),
   missingFolderIds: new globalThis.Set<string>(),
+  unknownSoundIds: new globalThis.Set<string>(),
+  unknownFolderIds: new globalThis.Set<string>(),
 };
 
 export const useLibraryStore = create<LibraryStore>()(
@@ -201,7 +211,7 @@ export const useLibraryStore = create<LibraryStore>()(
       }),
 
     // Plain set — Immer + Set can be finicky, and missing state is simple runtime data
-    setMissingState: (missingSoundIds, missingFolderIds) =>
-      set({ missingSoundIds, missingFolderIds }),
+    setMissingState: (missingSoundIds, missingFolderIds, unknownSoundIds, unknownFolderIds) =>
+      set({ missingSoundIds, missingFolderIds, unknownSoundIds, unknownFolderIds }),
   }))
 );

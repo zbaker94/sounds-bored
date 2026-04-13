@@ -285,11 +285,13 @@ describe("libraryStore", () => {
   });
 
   describe("setMissingState", () => {
+    const emptySet = () => new globalThis.Set<string>();
+
     it("should update missingSoundIds and missingFolderIds", () => {
       const soundIds = new Set(["s1", "s2"]);
       const folderIds = new Set(["f1"]);
 
-      getState().setMissingState(soundIds, folderIds);
+      getState().setMissingState(soundIds, folderIds, emptySet(), emptySet());
 
       expect(getState().missingSoundIds).toEqual(soundIds);
       expect(getState().missingFolderIds).toEqual(folderIds);
@@ -298,25 +300,48 @@ describe("libraryStore", () => {
     it("should not mark isDirty", () => {
       useLibraryStore.setState({ isDirty: false });
 
-      getState().setMissingState(new Set(["s1"]), new Set());
+      getState().setMissingState(new Set(["s1"]), emptySet(), emptySet(), emptySet());
 
       expect(getState().isDirty).toBe(false);
     });
 
     it("should replace previous missing state entirely", () => {
-      getState().setMissingState(new Set(["s1", "s2"]), new Set(["f1"]));
-      getState().setMissingState(new Set(["s3"]), new Set());
+      getState().setMissingState(new Set(["s1", "s2"]), new Set(["f1"]), emptySet(), emptySet());
+      getState().setMissingState(new Set(["s3"]), emptySet(), emptySet(), emptySet());
 
       expect(getState().missingSoundIds).toEqual(new Set(["s3"]));
       expect(getState().missingFolderIds.size).toBe(0);
     });
 
     it("should clear missing state when called with empty sets", () => {
-      getState().setMissingState(new Set(["s1"]), new Set(["f1"]));
-      getState().setMissingState(new Set(), new Set());
+      getState().setMissingState(new Set(["s1"]), new Set(["f1"]), emptySet(), emptySet());
+      getState().setMissingState(emptySet(), emptySet(), emptySet(), emptySet());
 
       expect(getState().missingSoundIds.size).toBe(0);
       expect(getState().missingFolderIds.size).toBe(0);
+    });
+
+    it("should store unknownSoundIds and unknownFolderIds", () => {
+      const unknownSounds = new Set(["s-unknown"]);
+      const unknownFolders = new Set(["f-unknown"]);
+
+      getState().setMissingState(emptySet(), emptySet(), unknownSounds, unknownFolders);
+
+      expect(getState().unknownSoundIds).toEqual(unknownSounds);
+      expect(getState().unknownFolderIds).toEqual(unknownFolders);
+    });
+
+    it("should replace previous unknown state entirely", () => {
+      getState().setMissingState(emptySet(), emptySet(), new Set(["s1"]), new Set(["f1"]));
+      getState().setMissingState(emptySet(), emptySet(), new Set(["s2"]), emptySet());
+
+      expect(getState().unknownSoundIds).toEqual(new Set(["s2"]));
+      expect(getState().unknownFolderIds.size).toBe(0);
+    });
+
+    it("initial state has empty unknown sets", () => {
+      expect(getState().unknownSoundIds.size).toBe(0);
+      expect(getState().unknownFolderIds.size).toBe(0);
     });
   });
 });

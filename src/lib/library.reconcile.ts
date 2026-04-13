@@ -221,56 +221,89 @@ export class MissingFileError extends Error {
 export interface MissingStatusResult {
   missingSoundIds: Set<string>;
   missingFolderIds: Set<string>;
+  /** IDs whose existence could not be determined (e.g. permission denied, out-of-scope). */
+  unknownSoundIds: Set<string>;
+  unknownFolderIds: Set<string>;
 }
 
 /**
  * Check which global folders and sounds are missing from disk.
  *
  * A folder is missing if its path does not exist.
- * A sound is missing if:
- *   - it has a filePath that does not exist on disk, OR
- *   - its folderId points to a missing folder (even if filePath isn't checked separately)
- * Sounds with no filePath are never flagged.
+ * A sound is missing if its individual file is absent OR its folder is confirmed missing.
+ * Sounds with no filePath inherit their folder's status (missing/unknown).
  *
- * Folders or files that cannot be checked due to scope restrictions are
- * silently skipped (not treated as missing).
+ * Folders or files whose existence cannot be determined (permission denied,
+ * out-of-scope) are tracked in `unknownFolderIds`/`unknownSoundIds` instead of
+ * being silently treated as present.
  */
 export async function checkMissingStatus(
   globalFolders: GlobalFolder[],
   sounds: Sound[],
 ): Promise<MissingStatusResult> {
-  // Check all folder paths in parallel — skip any that throw (outside scope)
-  const folderChecks = await Promise.all(
-    globalFolders.map(async (f) => {
+  type FolderCheckResult = { id: string; status: "missing" | "present" | "unknown" };
+  type SoundCheckResult = { id: string; folderId: string | undefined; status: "missing" | "present" | "unknown" };
+
+  // Check all folder paths in parallel.
+  // exists() can throw when the path is outside the Tauri scope or the OS
+  // denies access — treat those as 'unknown' rather than silently 'present'.
+  const folderChecks: FolderCheckResult[] = await Promise.all(
+    globalFolders.map(async (f): Promise<FolderCheckResult> => {
       try {
-        return { id: f.id, missing: !(await exists(f.path)) };
+        return { id: f.id, status: (await exists(f.path)) ? "present" : "missing" };
       } catch {
-        return { id: f.id, missing: false };
+        return { id: f.id, status: "unknown" };
       }
     }),
   );
-  const missingFolderIds = new Set(folderChecks.filter((f) => f.missing).map((f) => f.id));
 
-  // Check all sound filePaths in parallel — skip any that throw (outside scope)
+  const missingFolderIds = new Set(
+    folderChecks.filter((f) => f.status === "missing").map((f) => f.id),
+  );
+  const unknownFolderIds = new Set(
+    folderChecks.filter((f) => f.status === "unknown").map((f) => f.id),
+  );
+
+  // Check all sound filePaths in parallel.
+  // Same policy: errors become 'unknown', not 'present'.
   const soundsWithPath = sounds.filter((s) => !!s.filePath);
-  const soundFileChecks = await Promise.all(
-    soundsWithPath.map(async (s) => {
+  const soundFileChecks: SoundCheckResult[] = await Promise.all(
+    soundsWithPath.map(async (s): Promise<SoundCheckResult> => {
       try {
-        return { id: s.id, folderId: s.folderId, missing: !(await exists(s.filePath!)) };
+        return {
+          id: s.id,
+          folderId: s.folderId,
+          status: (await exists(s.filePath!)) ? "present" : "missing",
+        };
       } catch {
-        return { id: s.id, folderId: s.folderId, missing: false };
+        return { id: s.id, folderId: s.folderId, status: "unknown" };
       }
     }),
   );
 
   const missingSoundIds = new Set<string>();
+  const unknownSoundIds = new Set<string>();
   for (const check of soundFileChecks) {
-    if (check.missing || (check.folderId && missingFolderIds.has(check.folderId))) {
+    // A confirmed-missing parent folder takes precedence over an unknown file check.
+    if (check.folderId && missingFolderIds.has(check.folderId)) {
+      missingSoundIds.add(check.id);
+    } else if (check.status === "unknown") {
+      unknownSoundIds.add(check.id);
+    } else if (check.status === "missing") {
       missingSoundIds.add(check.id);
     }
   }
+  // Sounds with no filePath inherit their folder's status.
+  for (const sound of sounds.filter((s) => !s.filePath)) {
+    if (!sound.folderId) continue;
+    if (missingFolderIds.has(sound.folderId)) {
+      missingSoundIds.add(sound.id);
+    } else if (unknownFolderIds.has(sound.folderId)) {
+      unknownSoundIds.add(sound.id);
+    }
+  }
 
-  return { missingSoundIds, missingFolderIds };
+  return { missingSoundIds, missingFolderIds, unknownSoundIds, unknownFolderIds };
 }
 
 // ─── Store-coupled orchestrators ─────────────────────────────────────────────
@@ -292,5 +325,12 @@ export async function refreshMissingState(globalFolders?: GlobalFolder[]): Promi
   if (!folders) return;
   const { sounds } = useLibraryStore.getState();
   const result = await checkMissingStatus(folders, sounds);
-  useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
+  useLibraryStore
+    .getState()
+    .setMissingState(
+      result.missingSoundIds,
+      result.missingFolderIds,
+      result.unknownSoundIds,
+      result.unknownFolderIds,
+    );
 }
