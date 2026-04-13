@@ -211,6 +211,108 @@ describe("PadConfigDrawer", () => {
     });
   });
 
+  describe("muteGroupId and color round-trip on edit submit", () => {
+    async function renderEditDrawerWithPad(padOverrides: Partial<Parameters<typeof createMockPad>[0]> = {}) {
+      const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer], ...padOverrides });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      const sound = createMockSound({ id: "s1", name: "FX Sound" });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: pad.name, layers: pad.layers, muteTargetPadIds: pad.muteTargetPadIds, muteGroupId: pad.muteGroupId, color: pad.color, icon: pad.icon }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+    }
+
+    it("preserves muteGroupId through a save cycle", async () => {
+      await renderEditDrawerWithPad({ muteGroupId: "group-A" });
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].muteGroupId).toBe("group-A");
+      });
+    });
+
+    it("preserves color through a save cycle", async () => {
+      await renderEditDrawerWithPad({ color: "#ff5500" });
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].color).toBe("#ff5500");
+      });
+    });
+
+    it("preserves both muteGroupId and color simultaneously", async () => {
+      await renderEditDrawerWithPad({ muteGroupId: "group-B", color: "#001122" });
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => {
+        const pad = useProjectStore.getState().project?.scenes[0].pads[0];
+        expect(pad?.muteGroupId).toBe("group-B");
+        expect(pad?.color).toBe("#001122");
+      });
+    });
+
+    it("preserves icon through a save cycle", async () => {
+      await renderEditDrawerWithPad({ icon: "Speaker01Icon" });
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].icon).toBe("Speaker01Icon");
+      });
+    });
+
+    it("clears muteGroupId when initialConfig omits it (regression for #172)", async () => {
+      // Pad starts with muteGroupId set; a caller that cleared it would omit it from initialConfig.
+      // The bug: if muteGroupId is absent from config, Object.assign silently preserves "group-A".
+      const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer], muteGroupId: "group-A" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      useLibraryStore.setState({ sounds: [createMockSound({ id: "s1", name: "FX Sound" })], tags: [], sets: [], isDirty: false });
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].muteGroupId).toBeUndefined();
+      });
+    });
+
+    it("clears color when initialConfig omits it (regression for #172)", async () => {
+      // Same regression scenario for color.
+      const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer], color: "#ff5500" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      useLibraryStore.setState({ sounds: [createMockSound({ id: "s1", name: "FX Sound" })], tags: [], sets: [], isDirty: false });
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => {
+        expect(useProjectStore.getState().project?.scenes[0].pads[0].color).toBeUndefined();
+      });
+    });
+  });
+
   it("closes overlay without saving when Cancel is clicked", async () => {
     renderDrawer();
     openDrawer();
