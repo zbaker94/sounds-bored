@@ -557,3 +557,31 @@ describe("tick accessor functions", () => {
     expect(result["pad-2"]).toBeCloseTo(0.5);
   });
 });
+
+describe("clearAllAudioState", () => {
+  it("clears fade tracking, chain queues, voices, gains, and progress in one call", async () => {
+    const {
+      clearAllAudioState,
+      getPadGain,
+      getOrCreateLayerGain,
+      setPadProgressInfo,
+      setLayerChain,
+      addFadingOutPad,
+      isPadFadingOut,
+      getLayerChain,
+      isPadActive,
+    } = await import("./audioState");
+
+    const padGain = getPadGain("pad-clearall");
+    getOrCreateLayerGain("layer-clearall", 80, padGain);
+    setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
+    setLayerChain("layer-clearall", []);
+    addFadingOutPad("pad-clearall");
+
+    clearAllAudioState();
+
+    expect(isPadFadingOut("pad-clearall")).toBe(false);
+    expect(getLayerChain("layer-clearall")).toBeUndefined();
+    expect(isPadActive("pad-clearall")).toBe(false);
+  });
+});

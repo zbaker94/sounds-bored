@@ -628,3 +628,32 @@ export function getLayerVolume(layerId: string): number {
   const gain = layerGainMap.get(layerId);
   return gain ? gain.gain.value : 1.0;
 }
+
+// ---------------------------------------------------------------------------
+// Consolidated cleanup — instant, no gain ramp (for project close)
+// ---------------------------------------------------------------------------
+
+/**
+ * Instantly release all audio engine state — no gain ramp.
+ * Use on project close / component unmount where a click is acceptable.
+ * For graceful in-session stopping (with gain ramp), use padPlayer.stopAllPads() instead.
+ *
+ * Clears in the same order as stopAllPads to respect invariants:
+ *   1. Chain queues + fade tracking first (prevents onended from restarting chains)
+ *   2. onended callbacks nulled (prevents callbacks from firing during voice.stop())
+ *   3. Voices stopped, then gains cleared
+ */
+export function clearAllAudioState(): void {
+  clearAllFadeTracking();
+  clearAllLayerChains();
+  clearAllLayerCycleIndexes();
+  clearAllLayerPlayOrders();
+  clearAllLayerPending();
+  nullAllOnEnded();
+  clearAllStreamingAudio();
+  clearAllPadProgressInfo();
+  clearAllLayerProgressInfo();
+  clearAllLayerGains();
+  clearAllPadGains();
+  stopAllVoices();
+}
