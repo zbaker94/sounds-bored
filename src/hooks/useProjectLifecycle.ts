@@ -54,12 +54,22 @@ export function useProjectLifecycle() {
     }, WINDOW_CLOSE_DELAY);
   }, [allowClose]);
 
+  // Tracks whether the current close/discard was initiated intentionally by the user.
+  // Set to true inside close handlers so the guard effect below suppresses the
+  // false-alarm "No project loaded" toast and redirect that would otherwise fire
+  // when the store is cleared before the window closes. Auto-resets on the next
+  // project load so the guard re-arms correctly if the component survives a
+  // project-switch without unmounting.
+  const closingIntentionallyRef = useRef(false);
+
   const handleSaveAndClose = () => {
+    closingIntentionallyRef.current = true;
     closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
     requestSaveAndThen(closeWindow);
   };
 
   const handleDiscardAndClose = async () => {
+    closingIntentionallyRef.current = true;
     closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
 
     if (isTemporary && folderPath) {
@@ -125,9 +135,17 @@ export function useProjectLifecycle() {
     }
   }, [project, missingSoundIds]);
 
-  // Redirect to start screen if project is unloaded from under us
+  // Guard: project unexpectedly null while MainPage is mounted.
+  // Re-arm the flag when a new project loads so the guard works across
+  // project-switch flows that don't unmount this hook.
+  // When the close is intentional, suppress both the error toast AND the
+  // navigate — the close handlers drive their own navigation/window-close.
   useEffect(() => {
-    if (!project) {
+    if (project) {
+      closingIntentionallyRef.current = false;
+      return;
+    }
+    if (!closingIntentionallyRef.current) {
       toast.error("No project loaded. Returning to start screen.");
       navigate("/");
     }
