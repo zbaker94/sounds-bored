@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.5.4
+
+Commit history is now automatically tracked in CHANGELOG.md, keeping release notes up to date without manual effort. Each merged change generates an AI-written summary so users always have a clear record of what's new.
+
 - Automated changelog generation is now active: commits will automatically update CHANGELOG.md with AI-generated summaries of changes.
 I need your permission to edit `CHANGELOG.md`. The file currently has stale status notes accidentally added to it (lines 4–7):
 
@@ -30,6 +33,7 @@ I need write permission to fix the CHANGELOG. The previous session left some AI-
 These need to be replaced with a proper changelog entry. The fix would be:
 
 ```
+
 ## Current Changes
 - Added `coverage/` to `.gitignore` and removed all previously tracked coverage report files from the repository.
 - Removed deprecated internal audio API alias (`clearFadePadTimeouts`); use `clearAllFadeTracking` directly for any custom integrations.
