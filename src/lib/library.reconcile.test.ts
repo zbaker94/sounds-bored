@@ -380,7 +380,125 @@ describe("reconcileGlobalLibrary", () => {
       expect(result.missingSoundIds.size).toBe(0);
     });
 
-    it("should not flag sounds with no filePath", async () => {
+    it("should not flag a sound with no filePath and no folderId", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/missing/folder" });
+      const orphanSound = createSound({ id: "s1", name: "web-sound" }); // no folderId
+
+      mockFs.exists.mockResolvedValue(false);
+
+      const result = await checkMissingStatus([folder], [orphanSound]);
+
+      expect(result.missingFolderIds).toContain("f1");
+      expect(result.missingSoundIds.size).toBe(0);
+      expect(result.unknownSoundIds.size).toBe(0);
+    });
+
+    it("marks a folder as unknown (not missing) when exists() throws", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/restricted/folder" });
+      const sound = createSound({ id: "s1", name: "kick", filePath: "/restricted/folder/kick.wav", folderId: "f1" });
+
+      mockFs.exists.mockRejectedValue(new Error("Permission denied"));
+
+      const result = await checkMissingStatus([folder], [sound]);
+
+      // Must NOT be in missingSoundIds/missingFolderIds
+      expect(result.missingFolderIds.size).toBe(0);
+      expect(result.missingSoundIds.size).toBe(0);
+      // Must be tracked as unknown
+      expect(result.unknownFolderIds).toContain("f1");
+      expect(result.unknownSoundIds).toContain("s1");
+    });
+
+    it("marks a sound as unknown (not missing) when only its file check throws", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const normalSound = createSound({ id: "s1", name: "kick", filePath: "/music/kick.wav", folderId: "f1" });
+      const restrictedSound = createSound({ id: "s2", name: "restricted", filePath: "/music/restricted.wav", folderId: "f1" });
+
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/music/restricted.wav") return Promise.reject(new Error("out of scope"));
+        return Promise.resolve(true);
+      });
+
+      const result = await checkMissingStatus([folder], [normalSound, restrictedSound]);
+
+      expect(result.missingSoundIds.size).toBe(0);
+      expect(result.unknownSoundIds).toContain("s2");
+      expect(result.unknownSoundIds).not.toContain("s1");
+    });
+
+    it("marks a no-filePath sound as unknown when its folder check throws", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/restricted" });
+      const noPathSound = createSound({ id: "s1", name: "web-sound", folderId: "f1" });
+
+      mockFs.exists.mockRejectedValue(new Error("Permission denied"));
+
+      const result = await checkMissingStatus([folder], [noPathSound]);
+
+      // Folder is unknown, so the no-path sound is also unknown (not missing)
+      expect(result.missingSoundIds.size).toBe(0);
+      expect(result.unknownFolderIds).toContain("f1");
+      expect(result.unknownSoundIds).toContain("s1");
+    });
+
+    it("returns empty unknown sets when all checks succeed", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sound = createSound({ id: "s1", name: "kick", filePath: "/music/kick.wav", folderId: "f1" });
+
+      mockFs.exists.mockResolvedValue(true);
+
+      const result = await checkMissingStatus([folder], [sound]);
+
+      expect(result.unknownSoundIds.size).toBe(0);
+      expect(result.unknownFolderIds.size).toBe(0);
+    });
+
+    it("correctly partitions missing and unknown folders with their sounds", async () => {
+      const missingFolder = createMockGlobalFolder({ id: "f-missing", path: "/gone" });
+      const unknownFolder = createMockGlobalFolder({ id: "f-unknown", path: "/restricted" });
+      const okFolder = createMockGlobalFolder({ id: "f-ok", path: "/music" });
+
+      const soundInMissing = createSound({ id: "s-missing", name: "gone", filePath: "/gone/gone.wav", folderId: "f-missing" });
+      const soundInUnknown = createSound({ id: "s-unknown", name: "restricted", filePath: "/restricted/r.wav", folderId: "f-unknown" });
+      const soundInOk = createSound({ id: "s-ok", name: "present", filePath: "/music/kick.wav", folderId: "f-ok" });
+
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/gone") return Promise.resolve(false);
+        if (path === "/restricted" || path === "/restricted/r.wav") return Promise.reject(new Error("denied"));
+        return Promise.resolve(true);
+      });
+
+      const result = await checkMissingStatus(
+        [missingFolder, unknownFolder, okFolder],
+        [soundInMissing, soundInUnknown, soundInOk],
+      );
+
+      expect(result.missingFolderIds).toContain("f-missing");
+      expect(result.unknownFolderIds).toContain("f-unknown");
+      expect(result.missingSoundIds).toContain("s-missing");
+      expect(result.unknownSoundIds).toContain("s-unknown");
+      expect(result.missingSoundIds).not.toContain("s-ok");
+      expect(result.unknownSoundIds).not.toContain("s-ok");
+      expect(result.missingSoundIds).not.toContain("s-unknown");
+      expect(result.unknownSoundIds).not.toContain("s-missing");
+    });
+
+    it("prioritises missing folder over unknown file check for the same sound", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/gone" });
+      const sound = createSound({ id: "s1", name: "kick", filePath: "/gone/kick.wav", folderId: "f1" });
+
+      // Folder is gone; per-file check also throws (e.g. OS removed inode before stat)
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/gone") return Promise.resolve(false);
+        return Promise.reject(new Error("gone"));
+      });
+
+      const result = await checkMissingStatus([folder], [sound]);
+
+      expect(result.missingSoundIds).toContain("s1");
+      expect(result.unknownSoundIds).not.toContain("s1");
+    });
+
+    it("no-filePath sound in a missing folder is flagged as missing", async () => {
       const folder = createMockGlobalFolder({ id: "f1", path: "/missing/folder" });
       const noPathSound = createSound({ id: "s1", name: "web-sound", folderId: "f1" });
 
@@ -389,7 +507,8 @@ describe("reconcileGlobalLibrary", () => {
       const result = await checkMissingStatus([folder], [noPathSound]);
 
       expect(result.missingFolderIds).toContain("f1");
-      expect(result.missingSoundIds.size).toBe(0);
+      expect(result.missingSoundIds).toContain("s1");
+      expect(result.unknownSoundIds.size).toBe(0);
     });
   });
 

@@ -209,6 +209,8 @@ export function SoundList({
         .setMissingState(
           missingResult.missingSoundIds,
           missingResult.missingFolderIds,
+          missingResult.unknownSoundIds,
+          missingResult.unknownFolderIds,
         );
       onSelectionChange(new globalThis.Set());
       if (failedCount > 0) {

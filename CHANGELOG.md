@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Files and folders that can't be checked due to permission errors are now tracked as "unknown" instead of being silently treated as present
+- Sounds in a missing folder are now correctly flagged as missing (previously only the folder was flagged)
+- Sounds with no file path now inherit their folder's missing/unknown status
 - Download URL validation is now stricter: only `http://` and `https://` URLs are accepted — `ftp://`, `file://`, `javascript:`, `data:`, and other schemes are blocked with a clear error message
 - Leading and trailing whitespace in the URL field is automatically trimmed before validation and submission
 - Missing sound/folder detection is now more reliable — the app correctly refreshes missing-file status after resolving files, removing sounds, previewing audio, and on auto-save

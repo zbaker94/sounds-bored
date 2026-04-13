@@ -205,6 +205,8 @@ export function FoldersPanel({
         .setMissingState(
           missingResult.missingSoundIds,
           missingResult.missingFolderIds,
+          missingResult.unknownSoundIds,
+          missingResult.unknownFolderIds,
         );
       const folderExists = await exists(folderPath);
       if (folderExists) {
