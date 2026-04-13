@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactored: `padPlayer.ts` split into focused modules (`fadeMixer`, `gainManager`, `layerTrigger`) for easier maintenance — no behavior changes.
+- Duplicate retrigger logic consolidated into a single shared helper, reducing the risk of inconsistent behavior between pad and layer triggers.
+- Project close now instantly releases all audio state and stops the audio tick, preventing potential resource leaks on unmount.
 - Fixed a bug where pending stop timers were not cancelled when clearing all audio state, preventing ghost stop actions after scene changes
 - Fixed streaming audio not being cleared when `clearAllAudioState` was called, which could leave stale audio elements registered
 - Fixed "next" retrigger mode to correctly stop the currently playing voice before advancing to the next sound in the sequence

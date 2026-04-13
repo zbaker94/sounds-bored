@@ -31,7 +31,10 @@
       "Bash(cargo metadata:*)",
       "Bash(python -c \"import json,sys; m=json.load\\(sys.stdin\\); [print\\(p['manifest_path']\\) for p in m['packages'] if 'shell' in p['name']]\")",
       "Bash(gh --version)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep -l \"padGainMap\\\\|layerGainMap\\\\|padProgressInfo\\\\|layerProgressInfo\\\\|padStreamingAudio\\\\|layerChainQueue\\\\|layerCycleIndex\\\\|layerPendingMap\\\\|fadePadTimeouts\\\\|fadingOutPadIds\\\\|voiceMap\\\\|layerVoiceMap\" /c/Repos/sounds-bored/src/**/*.test.ts)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(ls -la /c/Repos/sounds-bored/src/lib/audio/fadeMixer.* /c/Repos/sounds-bored/src/lib/audio/gainManager.* /c/Repos/sounds-bored/src/lib/audio/progressTracker.* /c/Repos/sounds-bored/src/lib/audio/layerChain.*)"
     ]
   },
   "enableAllProjectMcpServers": true,
