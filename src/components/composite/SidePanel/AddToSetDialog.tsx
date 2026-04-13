@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,7 +59,7 @@ export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogP
       addSoundsToSet(soundIds, setId);
     }
     const { sounds, tags, sets: currentSets } = useLibraryStore.getState();
-    await saveLibrary({ version: "1.0.0", sounds, tags, sets: currentSets });
+    await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds, tags, sets: currentSets });
     onOpenChange(false);
   }
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Library files are now saved with a centralized version constant instead of a hardcoded `"1.0.0"` string, ensuring version numbers stay consistent across all save operations.
 - Fixed a bug where pressing the left or right arrow keys to navigate scenes could jump to an unexpected scene if the active scene ID was missing or stale — the app now correctly falls back to the first scene in that case.
 - Fixed a false "No project loaded" error that appeared when intentionally saving or discarding changes before closing a project
 - Pressing **F** while hovering a pad now immediately fades that pad out (single fade), without needing to open the context menu first

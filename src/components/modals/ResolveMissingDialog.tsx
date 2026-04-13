@@ -7,7 +7,7 @@ import { useSaveGlobalLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
-import { AUDIO_EXTENSIONS } from "@/lib/constants";
+import { AUDIO_EXTENSIONS, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import type { Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -131,7 +131,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       await refreshMissingState();
 
       const latest = useLibraryStore.getState();
-      await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
       toast.success("Sound re-linked");
       onResolved?.();
       handleClose();
@@ -151,7 +151,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       evictBuffer(sound.id);
       evictStreamingElement(sound.id);
       const latest = useLibraryStore.getState();
-      await saveLibrary({ version: "1.0.0", sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
       toast.success(`"${sound.name}" removed from library`);
       onResolved?.();
       handleClose();

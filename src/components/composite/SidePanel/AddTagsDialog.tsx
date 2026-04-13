@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -164,7 +165,7 @@ export function AddTagsDialog({
       try {
         const latest = useLibraryStore.getState();
         await saveLibrary({
-          version: "1.0.0",
+          version: CURRENT_LIBRARY_VERSION,
           sounds: latest.sounds,
           tags: latest.tags,
           sets: latest.sets,
