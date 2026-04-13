@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added real-time volume control for pads and layers, with smooth gain ramping to prevent audio clicks when adjusting volume mid-playback.
 - The SidePanel's folder browser and sets panel have been split into separate, focused components for improved reliability and maintainability
 - Missing sound folders are now automatically scanned on panel open, so the missing-folder warning appears immediately without requiring a manual Refresh
 - The "Delete Sounds from Disk" confirmation dialog now clearly shows how many files will be deleted and which pads/layers will be affected before you confirm
