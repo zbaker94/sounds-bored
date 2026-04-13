@@ -5,7 +5,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useUiStore } from "@/state/uiStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { CURRENT_LIBRARY_VERSION, EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
@@ -69,10 +69,7 @@ export function useBulkRemove(): {
         tags: latest.tags,
         sets: latest.sets,
       });
-      const result = await checkMissingStatus(settings.globalFolders, latest.sounds);
-      useLibraryStore
-        .getState()
-        .setMissingState(result.missingSoundIds, result.missingFolderIds);
+      await refreshMissingState(settings.globalFolders);
       toast.success(
         `${idsToRemove.size} missing sound${idsToRemove.size > 1 ? "s" : ""} removed`,
       );
@@ -132,13 +129,7 @@ export function useBulkRemove(): {
         tags: latest.tags,
         sets: latest.sets,
       });
-      const result = await checkMissingStatus(
-        updatedSettings.globalFolders,
-        latest.sounds,
-      );
-      useLibraryStore
-        .getState()
-        .setMissingState(result.missingSoundIds, result.missingFolderIds);
+      await refreshMissingState(updatedSettings.globalFolders);
       toast.success(
         `${folderIdsToRemove.size} missing folder${folderIdsToRemove.size > 1 ? "s" : ""} and ${soundIdsToRemove.size} sound${soundIdsToRemove.size !== 1 ? "s" : ""} removed`,
       );

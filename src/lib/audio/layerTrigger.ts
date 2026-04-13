@@ -16,9 +16,8 @@ import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
 import { filterSoundsByTags } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import type { Layer, Pad, Sound } from "@/lib/schemas";
 import { toast } from "sonner";
 import { startAudioTick } from "./audioTick";
@@ -276,13 +275,7 @@ export async function startLayerSound(
     clearLayerProgressInfo(layer.id);
     clearPadProgressInfo(pad.id);
     if (err instanceof MissingFileError) {
-      const settings = useAppSettingsStore.getState().settings;
-      if (settings) {
-        const { sounds } = useLibraryStore.getState();
-        checkMissingStatus(settings.globalFolders, sounds).then((result) => {
-          useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
-        });
-      }
+      void refreshMissingState();
       toast.error(`Failed to play "${sound.name}" — file not found. Check the Sounds panel.`);
     } else {
       const message = err instanceof Error ? err.message : String(err);

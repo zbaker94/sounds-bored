@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Missing sound/folder detection is now more reliable — the app correctly refreshes missing-file status after resolving files, removing sounds, previewing audio, and on auto-save
+- Resolving a missing file or folder now always updates the missing-file indicators immediately, regardless of app settings load order
+- Stale "missing" indicators are now properly cleared when files become available again
 - Fixed unnecessary UI re-renders during audio playback by only updating active layer state when it actually changes
 - Internal audio engine refactored: `padPlayer.ts` split into focused modules (`fadeMixer`, `gainManager`, `layerTrigger`) for easier maintenance — no behavior changes.
 - Duplicate retrigger logic consolidated into a single shared helper, reducing the risk of inconsistent behavior between pad and layer triggers.

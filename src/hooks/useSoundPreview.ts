@@ -1,8 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { playPreview, stopPreview } from "@/lib/audio/preview";
-import { MissingFileError, checkMissingStatus } from "@/lib/library.reconcile";
-import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { MissingFileError, refreshMissingState } from "@/lib/library.reconcile";
 import { toast } from "sonner";
 import type { Sound } from "@/lib/schemas";
 
@@ -28,13 +26,7 @@ export function useSoundPreview() {
         setPreviewingId(null);
         if (err instanceof MissingFileError) {
           toast.error(`"${sound.name}" not found — check the Sounds panel`);
-          const settings = useAppSettingsStore.getState().settings;
-          if (settings) {
-            const { sounds } = useLibraryStore.getState();
-            checkMissingStatus(settings.globalFolders, sounds).then((result) => {
-              useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
-            });
-          }
+          void refreshMissingState();
         }
       }
     },

@@ -3,7 +3,7 @@ import { useAppSettings } from "@/lib/appSettings.queries";
 import { useGlobalLibrary, useSaveGlobalLibrary } from "@/lib/library.queries";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { reconcileGlobalLibrary, checkMissingStatus } from "@/lib/library.reconcile";
+import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
 /**
@@ -93,11 +93,7 @@ export function useBootLoader() {
         }
 
         // Refresh missing-file state after reconciliation
-        checkMissingStatus(settings.globalFolders, useLibraryStore.getState().sounds).then(
-          (missingResult) => {
-            useLibraryStore.getState().setMissingState(missingResult.missingSoundIds, missingResult.missingFolderIds);
-          },
-        );
+        void refreshMissingState();
       },
     );
   }, [settings, library, updateLibrary]);
