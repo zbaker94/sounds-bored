@@ -8,7 +8,7 @@
 //   - applyRetriggerMode — deduplicates the retrigger switch shared by triggerPad + triggerLayer
 //   - startLayerPlayback — deduplicates the start-playback section shared by both
 
-import { ensureResumed, getAudioContext } from "./audioContext";
+import { getAudioContext } from "./audioContext";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
@@ -31,11 +31,7 @@ import {
   getLayerCycleIndex,
   getLayerGain,
   getLayerVoices,
-  getPadGain,
-  getOrCreateLayerGain,
   getPadProgressInfo,
-  isLayerActive,
-  isPadActive,
   recordLayerVoice,
   registerStreamingAudio,
   setLayerChain,
@@ -451,5 +447,3 @@ export async function startLayerPlayback(
   }
 }
 
-// Re-export for use in padPlayer's skipLayerForward / skipLayerBack
-export { ensureResumed, getPadGain, getOrCreateLayerGain, isLayerActive, isPadActive };

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine code has been reorganized into smaller, focused modules with no change to playback behavior.
 - Improved reliability when closing a project — all active audio state is now cleared instantly and in the correct order, preventing sounds from restarting or callbacks from firing after close.
 - Improved audio engine reliability by refactoring layer trigger logic into a dedicated module, reducing the risk of playback bugs
 - Retrigger behavior (stop, continue, restart, next) is now handled by a single consolidated code path, ensuring consistent behavior across all trigger scenarios
