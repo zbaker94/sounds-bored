@@ -557,3 +557,68 @@ describe("tick accessor functions", () => {
     expect(result["pad-2"]).toBeCloseTo(0.5);
   });
 });
+
+describe("clearAllAudioState", () => {
+  it("clears all runtime audio state in a single call", async () => {
+    vi.useFakeTimers();
+    const {
+      clearAllAudioState,
+      getPadGain,
+      getOrCreateLayerGain,
+      setPadProgressInfo,
+      getPadProgressInfo,
+      setLayerChain,
+      setLayerCycleIndex,
+      setLayerPlayOrder,
+      setLayerPending,
+      addFadingOutPad,
+      isPadFadingOut,
+      getLayerChain,
+      getLayerCycleIndex,
+      getLayerPlayOrder,
+      isLayerPending,
+      isPadActive,
+      getLayerGain,
+      registerStreamingAudio,
+      isPadStreaming,
+      setGlobalStopTimeout,
+    } = await import("./audioState");
+
+    const padGain = getPadGain("pad-clearall");
+    getOrCreateLayerGain("layer-clearall", 80, padGain);
+    setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
+    setLayerChain("layer-clearall", []);
+    setLayerCycleIndex("layer-clearall", 2);
+    setLayerPlayOrder("layer-clearall", []);
+    setLayerPending("layer-clearall");
+    addFadingOutPad("pad-clearall");
+
+    // Register a streaming audio element so isPadStreaming returns true before clear
+    const mockAudio = { pause: vi.fn(), currentTime: 0 } as unknown as HTMLAudioElement;
+    registerStreamingAudio("pad-clearall", "layer-clearall", mockAudio);
+    expect(isPadStreaming("pad-clearall")).toBe(true);
+
+    // Schedule a timeout (simulates stopAllPads post-ramp cleanup)
+    const spy = vi.fn();
+    const timeoutId = setTimeout(spy, 9999);
+    setGlobalStopTimeout(timeoutId);
+
+    clearAllAudioState();
+
+    expect(isPadFadingOut("pad-clearall")).toBe(false);          // fade tracking cleared
+    expect(getLayerChain("layer-clearall")).toBeUndefined();     // layer chains cleared
+    expect(getLayerCycleIndex("layer-clearall")).toBeUndefined(); // cycle indexes cleared
+    expect(getLayerPlayOrder("layer-clearall")).toBeUndefined(); // play orders cleared
+    expect(isLayerPending("layer-clearall")).toBe(false);        // pending set cleared
+    expect(getPadProgressInfo("pad-clearall")).toBeUndefined();  // progress info cleared
+    expect(isPadActive("pad-clearall")).toBe(false);             // voices cleared
+    expect(getLayerGain("layer-clearall")).toBeUndefined();      // layer gains disconnected & cleared
+    expect(isPadStreaming("pad-clearall")).toBe(false);          // streaming audio cleared
+
+    // Global stop timeout should be cancelled — spy must NOT fire
+    vi.runAllTimers();
+    expect(spy).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+});

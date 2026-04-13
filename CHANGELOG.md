@@ -1,6 +1,26 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactored: `padPlayer.ts` split into focused modules (`fadeMixer`, `gainManager`, `layerTrigger`) for easier maintenance — no behavior changes.
+- Duplicate retrigger logic consolidated into a single shared helper, reducing the risk of inconsistent behavior between pad and layer triggers.
+- Project close now instantly releases all audio state and stops the audio tick, preventing potential resource leaks on unmount.
+- Fixed a bug where pending stop timers were not cancelled when clearing all audio state, preventing ghost stop actions after scene changes
+- Fixed streaming audio not being cleared when `clearAllAudioState` was called, which could leave stale audio elements registered
+- Fixed "next" retrigger mode to correctly stop the currently playing voice before advancing to the next sound in the sequence
+- Fixed fade-out cleanup to properly clear layer play order state alongside chain and cycle index state
+- Fixed a bug where closing a project while audio was fading out could cause sounds from the previous session to bleed into the next session
+- Fixed a race condition where rapidly triggering a pad could start multiple overlapping sounds unexpectedly
+- Fixed sounds incorrectly continuing to chain to the next track during a fade-out
+- Fixed volume controls silently ignoring invalid values (NaN or out-of-range numbers) instead of applying a safe default
+- Improved audio cleanup when leaving the main editor — all active sounds and audio state are now fully stopped on exit.
+- Internal audio engine code has been reorganized into smaller, focused modules with no change to playback behavior.
+- Improved reliability when closing a project — all active audio state is now cleared instantly and in the correct order, preventing sounds from restarting or callbacks from firing after close.
+- Improved audio engine reliability by refactoring layer trigger logic into a dedicated module, reducing the risk of playback bugs
+- Retrigger behavior (stop, continue, restart, next) is now handled by a single consolidated code path, ensuring consistent behavior across all trigger scenarios
+- Added test coverage for core audio layer functions including sound resolution, volume calculation, and retrigger modes
+- Pads now support smooth volume fade-in and fade-out transitions, including mid-fade reversal (re-triggering a fading pad ramps volume back up without restarting audio)
+- Per-pad fade duration can override the global fade setting; falls back to 2000ms if neither is configured
+- Added real-time volume control for pads and layers, with smooth gain ramping to prevent audio clicks when adjusting volume mid-playback.
 - The SidePanel's folder browser and sets panel have been split into separate, focused components for improved reliability and maintainability
 - Missing sound folders are now automatically scanned on panel open, so the missing-folder warning appears immediately without requiring a manual Refresh
 - The "Delete Sounds from Disk" confirmation dialog now clearly shows how many files will be deleted and which pads/layers will be affected before you confirm

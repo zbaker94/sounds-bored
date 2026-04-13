@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useProjectStore } from "@/state/projectStore";
-import { stopAllPads } from "@/lib/audio/padPlayer";
+import { clearAllAudioState } from "@/lib/audio/audioState";
+import { stopAudioTick } from "@/lib/audio/audioTick";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { SceneView } from "@/components/composite/SceneView/SceneView";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -33,7 +34,8 @@ function MainPageInner() {
 
   useEffect(() => {
     return () => {
-      stopAllPads();
+      stopAudioTick();
+      clearAllAudioState();
     };
   }, []);
 

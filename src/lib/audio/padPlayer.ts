@@ -1,71 +1,69 @@
 import { ensureResumed, getAudioContext } from "./audioContext";
-import { loadBuffer, MissingFileError } from "./bufferCache";
-import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
-import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
-import type { AudioVoice } from "./audioVoice";
+import { STOP_RAMP_S } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
-import { filterSoundsByTags } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { useProjectStore } from "@/state/projectStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { checkMissingStatus } from "@/lib/library.reconcile";
-import type { Layer, Pad, Scene, Sound } from "@/lib/schemas";
+import type { Pad, Scene } from "@/lib/schemas";
 import { isFadeablePad } from "@/lib/padUtils";
 import { toast } from "sonner";
+import { stopAudioTick } from "./audioTick";
 
 import {
   cancelPadFade,
-  addFadingOutPad,
-  removeFadingOutPad,
-  setFadePadTimeout,
-  deleteFadePadTimeout,
-  getPadGain,
-  forEachPadGain,
-  getOrCreateLayerGain,
-  getLayerGain,
-  clearLayerStreamingAudio,
-  registerStreamingAudio,
-  unregisterStreamingAudio,
-  clearAllStreamingAudio,
-  setPadProgressInfo,
-  getPadProgressInfo,
-  clearPadProgressInfo,
-  clearAllPadProgressInfo,
-  setLayerProgressInfo,
-  clearLayerProgressInfo,
-  clearAllLayerProgressInfo,
-  isLayerPending,
-  setLayerPending,
-  clearLayerPending,
-  getLayerChain,
-  setLayerChain,
-  deleteLayerChain,
-  getLayerCycleIndex,
-  setLayerCycleIndex,
-  deleteLayerCycleIndex,
+  cancelGlobalStopTimeout,
   clearAllFadeTracking,
-  clearAllPadGains,
-  clearAllLayerGains,
   clearAllLayerChains,
   clearAllLayerCycleIndexes,
+  clearAllLayerGains,
   clearAllLayerPending,
-  stopPadVoices,
-  stopAllVoices,
-  nullAllOnEnded,
-  getLayerVoices,
-  recordLayerVoice,
-  clearLayerVoice,
-  isLayerActive,
-  isPadFadingOut,
-  isPadActive,
-  stopLayerVoices,
-  setLayerPlayOrder,
-  getLayerPlayOrder,
-  deleteLayerPlayOrder,
   clearAllLayerPlayOrders,
+  clearAllPadGains,
+  clearAllStreamingAudio,
+  clearAllPadProgressInfo,
+  clearAllLayerProgressInfo,
+  clearLayerPending,
+  clearLayerStreamingAudio,
+  clearPadProgressInfo,
+  deleteLayerChain,
+  deleteLayerCycleIndex,
+  deleteLayerPlayOrder,
+  deleteFadePadTimeout,
+  forEachPadGain,
+  getLayerChain,
+  getLayerCycleIndex,
+  getLayerPlayOrder,
+  getLayerVoices,
+  getOrCreateLayerGain,
+  getPadGain,
+  isLayerActive,
+  isLayerPending,
+  isPadActive,
+  isPadFadingOut,
+  nullAllOnEnded,
+  setFadePadTimeout,
+  setGlobalStopTimeout,
+  setLayerChain,
+  setLayerCycleIndex,
+  setLayerPending,
+  setLayerPlayOrder,
+  stopAllVoices,
+  stopPadVoices,
 } from "./audioState";
-import { startAudioTick, stopAudioTick } from "./audioTick";
+
+import {
+  resolveFadeDuration,
+  fadePadOut,
+  fadePadInFromCurrent,
+} from "./fadeMixer";
+
+import {
+  applyRetriggerMode,
+  startLayerPlayback,
+  startLayerSound,
+  rampStopLayerVoices,
+  resolveSounds,
+  getVoiceVolume,
+} from "./layerTrigger";
 
 // Re-export public query/clear functions for backward compatibility
 export {
@@ -83,80 +81,24 @@ export {
   isPadActive,
 } from "./audioState";
 
+// Re-export functions moved to fadeMixer / gainManager for backward compatibility
+export {
+  freezePadAtCurrentVolume,
+  resolveFadeDuration,
+  fadePadOut,
+  fadePadInFromCurrent,
+} from "./fadeMixer";
+
+export {
+  setPadVolume,
+  resetPadGain,
+  syncLayerVolume,
+  setLayerVolume,
+  commitLayerVolume,
+} from "./gainManager";
+
 /** @deprecated Use clearAllFadeTracking instead. */
 export const clearFadePadTimeouts = clearAllFadeTracking;
-
-export function freezePadAtCurrentVolume(padId: string): void {
-  const ctx = getAudioContext();
-  const gain = getPadGain(padId);
-  const currentValue = gain.gain.value;
-  cancelPadFade(padId);
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(currentValue, ctx.currentTime);
-  // Tick reads the frozen gain value automatically — no store call needed.
-}
-
-export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): number {
-  return pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
-}
-
-export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): void {
-  // 1. Cancel any prior fade for this pad (RAF, timeout, store signal)
-  cancelPadFade(pad.id);
-
-  const ctx = getAudioContext();
-  const gain = getPadGain(pad.id);
-  const currentGain = gain.gain.value;
-  const startVol = fromVolume ?? currentGain;
-  const endVol = toVolume ?? 0;
-
-  // 2. Schedule Web Audio ramp
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(startVol, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
-
-  // 3. Mark this pad as fading out so a reverse fade-in can be detected
-  addFadingOutPad(pad.id);
-
-  // 4. Schedule cleanup (stored in fadePadTimeouts so cancelPadFade can cancel it)
-  // Tick reads gain node values automatically — no RAF or store signal needed.
-  const timeoutId = setTimeout(() => {
-    deleteFadePadTimeout(pad.id);
-    removeFadingOutPad(pad.id);
-    if (endVol === 0) {
-      stopPad(pad);
-      resetPadGain(pad.id);
-    }
-  }, durationMs + 5);
-  setFadePadTimeout(pad.id, timeoutId);
-}
-
-/**
- * Reverse an in-progress fade-out: cancel it and ramp gain back up to 1.0 from current value.
- * Unlike fadePadIn, this does NOT restart the audio — the existing voices keep playing.
- */
-export function fadePadInFromCurrent(pad: Pad, durationMs: number, toVolume?: number): void {
-  // 1. Cancel the fade-out (RAF, timeout, store signal, fadingOutPadIds)
-  cancelPadFade(pad.id);
-
-  const ctx = getAudioContext();
-  const gain = getPadGain(pad.id);
-  const fromVolume = gain.gain.value;
-  const endVol = toVolume ?? 1.0;
-
-  // 2. Schedule Web Audio ramp back to full volume
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(fromVolume, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
-
-  // 3. Schedule cleanup
-  // Tick reads gain node values automatically — no RAF or store signal needed.
-  const timeoutId = setTimeout(() => {
-    deleteFadePadTimeout(pad.id);
-    cancelPadFade(pad.id);
-  }, durationMs + 5);
-  setFadePadTimeout(pad.id, timeoutId);
-}
 
 export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): Promise<void> {
   // 1. Cancel any prior fade for this pad
@@ -231,54 +173,6 @@ export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDuratio
   crossfadePads(fadingOut, fadingIn, globalFadeDurationMs);
 }
 
-export function setPadVolume(padId: string, volume: number): void {
-  const ctx = getAudioContext();
-  const gain = getPadGain(padId);
-  const clamped = Math.max(0, Math.min(1, volume));
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
-  // Tick reads the gain node value automatically — no store call needed.
-}
-
-export function resetPadGain(padId: string): void {
-  // Unified teardown: cancels pending fade timeout and resets the gain node.
-  cancelPadFade(padId);
-  const gain = getPadGain(padId);
-  const ctx = getAudioContext();
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(1.0, ctx.currentTime);
-  // Tick reads the gain node value automatically — no store call needed.
-}
-
-/** Update a live layer gain node immediately (e.g. when pad config is saved mid-playback). No-op if the layer isn't active. */
-export function syncLayerVolume(layerId: string, volume: number): void {
-  const gain = getLayerGain(layerId);
-  if (!gain) return;
-  const ctx = getAudioContext();
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(volume / 100, ctx.currentTime);
-}
-
-/** Read a single field from a layer in the live project store.
- *  Falls back to `captured` if the pad or layer is no longer found (e.g. deleted)
- *  or if no project is currently loaded (e.g. project cleared mid-playback). */
-function liveLayerField<K extends keyof Layer>(
-  padId: string,
-  layerId: string,
-  field: K,
-  captured: Layer[K],
-): Layer[K] {
-  const project = useProjectStore.getState().project;
-  if (project) {
-    for (const scene of project.scenes) {
-      const pad = scene.pads.find((p) => p.id === padId);
-      if (pad) return pad.layers.find((l) => l.id === layerId)?.[field] ?? captured;
-    }
-  }
-  return captured;
-}
-
 /**
  * Update the loop flag on any active voices for a layer.
  *
@@ -293,10 +187,11 @@ function liveLayerField<K extends keyof Layer>(
  *
  * No-op if the layer has no active voices.
  */
-export function syncLayerPlaybackMode(layer: Layer): void {
+export function syncLayerPlaybackMode(layer: import("@/lib/schemas").Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
   const isLoopMode = layer.playbackMode === "loop" || layer.playbackMode === "hold";
+
   // Update the loop flag on non-chained voices and cycle-mode voices.
   // Cycle mode plays one sound at a time (like simultaneous), so source.loop
   // is used instead of chain-based looping.
@@ -317,23 +212,15 @@ export function syncLayerPlaybackMode(layer: Layer): void {
  *
  * - Chained -> chained (sequential <-> shuffled): rebuilds the chain queue with the
  *   new arrangement so the current sound plays out and the updated sequence follows.
- *   Looping is handled naturally — onended reads livePlaybackMode from the store
- *   when the rebuilt chain exhausts.
- *
- * - Chained -> non-chained (sequential/shuffled -> simultaneous): clears the queue
- *   so onended does not advance the stale chain. The current sound plays to
- *   completion, then stops (or loops, if playbackMode is loop/hold — the loop flag
- *   on active voices is synced here since non-chained looping uses source.loop).
+ * - Chained -> non-chained: clears the queue so onended does not advance the stale chain.
  *
  * No-op if the layer has no active voices.
  */
-export function syncLayerArrangement(layer: Layer): void {
+export function syncLayerArrangement(layer: import("@/lib/schemas").Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
 
   if (isChained(layer.arrangement)) {
-    // Switching between chained arrangements: rebuild the queue with the new
-    // arrangement. The current sound plays out; onended picks up the new sequence.
     const allSounds = resolveSounds(layer, useLibraryStore.getState().sounds);
     const newOrder = buildPlayOrder(layer.arrangement, allSounds);
     if (newOrder.length === 0) {
@@ -344,8 +231,6 @@ export function syncLayerArrangement(layer: Layer): void {
   } else {
     // Switching to non-chained (simultaneous): replace the stale chain with an empty
     // array so onended treats it as natural exhaustion rather than an external stop.
-    // The current sound plays to completion; when it ends, onended checks liveMode and
-    // liveArrangement from the store and starts all sounds simultaneously if looping.
     setLayerChain(layer.id, []);
   }
 }
@@ -353,16 +238,12 @@ export function syncLayerArrangement(layer: Layer): void {
 /**
  * Called when the sound selection for a layer changes while playback is active.
  *
- * For chained arrangements (sequential/shuffled): rebuilds the chain queue with
- * the new resolved sounds so the current sound plays to completion and the updated
- * selection follows at the next chain step.
- *
- * For non-chained arrangements (simultaneous): no-op here — the onended closure
- * re-resolves sounds from the live store at each loop restart boundary.
+ * For chained arrangements: rebuilds the chain queue with the new resolved sounds.
+ * For non-chained arrangements: no-op — onended re-resolves sounds from the live store.
  *
  * No-op if the layer has no active voices.
  */
-export function syncLayerSelection(layer: Layer): void {
+export function syncLayerSelection(layer: import("@/lib/schemas").Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
 
@@ -375,33 +256,20 @@ export function syncLayerSelection(layer: Layer): void {
       setLayerChain(layer.id, newOrder);
     }
   }
-  // Non-chained (simultaneous) with source.loop=true: voices loop internally
-  // at the Web Audio level and onended never fires, so there is no loop boundary
-  // at which to re-resolve sounds. Selection changes for simultaneous+loop layers
-  // are not applied until the pad is stopped and retriggered — a known limitation
-  // of native source.loop behaviour.
 }
 
 /**
  * Sync all live-playback state for a layer after a pad config save.
  * Calls syncLayerPlaybackMode, syncLayerArrangement, and/or syncLayerSelection
- * only for the fields that actually changed. When arrangement changes,
- * syncLayerSelection is skipped because syncLayerArrangement already rebuilds
- * the queue using the updated layer (which carries the new selection).
+ * only for the fields that actually changed.
  */
-export function syncLayerConfig(layer: Layer, original: Layer): void {
+export function syncLayerConfig(layer: import("@/lib/schemas").Layer, original: import("@/lib/schemas").Layer): void {
   if (original.playbackMode !== layer.playbackMode) syncLayerPlaybackMode(layer);
   const arrangementChanged = original.arrangement !== layer.arrangement;
   if (arrangementChanged) syncLayerArrangement(layer);
-  // syncLayerArrangement already calls resolveSounds with the updated layer (which
-  // carries the new selection), so skip syncLayerSelection to avoid a redundant
-  // rebuild — especially important for shuffled, where a second call would produce
-  // a different random order, discarding the one set by syncLayerArrangement.
-  //
-  // When arrangement is stable, use JSON.stringify to detect actual selection
-  // content changes (reference equality is unreliable since the form always
-  // creates new objects). This prevents the queue from being rebuilt — and the
-  // currently-playing sound from being replayed — when only playbackMode changes.
+  // syncLayerArrangement already rebuilds the queue using the updated selection,
+  // so skip syncLayerSelection to avoid a redundant rebuild — especially important
+  // for shuffled, where a second call would produce a different random order.
   if (!arrangementChanged && JSON.stringify(original.selection) !== JSON.stringify(layer.selection)) {
     syncLayerSelection(layer);
   }
@@ -453,7 +321,11 @@ export function stopAllPads(): void {
     gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0, ctx.currentTime + STOP_RAMP_S);
   });
-  setTimeout(() => {
+  // Track this timeout so clearAllAudioState() can cancel it if project close
+  // fires before the ramp completes — prevents stale cleanup from touching a
+  // new audio session.
+  const stopTimeoutId = setTimeout(() => {
+    cancelGlobalStopTimeout(); // clear the tracker (timeout already fired)
     clearAllStreamingAudio();
     clearAllPadProgressInfo();
     clearAllLayerProgressInfo();
@@ -461,6 +333,7 @@ export function stopAllPads(): void {
     clearAllPadGains();
     stopAllVoices();
   }, STOP_RAMP_S * 1000 + 5);
+  setGlobalStopTimeout(stopTimeoutId);
 }
 
 export function releasePadHoldLayers(pad: Pad): void {
@@ -480,211 +353,11 @@ export function releasePadHoldLayers(pad: Pad): void {
   }
 }
 
-/** Returns the 0-1 gain value for a specific sound within a layer.
- *  For "assigned" selections, reads from SoundInstance.volume (0-100 scale, same as layer.volume).
- *  For "tag"/"set" selections, defaults to 1.0 (no per-sound config yet). */
-function getVoiceVolume(layer: Layer, sound: Sound): number {
-  if (layer.selection.type === "assigned") {
-    const inst = layer.selection.instances.find((i) => i.soundId === sound.id);
-    return inst ? inst.volume / 100 : 1.0;
-  }
-  return 1.0;
-}
-
-function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
-  const soundById = new Map(sounds.map((s) => [s.id, s]));
-  const sel = layer.selection;
-  switch (sel.type) {
-    case "assigned":
-      return sel.instances
-        .map((inst) => soundById.get(inst.soundId))
-        .filter((s): s is Sound => !!s && !!s.filePath);
-    case "tag":
-      return filterSoundsByTags(sounds, sel.tagIds, sel.matchMode);
-    case "set":
-      return sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath);
-  }
-}
-
-/**
- * Load and start a single sound for a layer.
- *
- * Routes to the streaming path (HTMLAudioElement) for large files (>= 20 MB
- * compressed) and the buffer path (AudioBufferSourceNode) for small files.
- *
- * Sets up an onended handler that auto-chains to the next sound in
- * layerChainQueue (sequential/shuffled arrangement).
- *
- * Audio graph: sourceNode -> voiceGain -> layerGain -> padGain -> masterGain
- */
-async function startLayerSound(
-  pad: Pad,
-  layer: Layer,
-  sound: Sound,
-  ctx: AudioContext,
-  layerGain: GainNode,
-  voiceVolume: number,
-  allSounds: Sound[],
-): Promise<void> {
-  try {
-    let voice: AudioVoice;
-    let audio: HTMLAudioElement | null = null;
-
-    if (await checkIsLargeFile(sound)) {
-      // -- Streaming path (large files) ---
-      // Reuse a cached HTMLAudioElement so the browser only buffers the file
-      // once. The first trigger has normal load latency; all subsequent triggers
-      // are near-instant because the element is already buffered.
-      // Disconnect stale audio-graph connections before re-routing through a
-      // fresh voiceGain, then reset position so playback starts from the top.
-      const { audio: cachedAudio, sourceNode } = getOrCreateStreamingElement(sound, ctx);
-      audio = cachedAudio;
-      sourceNode.disconnect();
-      audio.currentTime = 0;
-      audio.loop = (layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode);
-      voice = wrapStreamingElement(audio, sourceNode, ctx, layerGain, voiceVolume);
-      registerStreamingAudio(pad.id, layer.id, audio);
-    } else {
-      // -- Buffer path (short files) ---
-      // Fully decoded AudioBuffer: instant retrigger, simultaneous instances.
-      const buffer = await loadBuffer(sound);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && (!isChained(layer.arrangement) || layer.cycleMode)) {
-        source.loop = true;
-      }
-      voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
-
-      // Chained arrangements play one sound at a time — always update to track the current sound.
-      // Simultaneous plays all sounds at once — keep the longest so the bar fills on the slowest sound.
-      const existing = getPadProgressInfo(pad.id);
-      if (isChained(layer.arrangement) || !existing || buffer.duration > existing.duration) {
-        setPadProgressInfo(pad.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
-      }
-      // Per-layer progress always tracks the most recent sound for this layer.
-      setLayerProgressInfo(layer.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
-    }
-
-    voice.setOnEnded(() => {
-      // endedCb is nulled on first fire — prevents double-call if the source
-      // ends naturally while a stopWithRamp timeout is pending.
-      if (audio) {
-        unregisterStreamingAudio(pad.id, layer.id, audio);
-      }
-      clearLayerVoice(pad.id, layer.id, voice);
-      // Chain to the next sound if one is queued (sequential/shuffled).
-      // `remaining === undefined` means the queue was cleared externally (stop/reset).
-      // `remaining.length === 0` means the chain ran to completion naturally.
-      const remaining = getLayerChain(layer.id);
-      const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
-      if (remaining === undefined) {
-        // Queue was externally cleared (e.g. stopAll, retrigger restart) — do not chain.
-      } else if (remaining.length > 0) {
-        const [next, ...rest] = remaining;
-        setLayerChain(layer.id, rest);
-        // Clear stale progress so the bar resets to 0 during the async buffer load
-        // rather than freezing at 1.0 (the clamped value of the just-ended sound).
-        clearLayerProgressInfo(layer.id);
-        clearPadProgressInfo(pad.id);
-        // Keep the tick alive during the async gap — voiceMap is temporarily empty
-        // after clearLayerVoice and before the next recordLayerVoice.
-        startAudioTick();
-        startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
-      } else if (liveMode === "loop" || liveMode === "hold") {
-        // Chain exhausted naturally — restart using the current live arrangement,
-        // playback mode, and selection. All fields read from the store so mid-playback
-        // config changes (arrangement, playback mode, or sound selection) take effect
-        // at each loop boundary.
-        const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
-        const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
-        const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
-        const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
-        // Clear stale progress before the async restart so the bar resets to 0 during
-        // the buffer load gap rather than clamping to 1.0.
-        clearLayerProgressInfo(layer.id);
-        clearPadProgressInfo(pad.id);
-        // Keep the tick alive during the async gap.
-        startAudioTick();
-        if (isChained(liveArr)) {
-          const newOrder = buildPlayOrder(liveArr, liveSounds);
-          if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
-          const [first, ...rest] = newOrder;
-          setLayerChain(layer.id, rest);
-          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds);
-        } else {
-          // Non-chained loop: start all sounds simultaneously using the current live
-          // selection so mid-playback sound changes take effect at each loop boundary.
-          deleteLayerChain(layer.id);
-          for (const sound of liveSounds) {
-            startLayerSound(pad, liveLayerSnap, sound, ctx, layerGain, getVoiceVolume(liveLayerSnap, sound), liveSounds);
-          }
-        }
-      } else {
-        deleteLayerChain(layer.id);
-      }
-    });
-
-    await voice.start();
-    recordLayerVoice(pad.id, layer.id, voice);
-    startAudioTick();
-
-  } catch (err) {
-    // Clear stale progress info so a failed load doesn't leave the bar permanently
-    // frozen at 1.0 (the clamped value of the sound that just ended in a loop chain).
-    clearLayerProgressInfo(layer.id);
-    clearPadProgressInfo(pad.id);
-    if (err instanceof MissingFileError) {
-      const settings = useAppSettingsStore.getState().settings;
-      if (settings) {
-        const { sounds } = useLibraryStore.getState();
-        checkMissingStatus(settings.globalFolders, sounds).then((result) => {
-          useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
-        });
-      }
-      toast.error(`Failed to play "${sound.name}" — file not found. Check the Sounds panel.`);
-    } else {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to play "${sound.name}": ${message}`);
-    }
-  }
-}
-
-function rampStopLayerVoices(
-  padId: string,
-  layer: Layer,
-  voices: readonly AudioVoice[],
-): void {
-  for (const v of voices) v.setOnEnded(null);
-  for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
-
-  const gain = getLayerGain(layer.id);
-  const resetValue = layer.volume / 100;
-  setTimeout(() => {
-    for (const v of voices) clearLayerVoice(padId, layer.id, v);
-    if (gain) {
-      const ctx = getAudioContext();
-      gain.gain.cancelScheduledValues(ctx.currentTime);
-      gain.gain.setValueAtTime(resetValue, ctx.currentTime);
-    }
-  }, STOP_RAMP_S * 1000 + 5);
-}
-
-function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
-  const voices = [...getLayerVoices(layer.id)];
-  if (voices.length === 0) return;
-  rampStopLayerVoices(pad.id, layer, voices);
-}
-
 // startVolume: 0-1. Pass 0 for drag-up gestures (silent start), defaults to 1.
 export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   const { sounds } = useLibraryStore.getState();
-
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
-  // padProgressInfo and padStreamingAudio are NOT cleared here — per-layer retrigger
-  // mode handling may skip playback entirely (e.g. 'continue'), and clearing eagerly
-  // would freeze the progress bar for layers that keep playing.
-  // Both are cleared lazily below, once we know a layer will actually start new playback.
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   // Tick reads gain node value automatically — no store call needed.
@@ -695,280 +368,76 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     const resolved = resolveSounds(layer, sounds);
     if (resolved.length === 0) continue;
 
-    // Leading debounce — if startLayerSound is in-flight for this layer, ignore the trigger
+    // Leading debounce — if startLayerSound is in-flight for this layer, ignore the trigger.
+    // Set pending synchronously BEFORE any await to close the race window between the
+    // check and the first await point.
     if (isLayerPending(layer.id)) continue;
+    setLayerPending(layer.id);
 
     const isLayerPlaying = isLayerActive(layer.id);
     const layerGain = getOrCreateLayerGain(layer.id, layer.volume, padGain);
 
-    // -- Retrigger handling ---
-    switch (layer.retriggerMode) {
-      case "stop":
-        if (isLayerPlaying) {
-          deleteLayerChain(layer.id);
-          // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
-          // callback won't fire — delete the layer's streaming entry explicitly.
-          clearLayerStreamingAudio(pad.id, layer.id);
-          stopLayerWithRampInternal(pad, layer);
-          // Cycle mode: advance cursor so next trigger plays the next sound.
-          if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-            const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
-            if (nextIndex >= resolved.length) {
-              deleteLayerCycleIndex(layer.id);
-            } else {
-              setLayerCycleIndex(layer.id, nextIndex);
-            }
-          }
-          continue;
-        }
-        break;
-
-      case "continue":
-        if (isLayerPlaying) continue;
-        break;
-
-      case "restart":
-        if (isLayerPlaying) {
-          deleteLayerChain(layer.id);
-          stopLayerVoices(pad.id, layer.id);
-          // Cycle mode: back the cursor up so the same sound replays.
-          // (The cursor was already advanced when the sound started.)
-          if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-            const cur = getLayerCycleIndex(layer.id) ?? 0;
-            setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
-          }
-        }
-        break;
-
-      case "next":
-        if (isLayerPlaying) {
-          // Capture queue before clearing it
-          const remaining = [...(getLayerChain(layer.id) ?? [])];
-          // setOnEnded(null) must come before stopLayer — stopLayer calls voice.stop() which
-          // fires onended synchronously; nulling first prevents the chain-advance callback from re-firing.
-          for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
-          deleteLayerChain(layer.id);
-          // setOnEnded(null) nulled the cleanup callback — delete streaming entry explicitly.
-          clearLayerStreamingAudio(pad.id, layer.id);
-          stopLayerVoices(pad.id, layer.id);
-          // Clear progress immediately so the bar resets to 0 while the next
-          // buffer loads. Without this, stale padProgressInfo keeps advancing
-          // during the async gap and the bar shows the old sound's position.
-          clearPadProgressInfo(pad.id);
-          clearLayerProgressInfo(layer.id);
-
-          if (layer.cycleMode && isChained(layer.arrangement)) {
-            // Cycle mode + next: stop current sound, advance cycle cursor, play next.
-            // Falls through to the start-playback section which reads the cycle cursor.
-          } else {
-            if (remaining.length > 0) {
-              // Advance to next sound in chain
-              const [next, ...rest] = remaining;
-              setLayerChain(layer.id, rest);
-              await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
-            } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
-              // Chain exhausted — loop back to beginning
-              const newOrder = buildPlayOrder(layer.arrangement, resolved);
-              if (newOrder.length > 0) {
-                const [first, ...rest] = newOrder;
-                setLayerChain(layer.id, rest);
-                await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-              }
-            }
-            // one-shot: queue exhausted -> just stop (already done above)
-            continue;
-          }
-        }
-        break;
+    const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
+    // triggerPad does not pass afterStopCleanup — pad-level playback store state
+    // is managed globally (stopAllPads / clearVoice).
+    if (action === "skip" || action === "chain-advanced") {
+      clearLayerPending(layer.id);
+      continue;
     }
 
-    // -- Start playback ---
     if (!progressCleared) {
       clearPadProgressInfo(pad.id);
       progressCleared = true;
     }
-    clearLayerProgressInfo(layer.id);
-    setLayerPending(layer.id);
-    try {
-      const playOrder = buildPlayOrder(layer.arrangement, resolved);
-      setLayerPlayOrder(layer.id, playOrder);
-
-      if (layer.cycleMode && isChained(layer.arrangement)) {
-        // Cycle mode: play exactly one sound per trigger, advancing the cursor.
-        // No chain queue — onended will not auto-advance to the next sound.
-        // Loop/hold modes loop the *same* sound via source.loop (same as simultaneous).
-        deleteLayerChain(layer.id);
-        const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
-        const sound = playOrder[cycleIndex % playOrder.length];
-        // Advance cursor for the next trigger
-        const nextIndex = cycleIndex + 1;
-        if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
-          // One-shot: cursor wraps to 0 for the next full cycle
-          deleteLayerCycleIndex(layer.id);
-        } else {
-          setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
-        }
-        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
-      } else if (isChained(layer.arrangement)) {
-        const [first, ...rest] = playOrder;
-        setLayerChain(layer.id, rest);
-        await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-      } else {
-        deleteLayerChain(layer.id);
-        for (const sound of playOrder) {
-          await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
-        }
-      }
-    } finally {
-      clearLayerPending(layer.id);
-    }
+    await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
+    // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
   }
-}
-
-// ---------------------------------------------------------------------------
-// Per-layer live controls (volume, trigger, stop, skip)
-// ---------------------------------------------------------------------------
-
-/** Set the live volume for a layer's gain node and mirror to the playback store.
- *  Call commitLayerVolume on drag-end to persist to the project schema. */
-export function setLayerVolume(layerId: string, volume: number): void {
-  const clamped = Math.max(0, Math.min(1, volume));
-  const gain = getLayerGain(layerId);
-  if (gain) {
-    // Layer is playing — update gain node. Tick reads the new value automatically.
-    const ctx = getAudioContext();
-    gain.gain.cancelScheduledValues(ctx.currentTime);
-    gain.gain.setValueAtTime(clamped, ctx.currentTime);
-  } else {
-    // Layer not playing — tick has no gain node to read. Push directly to store.
-    usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
-  }
-}
-
-/** Persist the current layer volume to the project schema (call on drag-end / value commit). */
-export function commitLayerVolume(layerId: string, volume: number): void {
-  const clamped = Math.max(0, Math.min(1, volume));
-  useProjectStore.getState().updateLayerVolume(layerId, clamped);
 }
 
 /** Trigger a single layer of a pad in isolation, respecting retrigger mode/arrangement/selection. */
-export async function triggerLayer(pad: Pad, layer: Layer): Promise<void> {
+export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Layer): Promise<void> {
   const { sounds } = useLibraryStore.getState();
   const resolved = resolveSounds(layer, sounds);
   if (resolved.length === 0) return;
+  // Set pending synchronously BEFORE any await to close the race window between
+  // the check and the first await point.
   if (isLayerPending(layer.id)) return;
+  setLayerPending(layer.id);
 
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
   const isPlaying = isLayerActive(layer.id);
   const layerGain = getOrCreateLayerGain(layer.id, layer.volume, padGain);
 
-  // -- Retrigger handling (same logic as triggerPad per-layer section) ---
-  switch (layer.retriggerMode) {
-    case "stop":
-      if (isPlaying) {
-        deleteLayerChain(layer.id);
-        clearLayerStreamingAudio(pad.id, layer.id);
-        stopLayerWithRampInternal(pad, layer);
-        setTimeout(() => {
-          if (!isPadActive(pad.id)) {
-            usePlaybackStore.getState().removePlayingPad(pad.id);
-          }
-        }, STOP_RAMP_S * 1000 + 10);
-        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-          const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
-          if (nextIndex >= resolved.length) {
-            deleteLayerCycleIndex(layer.id);
-          } else {
-            setLayerCycleIndex(layer.id, nextIndex);
-          }
-        }
-        return;
+  const action = await applyRetriggerMode(
+    pad, layer, isPlaying, ctx, layerGain, resolved,
+    // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad
+    // still has any active voices and remove it from the playing-pads set if not.
+    () => setTimeout(() => {
+      if (!isPadActive(pad.id)) {
+        usePlaybackStore.getState().removePlayingPad(pad.id);
       }
-      break;
+    }, STOP_RAMP_S * 1000 + 10),
+  );
 
-    case "continue":
-      if (isPlaying) return;
-      break;
-
-    case "restart":
-      if (isPlaying) {
-        deleteLayerChain(layer.id);
-        stopLayerVoices(pad.id, layer.id);
-        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-          const cur = getLayerCycleIndex(layer.id) ?? 0;
-          setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
-        }
-      }
-      break;
-
-    case "next":
-      if (isPlaying) {
-        const remaining = [...(getLayerChain(layer.id) ?? [])];
-        for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
-        deleteLayerChain(layer.id);
-        clearLayerStreamingAudio(pad.id, layer.id);
-        stopLayerVoices(pad.id, layer.id);
-        clearPadProgressInfo(pad.id);
-        clearLayerProgressInfo(layer.id);
-
-        if (layer.cycleMode && isChained(layer.arrangement)) {
-          // Falls through to start-playback below
-        } else {
-          if (remaining.length > 0) {
-            const [next, ...rest] = remaining;
-            setLayerChain(layer.id, rest);
-            await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
-          } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
-            const newOrder = buildPlayOrder(layer.arrangement, resolved);
-            if (newOrder.length > 0) {
-              const [first, ...rest] = newOrder;
-              setLayerChain(layer.id, rest);
-              await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-            }
-          }
-          usePlaybackStore.getState().addPlayingPad(pad.id);
-          return;
-        }
-      }
-      break;
-  }
-
-  // -- Start playback ---
-  clearPadProgressInfo(pad.id);
-  clearLayerProgressInfo(layer.id);
-  setLayerPending(layer.id);
-  try {
-    const playOrder = buildPlayOrder(layer.arrangement, resolved);
-    setLayerPlayOrder(layer.id, playOrder);
-
-    if (layer.cycleMode && isChained(layer.arrangement)) {
-      deleteLayerChain(layer.id);
-      const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
-      const sound = playOrder[cycleIndex % playOrder.length];
-      const nextIndex = cycleIndex + 1;
-      if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
-        deleteLayerCycleIndex(layer.id);
-      } else {
-        setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
-      }
-      await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
-    } else if (isChained(layer.arrangement)) {
-      const [first, ...rest] = playOrder;
-      setLayerChain(layer.id, rest);
-      await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-    } else {
-      deleteLayerChain(layer.id);
-      for (const sound of playOrder) {
-        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
-      }
-    }
-  } finally {
+  if (action === "skip") {
     clearLayerPending(layer.id);
+    return;
+  }
+  if (action === "chain-advanced") {
+    clearLayerPending(layer.id);
+    usePlaybackStore.getState().addPlayingPad(pad.id);
+    return;
   }
 
+  clearPadProgressInfo(pad.id);
+  await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
   usePlaybackStore.getState().addPlayingPad(pad.id);
 }
+
+// ---------------------------------------------------------------------------
+// Per-layer live controls (stop, skip)
+// ---------------------------------------------------------------------------
 
 /** Stop all voices for a specific layer with a short gain ramp. Cleans up pad playing state if no layers remain active. */
 export function stopLayerWithRamp(pad: Pad, layerId: string): void {
@@ -1058,13 +527,7 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
  *   - `toLevel` is the RIGHT thumb — the HIGHER volume endpoint (start of fade-out / end of fade-in)
  *
  * When the pad is PLAYING (fade-out): fades from `toLevel` → `fromLevel` (high → low).
- *   Args are swapped when passed to `fadePadOut` to match this direction.
  * When the pad is NOT PLAYING (fade-in): fades from `fromLevel` → `toLevel` (low → high).
- *
- * @param pad - The pad to fade
- * @param duration - Fade duration in milliseconds
- * @param fromLevel - Left thumb level (0–1), lower volume endpoint
- * @param toLevel - Right thumb level (0–1), higher volume endpoint
  */
 export function fadePadWithLevels(
   pad: Pad,

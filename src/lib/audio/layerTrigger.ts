@@ -1,0 +1,457 @@
+// src/lib/audio/layerTrigger.ts
+//
+// Extracted layer trigger helpers used by padPlayer.ts:
+//   - resolveSounds / liveLayerField / getVoiceVolume — private utilities
+//   - rampStopLayerVoices / stopLayerWithRampInternal — ramped layer stop primitives
+//   - loadLayerVoice — voice creation (streaming vs buffer), separated from lifecycle
+//   - startLayerSound — onended chain-continuation lifecycle (calls loadLayerVoice)
+//   - applyRetriggerMode — deduplicates the retrigger switch shared by triggerPad + triggerLayer
+//   - startLayerPlayback — deduplicates the start-playback section shared by both
+
+import { getAudioContext } from "./audioContext";
+import { loadBuffer, MissingFileError } from "./bufferCache";
+import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
+import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
+import type { AudioVoice } from "./audioVoice";
+import { buildPlayOrder, isChained } from "./arrangement";
+import { filterSoundsByTags } from "./resolveSounds";
+import { useLibraryStore } from "@/state/libraryStore";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useProjectStore } from "@/state/projectStore";
+import { checkMissingStatus } from "@/lib/library.reconcile";
+import type { Layer, Pad, Sound } from "@/lib/schemas";
+import { toast } from "sonner";
+import { startAudioTick } from "./audioTick";
+import {
+  clearLayerVoice,
+  clearLayerStreamingAudio,
+  deleteLayerChain,
+  deleteLayerCycleIndex,
+  getLayerChain,
+  getLayerCycleIndex,
+  getLayerGain,
+  getLayerVoices,
+  getPadProgressInfo,
+  recordLayerVoice,
+  registerStreamingAudio,
+  setLayerChain,
+  setLayerCycleIndex,
+  setLayerPlayOrder,
+  setLayerProgressInfo,
+  setPadProgressInfo,
+  clearLayerProgressInfo,
+  clearPadProgressInfo,
+  setLayerPending,
+  clearLayerPending,
+  stopLayerVoices,
+  unregisterStreamingAudio,
+} from "./audioState";
+
+// ---------------------------------------------------------------------------
+// Private utilities
+// ---------------------------------------------------------------------------
+
+/** Read a field from the live project store for a layer. Falls back to `captured`
+ *  if the pad/layer is not found (e.g. deleted mid-playback or project cleared). */
+export function liveLayerField<K extends keyof Layer>(
+  padId: string,
+  layerId: string,
+  field: K,
+  captured: Layer[K],
+): Layer[K] {
+  const project = useProjectStore.getState().project;
+  if (project) {
+    for (const scene of project.scenes) {
+      const pad = scene.pads.find((p) => p.id === padId);
+      if (pad) return pad.layers.find((l) => l.id === layerId)?.[field] ?? captured;
+    }
+  }
+  return captured;
+}
+
+/** Returns the 0–1 gain value for a specific sound within a layer.
+ *  For "assigned" selections, reads SoundInstance.volume (0–100 scale).
+ *  For "tag"/"set" selections, defaults to 1.0. */
+export function getVoiceVolume(layer: Layer, sound: Sound): number {
+  if (layer.selection.type === "assigned") {
+    const inst = layer.selection.instances.find((i) => i.soundId === sound.id);
+    return inst ? inst.volume / 100 : 1.0;
+  }
+  return 1.0;
+}
+
+/** Resolve a layer's sound selection to actual Sound objects with valid file paths. */
+export function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
+  const soundById = new Map(sounds.map((s) => [s.id, s]));
+  const sel = layer.selection;
+  switch (sel.type) {
+    case "assigned":
+      return sel.instances
+        .map((inst) => soundById.get(inst.soundId))
+        .filter((s): s is Sound => !!s && !!s.filePath);
+    case "tag":
+      return filterSoundsByTags(sounds, sel.tagIds, sel.matchMode);
+    case "set":
+      return sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ramped layer stop primitives (used by applyRetriggerMode + padPlayer stop fns)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ramp-stop a specific set of voices on a layer: null their onended callbacks,
+ * stop with a gain ramp, then clean up voice + gain state after the ramp window.
+ */
+export function rampStopLayerVoices(
+  padId: string,
+  layer: Layer,
+  voices: readonly AudioVoice[],
+): void {
+  for (const v of voices) v.setOnEnded(null);
+  for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
+
+  const gain = getLayerGain(layer.id);
+  const resetValue = layer.volume / 100;
+  setTimeout(() => {
+    for (const v of voices) clearLayerVoice(padId, layer.id, v);
+    if (gain) {
+      const ctx = getAudioContext();
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(resetValue, ctx.currentTime);
+    }
+  }, STOP_RAMP_S * 1000 + 5);
+}
+
+/** Stop all active voices for a layer with a short gain ramp. No-op if no voices. */
+export function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
+  const voices = [...getLayerVoices(layer.id)];
+  if (voices.length === 0) return;
+  rampStopLayerVoices(pad.id, layer, voices);
+}
+
+// ---------------------------------------------------------------------------
+// Voice creation — streaming vs buffer path
+// ---------------------------------------------------------------------------
+
+/**
+ * Create and start a voice for one sound on one layer.
+ * Routes to the streaming path (HTMLAudioElement) for large files and the
+ * buffer path (AudioBufferSourceNode) for small files. Updates progress info
+ * as a side effect. Returns the started voice and the HTMLAudioElement (if
+ * streaming, for cleanup tracking; null for buffer path).
+ *
+ * Throws on load failure — caller is responsible for catching.
+ */
+export async function loadLayerVoice(
+  sound: Sound,
+  layer: Layer,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  voiceVolume: number,
+  padId: string,
+): Promise<{ voice: AudioVoice; audio: HTMLAudioElement | null }> {
+  if (await checkIsLargeFile(sound)) {
+    // -- Streaming path (large files) ---
+    const { audio: cachedAudio, sourceNode } = getOrCreateStreamingElement(sound, ctx);
+    sourceNode.disconnect();
+    cachedAudio.currentTime = 0;
+    cachedAudio.loop =
+      (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
+      (!isChained(layer.arrangement) || layer.cycleMode);
+    const voice = wrapStreamingElement(cachedAudio, sourceNode, ctx, layerGain, voiceVolume);
+    registerStreamingAudio(padId, layer.id, cachedAudio);
+    return { voice, audio: cachedAudio };
+  } else {
+    // -- Buffer path (short files) ---
+    const buffer = await loadBuffer(sound);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    if (
+      (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
+      (!isChained(layer.arrangement) || layer.cycleMode)
+    ) {
+      source.loop = true;
+    }
+    const voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
+
+    // Chained: always update progress to track the current sound.
+    // Simultaneous: keep the longest-duration voice so the bar fills on the slowest sound.
+    const existing = getPadProgressInfo(padId);
+    if (isChained(layer.arrangement) || !existing || buffer.duration > existing.duration) {
+      setPadProgressInfo(padId, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
+    }
+    setLayerProgressInfo(layer.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
+
+    return { voice, audio: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// startLayerSound — voice lifecycle + onended chain continuation
+// ---------------------------------------------------------------------------
+
+/**
+ * Load and start a single sound for a layer. Sets up the onended callback that
+ * auto-chains to the next sound in layerChainQueue (sequential/shuffled arrangement).
+ *
+ * Audio graph: sourceNode -> voiceGain -> layerGain -> padGain -> masterGain
+ */
+export async function startLayerSound(
+  pad: Pad,
+  layer: Layer,
+  sound: Sound,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  voiceVolume: number,
+  allSounds: Sound[],
+): Promise<void> {
+  try {
+    const { voice, audio } = await loadLayerVoice(sound, layer, ctx, layerGain, voiceVolume, pad.id);
+
+    voice.setOnEnded(() => {
+      // endedCb is nulled on first fire — prevents double-call if the source
+      // ends naturally while a stopWithRamp timeout is pending.
+      if (audio) unregisterStreamingAudio(pad.id, layer.id, audio);
+      clearLayerVoice(pad.id, layer.id, voice);
+
+      // Chain to the next sound if one is queued (sequential/shuffled).
+      // `remaining === undefined` means the queue was cleared externally (stop/reset).
+      // `remaining.length === 0` means the chain ran to completion naturally.
+      const remaining = getLayerChain(layer.id);
+      const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
+
+      if (remaining === undefined) {
+        // Queue cleared externally — do not chain.
+      } else if (remaining.length > 0) {
+        const [next, ...rest] = remaining;
+        setLayerChain(layer.id, rest);
+        // Clear stale progress so the bar resets during the async buffer load.
+        clearLayerProgressInfo(layer.id);
+        clearPadProgressInfo(pad.id);
+        startAudioTick(); // keep tick alive during the async gap
+        startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds).catch(
+          // startLayerSound handles errors internally (toast + progress clear);
+          // the catch here prevents unhandled-rejection if it throws synchronously.
+          () => {},
+        );
+      } else if (liveMode === "loop" || liveMode === "hold") {
+        // Chain exhausted naturally — restart using live store values so mid-playback
+        // config changes (arrangement, playback mode, selection) take effect.
+        const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
+        const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
+        const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
+        const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
+        clearLayerProgressInfo(layer.id);
+        clearPadProgressInfo(pad.id);
+        startAudioTick(); // keep tick alive during the async gap
+        if (isChained(liveArr)) {
+          const newOrder = buildPlayOrder(liveArr, liveSounds);
+          if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
+          const [first, ...rest] = newOrder;
+          setLayerChain(layer.id, rest);
+          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
+            () => {},
+          );
+        } else {
+          deleteLayerChain(layer.id);
+          for (const snd of liveSounds) {
+            startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
+              () => {},
+            );
+          }
+        }
+      } else {
+        deleteLayerChain(layer.id);
+      }
+    });
+
+    await voice.start();
+    recordLayerVoice(pad.id, layer.id, voice);
+    startAudioTick();
+
+  } catch (err) {
+    // Clear stale progress so a failed load doesn't freeze the bar at 1.0.
+    clearLayerProgressInfo(layer.id);
+    clearPadProgressInfo(pad.id);
+    if (err instanceof MissingFileError) {
+      const settings = useAppSettingsStore.getState().settings;
+      if (settings) {
+        const { sounds } = useLibraryStore.getState();
+        checkMissingStatus(settings.globalFolders, sounds).then((result) => {
+          useLibraryStore.getState().setMissingState(result.missingSoundIds, result.missingFolderIds);
+        });
+      }
+      toast.error(`Failed to play "${sound.name}" — file not found. Check the Sounds panel.`);
+    } else {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to play "${sound.name}": ${message}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// applyRetriggerMode — deduplicates the retrigger switch shared by
+//   triggerPad (iterates layers, uses `continue`) and
+//   triggerLayer (single layer, uses `return`).
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of applying retrigger logic for one layer:
+ * - "skip"           — don't start new playback (stop mode stopped; continue mode kept going)
+ * - "proceed"        — clear progress and start new playback via startLayerPlayback
+ * - "chain-advanced" — "next" mode already started the chain's next sound; caller should
+ *                      record addPlayingPad if needed (triggerLayer) and then return/continue
+ */
+export type RetriggerAction = "skip" | "proceed" | "chain-advanced";
+
+/**
+ * Apply the layer's retrigger mode when the layer is already active (or not).
+ *
+ * @param afterStopCleanup - Optional callback fired after a "stop"-mode ramp-stop.
+ *   `triggerLayer` uses this to schedule a deferred `removePlayingPad` check;
+ *   `triggerPad` omits it (the pad-level store state is managed globally).
+ */
+export async function applyRetriggerMode(
+  pad: Pad,
+  layer: Layer,
+  isLayerPlaying: boolean,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  resolved: Sound[],
+  afterStopCleanup?: () => void,
+): Promise<RetriggerAction> {
+  switch (layer.retriggerMode) {
+    case "stop":
+      if (isLayerPlaying) {
+        deleteLayerChain(layer.id);
+        // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
+        // callback won't fire — delete the layer's streaming entry explicitly.
+        clearLayerStreamingAudio(pad.id, layer.id);
+        stopLayerWithRampInternal(pad, layer);
+        afterStopCleanup?.();
+        // Cycle mode: advance cursor so next trigger plays the next sound.
+        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+          const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
+          if (nextIndex >= resolved.length) {
+            deleteLayerCycleIndex(layer.id);
+          } else {
+            setLayerCycleIndex(layer.id, nextIndex);
+          }
+        }
+        return "skip";
+      }
+      break;
+
+    case "continue":
+      if (isLayerPlaying) return "skip";
+      break;
+
+    case "restart":
+      if (isLayerPlaying) {
+        deleteLayerChain(layer.id);
+        stopLayerVoices(pad.id, layer.id);
+        // Cycle mode: back cursor up so the same sound replays.
+        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+          const cur = getLayerCycleIndex(layer.id) ?? 0;
+          setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
+        }
+      }
+      break;
+
+    case "next":
+      if (isLayerPlaying) {
+        // Capture queue before clearing it.
+        const remaining = [...(getLayerChain(layer.id) ?? [])];
+        // Null onended BEFORE stopLayerVoices — stop() fires onended synchronously;
+        // nulling first prevents the chain-advance callback from re-firing.
+        for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
+        deleteLayerChain(layer.id);
+        clearLayerStreamingAudio(pad.id, layer.id);
+        stopLayerVoices(pad.id, layer.id);
+        // Clear progress immediately so the bar resets to 0 while the next buffer loads.
+        clearPadProgressInfo(pad.id);
+        clearLayerProgressInfo(layer.id);
+
+        if (layer.cycleMode && isChained(layer.arrangement)) {
+          // Cycle mode + next: fall through to start-playback (reads updated cycle cursor).
+          return "proceed";
+        }
+
+        if (remaining.length > 0) {
+          const [next, ...rest] = remaining;
+          setLayerChain(layer.id, rest);
+          await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+        } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
+          // Chain exhausted — loop back to beginning.
+          const newOrder = buildPlayOrder(layer.arrangement, resolved);
+          if (newOrder.length > 0) {
+            const [first, ...rest] = newOrder;
+            setLayerChain(layer.id, rest);
+            await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+          }
+        }
+        // one-shot: queue exhausted — just stopped (already done above).
+        return "chain-advanced";
+      }
+      break;
+  }
+
+  return "proceed";
+}
+
+// ---------------------------------------------------------------------------
+// startLayerPlayback — deduplicates the start-playback section shared by
+//   triggerPad (inside its layer for-loop) and triggerLayer.
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the play order and start all sounds for a layer.
+ * Handles cycleMode, chained (sequential/shuffled), and simultaneous arrangements.
+ * Manages the layerPending guard internally.
+ *
+ * Callers are responsible for clearing padProgressInfo BEFORE calling this
+ * (triggerPad does it once for the first layer that starts; triggerLayer always does it).
+ */
+export async function startLayerPlayback(
+  pad: Pad,
+  layer: Layer,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  resolved: Sound[],
+): Promise<void> {
+  clearLayerProgressInfo(layer.id);
+  setLayerPending(layer.id);
+  try {
+    const playOrder = buildPlayOrder(layer.arrangement, resolved);
+    setLayerPlayOrder(layer.id, playOrder);
+
+    if (layer.cycleMode && isChained(layer.arrangement)) {
+      // Cycle mode: play exactly one sound per trigger, advancing the cursor.
+      // No chain queue — onended will not auto-advance.
+      deleteLayerChain(layer.id);
+      const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
+      const sound = playOrder[cycleIndex % playOrder.length];
+      const nextIndex = cycleIndex + 1;
+      if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
+        deleteLayerCycleIndex(layer.id);
+      } else {
+        setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
+      }
+      await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+    } else if (isChained(layer.arrangement)) {
+      const [first, ...rest] = playOrder;
+      setLayerChain(layer.id, rest);
+      await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+    } else {
+      deleteLayerChain(layer.id);
+      for (const sound of playOrder) {
+        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+      }
+    }
+  } finally {
+    clearLayerPending(layer.id);
+  }
+}
+
