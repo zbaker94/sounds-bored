@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Saving a pad configuration now shows a clear error message if the selected tags or set don't match any sounds in your library, preventing silent misconfiguration.
 - Pads with sequential sound layers now display the currently-playing sound name more reliably and with less UI flicker during playback.
 - Large audio files are now preloaded more efficiently — redundant streaming preloads are skipped when editing pads or scenes if the set of large sounds in the active scene hasn't changed.
 - Layers with the same sound assigned multiple times now correctly play each instance in order, preserving the intended arrangement.

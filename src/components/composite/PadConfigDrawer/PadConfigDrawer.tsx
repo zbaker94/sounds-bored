@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useForm, useFormContext, FormProvider, Controller, type Resolver } from "react-hook-form";
+import { useForm, useFormContext, FormProvider, Controller, type Resolver, type FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
@@ -105,8 +105,10 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
       const sel = layer.selection;
       if (sel.type === "tag") {
         if (filterSoundsByTags(sounds, sel.tagIds, sel.matchMode).length === 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setError(`layers.${i}.selection.tagIds` as any, {
+          // Typed annotation (not `as` cast) lets TypeScript validate the template literal
+          // path against PadConfigForm's FieldPath union at compile time.
+          const field: FieldPath<PadConfigForm> = `layers.${i}.selection.tagIds`;
+          setError(field, {
             type: "manual",
             message: "No sounds in library match these tags",
           });
@@ -114,8 +116,10 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         }
       } else if (sel.type === "set") {
         if (sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath).length === 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setError(`layers.${i}.selection.setId` as any, {
+          // Typed annotation (not `as` cast) lets TypeScript validate the template literal
+          // path against PadConfigForm's FieldPath union at compile time.
+          const field: FieldPath<PadConfigForm> = `layers.${i}.selection.setId`;
+          setError(field, {
             type: "manual",
             message: "No sounds in library match this set",
           });
