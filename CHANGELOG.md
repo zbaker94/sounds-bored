@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where a pad's layers could get permanently stuck in a "pending" state if an audio error occurred mid-trigger, which would silently prevent those layers from playing again until the app was restarted
+- When one layer in a pad fails to play due to an audio error, the remaining layers now continue to trigger as expected instead of being silently blocked
 - Fixed a minor internal audio engine inefficiency where the audio context was being retrieved twice unnecessarily when updating layer volume.
 - Fixed a bug where layer volume was applied incorrectly — sounds were playing at incorrect volumes due to a unit mismatch (the internal scale was 0–100 but the audio engine expected 0–1)
 - Fixed a bug where sequential layers would resume from an incorrect position after a sound fails to load, instead of restarting from the beginning on the next trigger.

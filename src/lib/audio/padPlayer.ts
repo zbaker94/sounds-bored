@@ -368,23 +368,29 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     if (isLayerPending(layer.id)) continue;
     setLayerPending(layer.id);
 
-    const isLayerPlaying = isLayerActive(layer.id);
-    const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
+    try {
+      const isLayerPlaying = isLayerActive(layer.id);
+      const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
 
-    const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
-    // triggerPad does not pass afterStopCleanup — pad-level playback store state
-    // is managed globally (stopAllPads / clearVoice).
-    if (action === "skip" || action === "chain-advanced") {
+      const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
+      // triggerPad does not pass afterStopCleanup — pad-level playback store state
+      // is managed globally (stopAllPads / clearVoice).
+      if (action === "skip" || action === "chain-advanced") {
+        clearLayerPending(layer.id);
+        continue;
+      }
+
+      if (!progressCleared) {
+        clearPadProgressInfo(pad.id);
+        progressCleared = true;
+      }
+      await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
+      // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
+    } catch (err) {
+      // Unexpected failures in one layer must not block sibling layers or leave pending set.
       clearLayerPending(layer.id);
-      continue;
+      emitAudioError(err);
     }
-
-    if (!progressCleared) {
-      clearPadProgressInfo(pad.id);
-      progressCleared = true;
-    }
-    await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
-    // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
   }
 }
 
@@ -398,35 +404,40 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
   if (isLayerPending(layer.id)) return;
   setLayerPending(layer.id);
 
-  const ctx = await ensureResumed();
-  const padGain = getPadGain(pad.id);
-  const isPlaying = isLayerActive(layer.id);
-  const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
+  try {
+    const ctx = await ensureResumed();
+    const padGain = getPadGain(pad.id);
+    const isPlaying = isLayerActive(layer.id);
+    const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
 
-  const action = await applyRetriggerMode(
-    pad, layer, isPlaying, ctx, layerGain, resolved,
-    // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad
-    // still has any active voices and remove it from the playing-pads set if not.
-    () => setTimeout(() => {
-      if (!isPadActive(pad.id)) {
-        usePlaybackStore.getState().removePlayingPad(pad.id);
-      }
-    }, STOP_RAMP_S * 1000 + 10),
-  );
+    const action = await applyRetriggerMode(
+      pad, layer, isPlaying, ctx, layerGain, resolved,
+      // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad
+      // still has any active voices and remove it from the playing-pads set if not.
+      () => setTimeout(() => {
+        if (!isPadActive(pad.id)) {
+          usePlaybackStore.getState().removePlayingPad(pad.id);
+        }
+      }, STOP_RAMP_S * 1000 + 10),
+    );
 
-  if (action === "skip") {
-    clearLayerPending(layer.id);
-    return;
-  }
-  if (action === "chain-advanced") {
-    clearLayerPending(layer.id);
+    if (action === "skip") {
+      return;
+    }
+    if (action === "chain-advanced") {
+      usePlaybackStore.getState().addPlayingPad(pad.id);
+      return;
+    }
+
+    clearPadProgressInfo(pad.id);
+    await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
     usePlaybackStore.getState().addPlayingPad(pad.id);
-    return;
+  } finally {
+    // Safety net: clearLayerPending is idempotent.
+    // Guards against unexpected throws from ensureResumed or applyRetriggerMode
+    // before startLayerPlayback's own finally can run.
+    clearLayerPending(layer.id);
   }
-
-  clearPadProgressInfo(pad.id);
-  await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
-  usePlaybackStore.getState().addPlayingPad(pad.id);
 }
 
 // ---------------------------------------------------------------------------
