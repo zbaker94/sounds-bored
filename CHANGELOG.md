@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- The loading screen now stays visible until both app settings and the sound library have fully loaded, preventing the app from appearing ready before initialization is complete.
 - Startup errors are now surfaced: if scanning your sound folders fails, a notification appears instead of silently doing nothing
 - If the app can't save your sound library after a scan, you'll now see an error notification rather than losing the save silently
 - Missing-file detection now always runs on startup, even if the folder scan encountered an error

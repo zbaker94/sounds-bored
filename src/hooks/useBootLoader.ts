@@ -17,7 +17,7 @@ import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
  * After both are loaded, runs one-time reconciliation to discover new audio
  * files in globalFolders and backfill folderIds on existing sounds.
  */
-export function useBootLoader() {
+export function useBootLoader(): { ready: boolean } {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [libraryLoaded, setLibraryLoaded] = useState(false);
   const hasReconciled = useRef(false);
@@ -110,4 +110,6 @@ export function useBootLoader() {
         void refreshMissingState();
       });
   }, [settingsLoaded, libraryLoaded]);
+
+  return { ready: settingsLoaded && libraryLoaded };
 }

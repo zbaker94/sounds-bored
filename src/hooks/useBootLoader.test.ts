@@ -59,6 +59,23 @@ beforeEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("useBootLoader", () => {
+  it("returns ready:false before loads complete and ready:true after", async () => {
+    let resolveSettings!: (v: unknown) => void;
+    let resolveLibrary!: (v: unknown) => void;
+    mockLoadAppSettings.mockReturnValue(new Promise((r) => { resolveSettings = r; }));
+    mockLoadGlobalLibrary.mockReturnValue(new Promise((r) => { resolveLibrary = r; }));
+
+    const { result } = renderHook(() => useBootLoader());
+    expect(result.current.ready).toBe(false);
+
+    await act(async () => { resolveSettings(defaultSettings); });
+    // library still pending — not ready yet
+    expect(result.current.ready).toBe(false);
+
+    await act(async () => { resolveLibrary(defaultLibrary); });
+    expect(result.current.ready).toBe(true);
+  });
+
   it("loads app settings into the store at mount", async () => {
     const settings = createMockAppSettings({ globalFolders: [] });
     mockLoadAppSettings.mockResolvedValue(settings);
