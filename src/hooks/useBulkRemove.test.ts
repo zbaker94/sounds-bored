@@ -115,6 +115,35 @@ describe("useBulkRemove", () => {
 
       expect(mockSaveLibrary).not.toHaveBeenCalled();
     });
+
+    it("uses live store settings — settings updated after render are reflected in handler", async () => {
+      // Prove the handler reads from Zustand, not a stale React-render closure.
+      // Seed with settingsA, render, then change store to settingsB before invoking.
+      const settingsA = createMockAppSettings({ globalFolders: [] });
+      const settingsB = createMockAppSettings({ globalFolders: [createMockGlobalFolder({ path: "/new" })] });
+      const missing = createMockSound({ id: "s-miss" });
+
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsA });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [missing],
+        missingSoundIds: new globalThis.Set(["s-miss"]),
+      });
+
+      const { result } = renderHook(() => useBulkRemove());
+
+      // Update store after initial render (simulates settings save between renders)
+      await act(async () => {
+        useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsB });
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveAllMissingSounds();
+      });
+
+      // Must use settingsB.globalFolders — not stale settingsA value
+      expect(mockRefreshMissingState).toHaveBeenCalledWith(settingsB.globalFolders);
+    });
   });
 
   describe("handleRemoveAllMissingFolders", () => {

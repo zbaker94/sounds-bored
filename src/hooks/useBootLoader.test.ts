@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useBootLoader } from "./useBootLoader";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
-import { createMockAppSettings, createMockSound } from "@/test/factories";
+import { createMockAppSettings, createMockGlobalFolder, createMockSound } from "@/test/factories";
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -76,15 +76,38 @@ describe("useBootLoader", () => {
     expect(result.current.ready).toBe(true);
   });
 
-  it("loads app settings into the store at mount", async () => {
+  it("still becomes ready:true when settings load fails", async () => {
+    mockLoadAppSettings.mockRejectedValue(new Error("disk read failed"));
+    const { result } = renderHook(() => useBootLoader());
+    await act(async () => {});
+    expect(result.current.ready).toBe(true);
+  });
+
+  it("still becomes ready:true when library load fails", async () => {
+    mockLoadGlobalLibrary.mockRejectedValue(new Error("disk read failed"));
+    const { result } = renderHook(() => useBootLoader());
+    await act(async () => {});
+    expect(result.current.ready).toBe(true);
+  });
+
+  it("loads app settings into the store at mount and does not re-load on re-render", async () => {
     const settings = createMockAppSettings({ globalFolders: [] });
     mockLoadAppSettings.mockResolvedValue(settings);
 
-    await act(async () => {
-      renderHook(() => useBootLoader());
-    });
+    const { rerender } = renderHook(() => useBootLoader());
+    await act(async () => {});
 
     expect(useAppSettingsStore.getState().settings).toBe(settings);
+
+    // Mutate store after load (simulates user changing settings)
+    const updatedSettings = createMockAppSettings({ globalFolders: [createMockGlobalFolder()] });
+    useAppSettingsStore.getState().loadSettings(updatedSettings);
+
+    // Re-render must NOT trigger another disk read that would clobber the mutation
+    rerender();
+    await act(async () => {});
+    expect(mockLoadAppSettings).toHaveBeenCalledTimes(1);
+    expect(useAppSettingsStore.getState().settings).toBe(updatedSettings);
   });
 
   it("loads global library into the store at mount", async () => {
@@ -123,18 +146,30 @@ describe("useBootLoader", () => {
     expect(useLibraryStore.getState().sounds.some((s) => s.id === "new-s")).toBe(true);
   });
 
-  it("skips applying reconcile result when store is dirty (user mutation wins)", async () => {
+  it("skips applying reconcile result when a user mutation arrives while scan is in-flight", async () => {
+    // The actual race: reconcile is running async, user mutates the store,
+    // then reconcile resolves — the user's mutation must win.
     const dirtySound = createMockSound({ id: "user-edit" });
-    mockReconcile.mockImplementation(async () => {
-      // Simulate a user mutation that happens mid-scan
-      useLibraryStore.getState().updateLibrary((draft) => {
-        draft.sounds = [dirtySound];
-      });
-      return { changed: true, sounds: [createMockSound({ id: "stale-result" })], inaccessibleFolderIds: [] };
-    });
+    const staleSound = createMockSound({ id: "stale-result" });
 
+    let resolveReconcile!: (v: unknown) => void;
+    mockReconcile.mockReturnValue(
+      new Promise((r) => { resolveReconcile = r; }),
+    );
+
+    renderHook(() => useBootLoader());
+    // Let effects fire so reconcile is now in-flight
+    await act(async () => {});
+
+    // User mutation arrives while scan is still running
+    useLibraryStore.getState().updateLibrary((draft) => {
+      draft.sounds = [dirtySound];
+    });
+    expect(useLibraryStore.getState().isDirty).toBe(true);
+
+    // Reconcile resolves with stale data — dirty guard must block the overwrite
     await act(async () => {
-      renderHook(() => useBootLoader());
+      resolveReconcile({ changed: true, sounds: [staleSound], inaccessibleFolderIds: [] });
     });
 
     const ids = useLibraryStore.getState().sounds.map((s) => s.id);
@@ -171,7 +206,7 @@ describe("useBootLoader", () => {
     expect(mockSaveGlobalLibrary).not.toHaveBeenCalled();
   });
 
-  it("shows error toast and still proceeds to reconcile when settings load fails", async () => {
+  it("shows error toast and still proceeds when settings load fails", async () => {
     const { toast } = await import("sonner");
     mockLoadAppSettings.mockRejectedValue(new Error("disk read failed"));
 
@@ -197,9 +232,11 @@ describe("useBootLoader", () => {
     expect(toast.error).toHaveBeenCalledWith("Failed to load sound library");
   });
 
-  it("does not run reconciliation twice on re-render", async () => {
+  it("does not run reconciliation more than once regardless of re-renders", async () => {
     const { rerender } = renderHook(() => useBootLoader());
 
+    await act(async () => {});
+    rerender();
     await act(async () => {});
     rerender();
     await act(async () => {});

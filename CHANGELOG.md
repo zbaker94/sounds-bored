@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- App now stays fully functional even when settings or sound library files fail to load on startup
+- Duplicate folder detection now correctly reflects the latest settings, preventing silent misses when settings change rapidly
+- Boot sequence runs exactly once regardless of component re-renders, avoiding redundant disk reads
+- User edits to the sound library are no longer overwritten if a background folder scan finishes after the edit was made
 - The loading screen now stays visible until both app settings and the sound library have fully loaded, preventing the app from appearing ready before initialization is complete.
 - Startup errors are now surfaced: if scanning your sound folders fails, a notification appears instead of silently doing nothing
 - If the app can't save your sound library after a scan, you'll now see an error notification rather than losing the save silently

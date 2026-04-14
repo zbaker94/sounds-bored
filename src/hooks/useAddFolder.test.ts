@@ -168,4 +168,33 @@ describe("useAddFolder", () => {
 
     expect(result.current.isAddingFolder).toBe(false);
   });
+
+  it("uses live store settings — settings changed after render are reflected in handler", async () => {
+    // Prove the handler reads Zustand, not a stale React-render snapshot.
+    // Seed with settingsA (empty folders), render, switch store to settingsB (one folder),
+    // then open a dialog for a NEW path. The duplicate-check must use settingsB.
+    const existingFolder = createMockGlobalFolder({ path: "/new-path" });
+    const settingsA = createMockAppSettings({ globalFolders: [] });
+    const settingsB = createMockAppSettings({ globalFolders: [existingFolder] });
+
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsA });
+    const { result } = renderHook(() => useAddFolder());
+
+    // Update store after initial render (simulates a concurrent settings save)
+    await act(async () => {
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsB });
+    });
+
+    // Picking the path that NOW exists in settingsB — handler must see the updated list
+    mockOpen.mockResolvedValue("/new-path");
+
+    await act(async () => {
+      await result.current.handleAddFolder();
+    });
+
+    // With stale settingsA, no duplicate would be detected and saveSettings would be called.
+    // With live settingsB, the duplicate check fires and saveSettings must NOT be called.
+    expect(mockToastError).toHaveBeenCalledWith("That folder is already in your library.");
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
 });
