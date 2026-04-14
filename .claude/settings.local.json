@@ -46,7 +46,8 @@
       "mcp___hypothesi_tauri-mcp-server__webview_interact",
       "mcp___hypothesi_tauri-mcp-server__webview_find_element",
       "mcp___hypothesi_tauri-mcp-server__webview_keyboard",
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "Bash(ls src/hooks/useAutoSave.test.*)"
     ]
   },
   "enableAllProjectMcpServers": true,
