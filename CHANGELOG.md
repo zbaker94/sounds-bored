@@ -4,6 +4,9 @@
 - Playback errors (missing files, decode failures, fade errors) now show as toast notifications in the app UI instead of being silently swallowed or logged only to the console.
 - When a sound file is missing from disk and you try to play it, the app now automatically refreshes the missing-file indicators in the Sounds panel alongside showing the error message.
 - Layer volume changes are now saved to the project correctly when you finish dragging the volume slider on a pad.
+- Fixed a security vulnerability where malicious path inputs could escape the intended directory during downloads and project exports (path traversal protection)
+- Project exports now reject symlinks and non-audio files, preventing sensitive files from being accidentally bundled into export archives
+- Download filenames are now validated to block path separators and special characters that could cause unexpected behavior
 
 ## v1.5.4
 
