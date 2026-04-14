@@ -128,7 +128,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: "dl",
         importFolderId: "imp",
       });
-      useAppSettingsStore.setState({ settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
 
       const folderSound = createMockSound({ id: "fs", folderId: "reg" });
       useLibraryStore.setState({
@@ -171,7 +171,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: "dl",
         importFolderId: undefined,
       });
-      useAppSettingsStore.setState({ settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
 
       useLibraryStore.setState({
         ...initialLibraryState,
@@ -233,7 +233,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: undefined,
         importFolderId: undefined,
       });
-      useAppSettingsStore.setState({ settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
       useLibraryStore.setState({
         ...initialLibraryState,
         missingFolderIds: new globalThis.Set(["f1"]),
@@ -261,7 +261,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: "dl",
         importFolderId: undefined,
       });
-      useAppSettingsStore.setState({ settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
 
       useLibraryStore.setState({
         ...initialLibraryState,

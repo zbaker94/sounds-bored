@@ -17,6 +17,9 @@ vi.mock("@/lib/ytdlp.queries", () => ({
   })),
 }));
 
+// Created at module scope so tests in nested describe blocks can reference
+// mockSettings.downloadFolderId. The factory returns a fresh object each call
+// so state cannot leak; beforeEach resets the store with a fresh instance.
 const mockSettings = createMockAppSettings();
 
 function renderDialog(open = true) {

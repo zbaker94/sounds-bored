@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- App now shows an error notification when settings or the sound library fail to load on startup, instead of silently failing
+- Fixed a bug where test state could leak between test cases in certain store-related tests
 - Fixed a race condition where app settings or sound library changes could be silently overwritten during app startup or after saving
 - App settings and sound library data now load more reliably at startup, with no window where a background data refresh could discard recent changes
 - Fixed a bug where stopping a sound after it had already naturally ended could throw an error instead of completing cleanly.

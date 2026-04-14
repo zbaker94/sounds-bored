@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
@@ -24,14 +25,24 @@ export function useBootLoader() {
   // One-time load at mount — plain async functions, no query subscription.
   // Both loads are independent and fire in parallel.
   useEffect(() => {
-    loadAppSettings().then((settings) => {
-      useAppSettingsStore.getState().loadSettings(settings);
-      setSettingsLoaded(true);
-    });
-    loadGlobalLibrary().then((library) => {
-      useLibraryStore.getState().loadLibrary(library);
-      setLibraryLoaded(true);
-    });
+    loadAppSettings()
+      .then((settings) => {
+        useAppSettingsStore.getState().loadSettings(settings);
+        setSettingsLoaded(true);
+      })
+      .catch(() => {
+        toast.error("Failed to load app settings");
+        setSettingsLoaded(true);
+      });
+    loadGlobalLibrary()
+      .then((library) => {
+        useLibraryStore.getState().loadLibrary(library);
+        setLibraryLoaded(true);
+      })
+      .catch(() => {
+        toast.error("Failed to load sound library");
+        setLibraryLoaded(true);
+      });
   }, []);
 
   useEffect(() => {
