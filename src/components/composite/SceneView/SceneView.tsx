@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Pad } from "@/lib/schemas";
+import type { Pad, Sound } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
@@ -67,17 +67,49 @@ export function SceneView() {
   // buffered the file by the time the user triggers the pad.
   // Uses fileSizeBytes (in schema) for a synchronous size check — no HEAD
   // request. Tag/set selections are resolved against the current library.
+  //
+  // Perf: Immer replaces the scenes array reference on every project write
+  // (e.g. volume tweaks, pad renames), so this effect fires for every mutation
+  // even when the set of large sounds to preload hasn't changed. We guard with
+  // a ref-based early-exit: compute the set of large sound IDs referenced by
+  // the active scene and bail out if it's identical to the previous run.
+  const prevPreloadIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!activeScene) return;
-    const isLarge = (s: (typeof librarySounds)[number]) =>
+    const isLarge = (s: Sound) =>
       s.fileSizeBytes !== undefined && s.fileSizeBytes >= LARGE_FILE_THRESHOLD_BYTES;
 
+    // First pass: collect IDs of large sounds that would be preloaded.
+    const newIds = new Set<string>();
+    const toPreload: Sound[] = [];
     for (const pad of activeScene.pads) {
       for (const layer of pad.layers) {
         for (const sound of resolveLayerSounds(layer, librarySounds)) {
-          if (sound.filePath && isLarge(sound)) preloadStreamingAudio(sound);
+          if (sound.filePath && isLarge(sound) && !newIds.has(sound.id)) {
+            newIds.add(sound.id);
+            toPreload.push(sound);
+          }
         }
       }
+    }
+
+    // Early-exit when the referenced large-sound set hasn't changed.
+    // Equal size + every newId in prev ⇒ sets are identical (both are deduplicated).
+    const prev = prevPreloadIdsRef.current;
+    if (prev.size === newIds.size) {
+      let identical = true;
+      for (const id of newIds) {
+        if (!prev.has(id)) {
+          identical = false;
+          break;
+        }
+      }
+      if (identical) return;
+    }
+
+    prevPreloadIdsRef.current = newIds;
+    for (const sound of toPreload) {
+      preloadStreamingAudio(sound);
     }
   }, [activeScene, librarySounds]);
 
