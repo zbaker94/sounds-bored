@@ -140,7 +140,7 @@ describe("layerTrigger", () => {
     async function setup() {
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-r");
-      const layerGain = getOrCreateLayerGain("layer-r", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-r", 1, padGain);
       return { padGain, layerGain };
     }
 
@@ -205,7 +205,7 @@ describe("layerTrigger", () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cyc-stop");
-      const layerGain = getOrCreateLayerGain("layer-cyc-stop", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-cyc-stop", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-stop" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -226,7 +226,7 @@ describe("layerTrigger", () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cyc-stop-wrap");
-      const layerGain = getOrCreateLayerGain("layer-cyc-stop-wrap", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-cyc-stop-wrap", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-stop-wrap" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -250,7 +250,7 @@ describe("layerTrigger", () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cyc-restart");
-      const layerGain = getOrCreateLayerGain("layer-cyc-restart", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-cyc-restart", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-restart" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -271,7 +271,7 @@ describe("layerTrigger", () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cyc-restart-wrap");
-      const layerGain = getOrCreateLayerGain("layer-cyc-restart-wrap", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-cyc-restart-wrap", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-restart-wrap" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -296,7 +296,7 @@ describe("layerTrigger", () => {
       const { loadBuffer } = await import("./bufferCache");
       const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-next-rem");
-      const layerGain = getOrCreateLayerGain("layer-next-rem", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-next-rem", 1, padGain);
       const pad = createMockPad({ id: "pad-next-rem" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -328,7 +328,7 @@ describe("layerTrigger", () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-next-exhaust");
-      const layerGain = getOrCreateLayerGain("layer-next-exhaust", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-next-exhaust", 1, padGain);
       const pad = createMockPad({ id: "pad-next-exhaust" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const layer = createMockLayer({
@@ -355,7 +355,7 @@ describe("layerTrigger", () => {
       const { loadBuffer } = await import("./bufferCache");
       const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-next-loop");
-      const layerGain = getOrCreateLayerGain("layer-next-loop", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-next-loop", 1, padGain);
       const pad = createMockPad({ id: "pad-next-loop" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -384,7 +384,7 @@ describe("layerTrigger", () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
       const padGain = getPadGain("pad-next-cycle");
-      const layerGain = getOrCreateLayerGain("layer-next-cycle", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-next-cycle", 1, padGain);
       const pad = createMockPad({ id: "pad-next-cycle" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const layer = createMockLayer({
@@ -409,7 +409,7 @@ describe("layerTrigger", () => {
       const { startLayerPlayback } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, isLayerActive } = await import("./audioState");
       const padGain = getPadGain("pad-slp");
-      const layerGain = getOrCreateLayerGain("layer-slp", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-slp", 1, padGain);
       const pad = createMockPad({ id: "pad-slp" });
       const sound = createMockSound({ id: "s1", filePath: "s.wav" });
       const layer = createMockLayer({
@@ -427,7 +427,7 @@ describe("layerTrigger", () => {
       const { startLayerPlayback } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, isLayerActive, getLayerChain } = await import("./audioState");
       const padGain = getPadGain("pad-chain");
-      const layerGain = getOrCreateLayerGain("layer-chain", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-chain", 1, padGain);
       const pad = createMockPad({ id: "pad-chain" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -452,7 +452,7 @@ describe("layerTrigger", () => {
       const { loadBuffer } = await import("./bufferCache");
       const { getPadGain, getOrCreateLayerGain, isLayerActive, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cycle");
-      const layerGain = getOrCreateLayerGain("layer-cycle", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-cycle", 1, padGain);
       const pad = createMockPad({ id: "pad-cycle" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -481,7 +481,7 @@ describe("layerTrigger", () => {
       const { startLayerPlayback } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
       const padGain = getPadGain("pad-cycle-end");
-      const layerGain = getOrCreateLayerGain("layer-cycle-end", 100, padGain);
+      const layerGain = getOrCreateLayerGain("layer-cycle-end", 1, padGain);
       const pad = createMockPad({ id: "pad-cycle-end" });
       const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
       const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
@@ -514,7 +514,7 @@ describe("startLayerSound error bus", () => {
     const layer = createMockLayer({ id: "err-layer" });
     const sound = createMockSound({ id: "s1", name: "kick", filePath: "kick.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
 
@@ -533,7 +533,7 @@ describe("startLayerSound error bus", () => {
     const layer = createMockLayer({ id: "err-layer-2" });
     const sound = createMockSound({ id: "s2", name: "snare", filePath: "snare.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
 
@@ -586,7 +586,7 @@ describe("startLayerSound circuit-breaker", () => {
     const layer = createMockLayer({ id: "cb-layer-1" });
     const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // First failure — counter increments to 1, error emitted normally.
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
@@ -616,7 +616,7 @@ describe("startLayerSound circuit-breaker", () => {
     const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Simulate an in-flight chain that would normally continue advancing.
     setLayerChain("cb-layer-2", [s2]);
@@ -651,7 +651,7 @@ describe("startLayerSound circuit-breaker", () => {
     const layer = createMockLayer({ id: "cb-layer-3" });
     const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Trip the breaker with 3 failures.
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
@@ -684,7 +684,7 @@ describe("startLayerSound circuit-breaker", () => {
     const layer = createMockLayer({ id: "cb-layer-4" });
     const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Two back-to-back failures build the counter to 2.
     vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail 1"));
@@ -713,7 +713,7 @@ describe("startLayerSound circuit-breaker", () => {
     const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
     const s2 = createMockSound({ id: "s2", name: "two", filePath: "s2.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Instrument wrapBufferSource so we can capture + invoke the onended callback.
     const capturedOnEnded: Array<() => void> = [];
@@ -775,7 +775,7 @@ describe("startLayerSound circuit-breaker", () => {
       selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
     });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     const capturedOnEnded: Array<() => void> = [];
     const voiceMock = {
@@ -832,7 +832,7 @@ describe("startLayerSound circuit-breaker", () => {
       selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
     });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     const capturedOnEnded: Array<() => void> = [];
     const voiceMock = {
@@ -880,7 +880,7 @@ describe("startLayerSound circuit-breaker", () => {
     const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
     const s3 = createMockSound({ id: "s3", filePath: "s3.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Simulate a 3-sound chain [s1, s2, s3] all failing.
     setLayerChain(layer.id, [s2, s3]);
@@ -910,7 +910,7 @@ describe("startLayerSound circuit-breaker", () => {
     const layer = createMockLayer({ id: "cb-reset-layer" });
     const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Build counter to 2 with 2 failures.
     vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail 1"));
@@ -946,7 +946,7 @@ describe("startLayerSound circuit-breaker", () => {
     const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Trigger 1: one failure → counter reaches 1.
     vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("first trigger fail"));
@@ -1020,7 +1020,7 @@ describe("startLayerSound chain-state cleanup on error", () => {
     const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Simulate a stale chain left from a prior mid-chain position.
     setLayerChain("cleanup-layer-1", [s2]);
@@ -1047,7 +1047,7 @@ describe("startLayerSound chain-state cleanup on error", () => {
     const layer = createMockLayer({ id: "cleanup-layer-2", arrangement: "sequential" });
     const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Simulate an advanced cycle index left by startLayerPlayback before startLayerSound failed.
     setLayerCycleIndex("cleanup-layer-2", 2);
@@ -1075,7 +1075,7 @@ describe("startLayerSound chain-state cleanup on error", () => {
     const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     setLayerChain("cleanup-layer-3", [s2]);
 
@@ -1099,7 +1099,7 @@ describe("startLayerSound chain-state cleanup on error", () => {
     const layer = createMockLayer({ id: "cleanup-layer-4", arrangement: "sequential" });
     const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     setLayerCycleIndex("cleanup-layer-4", 2);
 
@@ -1129,7 +1129,7 @@ describe("startLayerSound chain-state cleanup on error", () => {
     const s2 = createMockSound({ id: "s2", name: "two", filePath: "s2.wav" });
     const s3 = createMockSound({ id: "s3", name: "three", filePath: "s3.wav" });
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
     // Instrument wrapBufferSource to capture the onended callback from s1.
     const capturedOnEnded: Array<() => void> = [];

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where layer volume was applied incorrectly — sounds were playing at incorrect volumes due to a unit mismatch (the internal scale was 0–100 but the audio engine expected 0–1)
 - Fixed a bug where sequential layers would resume from an incorrect position after a sound fails to load, instead of restarting from the beginning on the next trigger.
 - Fixed a race condition in "Save As" where two rapid saves to the same folder name could both pass the existence check; the folder is now created atomically before copying begins
 - "Save As" no longer leaves an empty orphaned folder behind if the file copy fails, preventing a confusing "already exists" error on retry

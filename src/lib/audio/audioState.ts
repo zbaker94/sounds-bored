@@ -366,19 +366,27 @@ export function deleteFadePadTimeout(padId: string): void {
 // Layer gain functions
 // ---------------------------------------------------------------------------
 
+/**
+ * Get or create a GainNode for the given layer, connecting it to `padGain`.
+ *
+ * @param volume - [0,1] normalized gain. Callers reading from project schema
+ *   (which stores [0,100]) must divide by 100 before passing.
+ *   Non-finite values (NaN, Infinity) default to 1 to avoid Web Audio RangeError.
+ */
 export function getOrCreateLayerGain(layerId: string, volume: number, padGain: GainNode): GainNode {
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
   const existing = layerGainMap.get(layerId);
   if (existing) {
     // Sync cached gain to the current layer.volume in case it was changed via the config dialog.
     // cancelScheduledValues clears any pending reset from a previous ramp-stop timeout.
     const ctx = getAudioContext();
     existing.gain.cancelScheduledValues(ctx.currentTime);
-    existing.gain.setValueAtTime(volume / 100, ctx.currentTime);
+    existing.gain.setValueAtTime(clamped, ctx.currentTime);
     return existing;
   }
   const ctx = getAudioContext();
   const gain = ctx.createGain();
-  gain.gain.value = volume / 100;
+  gain.gain.value = clamped;
   gain.connect(padGain);
   layerGainMap.set(layerId, gain);
   return gain;

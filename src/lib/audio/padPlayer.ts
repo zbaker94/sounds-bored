@@ -369,7 +369,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
     setLayerPending(layer.id);
 
     const isLayerPlaying = isLayerActive(layer.id);
-    const layerGain = getOrCreateLayerGain(layer.id, layer.volume, padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
 
     const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
     // triggerPad does not pass afterStopCleanup — pad-level playback store state
@@ -401,7 +401,7 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
   const isPlaying = isLayerActive(layer.id);
-  const layerGain = getOrCreateLayerGain(layer.id, layer.volume, padGain);
+  const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
 
   const action = await applyRetriggerMode(
     pad, layer, isPlaying, ctx, layerGain, resolved,
@@ -484,7 +484,7 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
 
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
-      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
     });
@@ -506,7 +506,7 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
 
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
-      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
     });
@@ -572,7 +572,7 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
 
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
-      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
     });
@@ -598,7 +598,7 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
 
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
-      const layerGain = getOrCreateLayerGain(layerId, layer.volume, padGain);
+      const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
     });

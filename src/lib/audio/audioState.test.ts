@@ -210,13 +210,93 @@ describe("clearAllPadGains", () => {
   });
 });
 
+// ── getOrCreateLayerGain ─────────────────────────────────────────────────────
+
+describe("getOrCreateLayerGain", () => {
+  beforeEach(() => {
+    clearAllLayerGains();
+    mockCtx.createGain.mockImplementation(makeMockGain);
+  });
+
+  it("sets gain.value to the normalized [0,1] volume on creation", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-vol-test", 0.8, padGain);
+    expect(layerGain.gain.value).toBe(0.8);
+  });
+
+  it("sets gain.value to 0 when volume is 0", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-zero", 0, padGain);
+    expect(layerGain.gain.value).toBe(0);
+  });
+
+  it("sets gain.value to 1 when volume is 1", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-full", 1, padGain);
+    expect(layerGain.gain.value).toBe(1);
+  });
+
+  it("connects the new gain node to padGain", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-connect", 0.5, padGain);
+    expect(layerGain.connect).toHaveBeenCalledWith(padGain);
+  });
+
+  it("returns the cached gain node on subsequent calls for the same layerId", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const countBefore = mockCtx.createGain.mock.calls.length;
+    const first = getOrCreateLayerGain("layer-cache", 0.8, padGain);
+    const second = getOrCreateLayerGain("layer-cache", 0.8, padGain);
+    expect(second).toBe(first);
+    // createGain called exactly once — cache hit does not create a new node
+    expect(mockCtx.createGain.mock.calls.length - countBefore).toBe(1);
+  });
+
+  it("calls cancelScheduledValues before setValueAtTime on cache hit", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-cancel", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    getOrCreateLayerGain("layer-cancel", 0.5, padGain);
+    expect(layerGain.gain.cancelScheduledValues).toHaveBeenCalledWith(mockCtx.currentTime);
+    const cancelOrder = layerGain.gain.cancelScheduledValues.mock.invocationCallOrder[0];
+    const setOrder = layerGain.gain.setValueAtTime.mock.invocationCallOrder[0];
+    expect(cancelOrder).toBeLessThan(setOrder);
+  });
+
+  it("calls setValueAtTime with the normalized [0,1] volume on cache hit", () => {
+    const padGain = getPadGain("pad-gain-test");
+    // First call creates the node
+    const layerGain = getOrCreateLayerGain("layer-sync", 0.8, padGain);
+    // Second call should sync the cached node's gain to the new volume
+    getOrCreateLayerGain("layer-sync", 0.5, padGain);
+    expect(layerGain.gain.setValueAtTime).toHaveBeenLastCalledWith(0.5, mockCtx.currentTime);
+  });
+
+  it("clamps volume > 1 to 1", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-over", 1.5, padGain);
+    expect(layerGain.gain.value).toBe(1);
+  });
+
+  it("clamps negative volume to 0", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-neg", -0.5, padGain);
+    expect(layerGain.gain.value).toBe(0);
+  });
+
+  it("defaults to 1 for NaN volume to avoid Web Audio RangeError", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-nan", NaN, padGain);
+    expect(layerGain.gain.value).toBe(1);
+  });
+});
+
 // ── clearAllLayerGains ───────────────────────────────────────────────────────
 
 describe("clearAllLayerGains", () => {
   it("disconnects all layer gain nodes before clearing", () => {
     const padGain = getPadGain("pad-1");
-    const layerGain1 = getOrCreateLayerGain("layer-1", 80, padGain);
-    const layerGain2 = getOrCreateLayerGain("layer-2", 50, padGain);
+    const layerGain1 = getOrCreateLayerGain("layer-1", 0.8, padGain);
+    const layerGain2 = getOrCreateLayerGain("layer-2", 0.5, padGain);
 
     clearAllLayerGains();
 
@@ -226,9 +306,9 @@ describe("clearAllLayerGains", () => {
 
   it("empties the map so a subsequent getOrCreateLayerGain call creates a new node", () => {
     const padGain = getPadGain("pad-1");
-    const first = getOrCreateLayerGain("layer-1", 80, padGain);
+    const first = getOrCreateLayerGain("layer-1", 0.8, padGain);
     clearAllLayerGains();
-    const second = getOrCreateLayerGain("layer-1", 80, padGain);
+    const second = getOrCreateLayerGain("layer-1", 0.8, padGain);
     expect(second).not.toBe(first);
   });
 
@@ -576,11 +656,11 @@ describe("tick accessor functions", () => {
     const padGain = getPadGain("pad-1");
 
     // layer-1: has both a gain node AND a voice
-    getOrCreateLayerGain("layer-1", 100, padGain);
+    getOrCreateLayerGain("layer-1", 1, padGain);
     recordLayerVoice("pad-1", "layer-1", makeVoice());
 
     // layer-2: has a gain node but NO voice (should not be iterated)
-    getOrCreateLayerGain("layer-2", 80, padGain);
+    getOrCreateLayerGain("layer-2", 0.8, padGain);
 
     const visited: string[] = [];
     forEachActiveLayerGain((layerId) => visited.push(layerId));
@@ -589,7 +669,7 @@ describe("tick accessor functions", () => {
 
   it("forEachActiveLayerGain passes the correct GainNode to fn", () => {
     const padGain = getPadGain("pad-1");
-    const layerGain = getOrCreateLayerGain("layer-1", 100, padGain);
+    const layerGain = getOrCreateLayerGain("layer-1", 1, padGain);
     recordLayerVoice("pad-1", "layer-1", makeVoice());
 
     let receivedGain: GainNode | undefined;
@@ -676,7 +756,7 @@ describe("clearAllAudioState", () => {
     } = await import("./audioState");
 
     const padGain = getPadGain("pad-clearall");
-    getOrCreateLayerGain("layer-clearall", 80, padGain);
+    getOrCreateLayerGain("layer-clearall", 0.8, padGain);
     setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
     setLayerChain("layer-clearall", []);
     setLayerCycleIndex("layer-clearall", 2);
