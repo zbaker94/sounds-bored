@@ -27,7 +27,11 @@ vi.mock("./streamingCache", () => ({
   getOrCreateStreamingElement: vi.fn(),
   LARGE_FILE_THRESHOLD_BYTES: 20 * 1024 * 1024,
 }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+const mockEmitAudioError = vi.fn();
+vi.mock("./audioEvents", () => ({
+  emitAudioError: (...args: unknown[]) => mockEmitAudioError(...args),
+  setAudioErrorHandler: vi.fn(),
+}));
 vi.mock("@/state/libraryStore", () => ({
   useLibraryStore: { getState: vi.fn(() => ({ sounds: [] })) },
 }));
@@ -36,9 +40,6 @@ vi.mock("@/state/appSettingsStore", () => ({
 }));
 vi.mock("@/state/projectStore", () => ({
   useProjectStore: { getState: vi.fn(() => ({ project: null })) },
-}));
-vi.mock("@/lib/library.reconcile", () => ({
-  refreshMissingState: vi.fn().mockResolvedValue(undefined),
 }));
 
 function makeMockGain() {
@@ -482,5 +483,47 @@ describe("layerTrigger", () => {
       // One-shot exhausted — cursor should be deleted (reset for next trigger from beginning)
       expect(getLayerCycleIndex("layer-cycle-end")).toBeUndefined();
     });
+  });
+});
+
+// ── startLayerSound — error bus ───────────────────────────────────────────────
+
+describe("startLayerSound error bus", () => {
+  it("emits isMissingFile:true via audioEvents on MissingFileError", async () => {
+    const { loadBuffer, MissingFileError } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("not found"));
+    const pad = createMockPad({ id: "err-pad" });
+    const layer = createMockLayer({ id: "err-layer" });
+    const sound = createMockSound({ id: "s1", name: "kick", filePath: "kick.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.any(MissingFileError),
+      expect.objectContaining({ isMissingFile: true, soundName: "kick" }),
+    );
+  });
+
+  it("emits generic error via audioEvents on load failure", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
+    const pad = createMockPad({ id: "err-pad-2" });
+    const layer = createMockLayer({ id: "err-layer-2" });
+    const sound = createMockSound({ id: "s2", name: "snare", filePath: "snare.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "decode failed" }),
+      expect.objectContaining({ isMissingFile: false, soundName: "snare" }),
+    );
   });
 });

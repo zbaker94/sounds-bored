@@ -213,29 +213,8 @@ describe("gainManager", () => {
     });
   });
 
-  describe("commitLayerVolume", () => {
-    it("persists clamped volume to project store", async () => {
-      const { useProjectStore } = await import("@/state/projectStore");
-      const mockUpdate = vi.fn();
-      vi.mocked(useProjectStore.getState).mockReturnValue({ updateLayerVolume: mockUpdate } as unknown as ReturnType<typeof useProjectStore.getState>);
-      const { commitLayerVolume } = await import("./gainManager");
-
-      commitLayerVolume("layer-commit", 0.9);
-
-      expect(mockUpdate).toHaveBeenCalledWith("layer-commit", 0.9);
-    });
-
-    it("clamps out-of-range values (1.5 → 1.0, -0.1 → 0)", async () => {
-      const { useProjectStore } = await import("@/state/projectStore");
-      const mockUpdate = vi.fn();
-      vi.mocked(useProjectStore.getState).mockReturnValue({ updateLayerVolume: mockUpdate } as unknown as ReturnType<typeof useProjectStore.getState>);
-      const { commitLayerVolume } = await import("./gainManager");
-
-      commitLayerVolume("layer-hi", 1.5);
-      commitLayerVolume("layer-lo", -0.1);
-
-      expect(mockUpdate).toHaveBeenCalledWith("layer-hi", 1.0);
-      expect(mockUpdate).toHaveBeenCalledWith("layer-lo", 0);
-    });
-  });
+  // commitLayerVolume was removed from gainManager — persisting layer volume to
+  // the project schema is a UI-layer concern. Coverage for the onValueCommit path
+  // that calls useProjectStore.getState().updateLayerVolume() lives in
+  // PadControlContent.test.tsx.
 });

@@ -17,9 +17,8 @@ import { buildPlayOrder, isChained } from "./arrangement";
 import { filterSoundsByTags } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectStore } from "@/state/projectStore";
-import { refreshMissingState } from "@/lib/library.reconcile";
 import type { Layer, Pad, Sound } from "@/lib/schemas";
-import { toast } from "sonner";
+import { emitAudioError } from "./audioEvents";
 import { startAudioTick } from "./audioTick";
 import {
   clearLayerVoice,
@@ -274,13 +273,12 @@ export async function startLayerSound(
     // Clear stale progress so a failed load doesn't freeze the bar at 1.0.
     clearLayerProgressInfo(layer.id);
     clearPadProgressInfo(pad.id);
-    if (err instanceof MissingFileError) {
-      void refreshMissingState();
-      toast.error(`Failed to play "${sound.name}" — file not found. Check the Sounds panel.`);
-    } else {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to play "${sound.name}": ${message}`);
-    }
+    // Emit via the error bus — the UI-layer handler (useAudioErrorHandler) is
+    // responsible for showing toasts and triggering library reconciliation.
+    emitAudioError(err, {
+      soundName: sound.name,
+      isMissingFile: err instanceof MissingFileError,
+    });
   }
 }
 

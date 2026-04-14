@@ -5,7 +5,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad, Scene } from "@/lib/schemas";
 import { isFadeablePad } from "@/lib/padUtils";
-import { toast } from "sonner";
+import { emitAudioError } from "./audioEvents";
 import { stopAudioTick } from "./audioTick";
 
 import {
@@ -94,7 +94,6 @@ export {
   resetPadGain,
   syncLayerVolume,
   setLayerVolume,
-  commitLayerVolume,
 } from "./gainManager";
 
 export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): Promise<void> {
@@ -128,8 +127,7 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
   fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad, globalFadeDurationMs)));
   fadingIn.forEach((pad) =>
     fadePadIn(pad, resolveFadeDuration(pad, globalFadeDurationMs)).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Playback error: audio fade failed — ${message}`);
+      emitAudioError(err);
     })
   );
 }
@@ -151,8 +149,7 @@ export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number, fromVolu
     }
   } else {
     fadePadIn(pad, duration, fromVolume, toVolume).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Playback error: audio fade failed — ${message}`);
+      emitAudioError(err);
     });
   }
 }
