@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pad buttons now update more smoothly during audio playback — high-frequency audio tick re-renders are isolated to smaller sub-components, reducing UI jitter on active pads
+- Playback progress bars and multi-fade volume sliders are now rendered in dedicated sub-components (`PadButtonProgress`, `PadButtonFadeOverlay`) for better performance
+- Volume display logic (show/hide timing during drags and audio fades) has been extracted into a reusable hook, improving consistency across pad interactions
 - Improved app startup reliability: the sound library reconciliation now correctly runs only once, even under React's strict development mode, preventing potential duplicate processing on launch.
 - App now stays fully functional even when settings or sound library files fail to load on startup
 - Duplicate folder detection now correctly reflects the latest settings, preventing silent misses when settings change rapidly

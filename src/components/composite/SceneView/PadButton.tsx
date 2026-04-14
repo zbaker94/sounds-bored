@@ -1,17 +1,13 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
+import React, { memo, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
-import { Slider } from "@/components/ui/slider";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { useProjectStore } from "@/state/projectStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
-import { setPadVolume } from "@/lib/audio/padPlayer";
+import { usePadVolumeDisplay } from "@/hooks/usePadVolumeDisplay";
 import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -19,6 +15,8 @@ import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { PadControlContent } from "./PadControlContent";
+import { PadButtonProgress } from "./PadButtonProgress";
+import { PadButtonFadeOverlay } from "./PadButtonFadeOverlay";
 import { PAD_FLIP_DURATION_MS, PAD_FLIP_EASE, PAD_STAGGER_MS } from "./padAnimations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
@@ -37,144 +35,27 @@ interface PadButtonProps {
 const TILT_SPRING = { stiffness: 1200, damping: 80 } as const;
 
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
+  // isPlaying drives styling (border, background, drop-shadow, pulse ring).
+  // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
 
-  // useShallow so these only cause re-renders when their specific values change, not every tick.
-  // activePadLayers: stable array reference while the same layers are active — only changes on
-  //   layer start/stop, not every RAF frame.
-  // layerProgressForPad: only re-renders THIS pad when ITS layer progress changes. Non-playing
-  //   pads return {} (stable via shallow equality) and never re-render on audio ticks.
-  const activePadLayers = usePlaybackStore(
-    useShallow((s) => pad.layers.filter((l) => s.activeLayerIds.has(l.id)))
-  );
-  const layerProgressForPad = usePlaybackStore(
-    useShallow((s) => {
-      const result: Record<string, number> = {};
-      for (const l of pad.layers) {
-        const p = s.layerProgress[l.id];
-        if (p !== undefined) result[l.id] = p;
-      }
-      return result;
-    })
-  );
   const editMode = useUiStore((s) => s.editMode);
   const toggleEditMode = useUiStore((s) => s.toggleEditMode);
   const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
-  // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
-  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
 
-  // liveVolumeChanging: true while an audio fade is actively running (liveVolume changing each frame).
-  // A stability timer fires 300ms after liveVolume stops changing — at that point the volume has
-  // settled and the bar should start its linger-then-hide sequence.
-  // isDragging suppresses the stability timer so a pause mid-drag doesn't prematurely hide the bar.
-  const [liveVolumeChanging, setLiveVolumeChanging] = useState(false);
-  const liveVolumeStabilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (isDragging) {
-      // Drag active — show bar, cancel any pending stability timer
-      setLiveVolumeChanging(true);
-      if (liveVolumeStabilityTimerRef.current !== null) {
-        clearTimeout(liveVolumeStabilityTimerRef.current);
-        liveVolumeStabilityTimerRef.current = null;
-      }
-      return;
-    }
-    if (liveVolume !== undefined) {
-      // Non-drag volume change (audio fade) — show bar, reset stability timer
-      setLiveVolumeChanging(true);
-      if (liveVolumeStabilityTimerRef.current !== null) clearTimeout(liveVolumeStabilityTimerRef.current);
-      liveVolumeStabilityTimerRef.current = setTimeout(() => {
-        liveVolumeStabilityTimerRef.current = null;
-        setLiveVolumeChanging(false);
-      }, 300);
-    } else {
-      // Volume returned to full or pad stopped — clear immediately
-      if (liveVolumeStabilityTimerRef.current !== null) {
-        clearTimeout(liveVolumeStabilityTimerRef.current);
-        liveVolumeStabilityTimerRef.current = null;
-      }
-      setLiveVolumeChanging(false);
-    }
-    return () => {
-      if (liveVolumeStabilityTimerRef.current !== null) {
-        clearTimeout(liveVolumeStabilityTimerRef.current);
-        liveVolumeStabilityTimerRef.current = null;
-      }
-    };
-  }, [liveVolume, isDragging]);
+  // Volume display state is fully managed by the hook — PadButton only consumes the result.
+  const { showVolumeDisplay, volumeExiting, displayVolume } = usePadVolumeDisplay(
+    pad.id,
+    isDragging,
+    dragVolume,
+  );
 
-  // isVolumeActive: true while volume is actively changing (drag or audio fade).
-  // Goes false when drag ends or volume stabilizes → triggers the linger-then-hide sequence.
-  const isVolumeActive = isDragging || liveVolumeChanging;
-  const [showVolumeDisplay, setShowVolumeDisplay] = useState(false);
-  const [volumeExiting, setVolumeExiting] = useState(false);
-  const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastVolumeRef = useRef(liveVolume ?? 1.0);
-  if (liveVolume !== undefined) lastVolumeRef.current = liveVolume;
-  if (dragVolume !== null) lastVolumeRef.current = dragVolume;
-  // During a drag, prefer dragVolume (updated synchronously on every pointer move) over
-  // liveVolume (tick-driven, up to one RAF frame stale). Fallback to last seen tick value.
-  const displayVolume = (isDragging && dragVolume !== null)
-    ? dragVolume
-    : (liveVolume ?? dragVolume ?? lastVolumeRef.current);
-
-  useEffect(() => {
-    if (isVolumeActive) {
-      if (volumeFadeTimerRef.current !== null) {
-        clearTimeout(volumeFadeTimerRef.current);
-        volumeFadeTimerRef.current = null;
-      }
-      if (volumeHideTimerRef.current !== null) {
-        clearTimeout(volumeHideTimerRef.current);
-        volumeHideTimerRef.current = null;
-      }
-      setShowVolumeDisplay(true);
-      setVolumeExiting(false);
-    } else {
-      volumeFadeTimerRef.current = setTimeout(() => {
-        volumeFadeTimerRef.current = null;
-        setVolumeExiting(true);
-        volumeHideTimerRef.current = setTimeout(() => {
-          volumeHideTimerRef.current = null;
-          setShowVolumeDisplay(false);
-          setVolumeExiting(false);
-        }, 220);
-      }, 450);
-    }
-    return () => {
-      if (volumeFadeTimerRef.current !== null) {
-        clearTimeout(volumeFadeTimerRef.current);
-        volumeFadeTimerRef.current = null;
-      }
-      if (volumeHideTimerRef.current !== null) {
-        clearTimeout(volumeHideTimerRef.current);
-        volumeHideTimerRef.current = null;
-      }
-    };
-  }, [isVolumeActive]);
-
-  // Multi-fade mode derived state — read from store directly
+  // Multi-fade mode derived state
   const multiFadeActive = useMultiFadeStore((s) => s.active);
   const isMultiFadeSelected = useMultiFadeStore((s) => s.active && s.selectedPads.has(pad.id));
-  const multiFadeLevels = useMultiFadeStore((s) => {
-    if (!s.active) return null;
-    const entry = s.selectedPads.get(pad.id);
-    return entry ? entry.levels : null;
-  });
   const toggleMultiFadePad = useMultiFadeStore((s) => s.toggleMultiFadePad);
-  const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
   const reopenPadId = useMultiFadeStore((s) => s.reopenPadId);
   const clearReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
-
-  const setPadFadeDuration = useProjectStore((s) => s.setPadFadeDuration);
-  const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs);
-
-  const resolvedFadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
-  const [displayDuration, setDisplayDuration] = useState(resolvedFadeDuration);
-  useEffect(() => {
-    setDisplayDuration(resolvedFadeDuration);
-  }, [resolvedFadeDuration]);
 
   const isDesktop = useIsMd();
 
@@ -284,8 +165,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
   );
   const isUnplayable = padSoundState === "disabled";
 
-  // Multi-fade mode: left-click toggles pad selection instead of triggering playback
-  // Read liveVolume imperatively to avoid recomputing on every RAF frame during a fade
+  // Multi-fade mode: left-click toggles pad selection instead of triggering playback.
+  // Read liveVolume imperatively to avoid recomputing on every RAF frame during a fade.
   const multiFadeHandlers = useMemo(() => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
@@ -426,22 +307,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
                   />
                 )}
-                {/* Playback progress — one bar per active layer, split vertically */}
-                {isPlaying && activePadLayers.length > 0 && (
-                  <div className="absolute inset-0 pointer-events-none flex flex-col">
-                    {activePadLayers.map((layer) => (
-                      <div
-                        key={layer.id}
-                        className="relative overflow-hidden flex-1"
-                      >
-                        <div
-                          className="absolute top-0 left-0 bottom-0 bg-white/20 border border-white rounded-r"
-                          style={{ width: `${(layerProgressForPad[layer.id] ?? 0) * 100}%` }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* Playback progress — one bar per active layer, split vertically.
+                    Isolated in PadButtonProgress so 60Hz RAF ticks do not re-render PadButton. */}
+                <PadButtonProgress padId={pad.id} layers={pad.layers} />
                 {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
                 <div className="relative z-10 flex flex-col items-center gap-0.5">
                   <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
@@ -462,55 +330,8 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                     </motion.div>
                   )}
                 </div>
-                {/* Multi-fade slider overlay on selected pad */}
-                <AnimatePresence>
-                  {isMultiFadeSelected && multiFadeLevels && (
-                    <motion.div
-                      className="absolute bottom-0 left-0 right-0 z-20 px-2 pb-1.5 pt-0.5 bg-black/60 backdrop-blur-sm rounded-b-xl"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      transition={{ duration: 0.15 }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <Slider
-                        compact
-                        tooltipLabel={(v) => `${v}%`}
-                        value={[multiFadeLevels[0], multiFadeLevels[1]]}
-                        onValueChange={(v) => {
-                          if (isPlaying && v[1] !== multiFadeLevels[1]) {
-                            setPadVolume(pad.id, v[1] / 100);
-                          }
-                          setMultiFadeLevels(pad.id, [v[0], v[1]]);
-                        }}
-                        onPointerUp={() => {}}
-                        min={0}
-                        max={100}
-                        step={1}
-                        className="[&_[data-slot=slider-track]]:bg-white/20"
-                      />
-                      <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
-                        <span>{isPlaying ? "end" : "start"}</span>
-                        <span>{isPlaying ? "start" : "end"}</span>
-                      </div>
-                      <Slider
-                        compact
-                        tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
-                        value={[displayDuration]}
-                        onValueChange={(v) => setDisplayDuration(v[0])}
-                        onPointerUp={() => setPadFadeDuration(sceneId, pad.id, displayDuration)}
-                        min={100}
-                        max={10000}
-                        step={100}
-                        className="mt-1.5 [&_[data-slot=slider-track]]:bg-white/20"
-                      />
-                      <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
-                        <span>fade</span>
-                        <span>{(displayDuration / 1000).toFixed(1)}s</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Multi-fade slider overlay — isolated in PadButtonFadeOverlay with its own store subscriptions */}
+                <PadButtonFadeOverlay pad={pad} sceneId={sceneId} />
               </button>
               {padSoundState === "partial" && (
                 <Tooltip>
