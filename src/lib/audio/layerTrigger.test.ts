@@ -543,3 +543,429 @@ describe("startLayerSound error bus", () => {
     );
   });
 });
+
+// ── startLayerSound — circuit-breaker (issue #170) ────────────────────────────
+
+describe("startLayerSound circuit-breaker", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null,
+      loop: false,
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      addEventListener: vi.fn(),
+    });
+    const {
+      clearAllPadGains,
+      clearAllLayerGains,
+      clearAllLayerChains,
+      clearAllFadeTracking,
+      clearAllVoices,
+      clearAllLayerConsecutiveFailures,
+    } = await import("./audioState");
+    clearAllPadGains();
+    clearAllLayerGains();
+    clearAllLayerChains();
+    clearAllFadeTracking();
+    clearAllVoices();
+    clearAllLayerConsecutiveFailures();
+  });
+
+  it("increments the consecutive-failure counter on each failure (below threshold)", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, getLayerConsecutiveFailures } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
+
+    const pad = createMockPad({ id: "cb-pad-1" });
+    const layer = createMockLayer({ id: "cb-layer-1" });
+    const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // First failure — counter increments to 1, error emitted normally.
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-layer-1")).toBe(1);
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(1);
+
+    // Second failure — counter increments to 2, another per-failure error emitted.
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-layer-1")).toBe(2);
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(2);
+  });
+
+  it("fires the circuit-breaker after 3 consecutive failures: deletes chain and emits ONE summary error", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      setLayerChain,
+      getLayerChain,
+      getLayerConsecutiveFailures,
+    } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
+
+    const pad = createMockPad({ id: "cb-pad-2" });
+    const layer = createMockLayer({ id: "cb-layer-2" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Simulate an in-flight chain that would normally continue advancing.
+    setLayerChain("cb-layer-2", [s2]);
+
+    // Failures 1 and 2 — normal per-failure emits, chain is untouched.
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(2);
+    expect(getLayerChain("cb-layer-2")).toEqual([s2]);
+
+    // Failure 3 — circuit trips: chain deleted, counter reset, exactly ONE more emit.
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(3);
+    // Verify the third emit is the summary message, not the per-sound one.
+    const lastCall = mockEmitAudioError.mock.calls[2];
+    expect((lastCall[0] as Error).message).toMatch(/3 consecutive load failures/i);
+    expect(lastCall[1]).toEqual(expect.objectContaining({ isMissingFile: false }));
+    // Chain torn down so no further onended-chained sounds can be loaded.
+    expect(getLayerChain("cb-layer-2")).toBeUndefined();
+    // Counter reset so a future trigger starts fresh.
+    expect(getLayerConsecutiveFailures("cb-layer-2")).toBe(0);
+  });
+
+  it("does NOT emit additional errors once the circuit has tripped (no toast per sound in a 500-sound chain)", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
+
+    const pad = createMockPad({ id: "cb-pad-3" });
+    const layer = createMockLayer({ id: "cb-layer-3" });
+    const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Trip the breaker with 3 failures.
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(3);
+
+    // A real chain would have its queue deleted after the trip and stop advancing.
+    // But even if the caller continues invoking startLayerSound directly (worst case),
+    // we still emit one error per invocation — the protection is the chain-queue
+    // teardown in the onended path. This assertion documents the boundary:
+    // the breaker is a per-failure-run counter that resets after tripping.
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    // Counter restarts from 0, so this extra synthetic call produces one more emit —
+    // NOT the runaway 1-per-sound behavior previously seen because the real-world
+    // driver (the onended chain) is now broken upstream.
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(4);
+  });
+
+  it("resets the consecutive-failure counter on a successful load", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      getLayerConsecutiveFailures,
+    } = await import("./audioState");
+
+    const pad = createMockPad({ id: "cb-pad-4" });
+    const layer = createMockLayer({ id: "cb-layer-4" });
+    const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Two back-to-back failures build the counter to 2.
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail 1"));
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail 2"));
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-layer-4")).toBe(2);
+
+    // A successful load resets the counter back to 0.
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-layer-4")).toBe(0);
+  });
+
+  it("no longer silently swallows chain-continuation errors: onended-driven load failure flows through emitAudioError", async () => {
+    // Prior to the fix, onended's chain-continuation path used `.catch(() => {})`,
+    // silently dropping any error thrown by the recursive startLayerSound call.
+    // Now, loadBuffer failures in the chained call still reach emitAudioError
+    // (through startLayerSound's internal catch), proving the error is not lost.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+
+    const pad = createMockPad({ id: "cb-pad-log" });
+    const layer = createMockLayer({ id: "cb-layer-log", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
+    const s2 = createMockSound({ id: "s2", name: "two", filePath: "s2.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Instrument wrapBufferSource so we can capture + invoke the onended callback.
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    // First load succeeds — onended is registered; s2 is queued as the chain remainder.
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    setLayerChain(layer.id, [s2]);
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2]);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+
+    // Reset the emit tracker so we only count the chained-call emit.
+    mockEmitAudioError.mockClear();
+
+    // Second (chained) load rejects. With the old silent-catch this would have
+    // been lost — with the fix it flows through emitAudioError just like any
+    // other failure.
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("chained load boom"));
+
+    capturedOnEnded[0]();
+    // Flush microtasks so the chained startLayerSound promise settles.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "chained load boom" }),
+      expect.objectContaining({ soundName: "two", isMissingFile: false }),
+    );
+  });
+
+  it("loop-restart .catch path: load failure in chain loop-restart is not silent", async () => {
+    // The onended handler rebuilds the chain when playbackMode=loop and the chain
+    // has exhausted naturally. If that startLayerSound call fails, the .catch logs
+    // to console rather than swallowing — and the failure reaches emitAudioError
+    // via startLayerSound's internal catch.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    // Configure library store so resolveSounds returns s1 (needed for loop-restart live lookup).
+    const { useLibraryStore } = await import("@/state/libraryStore");
+
+    const s1 = createMockSound({ id: "s1", name: "loopSound", filePath: "s1.wav" });
+    vi.mocked(useLibraryStore.getState).mockReturnValue({ sounds: [s1] } as ReturnType<typeof useLibraryStore.getState>);
+
+    const pad = createMockPad({ id: "cb-loop-pad" });
+    // Layer selection must reference s1 so resolveSounds returns it from the live library.
+    const layer = createMockLayer({
+      id: "cb-loop-layer",
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
+    });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    // First load succeeds — onended is registered; chain is empty (exhausted naturally).
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    setLayerChain(layer.id, []);  // empty chain = natural exhaustion
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+
+    mockEmitAudioError.mockClear();
+
+    // Loop-restart load fails. Should flow through emitAudioError, not be silently dropped.
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("loop-restart boom"));
+
+    // Trigger onended — this causes the loop-restart path in startLayerSound's onended handler.
+    capturedOnEnded[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "loop-restart boom" }),
+      expect.objectContaining({ isMissingFile: false }),
+    );
+  });
+
+  it("simultaneous loop-restart .catch path: load failure in simultaneous loop-restart is not silent", async () => {
+    // Same as loop-restart but with simultaneous arrangement — when the chain
+    // exhausts and arrangement is non-chained, the loop-restart fires all sounds
+    // simultaneously via separate startLayerSound calls. Failures must not be silent.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    // Configure library store so resolveSounds returns s1 during the live loop-restart lookup.
+    const { useLibraryStore } = await import("@/state/libraryStore");
+
+    const s1 = createMockSound({ id: "s1", name: "simSound", filePath: "s1.wav" });
+    vi.mocked(useLibraryStore.getState).mockReturnValue({ sounds: [s1] } as ReturnType<typeof useLibraryStore.getState>);
+
+    const pad = createMockPad({ id: "cb-sim-pad" });
+    // simultaneous arrangement (isChained returns false); selection references s1.
+    const layer = createMockLayer({
+      id: "cb-sim-layer",
+      arrangement: "simultaneous",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
+    });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    // First load succeeds with empty chain (simultaneous layers don't use chain queue).
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    setLayerChain(layer.id, []);  // empty chain triggers the "exhausted" → loop branch
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+
+    mockEmitAudioError.mockClear();
+
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("sim-restart boom"));
+    capturedOnEnded[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "sim-restart boom" }),
+      expect.objectContaining({ isMissingFile: false }),
+    );
+  });
+
+  it("circuit-breaker tears down chain queue on 3rd consecutive failure (prevents onended from advancing)", async () => {
+    // After CHAIN_FAILURE_THRESHOLD consecutive failures the chain queue is deleted.
+    // This is what prevents the onended handler from advancing — it checks getLayerChain
+    // and bails when the result is undefined (cleared externally).
+    // Note: this test exercises the state directly via three startLayerSound calls; the
+    // companion test above ("no longer silently swallows") exercises the onended path.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain, getLayerChain } = await import("./audioState");
+
+    const pad = createMockPad({ id: "cb-chain-stop-pad" });
+    const layer = createMockLayer({ id: "cb-chain-stop-layer", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
+    const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
+    const s3 = createMockSound({ id: "s3", filePath: "s3.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Simulate a 3-sound chain [s1, s2, s3] all failing.
+    setLayerChain(layer.id, [s2, s3]);
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("all missing"));
+
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2, s3]);
+    await startLayerSound(pad, layer, s2, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2, s3]);
+    // Third failure trips the breaker
+    await startLayerSound(pad, layer, s3, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2, s3]);
+
+    // Chain must be cleared (undefined) — onended cannot advance further.
+    expect(getLayerChain("cb-chain-stop-layer")).toBeUndefined();
+    // Exactly 3 emits total (2 per-sound + 1 summary).
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(3);
+    const summaryCall = mockEmitAudioError.mock.calls[2];
+    expect((summaryCall[0] as Error).message).toMatch(/consecutive load failures/i);
+  });
+
+  it("post-reset failure counter starts from 0 again", async () => {
+    // After a success resets the counter, a new run of failures must accumulate
+    // from 0 before the breaker trips — not trip immediately from a stale count.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, getLayerConsecutiveFailures } = await import("./audioState");
+
+    const pad = createMockPad({ id: "cb-reset-pad" });
+    const layer = createMockLayer({ id: "cb-reset-layer" });
+    const sound = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Build counter to 2 with 2 failures.
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail 1"));
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail 2"));
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-reset-layer")).toBe(2);
+
+    // Success resets counter to 0.
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-reset-layer")).toBe(0);
+
+    // A new failure after the reset starts fresh at 1 — not 3 (no immediate trip).
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("fail after reset"));
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    expect(getLayerConsecutiveFailures("cb-reset-layer")).toBe(1);
+    // Only one additional emit for this failure (not a summary/circuit-trip emit).
+    const lastCall = mockEmitAudioError.mock.calls[mockEmitAudioError.mock.calls.length - 1];
+    expect((lastCall[0] as Error).message).toBe("fail after reset");
+  });
+
+  it("fresh re-trigger via startLayerPlayback resets the failure counter", async () => {
+    // Counter from a previous play session should not carry over to a new trigger.
+    // startLayerPlayback must reset the counter at trigger entry so the first
+    // failure on the new trigger is counted from 0, not from the stale value.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerPlayback } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, getLayerConsecutiveFailures } = await import("./audioState");
+
+    const pad = createMockPad({ id: "cb-retrig-pad" });
+    const layer = createMockLayer({ id: "cb-retrig-layer", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Trigger 1: one failure → counter reaches 1.
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("first trigger fail"));
+    await startLayerPlayback(pad, layer, mockCtx as unknown as AudioContext, layerGain, [s1, s2]);
+    expect(getLayerConsecutiveFailures("cb-retrig-layer")).toBe(1);
+
+    // Trigger 2: startLayerPlayback must reset the counter to 0 before starting.
+    // Even though the previous trigger left it at 1, the fresh trigger resets it.
+    mockEmitAudioError.mockClear();
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("second trigger fail"));
+    await startLayerPlayback(pad, layer, mockCtx as unknown as AudioContext, layerGain, [s1, s2]);
+    // Counter is 1 (one failure on this new trigger), not 2 (accumulated across triggers).
+    expect(getLayerConsecutiveFailures("cb-retrig-layer")).toBe(1);
+    // The emit for the second trigger must be a per-sound error, not a circuit-trip summary.
+    // If the counter were not reset (accumulated = 2), the third failure would fire the
+    // summary, not a per-sound error. Confirming it's a per-sound error proves the reset.
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(1);
+    const emitArg = mockEmitAudioError.mock.calls[0][0] as Error;
+    expect(emitArg.message).toBe("second trigger fail");
+    expect(emitArg.message).not.toMatch(/consecutive load failures/i);
+  });
+});

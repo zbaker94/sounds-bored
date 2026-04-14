@@ -30,8 +30,10 @@ import {
   getLayerGain,
   getLayerVoices,
   getPadProgressInfo,
+  incrementLayerConsecutiveFailures,
   recordLayerVoice,
   registerStreamingAudio,
+  resetLayerConsecutiveFailures,
   setLayerChain,
   setLayerCycleIndex,
   setLayerPlayOrder,
@@ -44,6 +46,13 @@ import {
   stopLayerVoices,
   unregisterStreamingAudio,
 } from "./audioState";
+
+/**
+ * Maximum consecutive `loadLayerVoice` failures allowed within a single chain
+ * before the chain is torn down and a single summary error is emitted. Prevents
+ * a 500-sound chain with 500 missing files from producing 500 toasts.
+ */
+const CHAIN_FAILURE_THRESHOLD = 3;
 
 // ---------------------------------------------------------------------------
 // Private utilities
@@ -219,9 +228,10 @@ export async function startLayerSound(
         clearPadProgressInfo(pad.id);
         startAudioTick(); // keep tick alive during the async gap
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds).catch(
-          // startLayerSound handles errors internally (toast + progress clear);
+          // startLayerSound handles errors internally (emitAudioError + progress clear);
           // the catch here prevents unhandled-rejection if it throws synchronously.
-          () => {},
+          // Log to console so failures in the chain path are diagnosable instead of silent.
+          (err) => { console.error("[layerTrigger] chain continuation failed:", err); },
         );
       } else if (liveMode === "loop" || liveMode === "hold") {
         // Chain exhausted naturally — restart using live store values so mid-playback
@@ -239,13 +249,13 @@ export async function startLayerSound(
           const [first, ...rest] = newOrder;
           setLayerChain(layer.id, rest);
           startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
-            () => {},
+            (err) => { console.error("[layerTrigger] chain loop-restart failed:", err); },
           );
         } else {
           deleteLayerChain(layer.id);
           for (const snd of liveSounds) {
             startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
-              () => {},
+              (err) => { console.error("[layerTrigger] simultaneous loop-restart failed:", err); },
             );
           }
         }
@@ -256,14 +266,40 @@ export async function startLayerSound(
 
     await voice.start();
     recordLayerVoice(pad.id, layer.id, voice);
+    // Voice fully started and recorded — clear the consecutive-failure counter so
+    // a future failure starts from zero. Placed after recordLayerVoice so we only
+    // count it as a real success once the voice is actually tracked in state.
+    resetLayerConsecutiveFailures(layer.id);
     startAudioTick();
 
   } catch (err) {
     // Clear stale progress so a failed load doesn't freeze the bar at 1.0.
     clearLayerProgressInfo(layer.id);
     clearPadProgressInfo(pad.id);
-    // Emit via the error bus — the UI-layer handler (useAudioErrorHandler) is
-    // responsible for showing toasts and triggering library reconciliation.
+
+    // Circuit-breaker: a chain of consecutive load failures (e.g. entire library
+    // missing on disk) would otherwise spawn one toast per sound. Tear the chain
+    // down after CHAIN_FAILURE_THRESHOLD consecutive failures and emit a single
+    // summary error in place of the per-sound error for that final failure.
+    const failureCount = incrementLayerConsecutiveFailures(layer.id);
+    if (failureCount >= CHAIN_FAILURE_THRESHOLD) {
+      // Break the chain so no further onended-driven continuations occur.
+      deleteLayerChain(layer.id);
+      resetLayerConsecutiveFailures(layer.id);
+      emitAudioError(
+        new Error(
+          `Chain stopped after ${CHAIN_FAILURE_THRESHOLD} consecutive load failures (pad: "${pad.name}", layer: "${layer.name ?? layer.id}")`,
+        ),
+        {
+          soundName: sound.name,
+          isMissingFile: err instanceof MissingFileError,
+        },
+      );
+      return;
+    }
+
+    // Under the threshold — emit via the error bus as usual. The UI-layer
+    // handler (useAudioErrorHandler) shows the toast and triggers reconciliation.
     emitAudioError(err, {
       soundName: sound.name,
       isMissingFile: err instanceof MissingFileError,
@@ -401,6 +437,10 @@ export async function startLayerPlayback(
   layerGain: GainNode,
   resolved: Sound[],
 ): Promise<void> {
+  // A fresh user trigger always starts a clean failure sequence — reset the
+  // circuit-breaker counter so failures from a previous play don't carry over
+  // and prematurely suppress toasts on the new trigger's sounds.
+  resetLayerConsecutiveFailures(layer.id);
   clearLayerProgressInfo(layer.id);
   setLayerPending(layer.id);
   try {
