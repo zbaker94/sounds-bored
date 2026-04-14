@@ -1,53 +1,52 @@
-import { useEffect, useRef } from "react";
-import { useAppSettings } from "@/lib/appSettings.queries";
-import { useGlobalLibrary, useSaveCurrentLibrary } from "@/lib/library.queries";
+import { useEffect, useRef, useState } from "react";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
+import { loadGlobalLibrary, saveGlobalLibrary } from "@/lib/library";
+import { loadAppSettings } from "@/lib/appSettings";
+import { getCurrentLibraryPayload } from "@/lib/library.queries";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
 /**
  * Loads appSettings and globalLibrary from disk into their respective
- * Zustand stores at app boot. TanStack Query handles the fetching and
- * caching; this hook bridges the gap by pushing the data into Zustand
- * so the rest of the app can use store selectors.
+ * Zustand stores at app boot. Uses direct async calls — no TanStack Query
+ * cache — so there is no dual-ownership window where a query refetch can
+ * overwrite in-flight Zustand mutations.
  *
- * After both are loaded, runs reconciliation to discover new audio files
- * in globalFolders and backfill folderIds on existing sounds.
+ * After both are loaded, runs one-time reconciliation to discover new audio
+ * files in globalFolders and backfill folderIds on existing sounds.
  */
 export function useBootLoader() {
-  const { data: settings } = useAppSettings();
-  const { data: library } = useGlobalLibrary();
-
-  const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
-
-  const loadSettings = useAppSettingsStore((s) => s.loadSettings);
-  const loadLibrary = useLibraryStore((s) => s.loadLibrary);
-  const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const hasReconciled = useRef(false);
 
+  // One-time load at mount — plain async functions, no query subscription.
+  // Both loads are independent and fire in parallel.
   useEffect(() => {
-    if (settings) {
-      loadSettings(settings);
-    }
-  }, [settings, loadSettings]);
+    loadAppSettings().then((settings) => {
+      useAppSettingsStore.getState().loadSettings(settings);
+      setSettingsLoaded(true);
+    });
+    loadGlobalLibrary().then((library) => {
+      useLibraryStore.getState().loadLibrary(library);
+      setLibraryLoaded(true);
+    });
+  }, []);
 
   useEffect(() => {
-    if (library) {
-      loadLibrary(library);
-    }
-  }, [library, loadLibrary]);
-
-  useEffect(() => {
-    if (!settings || !library || hasReconciled.current) return;
+    if (!settingsLoaded || !libraryLoaded || hasReconciled.current) return;
     hasReconciled.current = true;
 
-    // Use the current store snapshot (not the query-cache snapshot) as the
-    // reconciliation baseline. The store is always up-to-date; the query cache
-    // can be stale while a background refetch is in flight, which would cause
-    // reconciliation to overwrite any tag assignments the user made between
-    // when the effect fired and when the async scan completes.
+    // Read settings from the store — the loadAppSettings().then() above has
+    // already run by the time this effect fires (settingsLoaded is true).
+    const settings = useAppSettingsStore.getState().settings;
+    if (!settings) return;
+
+    // Use the current store snapshot (not a stale local variable) as the
+    // reconciliation baseline. The store is always up-to-date; reading it
+    // imperatively here avoids the stale-closure problem that existed when
+    // this was driven by query-cache data.
     const soundsAtReconcileStart = useLibraryStore.getState().sounds;
 
     reconcileGlobalLibrary(settings.globalFolders, soundsAtReconcileStart).then(
@@ -56,7 +55,7 @@ export function useBootLoader() {
         // If isDirty is true, the user (or another effect) modified the library
         // while the async folder scan was running — their changes take priority.
         if (result.changed && !useLibraryStore.getState().isDirty) {
-          updateLibrary((draft) => {
+          useLibraryStore.getState().updateLibrary((draft) => {
             draft.sounds = result.sounds;
           });
         }
@@ -83,12 +82,14 @@ export function useBootLoader() {
 
         // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
         if (useLibraryStore.getState().isDirty) {
-          saveCurrentLibrarySync();
+          void saveGlobalLibrary(getCurrentLibraryPayload()).then(() => {
+            useLibraryStore.getState().clearDirtyFlag();
+          });
         }
 
         // Refresh missing-file state after reconciliation
         void refreshMissingState();
       },
     );
-  }, [settings, library, updateLibrary, saveCurrentLibrarySync]);
+  }, [settingsLoaded, libraryLoaded]);
 }

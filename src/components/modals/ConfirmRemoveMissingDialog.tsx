@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useUiStore } from "@/state/uiStore";
-import { useAppSettings } from "@/lib/appSettings.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useBulkRemove } from "@/hooks/useBulkRemove";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 
@@ -25,7 +25,7 @@ export function ConfirmRemoveMissingDialog() {
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);
 
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const folders = settings?.globalFolders ?? EMPTY_GLOBAL_FOLDERS;
 
   const confirmRemoveSoundsOpen = useUiStore(

@@ -4,7 +4,8 @@ import { basename, dirname, join } from "@tauri-apps/api/path";
 import { copyFile, rename } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
@@ -70,7 +71,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
 
   const sounds = useLibraryStore((s) => s.sounds);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const { mutateAsync: saveSettings } = useSaveAppSettings();
   const { saveCurrentLibrary } = useSaveCurrentLibrary();
 

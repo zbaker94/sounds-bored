@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a race condition where app settings or sound library changes could be silently overwritten during app startup or after saving
+- App settings and sound library data now load more reliably at startup, with no window where a background data refresh could discard recent changes
 - Fixed a bug where stopping a sound after it had already naturally ended could throw an error instead of completing cleanly.
 - Fixed audio voices not properly disconnecting from the audio graph when stopped, which could cause resource leaks over time.
 - Saving a pad configuration now shows a clear error message if the selected tags or set don't match any sounds in your library, preventing silent misconfiguration.

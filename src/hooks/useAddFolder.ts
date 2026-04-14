@@ -2,7 +2,8 @@ import { useState, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
 import type { GlobalFolder } from "@/lib/schemas";
@@ -25,7 +26,7 @@ export function useAddFolder(): {
   const sounds = useLibraryStore((s) => s.sounds);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
 
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const { saveCurrentLibrary } = useSaveCurrentLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
 

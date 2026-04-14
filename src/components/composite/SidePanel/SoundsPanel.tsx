@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettings } from "@/lib/appSettings.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useImportSounds } from "@/hooks/useImportSounds";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import { AddSetDialog } from "./AddSetDialog";
@@ -22,7 +22,7 @@ import guyWithTorch from "@/assets/guywithtorch.gif";
 
 export function SoundsPanel() {
   const sets = useLibraryStore((s) => s.sets);
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const folders = useMemo(() => settings?.globalFolders ?? [], [settings]);
 
   const importFolder = folders.find((f) => f.id === settings?.importFolderId);

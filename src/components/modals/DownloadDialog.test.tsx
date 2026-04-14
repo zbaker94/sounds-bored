@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { DownloadDialog } from "./DownloadDialog";
 import { useDownloadStore, initialDownloadState } from "@/state/downloadStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { createMockAppSettings, createMockDownloadJob, createMockSound } from "@/test/factories";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -18,10 +19,6 @@ vi.mock("@/lib/ytdlp.queries", () => ({
 
 const mockSettings = createMockAppSettings();
 
-vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: vi.fn(() => ({ data: mockSettings })),
-}));
-
 function renderDialog(open = true) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -35,6 +32,7 @@ beforeEach(() => {
   mockStartDownload.mockClear();
   useLibraryStore.setState({ ...initialLibraryState });
   useDownloadStore.setState({ ...initialDownloadState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState, settings: mockSettings });
 });
 
 describe("DownloadDialog — URL validation", () => {
