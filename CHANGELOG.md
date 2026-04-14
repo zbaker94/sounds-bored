@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Startup errors are now surfaced: if scanning your sound folders fails, a notification appears instead of silently doing nothing
+- If the app can't save your sound library after a scan, you'll now see an error notification rather than losing the save silently
+- Missing-file detection now always runs on startup, even if the folder scan encountered an error
 - App now shows an error notification when settings or the sound library fail to load on startup, instead of silently failing
 - Fixed a bug where test state could leak between test cases in certain store-related tests
 - Fixed a race condition where app settings or sound library changes could be silently overwritten during app startup or after saving

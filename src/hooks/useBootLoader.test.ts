@@ -184,8 +184,37 @@ describe("useBootLoader", () => {
     const { rerender } = renderHook(() => useBootLoader());
 
     await act(async () => {});
-    await act(async () => { rerender(); });
+    rerender();
+    await act(async () => {});
 
     expect(mockReconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("still calls refreshMissingState when reconcile throws", async () => {
+    const { toast } = await import("sonner");
+    mockReconcile.mockRejectedValue(new Error("permission denied"));
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("Failed to scan sound folders");
+    expect(mockRefreshMissingState).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows error toast when saveGlobalLibrary throws after reconcile changes sounds", async () => {
+    const { toast } = await import("sonner");
+    mockReconcile.mockResolvedValue({
+      changed: true,
+      sounds: [createMockSound({ id: "new-s" })],
+      inaccessibleFolderIds: [],
+    });
+    mockSaveGlobalLibrary.mockRejectedValue(new Error("disk full"));
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("Failed to save sound library");
   });
 });

@@ -60,8 +60,8 @@ export function useBootLoader() {
     // this was driven by query-cache data.
     const soundsAtReconcileStart = useLibraryStore.getState().sounds;
 
-    reconcileGlobalLibrary(settings.globalFolders, soundsAtReconcileStart).then(
-      (result) => {
+    reconcileGlobalLibrary(settings.globalFolders, soundsAtReconcileStart)
+      .then((result) => {
         // Only apply if the store hasn't been mutated since we started the scan.
         // If isDirty is true, the user (or another effect) modified the library
         // while the async folder scan was running — their changes take priority.
@@ -93,14 +93,21 @@ export function useBootLoader() {
 
         // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
         if (useLibraryStore.getState().isDirty) {
-          void saveGlobalLibrary(getCurrentLibraryPayload()).then(() => {
-            useLibraryStore.getState().clearDirtyFlag();
-          });
+          void saveGlobalLibrary(getCurrentLibraryPayload())
+            .then(() => {
+              useLibraryStore.getState().clearDirtyFlag();
+            })
+            .catch(() => {
+              toast.error("Failed to save sound library");
+            });
         }
-
-        // Refresh missing-file state after reconciliation
+      })
+      .catch(() => {
+        toast.error("Failed to scan sound folders");
+      })
+      .finally(() => {
+        // Always refresh missing-file state, even if reconciliation failed.
         void refreshMissingState();
-      },
-    );
+      });
   }, [settingsLoaded, libraryLoaded]);
 }
