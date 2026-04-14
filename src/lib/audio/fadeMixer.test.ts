@@ -138,6 +138,41 @@ describe("fadeMixer", () => {
       expect(mockVoice.setOnEnded).toHaveBeenCalledWith(null);
     });
 
+    it("does not execute cleanup if pad is no longer fading out when timeout fires", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer = createMockLayer({ id: "layer-stale-guard" });
+      const {
+        getPadGain,
+        removeFadingOutPad,
+        isPadFadingOut,
+        setLayerChain,
+        setLayerCycleIndex,
+        getLayerChain,
+        getLayerCycleIndex,
+      } = await import("./audioState");
+      const { resetPadGain } = await import("./gainManager");
+      getPadGain("pad-stale-guard");
+      // Seed chain state so we can assert it is NOT cleared by the stale cleanup
+      setLayerChain("layer-stale-guard", []);
+      setLayerCycleIndex("layer-stale-guard", 1);
+      const { fadePadOut } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-stale-guard", layers: [layer] });
+
+      fadePadOut(pad, 500);
+      expect(isPadFadingOut("pad-stale-guard")).toBe(true);
+
+      // Simulate: fade state cleared without cancelling timeout (e.g., by a re-trigger
+      // that calls cancelPadFade — removeFadingOutPad alone replicates that race).
+      removeFadingOutPad("pad-stale-guard");
+      vi.advanceTimersByTime(600);
+
+      // Guard should prevent ALL cleanup from running on stale timeout
+      expect(resetPadGain).not.toHaveBeenCalled();
+      expect(getLayerChain("layer-stale-guard")).toEqual([]); // NOT cleared
+      expect(getLayerCycleIndex("layer-stale-guard")).toBe(1); // NOT cleared
+    });
+
     it("does not stop pad when fading to a non-zero volume", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);

@@ -4,6 +4,7 @@ import {
   cancelPadFade,
   addFadingOutPad,
   removeFadingOutPad,
+  isPadFadingOut,
   setFadePadTimeout,
   deleteFadePadTimeout,
   getPadGain,
@@ -69,6 +70,9 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
   //    to avoid a circular dependency on padPlayer.ts.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
+    // Guard: if pad is no longer fading out (e.g. re-triggered while this timeout
+    // was pending), skip cleanup so newly-started voices are not killed.
+    if (!isPadFadingOut(pad.id)) return;
     removeFadingOutPad(pad.id);
     if (endVol === 0) {
       // Inline stopPad: cancel fade, clear per-layer chain state, stop voices
