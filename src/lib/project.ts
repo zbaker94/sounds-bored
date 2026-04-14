@@ -265,18 +265,52 @@ export async function saveProjectAs(
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "_");
   const newProjectPath = await join(selectedPath, sanitizedName);
 
-  // Check if folder already exists
-  if (await exists(newProjectPath)) {
-    throw new Error(`A folder named "${sanitizedName}" already exists in the selected location.`);
+  // Create-or-fail: mkdir with { recursive: false } atomically fails if the folder
+  // already exists, eliminating the TOCTOU window that the previous exists()-then-copy
+  // pattern had. The overall copy is still not transactional — see the rollback block below.
+  try {
+    await mkdir(newProjectPath, { recursive: false });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+    // Match EEXIST across platforms:
+    //   Unix/macOS:  "already exists" or "os error 17" (EEXIST = 17)
+    //   Windows:     "os error 183" (ERROR_ALREADY_EXISTS) or "already exists" in English
+    if (
+      msg.includes("already exists") ||
+      msg.includes("eexist") ||
+      msg.includes("os error 17") ||
+      msg.includes("os error 183")
+    ) {
+      throw new Error(`A folder named "${sanitizedName}" already exists in the selected location.`);
+    }
+    // Permission denied, disk full, etc. — surface the original error as-is.
+    throw err;
   }
 
-  // Copy the entire project folder to the new location
-  await copyDirectory(currentPath, newProjectPath);
+  // Copy and save inside a try/catch so we can roll back the empty directory we just
+  // created if something goes wrong. Without rollback, a failed copy would leave a
+  // stale empty folder that blocks future Save As attempts with the same name.
+  // IMPORTANT: Keep discardTemporaryProject OUTSIDE this block — if the save succeeded
+  // but cleanup throws, we must NOT roll back the successfully-written project.
+  let savedProject: Awaited<ReturnType<typeof saveProject>>;
+  try {
+    // Copy the entire project folder to the new location. The destination directory
+    // already exists (we just created it); copyDirectory's internal mkdir call uses
+    // { recursive: true } and is a no-op on an existing directory.
+    await copyDirectory(currentPath, newProjectPath);
 
-  // Update the project.json with the new name and save timestamp
-  const savedProject = await saveProject(newProjectPath, { ...project, name: projectName });
+    // Update the project.json with the new name and save timestamp
+    savedProject = await saveProject(newProjectPath, { ...project, name: projectName });
+  } catch (err) {
+    // Best-effort cleanup of the directory we created. Ignore removal errors —
+    // there's nothing useful to do if cleanup itself fails, and we must still
+    // surface the original copy/save error to the caller.
+    try { await remove(newProjectPath, { recursive: true }); } catch { /* ignore */ }
+    throw err;
+  }
 
-  // Only clean up if this was a temp folder
+  // Temp-folder cleanup is outside the rollback scope: by this point the new project
+  // has been successfully written, so any failure here must not undo it.
   if (currentPath.includes("temp_")) {
     await discardTemporaryProject(currentPath);
   }
