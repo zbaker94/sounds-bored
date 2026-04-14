@@ -28,7 +28,7 @@ import {
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useAppSettings } from "@/lib/appSettings.queries";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
@@ -41,7 +41,6 @@ import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { SoundListItemTags } from "./SoundListItemTags";
 import { ConfirmDeleteSoundsDialog } from "./ConfirmDeleteSoundsDialog";
@@ -73,7 +72,7 @@ export function SoundList({
   const project = useProjectStore((s) => s.project);
 
   const { data: settings } = useAppSettings();
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();
 
@@ -191,13 +190,8 @@ export function SoundList({
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !selectedSoundIds.has(s.id));
       });
+      await saveCurrentLibrary();
       const latest = useLibraryStore.getState();
-      await saveLibrary({
-        version: CURRENT_LIBRARY_VERSION,
-        sounds: latest.sounds,
-        tags: latest.tags,
-        sets: latest.sets,
-      });
       const currentFolders =
         useAppSettingsStore.getState().settings?.globalFolders ?? [];
       const missingResult = await checkMissingStatus(

@@ -3,9 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import type { GlobalFolder } from "@/lib/schemas";
 
 /**
@@ -27,7 +26,7 @@ export function useAddFolder(): {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
 
   const { data: settings } = useAppSettings();
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
 
   const handleAddFolder = useCallback(async () => {
@@ -60,19 +59,13 @@ export function useAddFolder(): {
         updateLibrary((draft) => {
           draft.sounds = result.sounds;
         });
-        const latest = useLibraryStore.getState();
-        await saveLibrary({
-          version: CURRENT_LIBRARY_VERSION,
-          sounds: latest.sounds,
-          tags: latest.tags,
-          sets: latest.sets,
-        });
+        await saveCurrentLibrary();
       }
       toast.success(`Folder "${name}" added`);
     } finally {
       setIsAddingFolder(false);
     }
-  }, [settings, sounds, updateLibrary, saveLibrary, saveSettings]);
+  }, [settings, sounds, updateLibrary, saveCurrentLibrary, saveSettings]);
 
   return { isAddingFolder, handleAddFolder };
 }

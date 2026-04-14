@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +13,7 @@ interface AddSetDialogProps {
 
 export function AddSetDialog({ open, onOpenChange }: AddSetDialogProps) {
   const [name, setName] = useState("");
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   useEffect(() => {
     if (open) {
@@ -27,8 +26,7 @@ export function AddSetDialog({ open, onOpenChange }: AddSetDialogProps) {
     if (!trimmed) return;
 
     useLibraryStore.getState().addSet(trimmed);
-    const { sounds, tags, sets } = useLibraryStore.getState();
-    await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds, tags, sets });
+    await saveCurrentLibrary();
     onOpenChange(false);
   }
 

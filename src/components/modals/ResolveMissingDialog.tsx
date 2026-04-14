@@ -3,11 +3,11 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { basename } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
-import { AUDIO_EXTENSIONS, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -47,7 +47,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
 
   const sounds = useLibraryStore((s) => s.sounds);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   function handleClose() {
     setStep("main");
@@ -130,8 +130,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
 
       await refreshMissingState();
 
-      const latest = useLibraryStore.getState();
-      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveCurrentLibrary();
       toast.success("Sound re-linked");
       onResolved?.();
       handleClose();
@@ -150,8 +149,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       });
       evictBuffer(sound.id);
       evictStreamingElement(sound.id);
-      const latest = useLibraryStore.getState();
-      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveCurrentLibrary();
       toast.success(`"${sound.name}" removed from library`);
       onResolved?.();
       handleClose();

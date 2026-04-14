@@ -46,7 +46,7 @@ import { TruncatedPath } from "@/components/ui/truncated-path";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
@@ -57,7 +57,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
 import { ResolveMissingFolderDialog } from "@/components/modals/ResolveMissingFolderDialog";
-import { CURRENT_LIBRARY_VERSION, EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
+import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 const panelClass =
@@ -83,7 +83,7 @@ export function FoldersPanel({
   const folders = settings?.globalFolders ?? EMPTY_GLOBAL_FOLDERS;
 
   const removeGlobalFolder = useAppSettingsStore((s) => s.removeGlobalFolder);
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
 
   const { isAddingFolder, handleAddFolder } = useAddFolder();
@@ -187,15 +187,10 @@ export function FoldersPanel({
       if (settingsAfterRemove) {
         await saveSettings(settingsAfterRemove);
       }
-      const latest = useLibraryStore.getState();
-      await saveLibrary({
-        version: CURRENT_LIBRARY_VERSION,
-        sounds: latest.sounds,
-        tags: latest.tags,
-        sets: latest.sets,
-      });
+      await saveCurrentLibrary();
       const updatedFolders =
         useAppSettingsStore.getState().settings?.globalFolders ?? [];
+      const latest = useLibraryStore.getState();
       const missingResult = await checkMissingStatus(
         updatedFolders,
         latest.sounds,

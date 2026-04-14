@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject } from "@/lib/project.queries";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveGlobalLibrary, getCurrentLibraryPayload } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { AUTOSAVE_INTERVAL, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 
 /**
  * Hook to periodically save the current project.
@@ -63,7 +63,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       if (libraryJson === lastLibrarySaveRef.current) return;
 
       saveLibraryMutation.mutate(
-        { version: CURRENT_LIBRARY_VERSION, sounds, tags, sets },
+        getCurrentLibraryPayload(),
         { onSuccess: () => { lastLibrarySaveRef.current = libraryJson; } },
       );
     };

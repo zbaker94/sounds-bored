@@ -26,7 +26,7 @@ vi.mock("@/lib/audio/streamingCache", () => ({
 
 const mockSaveLibrary = vi.fn();
 vi.mock("@/lib/library.queries", () => ({
-  useSaveGlobalLibrary: () => ({ mutateAsync: mockSaveLibrary }),
+  useSaveCurrentLibrary: () => ({ saveCurrentLibrary: mockSaveLibrary }),
 }));
 
 const mockSaveSettings = vi.fn();

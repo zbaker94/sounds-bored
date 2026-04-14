@@ -5,11 +5,11 @@ import { copyFile, rename } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
-import { AUDIO_EXTENSIONS, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { GlobalFolder, Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -72,7 +72,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
   const { data: settings } = useAppSettings();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   function handleClose() {
     setStep("main");
@@ -152,8 +152,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       await refreshMissingState(updatedSettings.globalFolders);
 
       // Save reconciled library
-      const latest = useLibraryStore.getState();
-      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveCurrentLibrary();
 
       // Find sounds from this folder that are still missing (read updated state from store)
       const { sounds: latestSounds, missingSoundIds } = useLibraryStore.getState();
@@ -191,8 +190,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
         draft.sounds = draft.sounds.filter((s) => s.folderId !== folder.id);
       });
 
-      const latest = useLibraryStore.getState();
-      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveCurrentLibrary();
 
       await refreshMissingState(updatedSettings.globalFolders);
 
@@ -324,8 +322,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       evictBuffer(currentSound.id);
       evictStreamingElement(currentSound.id);
 
-      const latest = useLibraryStore.getState();
-      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveCurrentLibrary();
 
       const newResolved = resolvedCount + 1;
       setResolvedCount(newResolved);
@@ -348,8 +345,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       });
       evictBuffer(currentSound.id);
       evictStreamingElement(currentSound.id);
-      const latest = useLibraryStore.getState();
-      await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+      await saveCurrentLibrary();
       const newRemoved = removedCount + 1;
       setRemovedCount(newRemoved);
       setIsWorking(false);

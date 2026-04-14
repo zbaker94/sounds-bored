@@ -1,9 +1,8 @@
 import { useCallback } from "react";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { copyFilesToFolder, tagImportedSounds } from "@/lib/import";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 import type { GlobalFolder } from "@/lib/schemas";
 
 /**
@@ -17,7 +16,7 @@ export function useImportSounds(
   allFolders: GlobalFolder[],
 ): (paths: string[]) => Promise<number> {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   return useCallback(
     async (paths: string[]) => {
@@ -46,19 +45,13 @@ export function useImportSounds(
           systemAssignTagsToSounds,
         );
 
-        const latest = useLibraryStore.getState();
-        await saveLibrary({
-          version: CURRENT_LIBRARY_VERSION,
-          sounds: latest.sounds,
-          tags: latest.tags,
-          sets: latest.sets,
-        });
+        await saveCurrentLibrary();
       }
 
       return copied.length;
     },
     // importFolder.id is stable; allFolders ref is from settings (stable per render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [importFolder?.id, allFolders, updateLibrary, saveLibrary],
+    [importFolder?.id, allFolders, updateLibrary, saveCurrentLibrary],
   );
 }

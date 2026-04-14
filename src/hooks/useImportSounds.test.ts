@@ -17,7 +17,7 @@ vi.mock("@/lib/library.reconcile", () => ({
 
 const mockMutate = vi.fn();
 vi.mock("@/lib/library.queries", () => ({
-  useSaveGlobalLibrary: vi.fn(() => ({ mutateAsync: mockMutate })),
+  useSaveCurrentLibrary: vi.fn(() => ({ saveCurrentLibrary: mockMutate })),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

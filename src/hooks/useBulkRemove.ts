@@ -4,11 +4,11 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useUiStore } from "@/state/uiStore";
 import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
-import { CURRENT_LIBRARY_VERSION, EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
+import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 
 /**
  * Encapsulates bulk-remove flows for missing sounds and folders:
@@ -35,7 +35,7 @@ export function useBulkRemove(): {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
 
   const { data: settings } = useAppSettings();
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
 
   const folders = settings?.globalFolders ?? EMPTY_GLOBAL_FOLDERS;
@@ -62,13 +62,7 @@ export function useBulkRemove(): {
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !idsToRemove.has(s.id));
       });
-      const latest = useLibraryStore.getState();
-      await saveLibrary({
-        version: CURRENT_LIBRARY_VERSION,
-        sounds: latest.sounds,
-        tags: latest.tags,
-        sets: latest.sets,
-      });
+      await saveCurrentLibrary();
       await refreshMissingState(settings.globalFolders);
       toast.success(
         `${idsToRemove.size} missing sound${idsToRemove.size > 1 ? "s" : ""} removed`,
@@ -79,7 +73,7 @@ export function useBulkRemove(): {
       setIsBulkRemoving(false);
       useUiStore.getState().setConfirmRemoveMissingSoundsOpen(false);
     }
-  }, [settings, allMissingSounds, updateLibrary, saveLibrary]);
+  }, [settings, allMissingSounds, updateLibrary, saveCurrentLibrary]);
 
   const handleRemoveAllMissingFolders = useCallback(async () => {
     if (!settings) return;
@@ -122,13 +116,7 @@ export function useBulkRemove(): {
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !soundIdsToRemove.has(s.id));
       });
-      const latest = useLibraryStore.getState();
-      await saveLibrary({
-        version: CURRENT_LIBRARY_VERSION,
-        sounds: latest.sounds,
-        tags: latest.tags,
-        sets: latest.sets,
-      });
+      await saveCurrentLibrary();
       await refreshMissingState(updatedSettings.globalFolders);
       toast.success(
         `${folderIdsToRemove.size} missing folder${folderIdsToRemove.size > 1 ? "s" : ""} and ${soundIdsToRemove.size} sound${soundIdsToRemove.size !== 1 ? "s" : ""} removed`,
@@ -144,7 +132,7 @@ export function useBulkRemove(): {
       setIsBulkRemoving(false);
       useUiStore.getState().setConfirmRemoveMissingFoldersOpen(false);
     }
-  }, [settings, sounds, allMissingFolders, updateLibrary, saveLibrary, saveSettings]);
+  }, [settings, sounds, allMissingFolders, updateLibrary, saveCurrentLibrary, saveSettings]);
 
   return {
     isBulkRemoving,
