@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
-import { isLayerActive, isPadFading } from "./audioState";
+import { isLayerActive, isPadFading, isLayerPending } from "./audioState";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
@@ -3549,5 +3549,89 @@ describe("triggerLayer", () => {
     await triggerLayer(pad, layer);
     expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+  });
+});
+
+// ── Pending leak guards ───────────────────────────────────────────────────────
+
+describe("pending leak guards", () => {
+  it("clears layer pending when ensureResumed throws inside triggerLayer", async () => {
+    const audioCtx = await import("./audioContext");
+    (audioCtx.ensureResumed as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("audio context failed"),
+    );
+
+    const { triggerLayer } = await import("./padPlayer");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Error should propagate, but pending must be cleared
+    await expect(triggerLayer(pad, layer)).rejects.toThrow("audio context failed");
+    expect(isLayerPending(layer.id)).toBe(false);
+  });
+
+  it("clears layer pending when applyRetriggerMode throws inside triggerLayer", async () => {
+    // Make getOrCreateLayerGain throw by rejecting createGain on the layer gain call
+    // padGain is created first (call 1), layerGain second (call 2 — throws)
+    let createGainCallCount = 0;
+    mockCtx.createGain.mockImplementation(() => {
+      createGainCallCount++;
+      if (createGainCallCount >= 2) throw new Error("createGain failed");
+      return makeMockGain();
+    });
+
+    const { triggerLayer } = await import("./padPlayer");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await expect(triggerLayer(pad, layer)).rejects.toThrow("createGain failed");
+    expect(isLayerPending(layer.id)).toBe(false);
+  });
+
+  it("clears pending for a layer that throws in the triggerPad loop, allowing other layers to proceed", async () => {
+    const { triggerPad } = await import("./padPlayer");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    // Layer 1 will throw (createGain fails on its layer gain call)
+    const layer1 = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    // Layer 2 should still succeed
+    const layer2 = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer1, layer2] });
+
+    let createGainCallCount = 0;
+    mockCtx.createGain.mockImplementation(() => {
+      createGainCallCount++;
+      // Call 1: padGain (ok), Call 2: layer1 gain (throws), Call 3+: layer2 gain (ok)
+      if (createGainCallCount === 2) throw new Error("layer1 createGain failed");
+      return makeMockGain();
+    });
+
+    // triggerPad should resolve (error per layer is swallowed, not propagated)
+    await triggerPad(pad);
+
+    // Layer 1's pending must be cleared despite the throw
+    expect(isLayerPending(layer1.id)).toBe(false);
+    // Layer 2 should still have been triggered (other layers proceed)
+    expect(isLayerActive(layer2.id)).toBe(true);
   });
 });
