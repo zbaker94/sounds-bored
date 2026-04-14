@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved app startup reliability: the sound library reconciliation now correctly runs only once, even under React's strict development mode, preventing potential duplicate processing on launch.
 - App now stays fully functional even when settings or sound library files fail to load on startup
 - Duplicate folder detection now correctly reflects the latest settings, preventing silent misses when settings change rapidly
 - Boot sequence runs exactly once regardless of component re-renders, avoiding redundant disk reads

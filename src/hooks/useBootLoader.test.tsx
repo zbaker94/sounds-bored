@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { StrictMode } from "react";
 import { renderHook, act } from "@testing-library/react";
 import { useBootLoader } from "./useBootLoader";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
@@ -232,14 +233,14 @@ describe("useBootLoader", () => {
     expect(toast.error).toHaveBeenCalledWith("Failed to load sound library");
   });
 
-  it("does not run reconciliation more than once regardless of re-renders", async () => {
-    const { rerender } = renderHook(() => useBootLoader());
-
-    await act(async () => {});
-    rerender();
-    await act(async () => {});
-    rerender();
-    await act(async () => {});
+  it("does not run reconciliation twice under StrictMode (hasReconciled guard)", async () => {
+    // React StrictMode deliberately double-invokes effects to surface side-effect bugs.
+    // hasReconciled.current must block the second invocation — this test proves it.
+    await act(async () => {
+      renderHook(() => useBootLoader(), {
+        wrapper: ({ children }) => <StrictMode>{children}</StrictMode>,
+      });
+    });
 
     expect(mockReconcile).toHaveBeenCalledTimes(1);
   });
