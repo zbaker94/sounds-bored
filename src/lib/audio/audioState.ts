@@ -47,6 +47,7 @@
  * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
  * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
  * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
+ * layerConsecutiveFailureMap | layer ID | number                             | Consecutive chain load failures (circuit-break) | resetLayerConsecutiveFailures(), clearAllLayerConsecutiveFailures()
  * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
  * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), clearAllFadeTracking()
  */
@@ -108,6 +109,11 @@ const layerCycleIndex = new Map<string, number>();
 
 /** Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger. */
 const layerPendingMap = new Set<string>();
+
+/** Counts consecutive `loadLayerVoice` failures per layer, used to short-circuit
+ *  a failing chain (e.g. missing library) instead of spamming one toast per
+ *  chained sound. Reset on a successful voice start or when the circuit trips. */
+const layerConsecutiveFailureMap = new Map<string, number>();
 
 /** Stores the original play order for a layer chain so skip-back can derive the previous sound.
  *  Keyed by layer ID. Set when a chain is started; cleared on stopAllPads / stopPad. */
@@ -480,6 +486,32 @@ export function clearAllLayerPending(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Layer consecutive failure tracking (circuit-breaker for chain load failures)
+// ---------------------------------------------------------------------------
+
+/** Read the current consecutive-failure count for a layer (0 when absent). */
+export function getLayerConsecutiveFailures(layerId: string): number {
+  return layerConsecutiveFailureMap.get(layerId) ?? 0;
+}
+
+/** Increment the consecutive-failure count for a layer and return the new value. */
+export function incrementLayerConsecutiveFailures(layerId: string): number {
+  const next = (layerConsecutiveFailureMap.get(layerId) ?? 0) + 1;
+  layerConsecutiveFailureMap.set(layerId, next);
+  return next;
+}
+
+/** Reset the consecutive-failure count for a layer (call after a successful start). */
+export function resetLayerConsecutiveFailures(layerId: string): void {
+  layerConsecutiveFailureMap.delete(layerId);
+}
+
+/** Clear all consecutive-failure state (called from clearAllAudioState). */
+export function clearAllLayerConsecutiveFailures(): void {
+  layerConsecutiveFailureMap.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Layer chain queue
 // ---------------------------------------------------------------------------
 
@@ -726,6 +758,7 @@ export function clearAllAudioState(): void {
   clearAllLayerCycleIndexes();
   clearAllLayerPlayOrders();
   clearAllLayerPending();
+  clearAllLayerConsecutiveFailures();
   nullAllOnEnded();
   clearAllStreamingAudio();
   clearAllPadProgressInfo();

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed an issue where playing a pad with a missing sound library could generate hundreds of error notifications — the audio engine now stops after 3 consecutive load failures and shows a single summary error instead
+- Error notifications from chained sound sequences are no longer silently dropped; failures in sequential/loop playback chains now properly surface as visible errors
+- Re-triggering a pad resets the error counter, so a fresh trigger always gets full error reporting regardless of previous failures
 - Fixed a visual glitch where the volume bar would briefly flash after a pad finished playing
 - Volume display now hides correctly when a pad stops, without any lingering artifact from the previous playback
 - Pad buttons now update more smoothly during audio playback — high-frequency audio tick re-renders are isolated to smaller sub-components, reducing UI jitter on active pads
