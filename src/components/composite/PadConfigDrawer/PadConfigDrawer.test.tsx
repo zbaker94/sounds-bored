@@ -313,6 +313,134 @@ describe("PadConfigDrawer", () => {
     });
   });
 
+  describe("selection validation on save", () => {
+    it("shows tag-match error when no library sounds match the selected tags", async () => {
+      // Library contains one sound with tag "tag-other" — does not match the layer's "tag-missing".
+      const sound = createMockSound({ id: "s1", name: "FX Sound", filePath: "fx.mp3", tags: ["tag-other"] });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "tag", tagIds: ["tag-missing"], matchMode: "any", defaultVolume: 100 },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText(/no sounds in library match these tags/i)).toBeInTheDocument();
+      // Drawer remains open because submit failed.
+      expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER)).toBe(true);
+    });
+
+    it("shows set-match error when no library sounds match the selected set", async () => {
+      // Library contains one sound in a different set, so the layer's "set-missing" has no matches.
+      const sound = createMockSound({ id: "s1", name: "FX Sound", filePath: "fx.mp3", sets: ["set-other"] });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "set", setId: "set-missing", defaultVolume: 100 },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      expect(await screen.findByText(/no sounds in library match this set/i)).toBeInTheDocument();
+      // Drawer remains open because submit failed.
+      expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER)).toBe(true);
+    });
+
+    it("saves successfully when tag selection matches at least one library sound", async () => {
+      // Library contains a sound tagged "tag-match" that satisfies the layer's tag filter.
+      const sound = createMockSound({ id: "s1", name: "FX Sound", filePath: "fx.mp3", tags: ["tag-match"] });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "tag", tagIds: ["tag-match"], matchMode: "any", defaultVolume: 100 },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER)).toBe(false);
+      });
+      expect(screen.queryByText(/no sounds in library match these tags/i)).not.toBeInTheDocument();
+    });
+
+    it("saves successfully when set selection matches at least one library sound", async () => {
+      // Library contains a sound in the selected set with a file path — the layer's set has matches.
+      const sound = createMockSound({ id: "s1", name: "FX Sound", filePath: "fx.mp3", sets: ["set-match"] });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      const layer = createMockLayer({
+        id: "layer-1",
+        selection: { type: "set", setId: "set-match", defaultVolume: 100 },
+      });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [] }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER)).toBe(false);
+      });
+      expect(screen.queryByText(/no sounds in library match this set/i)).not.toBeInTheDocument();
+    });
+  });
+
   it("closes overlay without saving when Cancel is clicked", async () => {
     renderDrawer();
     openDrawer();
