@@ -18,6 +18,9 @@ export function createHistoryEntry(
 /**
  * Adds or updates a project in history
  * If the project path already exists, updates it. Otherwise, adds it to the front
+ *
+ * Note: loadProjectHistory() called without onCorruption — corruption recovery is
+ * silent for these non-boot call sites. The app continues with an empty history.
  */
 export async function addOrUpdateProjectInHistory(
   name: string,
