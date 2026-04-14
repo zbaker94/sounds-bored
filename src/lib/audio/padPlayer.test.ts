@@ -3600,6 +3600,65 @@ describe("pending leak guards", () => {
     expect(isLayerPending(layer.id)).toBe(false);
   });
 
+  it("cancels in-progress fade-out when pad is re-triggered (clears both flag and timeout)", async () => {
+    vi.useFakeTimers();
+    const { addFadingOutPad, isPadFadingOut, isPadFading, setFadePadTimeout } = await import("./audioState");
+    const { triggerPad } = await import("./padPlayer");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Put pad into fading-out state with a live timeout (as if fadePadOut was called previously)
+    addFadingOutPad(pad.id);
+    const timeoutId = setTimeout(() => {}, 10000);
+    setFadePadTimeout(pad.id, timeoutId);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isPadFading(pad.id)).toBe(true);
+
+    await triggerPad(pad);
+
+    // triggerPad should cancel the in-progress fade (both flag and timeout cleared)
+    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(isPadFading(pad.id)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("voices started after re-trigger survive the stale fade cleanup timeout", async () => {
+    vi.useFakeTimers();
+    const { fadePadOut } = await import("./fadeMixer");
+    const { triggerPad } = await import("./padPlayer");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Start a fade-out (schedules a 500ms cleanup timeout)
+    fadePadOut(pad, 500);
+
+    // Re-trigger during the fade window — triggerPad should cancel the stale cleanup
+    await triggerPad(pad);
+
+    // Capture the newly-started voice
+    const newVoice = createdSources[createdSources.length - 1];
+    expect(newVoice).toBeDefined();
+
+    // Advance past the original fade cleanup window
+    vi.advanceTimersByTime(600);
+
+    // The new voice must NOT have been stopped by the stale cleanup timeout
+    expect(newVoice.stop).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it("clears pending for a layer that throws in the triggerPad loop, allowing other layers to proceed", async () => {
     const { triggerPad } = await import("./padPlayer");
 

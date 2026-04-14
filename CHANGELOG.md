@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where re-triggering a pad during a fade-out could cause the fade's cleanup to stop the newly-started audio voices.
 - Fixed a bug where a pad's layers could get permanently stuck in a "pending" state if an audio error occurred mid-trigger, which would silently prevent those layers from playing again until the app was restarted
 - When one layer in a pad fails to play due to an audio error, the remaining layers now continue to trigger as expected instead of being silently blocked
 - Fixed a minor internal audio engine inefficiency where the audio context was being retrieved twice unnecessarily when updating layer volume.

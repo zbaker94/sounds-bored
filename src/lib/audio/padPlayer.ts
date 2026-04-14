@@ -352,6 +352,9 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   const { sounds } = useLibraryStore.getState();
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
+  // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
+  // that are about to be started below.
+  cancelPadFade(pad.id);
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   // Tick reads gain node value automatically — no store call needed.
@@ -407,6 +410,9 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
   try {
     const ctx = await ensureResumed();
     const padGain = getPadGain(pad.id);
+    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
+    // that are about to be started below (same fix as triggerPad).
+    cancelPadFade(pad.id);
     const isPlaying = isLayerActive(layer.id);
     const layerGain = getOrCreateLayerGain(layer.id, layer.volume / 100, padGain);
 
