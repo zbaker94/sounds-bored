@@ -1,5 +1,10 @@
 # Changelog
 
+## Current Changes
+- Fixed a security vulnerability where malicious path inputs could escape the intended directory during downloads and project exports (path traversal protection)
+- Project exports now reject symlinks and non-audio files, preventing sensitive files from being accidentally bundled into export archives
+- Download filenames are now validated to block path separators and special characters that could cause unexpected behavior
+
 ## v1.5.4
 
 - Removed deprecated internal audio API alias (`clearFadePadTimeouts`); use `clearAllFadeTracking` directly for any custom integrations.
