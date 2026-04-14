@@ -14,7 +14,7 @@ import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache"
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
 import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
-import { filterSoundsByTags } from "./resolveSounds";
+import { resolveLayerSounds } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectStore } from "@/state/projectStore";
 import type { Layer, Pad, Sound } from "@/lib/schemas";
@@ -78,20 +78,9 @@ export function getVoiceVolume(layer: Layer, sound: Sound): number {
   return 1.0;
 }
 
-/** Resolve a layer's sound selection to actual Sound objects with valid file paths. */
+/** Resolve a layer's sound selection to playable Sound objects (filePath required). */
 export function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
-  const soundById = new Map(sounds.map((s) => [s.id, s]));
-  const sel = layer.selection;
-  switch (sel.type) {
-    case "assigned":
-      return sel.instances
-        .map((inst) => soundById.get(inst.soundId))
-        .filter((s): s is Sound => !!s && !!s.filePath);
-    case "tag":
-      return filterSoundsByTags(sounds, sel.tagIds, sel.matchMode);
-    case "set":
-      return sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath);
-  }
+  return resolveLayerSounds(layer, sounds).filter((s) => !!s.filePath);
 }
 
 // ---------------------------------------------------------------------------

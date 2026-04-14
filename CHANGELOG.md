@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Sounds assigned via tags or sets now resolve consistently across playback, UI, export, and preload — fixing potential mismatches where different parts of the app used different logic
+- Tag-based layers with an empty tag list now correctly return no sounds instead of unintended results
+- Large file preloading for tag- and set-based layers now works correctly on scene load
 - Fixed a bug where resolving the last item in a missing-file dialog queue could leave the dialog in an inconsistent state instead of closing cleanly.
 - Refactored internal dialog queue logic into a shared utility, reducing code duplication with no change to user-facing behavior
 - Auto-save now correctly tracks and persists library changes (sounds, tags, sets) without redundant state subscriptions, improving reliability of auto-save behavior.

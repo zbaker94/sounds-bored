@@ -15,6 +15,7 @@ import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { ExportProgressDialog } from "@/components/modals/ExportProgressDialog";
 import type { Sound } from "@/lib/schemas";
 import { hasFilePath } from "@/lib/schemas";
+import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 
 interface ProjectActionsContextValue {
   /** True when there is something to save (dirty or temporary). */
@@ -128,24 +129,8 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     for (const scene of project.scenes) {
       for (const pad of scene.pads) {
         for (const layer of pad.layers) {
-          const sel = layer.selection;
-          if (sel.type === "assigned") {
-            for (const inst of sel.instances) {
-              referencedSoundIds.add(inst.soundId);
-            }
-          } else if (sel.type === "tag") {
-            for (const sound of sounds) {
-              const matches = sel.matchMode === "all"
-                ? sel.tagIds.every((t) => sound.tags.includes(t))
-                : sel.tagIds.some((t) => sound.tags.includes(t));
-              if (matches) referencedSoundIds.add(sound.id);
-            }
-          } else if (sel.type === "set") {
-            for (const sound of sounds) {
-              if (sound.sets.includes(sel.setId)) {
-                referencedSoundIds.add(sound.id);
-              }
-            }
+          for (const sound of resolveLayerSounds(layer, sounds)) {
+            referencedSoundIds.add(sound.id);
           }
         }
       }

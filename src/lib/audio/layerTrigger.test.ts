@@ -96,6 +96,22 @@ describe("layerTrigger", () => {
       });
       expect(resolveSounds(layer, [])).toEqual([]);
     });
+
+    it("filters out sounds without filePath for tag selection", async () => {
+      const { resolveSounds } = await import("./layerTrigger");
+      const withPath = createMockSound({ id: "t1", filePath: "t1.wav", tags: ["drums"] });
+      const noPath = createMockSound({ id: "t2", filePath: undefined, tags: ["drums"] });
+      const layer = createMockLayer({ selection: { type: "tag", tagIds: ["drums"], matchMode: "any" } });
+      expect(resolveSounds(layer, [withPath, noPath])).toEqual([withPath]);
+    });
+
+    it("filters out sounds without filePath for set selection", async () => {
+      const { resolveSounds } = await import("./layerTrigger");
+      const withPath = createMockSound({ id: "s1", filePath: "s1.wav", sets: ["set-x"] });
+      const noPath = createMockSound({ id: "s2", filePath: undefined, sets: ["set-x"] });
+      const layer = createMockLayer({ selection: { type: "set", setId: "set-x" } });
+      expect(resolveSounds(layer, [withPath, noPath])).toEqual([withPath]);
+    });
   });
 
   // ── getVoiceVolume ────────────────────────────────────────────────────────

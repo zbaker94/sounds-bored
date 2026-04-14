@@ -47,6 +47,7 @@ import {
 import type { Pad, Sound, Layer } from "@/lib/schemas";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
+import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { cn } from "@/lib/utils";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
 
@@ -76,22 +77,7 @@ export interface PadControlContentProps {
 }
 
 export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
-  const sel = layer.selection;
-  switch (sel.type) {
-    case "assigned":
-      return sel.instances
-        .map((inst) => sounds.find((s) => s.id === inst.soundId))
-        .filter((s): s is Sound => s !== undefined);
-    case "tag":
-      return sounds.filter((s) => {
-        if (sel.matchMode === "all") {
-          return sel.tagIds.every((id) => s.tags.includes(id));
-        }
-        return sel.tagIds.some((id) => s.tags.includes(id));
-      });
-    case "set":
-      return sounds.filter((s) => s.sets.includes(sel.setId));
-  }
+  return resolveLayerSounds(layer, sounds);
 }
 
 // ─── LayerRow ────────────────────────────────────────────────────────────────
