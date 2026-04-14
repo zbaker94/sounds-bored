@@ -30,9 +30,7 @@ vi.mock("@/lib/library.queries", () => ({
 }));
 
 const mockSaveSettings = vi.fn();
-const mockUseAppSettings = vi.fn();
 vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: () => mockUseAppSettings(),
   useSaveAppSettings: () => ({ mutateAsync: mockSaveSettings }),
 }));
 
@@ -64,7 +62,6 @@ beforeEach(() => {
   useUiStore.setState({ ...initialUiState });
   mockSaveLibrary.mockReset();
   mockSaveSettings.mockReset();
-  mockUseAppSettings.mockReset();
   mockRefreshMissingState.mockReset();
   mockEvictBuffer.mockReset();
   mockEvictStreaming.mockReset();
@@ -87,9 +84,7 @@ describe("useBulkRemove", () => {
         sounds: [present, missing1, missing2],
         missingSoundIds: new globalThis.Set(["s-missing-1", "s-missing-2"]),
       });
-      mockUseAppSettings.mockReturnValue({
-        data: createMockAppSettings({ globalFolders: [] }),
-      });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
 
       const { result } = renderHook(() => useBulkRemove());
       await act(async () => {
@@ -111,7 +106,7 @@ describe("useBulkRemove", () => {
     });
 
     it("no-ops when settings are unavailable", async () => {
-      mockUseAppSettings.mockReturnValue({ data: undefined });
+      // settings is null by default in initialAppSettingsState
       const { result } = renderHook(() => useBulkRemove());
 
       await act(async () => {
@@ -119,6 +114,35 @@ describe("useBulkRemove", () => {
       });
 
       expect(mockSaveLibrary).not.toHaveBeenCalled();
+    });
+
+    it("uses live store settings — settings updated after render are reflected in handler", async () => {
+      // Prove the handler reads from Zustand, not a stale React-render closure.
+      // Seed with settingsA, render, then change store to settingsB before invoking.
+      const settingsA = createMockAppSettings({ globalFolders: [] });
+      const settingsB = createMockAppSettings({ globalFolders: [createMockGlobalFolder({ path: "/new" })] });
+      const missing = createMockSound({ id: "s-miss" });
+
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsA });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [missing],
+        missingSoundIds: new globalThis.Set(["s-miss"]),
+      });
+
+      const { result } = renderHook(() => useBulkRemove());
+
+      // Update store after initial render (simulates settings save between renders)
+      await act(async () => {
+        useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsB });
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveAllMissingSounds();
+      });
+
+      // Must use settingsB.globalFolders — not stale settingsA value
+      expect(mockRefreshMissingState).toHaveBeenCalledWith(settingsB.globalFolders);
     });
   });
 
@@ -133,8 +157,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: "dl",
         importFolderId: "imp",
       });
-      useAppSettingsStore.setState({ settings });
-      mockUseAppSettings.mockReturnValue({ data: settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
 
       const folderSound = createMockSound({ id: "fs", folderId: "reg" });
       useLibraryStore.setState({
@@ -177,8 +200,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: "dl",
         importFolderId: undefined,
       });
-      useAppSettingsStore.setState({ settings });
-      mockUseAppSettings.mockReturnValue({ data: settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
 
       useLibraryStore.setState({
         ...initialLibraryState,
@@ -198,9 +220,7 @@ describe("useBulkRemove", () => {
 
   describe("state hooks", () => {
     it("closes the sounds confirm dialog via uiStore when the handler completes", async () => {
-      mockUseAppSettings.mockReturnValue({
-        data: createMockAppSettings({ globalFolders: [] }),
-      });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
       useUiStore.getState().setConfirmRemoveMissingSoundsOpen(true);
       expect(useUiStore.getState().confirmRemoveMissingSoundsOpen).toBe(true);
 
@@ -221,9 +241,7 @@ describe("useBulkRemove", () => {
         sounds: [missing],
         missingSoundIds: new globalThis.Set(["s-missing"]),
       });
-      mockUseAppSettings.mockReturnValue({
-        data: createMockAppSettings({ globalFolders: [] }),
-      });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
       mockSaveLibrary.mockRejectedValueOnce(new Error("disk full"));
       useUiStore.getState().setConfirmRemoveMissingSoundsOpen(true);
 
@@ -244,8 +262,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: undefined,
         importFolderId: undefined,
       });
-      useAppSettingsStore.setState({ settings });
-      mockUseAppSettings.mockReturnValue({ data: settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
       useLibraryStore.setState({
         ...initialLibraryState,
         missingFolderIds: new globalThis.Set(["f1"]),
@@ -273,8 +290,7 @@ describe("useBulkRemove", () => {
         downloadFolderId: "dl",
         importFolderId: undefined,
       });
-      useAppSettingsStore.setState({ settings });
-      mockUseAppSettings.mockReturnValue({ data: settings });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
 
       useLibraryStore.setState({
         ...initialLibraryState,

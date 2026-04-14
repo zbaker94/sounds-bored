@@ -52,6 +52,7 @@ vi.mock("@/lib/library.reconcile", () => ({
       missingFolderIds: new globalThis.Set<string>(),
     }),
   ),
+  refreshMissingState: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/audio/bufferCache", () => ({
@@ -69,7 +70,6 @@ vi.mock("@/lib/library.queries", () => ({
 }));
 
 vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: vi.fn(),
   useSaveAppSettings: vi.fn(() => ({ mutateAsync: mockMutateAsync })),
 }));
 
@@ -88,8 +88,6 @@ vi.mock("@/components/modals/ResolveMissingFolderDialog", () => ({
       </div>
     ) : null,
 }));
-
-import { useAppSettings } from "@/lib/appSettings.queries";
 
 // ---------- helpers ----------
 
@@ -122,13 +120,8 @@ function renderBrowser(props?: {
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useProjectStore.setState({ ...initialProjectState });
-  useAppSettingsStore.setState({ ...initialAppSettingsState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
   useUiStore.setState({ ...initialUiState });
-  vi.mocked(useAppSettings).mockReturnValue({
-    data: createMockAppSettings(),
-    isLoading: false,
-    isError: false,
-  } as unknown as ReturnType<typeof useAppSettings>);
   mockMutateAsync.mockClear();
 });
 
@@ -147,22 +140,14 @@ describe("FolderBrowser", () => {
 
   it("renders the folders list from app settings", () => {
     const folder = createMockGlobalFolder({ name: "Custom Folder" });
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [folder] },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
     renderBrowser();
     expect(screen.getByText("Custom Folder")).toBeInTheDocument();
   });
 
   it("'Remove All' banner button sets the uiStore confirmRemoveMissingFoldersOpen flag", async () => {
     const folder = createMockGlobalFolder({ id: "missing-f", name: "Missing Folder" });
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [folder] },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
     useLibraryStore.setState({
       ...initialLibraryState,
       missingFolderIds: new globalThis.Set<string>(["missing-f"]),
@@ -189,11 +174,7 @@ describe("FolderBrowser", () => {
       id: "missing-f",
       name: "Missing Folder",
     });
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [folder] },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
     useLibraryStore.setState({
       ...initialLibraryState,
       missingFolderIds: new globalThis.Set<string>(["missing-f"]),
@@ -220,11 +201,7 @@ describe("FolderBrowser", () => {
       id: "missing-f",
       name: "Missing Folder",
     });
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [folder] },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
     useLibraryStore.setState({
       ...initialLibraryState,
       missingFolderIds: new globalThis.Set<string>(["missing-f"]),
@@ -243,12 +220,6 @@ describe("FolderBrowser", () => {
   });
 
   it("Add Folder button renders and is not disabled when settings are loaded", () => {
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: createMockAppSettings(),
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
-
     renderBrowser();
 
     const addFolderBtn = screen.getByRole("button", { name: /add folder/i });

@@ -1,25 +1,24 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { loadAppSettings, saveAppSettings } from "./appSettings";
 import { AppSettings } from "./schemas";
-import { QUERY_STALE_TIME } from "./constants";
-
-export function useAppSettings() {
-  return useQuery<AppSettings, Error>({
-    queryKey: ["appSettings"],
-    queryFn: loadAppSettings,
-    staleTime: QUERY_STALE_TIME,
-  });
-}
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 
 export function useSaveAppSettings() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (settings: AppSettings) => {
       await saveAppSettings(settings);
       return settings;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appSettings"] });
+    onSuccess: (settings) => {
+      // Push the saved settings back into the Zustand store so every
+      // subscriber reflects the new state immediately — no query invalidation
+      // or refetch needed. This eliminates the window where a stale query
+      // result could overwrite in-flight mutations.
+      useAppSettingsStore.getState().loadSettings(settings);
     },
   });
 }
+
+// Re-export the underlying loader for callers that need a one-shot read
+// without going through the query cache (e.g. migration tooling).
+export { loadAppSettings };

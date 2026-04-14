@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { useAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
@@ -71,7 +70,7 @@ export function SoundList({
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const project = useProjectStore((s) => s.project);
 
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();

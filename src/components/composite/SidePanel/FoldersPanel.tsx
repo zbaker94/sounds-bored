@@ -45,7 +45,7 @@ import {
 import { TruncatedPath } from "@/components/ui/truncated-path";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
+import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { checkMissingStatus } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
@@ -79,7 +79,7 @@ export function FoldersPanel({
   const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);
   const project = useProjectStore((s) => s.project);
 
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const folders = settings?.globalFolders ?? EMPTY_GLOBAL_FOLDERS;
 
   const removeGlobalFolder = useAppSettingsStore((s) => s.removeGlobalFolder);

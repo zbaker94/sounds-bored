@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { DownloadDialog } from "./DownloadDialog";
 import { useDownloadStore, initialDownloadState } from "@/state/downloadStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { createMockAppSettings, createMockDownloadJob, createMockSound } from "@/test/factories";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -16,11 +17,10 @@ vi.mock("@/lib/ytdlp.queries", () => ({
   })),
 }));
 
+// Created at module scope so tests in nested describe blocks can reference
+// mockSettings.downloadFolderId. The factory returns a fresh object each call
+// so state cannot leak; beforeEach resets the store with a fresh instance.
 const mockSettings = createMockAppSettings();
-
-vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: vi.fn(() => ({ data: mockSettings })),
-}));
 
 function renderDialog(open = true) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -35,6 +35,7 @@ beforeEach(() => {
   mockStartDownload.mockClear();
   useLibraryStore.setState({ ...initialLibraryState });
   useDownloadStore.setState({ ...initialDownloadState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState, settings: mockSettings });
 });
 
 describe("DownloadDialog — URL validation", () => {

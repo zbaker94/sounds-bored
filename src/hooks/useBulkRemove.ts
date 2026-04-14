@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useUiStore } from "@/state/uiStore";
-import { useAppSettings, useSaveAppSettings } from "@/lib/appSettings.queries";
+import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
@@ -34,7 +34,7 @@ export function useBulkRemove(): {
   const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
 
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const { saveCurrentLibrary } = useSaveCurrentLibrary();
   const { mutateAsync: saveSettings } = useSaveAppSettings();
 

@@ -45,6 +45,7 @@ vi.mock("@/lib/library.reconcile", () => ({
       missingFolderIds: new globalThis.Set<string>(),
     }),
   ),
+  refreshMissingState: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/audio/bufferCache", () => ({
@@ -67,7 +68,6 @@ vi.mock("@/lib/library.queries", () => ({
 }));
 
 vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: vi.fn(),
   useSaveAppSettings: vi.fn(() => ({ mutateAsync: mockMutateAsync })),
 }));
 
@@ -90,8 +90,6 @@ vi.mock("@/components/modals/ResolveMissingDialog", () => ({
       </div>
     ) : null,
 }));
-
-import { useAppSettings } from "@/lib/appSettings.queries";
 
 // ---------- helpers ----------
 
@@ -131,13 +129,8 @@ function renderList(props?: Partial<SoundListProps>) {
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useProjectStore.setState({ ...initialProjectState });
-  useAppSettingsStore.setState({ ...initialAppSettingsState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
   useUiStore.setState({ ...initialUiState });
-  vi.mocked(useAppSettings).mockReturnValue({
-    data: createMockAppSettings(),
-    isLoading: false,
-    isError: false,
-  } as unknown as ReturnType<typeof useAppSettings>);
   mockMutateAsync.mockClear();
 });
 

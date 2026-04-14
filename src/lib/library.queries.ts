@@ -1,27 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { loadGlobalLibrary, saveGlobalLibrary } from "./library";
 import { GlobalLibrary } from "./schemas";
-import { QUERY_STALE_TIME, CURRENT_LIBRARY_VERSION } from "./constants";
+import { CURRENT_LIBRARY_VERSION } from "./constants";
 import { useLibraryStore } from "@/state/libraryStore";
 
-export function useGlobalLibrary() {
-  return useQuery<GlobalLibrary, Error>({
-    queryKey: ["globalLibrary"],
-    queryFn: loadGlobalLibrary,
-    staleTime: QUERY_STALE_TIME,
-  });
-}
-
 export function useSaveGlobalLibrary() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (library: GlobalLibrary) => {
       await saveGlobalLibrary(library);
       return library;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["globalLibrary"] });
+      // Zustand is the single source of truth for library data. Clearing the
+      // dirty flag after a successful save is all that's needed — no query
+      // invalidation or refetch, which previously created a window where stale
+      // query data could overwrite in-flight Zustand mutations.
       useLibraryStore.getState().clearDirtyFlag();
     },
   });
@@ -60,3 +54,7 @@ export function useSaveCurrentLibrary() {
 
   return { saveCurrentLibrary, saveCurrentLibrarySync, isPending };
 }
+
+// Re-export the underlying loader for callers that need a one-shot read
+// without going through the query cache (e.g. migration tooling).
+export { loadGlobalLibrary };

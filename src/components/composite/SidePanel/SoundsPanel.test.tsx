@@ -39,7 +39,7 @@ vi.mock("@/lib/import", () => ({
 
 vi.mock("@/lib/library.reconcile", () => ({
   reconcileGlobalLibrary: vi.fn(() =>
-    Promise.resolve({ sounds: [], changed: false })
+    Promise.resolve({ sounds: [], changed: false, inaccessibleFolderIds: [] })
   ),
   checkMissingStatus: vi.fn(() =>
     Promise.resolve({
@@ -47,6 +47,7 @@ vi.mock("@/lib/library.reconcile", () => ({
       missingFolderIds: new globalThis.Set<string>(),
     })
   ),
+  refreshMissingState: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/audio/bufferCache", () => ({
@@ -64,7 +65,6 @@ vi.mock("@/lib/library.queries", () => ({
 }));
 
 vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: vi.fn(),
   useSaveAppSettings: vi.fn(() => ({ mutateAsync: mockMutateAsync })),
 }));
 
@@ -81,7 +81,6 @@ vi.mock("./AddToSetDialog", () => ({
 
 // Pull in the mocked modules so tests can configure return values
 import { open } from "@tauri-apps/plugin-dialog";
-import { useAppSettings } from "@/lib/appSettings.queries";
 // plugin-fs is globally mocked by src/test/tauri-mocks.ts; pull the
 // auto-mocked `remove` so we can assert/clear it per-test.
 import { remove as fsRemove, exists as fsExists } from "@tauri-apps/plugin-fs";
@@ -110,12 +109,7 @@ function renderPanel(queryClient?: QueryClient) {
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useProjectStore.setState({ ...initialProjectState });
-  useAppSettingsStore.setState({ ...initialAppSettingsState });
-  vi.mocked(useAppSettings).mockReturnValue({
-    data: createMockAppSettings(),
-    isLoading: false,
-    isError: false,
-  } as unknown as ReturnType<typeof useAppSettings>);
+  useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
   mockOnFileDropEvent.mockClear();
   mockOnFileDropEvent.mockReturnValue(Promise.resolve(() => {}));
   vi.mocked(open).mockReset();
@@ -140,11 +134,7 @@ describe("SoundsPanel", () => {
   it("renders the Add Folder button in the empty folders panel", () => {
     renderPanel();
     // folders list is empty by default (settings has globalFolders but we override)
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
     expect(screen.getAllByRole("button", { name: /add folder/i }).length).toBeGreaterThan(0);
@@ -153,11 +143,7 @@ describe("SoundsPanel", () => {
   // 3. "Add Folder" item renders when folders exist
   it("renders the Add Folder item row when there are folders", () => {
     const settings = createMockAppSettings();
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: settings,
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settings });
 
     renderPanel();
     // The Item row (not a <button>) should contain "Add Folder" text
@@ -186,11 +172,7 @@ describe("SoundsPanel", () => {
 
   // 5. Clicking "Add Folder" button calls open() with directory: true
   it("calls open() with directory: true when Add Folder button (empty state) is clicked", async () => {
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
     vi.mocked(open).mockResolvedValueOnce(null);
 
     renderPanel();
@@ -207,11 +189,7 @@ describe("SoundsPanel", () => {
   // 5b. Duplicate folder path shows error toast and does not save
   it("shows an error toast and does not save when adding a folder that already exists", async () => {
     const existingFolder = createMockGlobalFolder({ path: "/music/sounds" });
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [existingFolder] },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [existingFolder] } });
     vi.mocked(open).mockResolvedValueOnce("/music/sounds");
 
     renderPanel();
@@ -234,11 +212,7 @@ describe("SoundsPanel", () => {
     });
 
     // Start with no selection (selectedId defaults to null when no folders/sets)
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -248,11 +222,7 @@ describe("SoundsPanel", () => {
 
   // 6b. useMemo: adding a sound to the store updates the list without explicit setSoundsForSelectedId
   it("reactively updates sound list when library store changes", async () => {
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -365,11 +335,7 @@ describe("SoundsPanel", () => {
     // No folders => selectedId defaults to sets[0].id, so we need to make sure
     // the selectedId doesn't match a set. With a folder present, selectedId will be folder id.
     const folder = createMockGlobalFolder();
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [folder] },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
 
     renderPanel();
 
@@ -387,11 +353,7 @@ describe("SoundsPanel", () => {
     });
 
     // No folders so selectedId defaults to sets[0].id — set is already selected
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -408,12 +370,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1, sound2],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -428,12 +385,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -455,12 +407,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1, sound2],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -482,12 +429,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1, sound2],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -515,12 +457,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -535,12 +472,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -562,12 +494,7 @@ describe("SoundsPanel", () => {
       ...initialLibraryState,
       sounds: [sound1, sound2],
     });
-
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
     renderPanel();
 
@@ -592,11 +519,7 @@ describe("SoundsPanel", () => {
   //      render with no selection.
   it("handles a stale selectedId when the selected folder is removed from settings", async () => {
     const folder = createMockGlobalFolder({ id: "soon-to-be-gone", name: "Gone" });
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other", importFolderId: "other2" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other", importFolderId: "other2" } });
 
     const { rerender } = renderPanel();
 
@@ -606,11 +529,7 @@ describe("SoundsPanel", () => {
     // Simulate the folder being removed from settings (e.g. deleted from disk,
     // or removed by another flow). The selectedId in local state still points
     // at the now-gone folder — the panel should not crash.
-    vi.mocked(useAppSettings).mockReturnValue({
-      data: { ...createMockAppSettings(), globalFolders: [], downloadFolderId: "", importFolderId: "" },
-      isLoading: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], downloadFolderId: "", importFolderId: "" } });
 
     const qc = makeQueryClient();
     await act(async () => {
@@ -648,11 +567,7 @@ describe("SoundsPanel", () => {
       });
 
       // Folder is not used as download/import destination
-      vi.mocked(useAppSettings).mockReturnValue({
-        data: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other-id", importFolderId: "other-id2" },
-        isLoading: false,
-        isError: false,
-      } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other-id", importFolderId: "other-id2" } });
 
       renderPanel();
 
@@ -681,12 +596,7 @@ describe("SoundsPanel", () => {
         folderPath: "/some/path",
         historyEntry: { name: "Test", path: "/some/path", date: new Date().toISOString() },
       });
-
-      vi.mocked(useAppSettings).mockReturnValue({
-        data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-        isLoading: false,
-        isError: false,
-      } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
       renderPanel();
 
@@ -717,12 +627,7 @@ describe("SoundsPanel", () => {
         folderPath: "/some/path",
         historyEntry: { name: "Test", path: "/some/path", date: new Date().toISOString() },
       });
-
-      vi.mocked(useAppSettings).mockReturnValue({
-        data: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
-        isLoading: false,
-        isError: false,
-      } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
 
       renderPanel();
 
@@ -751,11 +656,7 @@ describe("SoundsPanel", () => {
 
       // Select the folder so the sound is disk-deletable, but use a distinct
       // downloadFolderId / importFolderId so delete isn't blocked.
-      vi.mocked(useAppSettings).mockReturnValue({
-        data: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other", importFolderId: "other2" },
-        isLoading: false,
-        isError: false,
-      } as unknown as ReturnType<typeof useAppSettings>);
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder], downloadFolderId: "other", importFolderId: "other2" } });
 
       renderPanel();
 

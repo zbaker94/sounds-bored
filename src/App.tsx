@@ -11,13 +11,13 @@ import { LoadingScreen } from "@/components/screens/LoadingScreen";
 import { SettingsDialog } from "@/components/modals/SettingsDialog";
 
 function App() {
-  useBootLoader();
+  const { ready: bootReady } = useBootLoader();
   useUpdater();
-  const { ready } = usePreloadImages();
+  const { ready: imagesReady } = usePreloadImages();
 
   return (
     <AppErrorBoundary>
-      {!ready && <LoadingScreen />}
+      {(!bootReady || !imagesReady) && <LoadingScreen />}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<StartScreen />} errorElement={<RouteErrorElement />} />

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAddFolder } from "./useAddFolder";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -17,9 +18,7 @@ vi.mock("@/lib/library.queries", () => ({
 }));
 
 const mockSaveSettings = vi.fn();
-const mockUseAppSettings = vi.fn();
 vi.mock("@/lib/appSettings.queries", () => ({
-  useAppSettings: () => mockUseAppSettings(),
   useSaveAppSettings: () => ({ mutateAsync: mockSaveSettings }),
 }));
 
@@ -43,9 +42,9 @@ const mockToastError = toast.error as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
+  useAppSettingsStore.setState({ ...initialAppSettingsState });
   mockSaveLibrary.mockReset();
   mockSaveSettings.mockReset();
-  mockUseAppSettings.mockReset();
   mockReconcile.mockReset();
   mockOpen.mockReset();
   mockToastSuccess.mockReset();
@@ -54,7 +53,7 @@ beforeEach(() => {
 
 describe("useAddFolder", () => {
   it("no-ops when settings are unavailable", async () => {
-    mockUseAppSettings.mockReturnValue({ data: undefined });
+    // settings is null by default in initialAppSettingsState
     const { result } = renderHook(() => useAddFolder());
 
     await act(async () => {
@@ -66,7 +65,7 @@ describe("useAddFolder", () => {
   });
 
   it("bails out silently when the user cancels the directory picker", async () => {
-    mockUseAppSettings.mockReturnValue({ data: createMockAppSettings({ globalFolders: [] }) });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockOpen.mockResolvedValue(null);
 
     const { result } = renderHook(() => useAddFolder());
@@ -80,9 +79,7 @@ describe("useAddFolder", () => {
 
   it("shows an error toast and aborts when the folder path is already present", async () => {
     const existing = createMockGlobalFolder({ path: "/music/existing" });
-    mockUseAppSettings.mockReturnValue({
-      data: createMockAppSettings({ globalFolders: [existing] }),
-    });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [existing] }) });
     mockOpen.mockResolvedValue("/music/existing");
 
     const { result } = renderHook(() => useAddFolder());
@@ -95,9 +92,7 @@ describe("useAddFolder", () => {
   });
 
   it("calls open, saves settings, reconciles, and saves the library when changed", async () => {
-    mockUseAppSettings.mockReturnValue({
-      data: createMockAppSettings({ globalFolders: [] }),
-    });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockOpen.mockResolvedValue("/music/new");
     mockReconcile.mockResolvedValue({ changed: true, sounds: [] });
 
@@ -119,9 +114,7 @@ describe("useAddFolder", () => {
   });
 
   it("does not save the library when reconcile reports no changes", async () => {
-    mockUseAppSettings.mockReturnValue({
-      data: createMockAppSettings({ globalFolders: [] }),
-    });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockOpen.mockResolvedValue("/music/new");
     mockReconcile.mockResolvedValue({ changed: false, sounds: [] });
 
@@ -137,9 +130,7 @@ describe("useAddFolder", () => {
   });
 
   it("exposes isAddingFolder as false after completion", async () => {
-    mockUseAppSettings.mockReturnValue({
-      data: createMockAppSettings({ globalFolders: [] }),
-    });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockOpen.mockResolvedValue(null);
 
     const { result } = renderHook(() => useAddFolder());
@@ -151,9 +142,7 @@ describe("useAddFolder", () => {
   });
 
   it("sets isAddingFolder to true while folder is being added", async () => {
-    mockUseAppSettings.mockReturnValue({
-      data: createMockAppSettings({ globalFolders: [] }),
-    });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
 
     let resolve!: (v: string | null) => void;
     mockOpen.mockImplementationOnce(
@@ -178,5 +167,34 @@ describe("useAddFolder", () => {
     });
 
     expect(result.current.isAddingFolder).toBe(false);
+  });
+
+  it("uses live store settings — settings changed after render are reflected in handler", async () => {
+    // Prove the handler reads Zustand, not a stale React-render snapshot.
+    // Seed with settingsA (empty folders), render, switch store to settingsB (one folder),
+    // then open a dialog for a NEW path. The duplicate-check must use settingsB.
+    const existingFolder = createMockGlobalFolder({ path: "/new-path" });
+    const settingsA = createMockAppSettings({ globalFolders: [] });
+    const settingsB = createMockAppSettings({ globalFolders: [existingFolder] });
+
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsA });
+    const { result } = renderHook(() => useAddFolder());
+
+    // Update store after initial render (simulates a concurrent settings save)
+    await act(async () => {
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings: settingsB });
+    });
+
+    // Picking the path that NOW exists in settingsB — handler must see the updated list
+    mockOpen.mockResolvedValue("/new-path");
+
+    await act(async () => {
+      await result.current.handleAddFolder();
+    });
+
+    // With stale settingsA, no duplicate would be detected and saveSettings would be called.
+    // With live settingsB, the duplicate check fires and saveSettings must NOT be called.
+    expect(mockToastError).toHaveBeenCalledWith("That folder is already in your library.");
+    expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 });

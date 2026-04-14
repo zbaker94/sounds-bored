@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAppSettings } from "@/lib/appSettings.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useStartDownload } from "@/lib/ytdlp.queries";
 import { useDownloadStore } from "@/state/downloadStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -28,7 +28,7 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
   const [urlError, setUrlError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const { data: settings } = useAppSettings();
+  const settings = useAppSettingsStore((s) => s.settings);
   const { mutateAsync: startDownload, isPending } = useStartDownload();
 
   const downloadFolderId = settings?.downloadFolderId;
