@@ -27,7 +27,7 @@ import {
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio/streamingCache";
-import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
+import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { useHotkeys } from "react-hotkeys-hook";
 import { cn, modKey } from "@/lib/utils";
 import {
@@ -69,28 +69,13 @@ export function SceneView() {
   // request. Tag/set selections are resolved against the current library.
   useEffect(() => {
     if (!activeScene) return;
-    const soundMap = new Map(librarySounds.map((s) => [s.id, s]));
     const isLarge = (s: (typeof librarySounds)[number]) =>
       s.fileSizeBytes !== undefined && s.fileSizeBytes >= LARGE_FILE_THRESHOLD_BYTES;
 
     for (const pad of activeScene.pads) {
       for (const layer of pad.layers) {
-        const { selection } = layer;
-        if (selection.type === "assigned") {
-          for (const inst of selection.instances) {
-            const sound = soundMap.get(inst.soundId);
-            if (sound && isLarge(sound)) preloadStreamingAudio(sound);
-          }
-        } else if (selection.type === "tag") {
-          for (const sound of filterSoundsByTags(librarySounds, selection.tagIds, selection.matchMode)) {
-            if (isLarge(sound)) preloadStreamingAudio(sound);
-          }
-        } else if (selection.type === "set") {
-          for (const sound of librarySounds) {
-            if (sound.sets.includes(selection.setId) && sound.filePath && isLarge(sound)) {
-              preloadStreamingAudio(sound);
-            }
-          }
+        for (const sound of resolveLayerSounds(layer, librarySounds)) {
+          if (sound.filePath && isLarge(sound)) preloadStreamingAudio(sound);
         }
       }
     }

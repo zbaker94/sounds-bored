@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { filterSoundsByTags } from "./resolveSounds";
+import { filterSoundsByTags, resolveLayerSounds } from "./resolveSounds";
+import { createMockLayer } from "@/test/factories";
 import type { Sound } from "@/lib/schemas";
 
 function makeSound(overrides: Partial<Sound> & { id: string }): Sound {
@@ -10,6 +11,23 @@ function makeSound(overrides: Partial<Sound> & { id: string }): Sound {
     sets: [],
     ...overrides,
   };
+}
+
+function makeAssignedLayer(soundIds: string[]) {
+  return createMockLayer({
+    selection: {
+      type: "assigned",
+      instances: soundIds.map((id, i) => ({ id: `inst-${i}`, soundId: id, volume: 100 })),
+    },
+  });
+}
+
+function makeTagLayer(tagIds: string[], matchMode: "any" | "all" = "any") {
+  return createMockLayer({ selection: { type: "tag", tagIds, matchMode, defaultVolume: 100 } });
+}
+
+function makeSetLayer(setId: string) {
+  return createMockLayer({ selection: { type: "set", setId, defaultVolume: 100 } });
 }
 
 describe("filterSoundsByTags", () => {
@@ -69,6 +87,87 @@ describe("filterSoundsByTags", () => {
       // s5 has "drums" tag but no filePath
       const result = filterSoundsByTags(sounds, ["drums"], "all");
       expect(result.find((s) => s.id === "s5")).toBeUndefined();
+    });
+  });
+});
+
+describe("resolveLayerSounds", () => {
+  const s1 = makeSound({ id: "s1", tags: ["drums"], sets: ["set-a"] });
+  const s2 = makeSound({ id: "s2", tags: ["drums", "electronic"], sets: ["set-b"] });
+  const s3 = makeSound({ id: "s3", tags: ["ambient"], sets: ["set-a"] });
+  const s4 = makeSound({ id: "s4", filePath: undefined, tags: ["drums"], sets: ["set-a"] }); // no filePath
+
+  const allSounds = [s1, s2, s3, s4];
+
+  describe("assigned selection", () => {
+    it("returns sounds matching the assigned instance soundIds", () => {
+      const layer = makeAssignedLayer(["s1", "s3"]);
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([s1, s3]);
+    });
+
+    it("skips instances whose soundId is not in library", () => {
+      const layer = makeAssignedLayer(["s1", "missing-id"]);
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([s1]);
+    });
+
+    it("includes sounds without filePath (does NOT filter by filePath)", () => {
+      const layer = makeAssignedLayer(["s4"]);
+      const result = resolveLayerSounds(layer, allSounds);
+      expect(result).toEqual([s4]);
+    });
+
+    it("returns empty array when instances list is empty", () => {
+      const layer = makeAssignedLayer([]);
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([]);
+    });
+
+    it("returns duplicate entries when the same soundId appears multiple times", () => {
+      // Two instances referencing s1 → both are returned (preserves arrangement order)
+      const layer = makeAssignedLayer(["s1", "s1"]);
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([s1, s1]);
+    });
+  });
+
+  describe("tag selection", () => {
+    it("returns sounds with any matching tag (matchMode=any)", () => {
+      const layer = makeTagLayer(["drums"], "any");
+      // s1, s2, s4 all have 'drums' — including s4 which has no filePath
+      expect(resolveLayerSounds(layer, allSounds).map((s) => s.id)).toEqual(["s1", "s2", "s4"]);
+    });
+
+    it("returns sounds matching all tags (matchMode=all)", () => {
+      const layer = makeTagLayer(["drums", "electronic"], "all");
+      expect(resolveLayerSounds(layer, allSounds).map((s) => s.id)).toEqual(["s2"]);
+    });
+
+    it("returns empty array when tagIds is empty", () => {
+      const layer = makeTagLayer([], "any");
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([]);
+    });
+
+    it("does NOT filter by filePath — includes sounds without filePath", () => {
+      const layer = makeTagLayer(["drums"], "any");
+      const result = resolveLayerSounds(layer, allSounds);
+      expect(result.find((s) => s.id === "s4")).toBeDefined();
+    });
+  });
+
+  describe("set selection", () => {
+    it("returns sounds belonging to the specified set", () => {
+      const layer = makeSetLayer("set-a");
+      // s1, s3, s4 are in set-a
+      expect(resolveLayerSounds(layer, allSounds).map((s) => s.id)).toEqual(["s1", "s3", "s4"]);
+    });
+
+    it("returns empty array when no sounds belong to the set", () => {
+      const layer = makeSetLayer("set-nonexistent");
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([]);
+    });
+
+    it("does NOT filter by filePath — includes sounds without filePath", () => {
+      const layer = makeSetLayer("set-a");
+      const result = resolveLayerSounds(layer, allSounds);
+      expect(result.find((s) => s.id === "s4")).toBeDefined();
     });
   });
 });
