@@ -26,6 +26,8 @@ import {
   getLayerVoiceVersion,
   computeAllPadProgress,
   computeAllLayerProgress,
+  getLayerPlayOrder,
+  getLayerChain,
 } from "./audioState";
 
 const VOLUME_EPSILON = 0.001;
@@ -43,6 +45,8 @@ let prevActiveLayerIds = new Set<string>();
 let prevLayerVoiceVersion = -1;
 let prevPadProgress: Record<string, number> = {};
 let prevLayerProgress: Record<string, number> = {};
+let prevLayerPlayOrder: Record<string, string[]> = {};
+let prevLayerChain: Record<string, string[]> = {};
 
 /** Reset all per-frame tracker state. Called on start, self-terminate, and stop. */
 function resetTrackers(): void {
@@ -52,6 +56,8 @@ function resetTrackers(): void {
   prevLayerVoiceVersion = -1;
   prevPadProgress = {};
   prevLayerProgress = {};
+  prevLayerPlayOrder = {};
+  prevLayerChain = {};
 }
 
 function tick(): void {
@@ -104,6 +110,42 @@ function tick(): void {
     prevLayerVoiceVersion = currentLayerVoiceVersion;
   }
 
+  // --- Compute layerPlayOrder and layerChain (sound IDs only) ---
+  // Walk the active layer ID set and extract ID lists from audioState Maps.
+  // Stale entries for layers that are no longer active naturally drop out.
+  // When a layer's ID list is unchanged vs the previous tick, reuse the prior
+  // array reference so Zustand selectors like (s) => s.layerPlayOrder[layer.id]
+  // don't see a new reference (which would cause cross-layer re-render churn
+  // whenever any single layer's chain advances).
+  const nextLayerPlayOrder: Record<string, string[]> = {};
+  const nextLayerChain: Record<string, string[]> = {};
+  for (const layerId of nextActiveLayerIds) {
+    const playOrder = getLayerPlayOrder(layerId);
+    if (playOrder && playOrder.length > 0) {
+      const ids = playOrder.map((s) => s.id);
+      const prev = prevLayerPlayOrder[layerId];
+      if (prev && prev.length === ids.length && prev.every((v, i) => v === ids[i])) {
+        nextLayerPlayOrder[layerId] = prev;
+      } else {
+        nextLayerPlayOrder[layerId] = ids;
+      }
+    }
+    const chain = getLayerChain(layerId);
+    if (chain && chain.length > 0) {
+      const ids = chain.map((s) => s.id);
+      const prev = prevLayerChain[layerId];
+      if (prev && prev.length === ids.length && prev.every((v, i) => v === ids[i])) {
+        nextLayerChain[layerId] = prev;
+      } else {
+        nextLayerChain[layerId] = ids;
+      }
+    }
+  }
+  const layerPlayOrderChanged = !stringArrayRecordsEqual(nextLayerPlayOrder, prevLayerPlayOrder);
+  const layerChainChanged = !stringArrayRecordsEqual(nextLayerChain, prevLayerChain);
+  if (layerPlayOrderChanged) prevLayerPlayOrder = nextLayerPlayOrder;
+  if (layerChainChanged) prevLayerChain = nextLayerChain;
+
   // Diff padVolumes and layerVolumes to skip no-op updates.
   const padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
   const layerVolumesChanged = !volumesEqual(nextLayerVolumes, prevLayerVolumes);
@@ -119,7 +161,9 @@ function tick(): void {
     !layerVolumesChanged &&
     !padProgressChanged &&
     !layerProgressChanged &&
-    !activeLayerIdsChanged
+    !activeLayerIdsChanged &&
+    !layerPlayOrderChanged &&
+    !layerChainChanged
   ) {
     rafId = requestAnimationFrame(tick);
     return;
@@ -131,6 +175,8 @@ function tick(): void {
     ...(padProgressChanged ? { padProgress: nextPadProgress } : {}),
     ...(layerProgressChanged ? { layerProgress: nextLayerProgress } : {}),
     ...(activeLayerIdsChanged ? { activeLayerIds: nextActiveLayerIds } : {}),
+    ...(layerPlayOrderChanged ? { layerPlayOrder: nextLayerPlayOrder } : {}),
+    ...(layerChainChanged ? { layerChain: nextLayerChain } : {}),
   });
 
   rafId = requestAnimationFrame(tick);
@@ -159,6 +205,8 @@ function _clearAllTickFields(): void {
     padProgress: {},
     layerProgress: {},
     activeLayerIds: new Set(),
+    layerPlayOrder: {},
+    layerChain: {},
   });
 }
 
@@ -178,6 +226,26 @@ function progressEqual(a: Record<string, number>, b: Record<string, number>): bo
   if (aKeys.length !== Object.keys(b).length) return false;
   for (const k of aKeys) {
     if (!(k in b) || Math.abs(a[k] - b[k]) > PROGRESS_EPSILON) return false;
+  }
+  return true;
+}
+
+/** True when two records-of-string-arrays are structurally equal (same keys,
+ *  same array lengths, same ordered string contents). Used for diffing
+ *  layerPlayOrder and layerChain between ticks. */
+function stringArrayRecordsEqual(
+  a: Record<string, string[]>,
+  b: Record<string, string[]>,
+): boolean {
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  for (const k of aKeys) {
+    const av = a[k];
+    const bv = b[k];
+    if (!(k in b) || av.length !== bv.length) return false;
+    for (let i = 0; i < av.length; i++) {
+      if (av[i] !== bv[i]) return false;
+    }
   }
   return true;
 }

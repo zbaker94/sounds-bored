@@ -341,6 +341,154 @@ describe("PadControlContent — tooltips", () => {
   });
 });
 
+describe("PadControlContent — layer sound display (store-driven)", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useLibraryStore.setState({ ...initialLibraryState });
+    useMultiFadeStore.setState({
+      active: false, originPadId: null, selectedPads: new Map(), reopenPadId: null,
+    });
+    vi.clearAllMocks();
+    // Force full display mode so the layers section renders inline (not in a popover).
+    vi.spyOn(HTMLDivElement.prototype, "getBoundingClientRect").mockReturnValue({
+      height: 350, width: 300,
+      top: 0, left: 0, bottom: 350, right: 300,
+      x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders the current sound name for an active chained layer based on layerPlayOrder and layerChain in playbackStore", () => {
+    const s1 = createMockSound({ id: "s1", name: "Kick" });
+    const s2 = createMockSound({ id: "s2", name: "Snare" });
+    const s3 = createMockSound({ id: "s3", name: "Hat" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2, s3] });
+
+    const layer = createMockLayer({
+      id: "layer-1",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          createMockSoundInstance({ soundId: "s1" }),
+          createMockSoundInstance({ soundId: "s2" }),
+          createMockSoundInstance({ soundId: "s3" }),
+        ],
+      },
+    });
+    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    useProjectStore
+      .getState()
+      .loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+    // Mark layer as active with play order and chain — s2 is currently playing
+    // (chain has [s3] remaining, so currentIdx = 3 - 1 - 1 = 1 → s2).
+    usePlaybackStore.getState().setAudioTick({
+      activeLayerIds: new Set(["layer-1"]),
+      layerPlayOrder: { "layer-1": ["s1", "s2", "s3"] },
+      layerChain: { "layer-1": ["s3"] },
+    });
+
+    render(
+      <TooltipProvider>
+        <PadControlContent pad={pad} sceneId="scene-1" context="popover" />
+      </TooltipProvider>
+    );
+
+    const display = screen.getByTestId("layer-sound-display");
+    // When a layer is active in a chained arrangement, only the current sound is shown.
+    // The marquee variant duplicates the text for infinite scroll, so assert via getAllByText.
+    const hits = screen.getAllByText("Snare");
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    expect(display).toBeInTheDocument();
+  });
+
+  it("resolves currentSoundId to the last sound when layerChain is undefined (end of chain)", () => {
+    const s1 = createMockSound({ id: "s1", name: "Kick" });
+    const s2 = createMockSound({ id: "s2", name: "Snare" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2] });
+
+    const layer = createMockLayer({
+      id: "layer-1",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          createMockSoundInstance({ soundId: "s1" }),
+          createMockSoundInstance({ soundId: "s2" }),
+        ],
+      },
+    });
+    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    useProjectStore
+      .getState()
+      .loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+    // Active layer with playOrder [s1, s2] but no chain → currentSoundId should
+    // resolve to the last sound (s2). chainLength = 0, currentIdx = 2 - 0 - 1 = 1.
+    usePlaybackStore.getState().setAudioTick({
+      activeLayerIds: new Set(["layer-1"]),
+      layerPlayOrder: { "layer-1": ["s1", "s2"] },
+      layerChain: {},
+    });
+
+    render(
+      <TooltipProvider>
+        <PadControlContent pad={pad} sceneId="scene-1" context="popover" />
+      </TooltipProvider>
+    );
+
+    const display = screen.getByTestId("layer-sound-display");
+    // Only the current (last) sound should be displayed — "Snare", not "Kick".
+    const snareHits = screen.getAllByText("Snare");
+    expect(snareHits.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/Kick · Snare/)).not.toBeInTheDocument();
+    expect(display).toBeInTheDocument();
+  });
+
+  it("renders the full joined sound list when the layer is inactive", () => {
+    const s1 = createMockSound({ id: "s1", name: "Kick" });
+    const s2 = createMockSound({ id: "s2", name: "Snare" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2] });
+
+    const layer = createMockLayer({
+      id: "layer-1",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          createMockSoundInstance({ soundId: "s1" }),
+          createMockSoundInstance({ soundId: "s2" }),
+        ],
+      },
+    });
+    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    useProjectStore
+      .getState()
+      .loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+    // No activeLayerIds → layer inactive → full list rendered.
+    render(
+      <TooltipProvider>
+        <PadControlContent pad={pad} sceneId="scene-1" context="popover" />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByTestId("layer-sound-display")).toBeInTheDocument();
+    // "Kick · Snare" joined display
+    const hits = screen.getAllByText(/Kick · Snare/);
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe("getSoundsForLayer", () => {
   describe("assigned selection", () => {
     it("returns sounds matching instance soundIds in instance order", () => {

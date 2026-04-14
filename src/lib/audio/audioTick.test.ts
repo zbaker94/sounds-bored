@@ -13,6 +13,8 @@ vi.mock("./audioState", async (importOriginal) => {
     getLayerVoiceVersion: vi.fn().mockReturnValue(0),
     computeAllPadProgress: vi.fn().mockReturnValue({}),
     computeAllLayerProgress: vi.fn().mockReturnValue({}),
+    getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
+    getLayerChain: vi.fn().mockReturnValue(undefined),
   };
 });
 
@@ -24,6 +26,8 @@ import {
   getLayerVoiceVersion,
   computeAllPadProgress,
   computeAllLayerProgress,
+  getLayerPlayOrder,
+  getLayerChain,
 } from "./audioState";
 
 describe("audioTick", () => {
@@ -36,6 +40,8 @@ describe("audioTick", () => {
     vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
     vi.mocked(computeAllPadProgress).mockReturnValue({});
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(getLayerPlayOrder).mockReturnValue(undefined);
+    vi.mocked(getLayerChain).mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -48,6 +54,8 @@ describe("audioTick", () => {
       layerVolumes: { "layer-1": 0.7 },
       padProgress: { "pad-1": 0.3 },
       activeLayerIds: new Set(["layer-1"]),
+      layerPlayOrder: { "layer-1": ["s1", "s2"] },
+      layerChain: { "layer-1": ["s2"] },
     });
 
     stopAudioTick();
@@ -57,6 +65,8 @@ describe("audioTick", () => {
     expect(state.layerVolumes).toEqual({});
     expect(state.padProgress).toEqual({});
     expect(state.activeLayerIds.size).toBe(0);
+    expect(state.layerPlayOrder).toEqual({});
+    expect(state.layerChain).toEqual({});
   });
 
   it("startAudioTick is idempotent — calling twice does not create two RAFs", () => {
@@ -192,5 +202,261 @@ describe("audioTick", () => {
     expect(state.padVolumes["pad-2"]).toBeUndefined(); // full volume excluded
 
     rafSpy.mockRestore();
+  });
+
+  describe("layerPlayOrder / layerChain", () => {
+    function mkSound(id: string) {
+      return { id, name: id, filePath: `${id}.wav`, tags: [], sets: [] } as unknown as import("@/lib/schemas").Sound;
+    }
+
+    it("computes layerPlayOrder and layerChain as sound ID arrays for active layers", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      vi.mocked(getLayerPlayOrder).mockImplementation((layerId) =>
+        layerId === "layer-1" ? [mkSound("s1"), mkSound("s2"), mkSound("s3")] : undefined,
+      );
+      vi.mocked(getLayerChain).mockImplementation((layerId) =>
+        layerId === "layer-1" ? [mkSound("s2"), mkSound("s3")] : undefined,
+      );
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+
+      const state = usePlaybackStore.getState();
+      expect(state.layerPlayOrder["layer-1"]).toEqual(["s1", "s2", "s3"]);
+      expect(state.layerChain["layer-1"]).toEqual(["s2", "s3"]);
+
+      rafSpy.mockRestore();
+    });
+
+    it("does not include layers that are not active", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      // Even though audioState has data for layer-2, it's not in the active set → excluded
+      vi.mocked(getLayerPlayOrder).mockImplementation((layerId) =>
+        layerId === "layer-1" ? [mkSound("s1")] : [mkSound("stale")],
+      );
+      vi.mocked(getLayerChain).mockReturnValue(undefined);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+
+      const state = usePlaybackStore.getState();
+      expect(state.layerPlayOrder["layer-1"]).toEqual(["s1"]);
+      expect(state.layerPlayOrder["layer-2"]).toBeUndefined();
+
+      rafSpy.mockRestore();
+    });
+
+    it("updates store when layerChain changes between ticks", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      vi.mocked(getLayerPlayOrder).mockReturnValue([
+        mkSound("s1"),
+        mkSound("s2"),
+        mkSound("s3"),
+      ]);
+      // Tick 1: chain has 2 remaining ([s2, s3]) — s1 is currently playing
+      vi.mocked(getLayerChain).mockReturnValue([mkSound("s2"), mkSound("s3")]);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+      expect(usePlaybackStore.getState().layerChain["layer-1"]).toEqual(["s2", "s3"]);
+
+      // Tick 2: chain advances to [s3] — s2 is now playing
+      vi.mocked(getLayerChain).mockReturnValue([mkSound("s3")]);
+      capturedCallback!(performance.now());
+      expect(usePlaybackStore.getState().layerChain["layer-1"]).toEqual(["s3"]);
+
+      rafSpy.mockRestore();
+    });
+
+    it("does not re-emit setAudioTick when layerPlayOrder and layerChain are unchanged", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      vi.mocked(getLayerPlayOrder).mockReturnValue([mkSound("s1"), mkSound("s2")]);
+      vi.mocked(getLayerChain).mockReturnValue([mkSound("s2")]);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now()); // first tick populates
+
+      // Now freeze everything: layerVoiceVersion unchanged so activeLayerIds skipped;
+      // play order and chain identical → audioTick should NOT call setAudioTick.
+      const setAudioTickSpy = vi.spyOn(usePlaybackStore.getState(), "setAudioTick");
+      capturedCallback!(performance.now());
+      expect(setAudioTickSpy).not.toHaveBeenCalled();
+
+      setAudioTickSpy.mockRestore();
+      rafSpy.mockRestore();
+    });
+
+    it("includes layerPlayOrder but omits layerChain when chain is undefined (end of chain)", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      vi.mocked(getLayerPlayOrder).mockReturnValue([mkSound("s1"), mkSound("s2")]);
+      vi.mocked(getLayerChain).mockReturnValue(undefined);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+
+      const state = usePlaybackStore.getState();
+      expect(state.layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
+      expect(state.layerChain["layer-1"]).toBeUndefined();
+
+      rafSpy.mockRestore();
+    });
+
+    it("tracks multiple active layers independently in layerPlayOrder", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
+      vi.mocked(getLayerPlayOrder).mockImplementation((layerId) => {
+        if (layerId === "layer-1") return [mkSound("a1"), mkSound("a2")];
+        if (layerId === "layer-2") return [mkSound("b1"), mkSound("b2"), mkSound("b3")];
+        return undefined;
+      });
+      vi.mocked(getLayerChain).mockReturnValue(undefined);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+
+      const state = usePlaybackStore.getState();
+      expect(state.layerPlayOrder["layer-1"]).toEqual(["a1", "a2"]);
+      expect(state.layerPlayOrder["layer-2"]).toEqual(["b1", "b2", "b3"]);
+
+      rafSpy.mockRestore();
+    });
+
+    it("omits active layers whose play order is undefined (e.g. simultaneous arrangement)", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      vi.mocked(getLayerPlayOrder).mockReturnValue(undefined);
+      vi.mocked(getLayerChain).mockReturnValue(undefined);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+
+      const state = usePlaybackStore.getState();
+      expect(state.layerPlayOrder["layer-1"]).toBeUndefined();
+
+      rafSpy.mockRestore();
+    });
+
+    it("preserves array reference for a layer whose play order is unchanged when another layer's chain advances", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
+      // layer-1 has a stable play order across both ticks.
+      // layer-2 has a chain that advances between ticks.
+      vi.mocked(getLayerPlayOrder).mockImplementation((layerId) => {
+        if (layerId === "layer-1") return [mkSound("a1"), mkSound("a2")];
+        if (layerId === "layer-2") return [mkSound("b1"), mkSound("b2")];
+        return undefined;
+      });
+      vi.mocked(getLayerChain).mockImplementation((layerId) => {
+        if (layerId === "layer-2") return [mkSound("b2")];
+        return undefined;
+      });
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now());
+      const firstRef = usePlaybackStore.getState().layerPlayOrder["layer-1"];
+
+      // Tick 2: layer-2's chain advances to [] (empty → undefined)
+      vi.mocked(getLayerChain).mockImplementation(() => undefined);
+      capturedCallback!(performance.now());
+      const secondRef = usePlaybackStore.getState().layerPlayOrder["layer-1"];
+
+      // layer-1's play order array reference must be preserved — selectors
+      // like (s) => s.layerPlayOrder["layer-1"] should see the same reference.
+      expect(secondRef).toBe(firstRef);
+
+      rafSpy.mockRestore();
+    });
+
+    it("removes stale layer entries when a layer is no longer active", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(getLayerPlayOrder).mockImplementation((layerId) =>
+        layerId === "layer-1" ? [mkSound("s1")] : layerId === "layer-2" ? [mkSound("s2")] : undefined,
+      );
+      vi.mocked(getLayerChain).mockReturnValue(undefined);
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      // Tick 1: both layers active
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
+      startAudioTick();
+      capturedCallback!(performance.now());
+      expect(usePlaybackStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
+      expect(usePlaybackStore.getState().layerPlayOrder["layer-2"]).toBeDefined();
+
+      // Tick 2: only layer-1 active — layer-2's stale entry should drop out
+      vi.mocked(getLayerVoiceVersion).mockReturnValue(2);
+      vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+      capturedCallback!(performance.now());
+      expect(usePlaybackStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
+      expect(usePlaybackStore.getState().layerPlayOrder["layer-2"]).toBeUndefined();
+
+      rafSpy.mockRestore();
+    });
   });
 });
