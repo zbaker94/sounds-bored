@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react";
 import type React from "react";
 import type { GlobalFolder } from "@/lib/schemas";
+import { useResolveQueue } from "./useResolveQueue";
 
 /**
  * Manages the "resolve missing folder" dialog queue.
@@ -18,29 +18,11 @@ export function useResolveFolderQueue(): {
   handleFolderDialogResolved: () => void;
   handleFolderDialogClose: () => void;
 } {
-  const [folderDialogQueue, setFolderDialogQueue] = useState<GlobalFolder[]>(
-    [],
-  );
-  const folderWasResolved = useRef(false);
-
-  const handleFolderDialogResolved = useCallback(() => {
-    folderWasResolved.current = true;
-  }, []);
-
-  const handleFolderDialogClose = useCallback(() => {
-    const resolved = folderWasResolved.current;
-    folderWasResolved.current = false;
-    if (resolved) {
-      setFolderDialogQueue((q) => q.slice(1));
-    } else {
-      setFolderDialogQueue([]);
-    }
-  }, []);
-
+  const { queue, setQueue, handleResolved, handleClose } = useResolveQueue<GlobalFolder>();
   return {
-    folderDialogQueue,
-    setFolderDialogQueue,
-    handleFolderDialogResolved,
-    handleFolderDialogClose,
+    folderDialogQueue: queue,
+    setFolderDialogQueue: setQueue,
+    handleFolderDialogResolved: handleResolved,
+    handleFolderDialogClose: handleClose,
   };
 }

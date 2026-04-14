@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react";
 import type React from "react";
 import type { Sound } from "@/lib/schemas";
+import { useResolveQueue } from "./useResolveQueue";
 
 /**
  * Manages the "resolve missing sound" dialog queue.
@@ -18,27 +18,11 @@ export function useResolveSoundQueue(): {
   handleSoundDialogResolved: () => void;
   handleSoundDialogClose: () => void;
 } {
-  const [soundDialogQueue, setSoundDialogQueue] = useState<Sound[]>([]);
-  const soundWasResolved = useRef(false);
-
-  const handleSoundDialogResolved = useCallback(() => {
-    soundWasResolved.current = true;
-  }, []);
-
-  const handleSoundDialogClose = useCallback(() => {
-    const resolved = soundWasResolved.current;
-    soundWasResolved.current = false;
-    if (resolved) {
-      setSoundDialogQueue((q) => q.slice(1));
-    } else {
-      setSoundDialogQueue([]);
-    }
-  }, []);
-
+  const { queue, setQueue, handleResolved, handleClose } = useResolveQueue<Sound>();
   return {
-    soundDialogQueue,
-    setSoundDialogQueue,
-    handleSoundDialogResolved,
-    handleSoundDialogClose,
+    soundDialogQueue: queue,
+    setSoundDialogQueue: setQueue,
+    handleSoundDialogResolved: handleResolved,
+    handleSoundDialogClose: handleClose,
   };
 }
