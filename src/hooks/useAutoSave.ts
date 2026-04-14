@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject } from "@/lib/project.queries";
-import { useSaveGlobalLibrary, getCurrentLibraryPayload } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 
@@ -19,21 +19,14 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const lastSaveRef = useRef<string>("");
   const saveProjectMutation = useSaveProject();
 
-  const libraryRef = useRef(useLibraryStore.getState());
   const lastLibrarySaveRef = useRef<string>("");
-  const saveLibraryMutation = useSaveGlobalLibrary();
+  const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
 
   // Keep refs current without triggering effect re-runs
   useEffect(() => {
     return useProjectStore.subscribe((state) => {
       projectRef.current = state.project;
       isDirtyRef.current = state.isDirty;
-    });
-  }, []);
-
-  useEffect(() => {
-    return useLibraryStore.subscribe((state) => {
-      libraryRef.current = state;
     });
   }, []);
 
@@ -56,16 +49,13 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     };
 
     const saveLibrary = () => {
-      const { sounds, tags, sets, isDirty } = libraryRef.current;
+      const { sounds, tags, sets, isDirty } = useLibraryStore.getState();
       if (!isDirty) return;
 
       const libraryJson = JSON.stringify({ sounds, tags, sets });
       if (libraryJson === lastLibrarySaveRef.current) return;
 
-      saveLibraryMutation.mutate(
-        getCurrentLibraryPayload(),
-        { onSuccess: () => { lastLibrarySaveRef.current = libraryJson; } },
-      );
+      saveCurrentLibrarySync({ onSuccess: () => { lastLibrarySaveRef.current = libraryJson; } });
     };
 
     saveCurrentProject();
@@ -78,5 +68,5 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       void refreshMissingState();
     }, interval);
     return () => clearInterval(intervalId);
-  }, [folderPath, isTemporary, interval]);
+  }, [folderPath, isTemporary, interval, saveCurrentLibrarySync]);
 }
