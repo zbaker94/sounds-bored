@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stopping a sound after it had already naturally ended could throw an error instead of completing cleanly.
+- Fixed audio voices not properly disconnecting from the audio graph when stopped, which could cause resource leaks over time.
 - Saving a pad configuration now shows a clear error message if the selected tags or set don't match any sounds in your library, preventing silent misconfiguration.
 - Pads with sequential sound layers now display the currently-playing sound name more reliably and with less UI flicker during playback.
 - Large audio files are now preloaded more efficiently — redundant streaming preloads are skipped when editing pads or scenes if the set of large sounds in the active scene hasn't changed.

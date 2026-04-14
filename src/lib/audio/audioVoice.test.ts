@@ -165,6 +165,15 @@ describe("wrapBufferSource", () => {
     expect(ctx._gain.gain.value).toBe(0.5);
   });
 
+  it("setLoop updates source.loop", () => {
+    const source = makeMockSource();
+    const voice = wrapBufferSource(source as any, makeMockCtx() as any, makeMockDestination() as any);
+    voice.setLoop(true);
+    expect(source.loop).toBe(true);
+    voice.setLoop(false);
+    expect(source.loop).toBe(false);
+  });
+
   describe("stopWithRamp", () => {
     beforeEach(() => { vi.useFakeTimers(); });
     afterEach(() => { vi.useRealTimers(); });
@@ -206,6 +215,16 @@ describe("wrapBufferSource", () => {
       voice.setOnEnded(null);
       vi.advanceTimersByTime(30);
       expect(cb).not.toHaveBeenCalled();
+    });
+
+    it("does not throw if source.stop() throws after ramp completes", () => {
+      const source = makeMockSource();
+      source.stop.mockImplementation(() => { throw new Error("already ended"); });
+      const ctx = makeMockCtx();
+      const dest = makeMockDestination();
+      const voice = wrapBufferSource(source as any, ctx as any, dest as any, 1.0);
+      voice.stopWithRamp(0.025);
+      expect(() => vi.advanceTimersByTime(30)).not.toThrow();
     });
   });
 });
@@ -263,6 +282,15 @@ describe("wrapStreamingElement", () => {
     const dest = makeMockDestination();
     const voice = wrapStreamingElement(audio as any, sourceNode as any, ctx as any, dest as any);
     expect(() => voice.stop()).not.toThrow();
+  });
+
+  it("stop() disconnects voiceGain from the audio graph", () => {
+    const audio = makeMockAudio();
+    const sourceNode = makeMockSourceNode();
+    const ctx = makeMockCtx();
+    const dest = makeMockDestination();
+    wrapStreamingElement(audio as any, sourceNode as any, ctx as any, dest as any).stop();
+    expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
   });
 
   it("stop() fires onended exactly once — not again on natural end after stop", () => {
@@ -340,6 +368,15 @@ describe("wrapStreamingElement", () => {
     expect(ctx._gain.gain.value).toBe(0.3);
   });
 
+  it("setLoop updates audio.loop", () => {
+    const audio = { ...makeMockAudio(), loop: false };
+    const voice = wrapStreamingElement(audio as any, makeMockSourceNode() as any, makeMockCtx() as any, makeMockDestination() as any);
+    voice.setLoop(true);
+    expect(audio.loop).toBe(true);
+    voice.setLoop(false);
+    expect(audio.loop).toBe(false);
+  });
+
   describe("stopWithRamp", () => {
     beforeEach(() => { vi.useFakeTimers(); });
     afterEach(() => { vi.useRealTimers(); });
@@ -370,6 +407,17 @@ describe("wrapStreamingElement", () => {
       expect(cb).not.toHaveBeenCalled();
       vi.advanceTimersByTime(30);
       expect(cb).toHaveBeenCalledOnce();
+    });
+
+    it("disconnects voiceGain after ramp completes", () => {
+      const audio = makeMockAudio();
+      const sourceNode = makeMockSourceNode();
+      const ctx = makeMockCtx();
+      const dest = makeMockDestination();
+      wrapStreamingElement(audio as any, sourceNode as any, ctx as any, dest as any, 1.0).stopWithRamp(0.025);
+      expect(ctx._gain.disconnect).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(30);
+      expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
     });
   });
 });
