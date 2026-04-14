@@ -41,7 +41,8 @@ export function getCurrentLibraryPayload(): GlobalLibrary {
  * Convenience hook: wraps `useSaveGlobalLibrary` so callers don't need to
  * construct the full `GlobalLibrary` payload by hand. Provides:
  *  - `saveCurrentLibrary()` — async, awaitable
- *  - `saveCurrentLibrarySync()` — fire-and-forget (use where you cannot await)
+ *  - `saveCurrentLibrarySync(options?)` — fire-and-forget; accepts the same
+ *    optional `MutateOptions` as TanStack's `mutate()` (e.g. `{ onSuccess }`)
  */
 export function useSaveCurrentLibrary() {
   const { mutate, mutateAsync, isPending } = useSaveGlobalLibrary();
@@ -50,9 +51,12 @@ export function useSaveCurrentLibrary() {
     await mutateAsync(getCurrentLibraryPayload());
   }, [mutateAsync]);
 
-  const saveCurrentLibrarySync = useCallback(() => {
-    mutate(getCurrentLibraryPayload());
-  }, [mutate]);
+  const saveCurrentLibrarySync = useCallback(
+    (options?: Parameters<typeof mutate>[1]) => {
+      mutate(getCurrentLibraryPayload(), options);
+    },
+    [mutate],
+  );
 
   return { saveCurrentLibrary, saveCurrentLibrarySync, isPending };
 }

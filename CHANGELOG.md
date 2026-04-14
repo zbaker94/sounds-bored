@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Auto-save now correctly tracks and persists library changes (sounds, tags, sets) without redundant state subscriptions, improving reliability of auto-save behavior.
 - Simplified how the sound library is saved internally — actions like adding/removing sounds, tags, and sets are now more reliable and less error-prone
 - Fixed potential bugs where stale library data could be saved when resolving missing files or folders
 - Removed internal developer scaffolding (`greet` command and its tests) that was never part of the user-facing feature set.
