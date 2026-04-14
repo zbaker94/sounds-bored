@@ -621,11 +621,11 @@ describe("startLayerSound circuit-breaker", () => {
     // Simulate an in-flight chain that would normally continue advancing.
     setLayerChain("cb-layer-2", [s2]);
 
-    // Failures 1 and 2 — normal per-failure emits, chain is untouched.
+    // Failures 1 and 2 — normal per-failure emits, chain is cleared on each failure.
     await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
     await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
     expect(mockEmitAudioError).toHaveBeenCalledTimes(2);
-    expect(getLayerChain("cb-layer-2")).toEqual([s2]);
+    expect(getLayerChain("cb-layer-2")).toBeUndefined();
 
     // Failure 3 — circuit trips: chain deleted, counter reset, exactly ONE more emit.
     await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
@@ -967,5 +967,196 @@ describe("startLayerSound circuit-breaker", () => {
     const emitArg = mockEmitAudioError.mock.calls[0][0] as Error;
     expect(emitArg.message).toBe("second trigger fail");
     expect(emitArg.message).not.toMatch(/consecutive load failures/i);
+  });
+});
+
+// ── startLayerSound — chain-state cleanup on error (issue #136) ───────────────
+
+describe("startLayerSound chain-state cleanup on error", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null,
+      loop: false,
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      addEventListener: vi.fn(),
+    });
+    const {
+      clearAllPadGains,
+      clearAllLayerGains,
+      clearAllLayerChains,
+      clearAllFadeTracking,
+      clearAllVoices,
+      clearAllLayerConsecutiveFailures,
+      clearAllLayerCycleIndexes,
+    } = await import("./audioState");
+    clearAllPadGains();
+    clearAllLayerGains();
+    clearAllLayerChains();
+    clearAllFadeTracking();
+    clearAllVoices();
+    clearAllLayerConsecutiveFailures();
+    clearAllLayerCycleIndexes();
+  });
+
+  it("clears layerChain after a single (below-threshold) decode failure so the next trigger starts fresh", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      setLayerChain,
+      getLayerChain,
+    } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
+
+    const pad = createMockPad({ id: "cleanup-pad-1" });
+    const layer = createMockLayer({ id: "cleanup-layer-1", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Simulate a stale chain left from a prior mid-chain position.
+    setLayerChain("cleanup-layer-1", [s2]);
+
+    // Single failure — below the circuit-breaker threshold of 3.
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2]);
+
+    // Chain must be cleared so the next trigger rebuilds from scratch.
+    expect(getLayerChain("cleanup-layer-1")).toBeUndefined();
+  });
+
+  it("clears layerCycleIndex after a single (below-threshold) decode failure so the next trigger resets the cycle", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      setLayerCycleIndex,
+      getLayerCycleIndex,
+    } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
+
+    const pad = createMockPad({ id: "cleanup-pad-2" });
+    const layer = createMockLayer({ id: "cleanup-layer-2", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Simulate an advanced cycle index left by startLayerPlayback before startLayerSound failed.
+    setLayerCycleIndex("cleanup-layer-2", 2);
+
+    // Single failure — below the circuit-breaker threshold of 3.
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+
+    // Cycle index must be cleared so the next trigger restarts from the beginning.
+    expect(getLayerCycleIndex("cleanup-layer-2")).toBeUndefined();
+  });
+
+  it("clears layerChain on MissingFileError — same cleanup applies regardless of error type", async () => {
+    const { loadBuffer, MissingFileError } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      setLayerChain,
+      getLayerChain,
+    } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("kick.wav not found"));
+
+    const pad = createMockPad({ id: "cleanup-pad-3" });
+    const layer = createMockLayer({ id: "cleanup-layer-3", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const s2 = createMockSound({ id: "s2", name: "two", filePath: "two.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    setLayerChain("cleanup-layer-3", [s2]);
+
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2]);
+
+    expect(getLayerChain("cleanup-layer-3")).toBeUndefined();
+  });
+
+  it("clears layerCycleIndex on MissingFileError — same cleanup applies regardless of error type", async () => {
+    const { loadBuffer, MissingFileError } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      setLayerCycleIndex,
+      getLayerCycleIndex,
+    } = await import("./audioState");
+    vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("kick.wav not found"));
+
+    const pad = createMockPad({ id: "cleanup-pad-4" });
+    const layer = createMockLayer({ id: "cleanup-layer-4", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "one.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    setLayerCycleIndex("cleanup-layer-4", 2);
+
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+
+    expect(getLayerCycleIndex("cleanup-layer-4")).toBeUndefined();
+  });
+
+  it("mid-chain onended failure clears remaining queued sounds (chain abort is intentional, not a continuation)", async () => {
+    // When startLayerSound is called recursively from onended (chain continuation)
+    // and the next sound fails to load, the remaining chain is cleared.
+    // This is intentional: before this fix, the stale chain was left in state
+    // causing retrigger:next to resume from an invalid position. Clearing it
+    // means the next trigger starts fresh from sound #1 — correct behavior.
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const {
+      getPadGain,
+      getOrCreateLayerGain,
+      setLayerChain,
+      getLayerChain,
+    } = await import("./audioState");
+
+    const pad = createMockPad({ id: "cleanup-pad-5" });
+    const layer = createMockLayer({ id: "cleanup-layer-5", arrangement: "sequential" });
+    const s1 = createMockSound({ id: "s1", name: "one", filePath: "s1.wav" });
+    const s2 = createMockSound({ id: "s2", name: "two", filePath: "s2.wav" });
+    const s3 = createMockSound({ id: "s3", name: "three", filePath: "s3.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 100, padGain);
+
+    // Instrument wrapBufferSource to capture the onended callback from s1.
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    // s1 loads and plays; chain is [s2, s3].
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    setLayerChain(layer.id, [s2, s3]);
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1, s2, s3]);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+
+    // s2 fails — onended fires for s1, which advances the chain to [s3] then calls
+    // startLayerSound(s2). s2's failure clears the remaining [s3] from the chain.
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("s2 decode failed"));
+    capturedOnEnded[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Chain must be undefined — s3 is not accessible via retrigger:next (correct).
+    expect(getLayerChain("cleanup-layer-5")).toBeUndefined();
   });
 });
