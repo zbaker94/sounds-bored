@@ -31,7 +31,7 @@ describe("usePadVolumeDisplay", () => {
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
           usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
-        { initialProps: { isDragging: false, dragVolume: null } }
+        { initialProps: { isDragging: false, dragVolume: null as number | null } }
       );
       expect(result.current.showVolumeDisplay).toBe(false);
       rerender({ isDragging: true, dragVolume: 0.5 });
@@ -55,7 +55,7 @@ describe("usePadVolumeDisplay", () => {
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
           usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
-        { initialProps: { isDragging: true, dragVolume: 0.5 } }
+        { initialProps: { isDragging: true, dragVolume: 0.5 as number | null } }
       );
       expect(result.current.showVolumeDisplay).toBe(true);
       // Stop dragging — linger timer starts (450ms)
@@ -122,11 +122,28 @@ describe("usePadVolumeDisplay", () => {
       expect(result.current.showVolumeDisplay).toBe(false);
     });
 
-    it("cancels pending timers when drag resumes during linger", () => {
+    it("does not start linger when padVolumes clears while bar was never shown (no-op)", () => {
+      // Simulate the engine-layer fix: padVolumes cleared synchronously when pad stops,
+      // so liveVolume was never set before the hook mounted.
+      const { result } = renderHook(() =>
+        usePadVolumeDisplay(PAD_ID, false, null)
+      );
+      // Bar was never showing (padVolumes was never set)
+      expect(result.current.showVolumeDisplay).toBe(false);
+      // padVolumes clears (no-op — was never set)
+      act(() => {
+        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+      });
+      act(() => { vi.advanceTimersByTime(450 + 220); });
+      // Still hidden — no linger should fire
+      expect(result.current.showVolumeDisplay).toBe(false);
+    });
+
+    it("cancels pending linger timer when drag resumes during linger", () => {
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
           usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
-        { initialProps: { isDragging: true, dragVolume: 0.4 } }
+        { initialProps: { isDragging: true, dragVolume: 0.4 as number | null } }
       );
       rerender({ isDragging: false, dragVolume: null });
       // In linger window (300ms before exit starts)
@@ -138,6 +155,78 @@ describe("usePadVolumeDisplay", () => {
       expect(result.current.showVolumeDisplay).toBe(true);
       expect(result.current.volumeExiting).toBe(false);
     });
+
+    it("clears pending stability timer when liveVolume disappears mid-fade", () => {
+      // Scenario: pad is playing with a fade, bar is visible, stability timer is running.
+      // Pad stops → clearVoice clears padVolumes synchronously → liveVolume goes undefined.
+      // The stability timer must be cancelled immediately (not fire 300ms later).
+      const { result } = renderHook(() =>
+        usePadVolumeDisplay(PAD_ID, false, null)
+      );
+      act(() => {
+        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.4 } });
+      });
+      expect(result.current.showVolumeDisplay).toBe(true);
+      // Mid-stability-timer window (150ms in, 150ms before it fires)
+      act(() => { vi.advanceTimersByTime(150); });
+      // Pad stops — padVolumes cleared synchronously by clearVoice
+      act(() => {
+        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+      });
+      // liveVolumeChanging cleared immediately (stability timer cancelled, not rescheduled)
+      // isVolumeActive → false → linger starts
+      act(() => { vi.advanceTimersByTime(450); });
+      expect(result.current.volumeExiting).toBe(true);
+      act(() => { vi.advanceTimersByTime(220); });
+      expect(result.current.showVolumeDisplay).toBe(false);
+    });
+
+    it("cancels linger timer when drag starts during linger phase after pad stop", () => {
+      // Pad was playing, bar visible, drag ends → linger starts.
+      // Before linger finishes, pad stops → padVolumes cleared.
+      // The linger should be cancelled and the bar should hide once the linger completes
+      // (but the bar was already showing due to drag, so the linger runs).
+      const { result, rerender } = renderHook(
+        ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
+          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
+        { initialProps: { isDragging: true, dragVolume: 0.5 as number | null } }
+      );
+      // Drag ends — linger starts
+      rerender({ isDragging: false, dragVolume: null });
+      act(() => { vi.advanceTimersByTime(200); }); // mid-linger
+      expect(result.current.volumeExiting).toBe(false);
+      // Resume drag — cancels linger, bar stays
+      rerender({ isDragging: true, dragVolume: 0.6 });
+      act(() => { vi.advanceTimersByTime(500); }); // would have been past the original linger
+      expect(result.current.showVolumeDisplay).toBe(true);
+      expect(result.current.volumeExiting).toBe(false);
+    });
+
+    it("re-shows bar on rapid re-trigger after natural end", () => {
+      // Verifies that after a pad stops (padVolumes cleared) and re-triggers,
+      // a new fade correctly shows the bar again.
+      const { result } = renderHook(() =>
+        usePadVolumeDisplay(PAD_ID, false, null)
+      );
+      // First trigger: fade shows bar
+      act(() => {
+        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.5 } });
+      });
+      expect(result.current.showVolumeDisplay).toBe(true);
+      // Pad stops → padVolumes cleared by engine (synchronous)
+      act(() => {
+        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+      });
+      // linger runs, bar eventually hides
+      act(() => { vi.advanceTimersByTime(450 + 220); });
+      expect(result.current.showVolumeDisplay).toBe(false);
+      // Re-trigger: new fade
+      act(() => {
+        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.6 } });
+      });
+      expect(result.current.showVolumeDisplay).toBe(true);
+      expect(result.current.displayVolume).toBe(0.6);
+    });
   });
 
   describe("cleanup on unmount", () => {
@@ -145,7 +234,7 @@ describe("usePadVolumeDisplay", () => {
       const { result, rerender, unmount } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
           usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
-        { initialProps: { isDragging: true, dragVolume: 0.5 } }
+        { initialProps: { isDragging: true, dragVolume: 0.5 as number | null } }
       );
       rerender({ isDragging: false, dragVolume: null });
       // Timers are pending

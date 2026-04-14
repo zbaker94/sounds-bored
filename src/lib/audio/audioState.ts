@@ -528,11 +528,27 @@ export function recordVoice(padId: string, voice: AudioVoice): void {
   usePlaybackStore.getState().addPlayingPad(padId);
 }
 
+/**
+ * Clear padVolumes[padId] from the store in the same synchronous transaction as
+ * removePlayingPad. The audioTick only clears padVolumes in the next RAF frame;
+ * without this, there is a one-frame window where playingPadIds is cleared but
+ * padVolumes still has a value, causing the volume bar to flash after a pad ends.
+ * Called from every code path that removes the last voice for a pad.
+ */
+function clearPadVolumesEntry(padId: string): void {
+  const store = usePlaybackStore.getState();
+  if (padId in store.padVolumes) {
+    const { [padId]: _dropped, ...rest } = store.padVolumes;
+    store.setAudioTick({ padVolumes: rest });
+  }
+}
+
 export function clearVoice(padId: string, voice: AudioVoice): void {
   const updated = (voiceMap.get(padId) ?? []).filter((v) => v !== voice);
   if (updated.length === 0) {
     voiceMap.delete(padId);
     usePlaybackStore.getState().removePlayingPad(padId);
+    clearPadVolumesEntry(padId);
   } else {
     voiceMap.set(padId, updated);
   }
@@ -543,6 +559,7 @@ export function stopPadVoices(padId: string): void {
   const stoppedSet = new Set(voices);
   voiceMap.delete(padId);
   usePlaybackStore.getState().removePlayingPad(padId);
+  clearPadVolumesEntry(padId);
   // Also clean layerVoiceMap for layers on this pad
   for (const [layerId, layerVoices] of layerVoiceMap) {
     const remaining = layerVoices.filter((v) => !stoppedSet.has(v));
@@ -566,7 +583,10 @@ export function stopAllVoices(): void {
   voiceMap.clear();
   layerVoiceMap.clear();
   layerVoiceVersion++;
-  usePlaybackStore.getState().clearAllPlayingPads();
+  const store = usePlaybackStore.getState();
+  store.clearAllPlayingPads();
+  // Clear padVolumes in the same transaction as clearAllPlayingPads (same race as #217).
+  store.setAudioTick({ padVolumes: {} });
   for (const voice of allVoices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -601,6 +621,7 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   if (padVoices.length === 0) {
     voiceMap.delete(padId);
     usePlaybackStore.getState().removePlayingPad(padId);
+    clearPadVolumesEntry(padId);
   } else {
     voiceMap.set(padId, padVoices);
   }

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a visual glitch where the volume bar would briefly flash after a pad finished playing
+- Volume display now hides correctly when a pad stops, without any lingering artifact from the previous playback
 - Pad buttons now update more smoothly during audio playback — high-frequency audio tick re-renders are isolated to smaller sub-components, reducing UI jitter on active pads
 - Playback progress bars and multi-fade volume sliders are now rendered in dedicated sub-components (`PadButtonProgress`, `PadButtonFadeOverlay`) for better performance
 - Volume display logic (show/hide timing during drags and audio fades) has been extracted into a reusable hook, improving consistency across pad interactions
