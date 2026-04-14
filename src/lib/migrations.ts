@@ -1,3 +1,5 @@
+import { CURRENT_LIBRARY_VERSION } from "./constants";
+
 type RawProject = Record<string, unknown>;
 type MigrationFn = (raw: RawProject) => RawProject;
 
@@ -137,6 +139,145 @@ export function migrateProject(raw: RawProject): RawProject {
     throw new MigrationError(
       `No migration path found for project version "${version}". ` +
       `The project may be from an unsupported version of SoundsBored.`
+    );
+  }
+
+  return current;
+}
+
+// ---------------------------------------------------------------------------
+// Library migrations
+// ---------------------------------------------------------------------------
+
+type RawLibrary = Record<string, unknown>;
+type LibraryMigrationFn = (raw: RawLibrary) => RawLibrary;
+
+interface LibraryMigration {
+  fromVersion: string;
+  toVersion: string;
+  migrate: LibraryMigrationFn;
+}
+
+/**
+ * Deduplicate items in an array by their `id` field, keeping the first
+ * occurrence of each id. Non-array input is returned unchanged.
+ * Items missing an 'id' field are always kept (not deduped); downstream Zod validation will reject them.
+ */
+function dedupeById(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const seen = new Set<unknown>();
+  const result: unknown[] = [];
+  for (const item of value) {
+    if (item && typeof item === "object" && "id" in item) {
+      const id = (item as { id: unknown }).id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+/**
+ * If the given numeric field on `obj` is present but not a finite non-negative
+ * number, remove it. Valid values are left untouched.
+ */
+function stripInvalidNumeric(obj: Record<string, unknown>, field: string): void {
+  if (!(field in obj)) return;
+  const v = obj[field];
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
+    delete obj[field];
+  }
+}
+
+const LIBRARY_MIGRATIONS: LibraryMigration[] = [
+  {
+    // Seed migration: legacy libraries saved before stricter GlobalLibrarySchema
+    // constraints (PR #251) may contain duplicate ids or invalid numeric fields
+    // on sounds. Sanitize so Zod parse does not fail on legacy files.
+    fromVersion: UNVERSIONED_DEFAULT,
+    // toVersion must match CURRENT_LIBRARY_VERSION — update when adding new migrations
+    toVersion: "1.0.0",
+    migrate: (raw) => {
+      const next = { ...raw };
+
+      // Sounds: invalid fields (durationMs, fileSizeBytes) are stripped but the sound
+      // is preserved, because SoundSchema has many optional fields and stripping one bad
+      // numeric value is recoverable. A sound with missing required fields (name, tags,
+      // sets) is left to fail Zod — there is no sensible default to invent.
+      //
+      // Tags: tags with missing/empty/non-string names are dropped entirely because a
+      // nameless tag is unrenderable and unsearchable — there is no recoverable default.
+      // Tags with valid names > 100 chars are truncated to fit the schema constraint.
+      if (Array.isArray(next.sounds)) {
+        const deduped = dedupeById(next.sounds) as unknown[];
+        next.sounds = deduped.map((sound) => {
+          if (!sound || typeof sound !== "object") return sound;
+          const copy = { ...(sound as Record<string, unknown>) };
+          stripInvalidNumeric(copy, "durationMs");
+          stripInvalidNumeric(copy, "fileSizeBytes");
+          return copy;
+        });
+      }
+
+      if (Array.isArray(next.tags)) {
+        // Filter first so that if duplicates exist, dedup keeps the first VALID occurrence.
+        const filtered = (next.tags as unknown[]).filter((tag) => {
+          if (!tag || typeof tag !== "object") return true;
+          const t = tag as Record<string, unknown>;
+          if (!("name" in t)) return false;
+          const name = t.name;
+          if (typeof name !== "string") return false;
+          if (name.trim().length === 0) return false;
+          return true;
+        });
+        const deduped = dedupeById(filtered) as unknown[];
+        next.tags = deduped.map((tag) => {
+          if (!tag || typeof tag !== "object") return tag;
+          const copy = { ...(tag as Record<string, unknown>) };
+          if (typeof copy.name === "string" && copy.name.length > 100) {
+            copy.name = copy.name.slice(0, 100);
+          }
+          return copy;
+        });
+      }
+
+      if (Array.isArray(next.sets)) {
+        next.sets = dedupeById(next.sets) as unknown[];
+      }
+
+      return next;
+    },
+  },
+];
+
+export function migrateLibrary(raw: RawLibrary): RawLibrary {
+  let current = { ...raw };
+  let version = (current.version as string | undefined) ?? UNVERSIONED_DEFAULT;
+
+  // Future-version guard: refuse to open libraries from a newer app version to
+  // prevent silent data loss from Zod stripping unknown fields on next save.
+  if (compareVersions(version, CURRENT_LIBRARY_VERSION) > 0) {
+    throw new MigrationError(
+      `This library was created with a newer version of SoundsBored (${version}). ` +
+      `Please update the app to open it.`
+    );
+  }
+
+  for (const migration of LIBRARY_MIGRATIONS) {
+    if (version === migration.fromVersion) {
+      current = migration.migrate(current);
+      version = migration.toVersion;
+      current.version = version;
+    }
+  }
+
+  // If the version is still not current after running all applicable migrations,
+  // there is no migration path for this version (unknown past version).
+  if (version !== CURRENT_LIBRARY_VERSION) {
+    throw new MigrationError(
+      `No migration path found for library version "${version}". ` +
+      `The library may be from an unsupported version of SoundsBored.`
     );
   }
 

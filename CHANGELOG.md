@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- When your sound library file is corrupted or contains invalid data, you now see a specific error message explaining what went wrong instead of a generic failure notice.
+- The app can now automatically repair legacy library files that contain duplicate sounds, tags, or sets — keeping the first occurrence of each duplicate rather than failing to load.
+- Sound entries with invalid duration or file size values (negative numbers, infinity) are automatically cleaned up when loading older library files.
+- Tags with missing, empty, or non-string names are automatically removed from legacy library files on load to prevent display and search issues.
+- Opening a library file saved by a newer version of the app now shows a clear message asking you to update, rather than silently corrupting data.
 - Duplicate sound, tag, and set IDs in the library are now detected and rejected with a clear error message indicating the offending ID
 - Volume values on layers, sound instances, and layer selections are now validated to stay within the 0–100 range
 - Sound duration and file size fields now reject negative numbers, NaN, and infinite values to prevent invalid audio metadata from being stored

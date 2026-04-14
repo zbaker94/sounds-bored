@@ -145,6 +145,97 @@ describe("loadProjectFile", () => {
     expect(result.version).toBe(CURRENT_VERSION);
   });
 
+  it("should throw ProjectValidationError for project with out-of-range volume", async () => {
+    // A layer's volume is constrained to [0, 100] by LayerSchema.
+    // volume: 200 must produce a ZodError wrapped as ProjectValidationError.
+    const invalidProject = {
+      name: "Bad Volume Project",
+      version: CURRENT_VERSION,
+      scenes: [
+        {
+          id: "scene-1",
+          name: "Scene 1",
+          pads: [
+            {
+              id: "pad-1",
+              name: "Pad 1",
+              muteTargetPadIds: [],
+              layers: [
+                {
+                  id: "layer-1",
+                  selection: { type: "assigned", instances: [] },
+                  arrangement: "simultaneous",
+                  cycleMode: false,
+                  playbackMode: "one-shot",
+                  retriggerMode: "restart",
+                  volume: 200,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      favoritedSetIds: [],
+    };
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify(invalidProject));
+
+    await expectToReject(
+      loadProjectFile("/test/path/project.json"),
+      ProjectValidationError,
+    );
+  });
+
+  it("should throw ProjectValidationError for project with negative startOffsetMs in SoundInstance", async () => {
+    // SoundInstance has no durationMs field, but startOffsetMs is constrained
+    // to min(0). A negative startOffsetMs must produce a ZodError wrapped as
+    // ProjectValidationError.
+    const invalidProject = {
+      name: "Bad Offset Project",
+      version: CURRENT_VERSION,
+      scenes: [
+        {
+          id: "scene-1",
+          name: "Scene 1",
+          pads: [
+            {
+              id: "pad-1",
+              name: "Pad 1",
+              muteTargetPadIds: [],
+              layers: [
+                {
+                  id: "layer-1",
+                  selection: {
+                    type: "assigned",
+                    instances: [
+                      {
+                        id: "inst-1",
+                        soundId: "sound-1",
+                        volume: 100,
+                        startOffsetMs: -1,
+                      },
+                    ],
+                  },
+                  arrangement: "simultaneous",
+                  cycleMode: false,
+                  playbackMode: "one-shot",
+                  retriggerMode: "restart",
+                  volume: 100,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      favoritedSetIds: [],
+    };
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify(invalidProject));
+
+    await expectToReject(
+      loadProjectFile("/test/path/project.json"),
+      ProjectValidationError,
+    );
+  });
+
   it("should default scenes and favoritedSetIds to empty arrays after migration", () => {
     // Simulate a 1.0.0 project being migrated — sounds/tags/sets are stripped,
     // favoritedSetIds is added, and the schema defaults scenes to [].

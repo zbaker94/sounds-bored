@@ -4,6 +4,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useBootLoader } from "./useBootLoader";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { LibraryValidationError } from "@/lib/library";
 import { createMockAppSettings, createMockGlobalFolder, createMockSound } from "@/test/factories";
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -15,10 +16,14 @@ vi.mock("@/lib/appSettings", () => ({
 
 const mockLoadGlobalLibrary = vi.fn();
 const mockSaveGlobalLibrary = vi.fn(() => Promise.resolve());
-vi.mock("@/lib/library", () => ({
-  loadGlobalLibrary: () => mockLoadGlobalLibrary(),
-  saveGlobalLibrary: () => mockSaveGlobalLibrary(),
-}));
+vi.mock("@/lib/library", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/library")>("@/lib/library");
+  return {
+    ...actual,
+    loadGlobalLibrary: () => mockLoadGlobalLibrary(),
+    saveGlobalLibrary: () => mockSaveGlobalLibrary(),
+  };
+});
 
 const mockReconcile = vi.fn();
 const mockRefreshMissingState = vi.fn(() => Promise.resolve());
@@ -231,6 +236,39 @@ describe("useBootLoader", () => {
     });
 
     expect(toast.error).toHaveBeenCalledWith("Failed to load sound library");
+  });
+
+  it("shows specific toast message when library load fails with LibraryValidationError", async () => {
+    const { toast } = await import("sonner");
+    mockLoadGlobalLibrary.mockRejectedValue(
+      new LibraryValidationError("library.json contains invalid data"),
+    );
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Library load failed: library.json contains invalid data",
+    );
+  });
+
+  it("shows generic toast message for unexpected library load error", async () => {
+    const { toast } = await import("sonner");
+    vi.mocked(toast.error).mockClear();
+    mockLoadGlobalLibrary.mockRejectedValue(new Error("unexpected failure"));
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("Failed to load sound library");
+    // Crucially, it should NOT show the specific "Library load failed:" prefix
+    // for non-LibraryValidationError cases — that prefix is reserved for the
+    // structured error path tested above.
+    expect(toast.error).not.toHaveBeenCalledWith(
+      expect.stringContaining("Library load failed:"),
+    );
   });
 
   it("does not run reconciliation twice under StrictMode (hasReconciled guard)", async () => {

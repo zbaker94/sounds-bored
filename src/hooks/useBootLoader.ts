@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { loadGlobalLibrary, saveGlobalLibrary } from "@/lib/library";
+import { loadGlobalLibrary, saveGlobalLibrary, LibraryValidationError } from "@/lib/library";
 import { loadAppSettings } from "@/lib/appSettings";
 import { getCurrentLibraryPayload } from "@/lib/library.queries";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
@@ -39,8 +39,12 @@ export function useBootLoader(): { ready: boolean } {
         useLibraryStore.getState().loadLibrary(library);
         setLibraryLoaded(true);
       })
-      .catch(() => {
-        toast.error("Failed to load sound library");
+      .catch((error: unknown) => {
+        if (error instanceof LibraryValidationError) {
+          toast.error(`Library load failed: ${error.message}`);
+        } else {
+          toast.error("Failed to load sound library");
+        }
         setLibraryLoaded(true);
       });
   }, []);
