@@ -430,11 +430,65 @@ describe("saveProjectAs", () => {
 
   it("should throw when folder already exists", async () => {
     mockDialog.open.mockResolvedValue("/new/location");
-    mockFs.exists.mockResolvedValue(true);
+    // Simulate atomic mkdir failing because the directory already exists
+    // (Tauri's plugin-fs surfaces this as an Error with an "os error 17"-style message).
+    mockFs.mkdir.mockRejectedValueOnce(new Error("File exists (os error 17)"));
     const project = createMockProject();
 
     await expect(saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project)).rejects.toThrow(
       "already exists"
+    );
+  });
+
+  it("should re-throw non-EEXIST mkdir errors without masking them", async () => {
+    mockDialog.open.mockResolvedValue("/new/location");
+    // Simulate a permission-denied error — this must NOT be surfaced as "already exists".
+    mockFs.mkdir.mockRejectedValue(new Error("Permission denied (os error 13)"));
+    const project = createMockProject();
+
+    const err = await saveProjectAs(
+      "Test",
+      "/app-local-data/SoundsBored/temp_Test_123",
+      project
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Permission denied");
+    expect((err as Error).message).not.toContain("already exists");
+  });
+
+  it("should recognise the Windows EEXIST code (os error 183) as a name collision", async () => {
+    mockDialog.open.mockResolvedValue("/new/location");
+    // Windows surfaces ERROR_ALREADY_EXISTS as os error 183, not 17
+    mockFs.mkdir.mockRejectedValueOnce(new Error("The file exists. (os error 183)"));
+    const project = createMockProject();
+
+    await expect(
+      saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project)
+    ).rejects.toThrow("already exists");
+  });
+
+  it("should remove the created directory when copyDirectory fails (no orphan left)", async () => {
+    mockDialog.open.mockResolvedValue("/new/location");
+    // mkdir succeeds (directory created), but copy fails mid-way
+    mockFs.readDir.mockRejectedValueOnce(new Error("I/O error during copy"));
+    const project = createMockProject();
+
+    await expect(
+      saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project)
+    ).rejects.toThrow("I/O error during copy");
+
+    // The empty directory we created must be removed so a retry with the same name
+    // doesn't immediately hit the "already exists" path. Assert the exact destination
+    // path (not the source) to ensure we're cleaning up newProjectPath, not currentPath.
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      "/new/location/Test",
+      expect.objectContaining({ recursive: true })
+    );
+    // The source temp folder must NOT have been removed by the rollback.
+    expect(mockFs.remove).not.toHaveBeenCalledWith(
+      expect.stringContaining("temp_Test_123"),
+      expect.objectContaining({ recursive: true })
     );
   });
 

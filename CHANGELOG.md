@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed a race condition in "Save As" where two rapid saves to the same folder name could both pass the existence check; the folder is now created atomically before copying begins
+- "Save As" no longer leaves an empty orphaned folder behind if the file copy fails, preventing a confusing "already exists" error on retry
+- "Save As" now correctly recognizes Windows-specific "folder already exists" errors (error code 183) in addition to the Unix equivalent (error code 17)
+- Permission denied and other unexpected filesystem errors during "Save As" are now surfaced with their original message instead of being masked as "already exists"
 - Auto-save now shows an error notification ("Auto-save failed — your changes may not be saved to disk.") when it cannot write to disk, so you are no longer silently losing changes.
 - Auto-save error toasts are rate-limited to once per minute, preventing notification spam if a disk or permission problem persists across multiple save attempts.
 - Auto-save keeps retrying on every interval tick after a failure, so your project will be saved automatically once the underlying issue (full disk, disconnected drive, etc.) is resolved.
