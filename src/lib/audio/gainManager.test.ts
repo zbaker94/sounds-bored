@@ -115,9 +115,8 @@ describe("gainManager", () => {
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync");
-      // getOrCreateLayerGain uses the legacy [0,100] API (separate concern); 80 here is just
-      // the initial-volume argument and is unrelated to the [0,1] value under test below.
-      getOrCreateLayerGain("layer-sync", 80, padGain);
+      // Initial volume value is irrelevant — syncLayerVolume overwrites it below.
+      getOrCreateLayerGain("layer-sync", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync", 0.5);
@@ -136,7 +135,7 @@ describe("gainManager", () => {
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync-hi");
-      getOrCreateLayerGain("layer-sync-hi", 80, padGain);
+      getOrCreateLayerGain("layer-sync-hi", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync-hi", 1.5);
@@ -150,7 +149,7 @@ describe("gainManager", () => {
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync-lo");
-      getOrCreateLayerGain("layer-sync-lo", 80, padGain);
+      getOrCreateLayerGain("layer-sync-lo", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync-lo", -0.5);
@@ -164,7 +163,7 @@ describe("gainManager", () => {
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync-nan");
-      getOrCreateLayerGain("layer-sync-nan", 80, padGain);
+      getOrCreateLayerGain("layer-sync-nan", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync-nan", NaN);
@@ -180,7 +179,7 @@ describe("gainManager", () => {
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-setlvol");
-      getOrCreateLayerGain("layer-setlvol", 80, padGain);
+      getOrCreateLayerGain("layer-setlvol", 0.8, padGain);
       const { setLayerVolume } = await import("./gainManager");
 
       setLayerVolume("layer-setlvol", 0.75);
