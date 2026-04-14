@@ -28,11 +28,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
-import {
-  isPadActive,
-  getLayerChain,
-  getLayerPlayOrder,
-} from "@/lib/audio/audioState";
+import { isPadActive } from "@/lib/audio/audioState";
 import {
   triggerPad,
   stopPad,
@@ -139,46 +135,35 @@ function LayerRow({
     }
   })();
 
-  const [currentSoundId, setCurrentSoundId] = useState<string | null>(null);
-  const [activePlayOrder, setActivePlayOrder] = useState<Sound[] | null>(null);
-  const soundRafRef = useRef<number | null>(null);
+  // Tick-managed slices for this layer — written by the global audioTick RAF.
+  // Replaces the previous per-LayerRow RAF loop that polled
+  // getLayerPlayOrder/getLayerChain from audioState directly.
+  const layerPlayOrderIds = usePlaybackStore(
+    (s) => s.layerPlayOrder[layer.id],
+  );
+  const layerChainIds = usePlaybackStore((s) => s.layerChain[layer.id]);
 
-  useEffect(() => {
-    if (!layerActive || !isChainedArrangement) {
-      setCurrentSoundId(null);
-      setActivePlayOrder(null);
-      if (soundRafRef.current !== null) {
-        cancelAnimationFrame(soundRafRef.current);
-        soundRafRef.current = null;
-      }
-      return;
-    }
-    const poll = () => {
-      const playOrder = getLayerPlayOrder(layer.id);
-      const chain = getLayerChain(layer.id);
-      if (playOrder && playOrder.length > 0) {
-        setActivePlayOrder((prev) => (prev === playOrder ? prev : playOrder));
-        const chainLength = chain?.length ?? 0;
-        const currentIdx = Math.max(0, playOrder.length - chainLength - 1);
-        const currentSound = playOrder[currentIdx];
-        const nextId = currentSound?.id ?? null;
-        setCurrentSoundId((prev) => (prev === nextId ? prev : nextId));
-      } else {
-        setActivePlayOrder(null);
-        setCurrentSoundId(null);
-      }
-      soundRafRef.current = requestAnimationFrame(poll);
-    };
-    soundRafRef.current = requestAnimationFrame(poll);
-    return () => {
-      if (soundRafRef.current !== null) {
-        cancelAnimationFrame(soundRafRef.current);
-        soundRafRef.current = null;
-      }
-      setCurrentSoundId(null);
-      setActivePlayOrder(null);
-    };
-  }, [layerActive, isChainedArrangement, layer.id]);
+  const soundMap = useMemo(
+    () => new Map(sounds.map((s) => [s.id, s])),
+    [sounds],
+  );
+
+  const activePlayOrder = useMemo<Sound[] | null>(() => {
+    if (!layerActive || !isChainedArrangement) return null;
+    if (!layerPlayOrderIds || layerPlayOrderIds.length === 0) return null;
+    const resolved = layerPlayOrderIds
+      .map((id) => soundMap.get(id))
+      .filter((s): s is Sound => s !== undefined);
+    return resolved.length > 0 ? resolved : null;
+  }, [layerActive, isChainedArrangement, layerPlayOrderIds, soundMap]);
+
+  const currentSoundId = useMemo<string | null>(() => {
+    if (!layerActive || !isChainedArrangement) return null;
+    if (!layerPlayOrderIds || layerPlayOrderIds.length === 0) return null;
+    const chainLength = layerChainIds?.length ?? 0;
+    const currentIdx = Math.max(0, layerPlayOrderIds.length - chainLength - 1);
+    return layerPlayOrderIds[currentIdx] ?? null;
+  }, [layerActive, isChainedArrangement, layerPlayOrderIds, layerChainIds]);
 
   const displayText = (() => {
     if (layerActive && isChainedArrangement && currentSoundId) {

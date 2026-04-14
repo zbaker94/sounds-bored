@@ -14,6 +14,12 @@ interface AudioTickSnapshot {
   padProgress?: Record<string, number>;
   layerProgress?: Record<string, number>;
   activeLayerIds?: Set<string>;
+  /** Per-layer ordered play order as sound IDs. Entry exists for layers whose
+   *  chained arrangement has computed a play order. Absence = no ordering yet. */
+  layerPlayOrder?: Record<string, string[]>;
+  /** Per-layer remaining chain queue as sound IDs (leading entry = currently playing).
+   *  Entry exists only for layers with an active chain queue. */
+  layerChain?: Record<string, string[]>;
 }
 
 interface PlaybackState {
@@ -53,6 +59,16 @@ interface PlaybackState {
   /** Set of layer IDs currently playing (have active voices). Replaces per-component RAF polling. */
   activeLayerIds: Set<string>;
 
+  /** Per-layer ordered play order (sound IDs). Tick-managed. Entry present only for
+   *  active layers with chained arrangements. Replaces the per-LayerRow RAF poll of
+   *  getLayerPlayOrder() in PadControlContent. */
+  layerPlayOrder: Record<string, string[]>;
+
+  /** Per-layer remaining chain queue (sound IDs). Tick-managed. Entry present only for
+   *  active layers with a chain queue. Replaces the per-LayerRow RAF poll of
+   *  getLayerChain() in PadControlContent. */
+  layerChain: Record<string, string[]>;
+
   /** Batch-set any subset of tick-managed fields in a single Zustand mutation. */
   setAudioTick: (snapshot: AudioTickSnapshot) => void;
 }
@@ -66,6 +82,8 @@ export const initialPlaybackState = {
   get padProgress() { return {} as Record<string, number>; },
   get layerProgress() { return {} as Record<string, number>; },
   get activeLayerIds() { return new Set<string>(); },
+  get layerPlayOrder() { return {} as Record<string, string[]>; },
+  get layerChain() { return {} as Record<string, string[]>; },
   isPreviewPlaying: false,
 };
 
@@ -101,6 +119,8 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
   padProgress: {},
   layerProgress: {},
   activeLayerIds: new Set<string>(),
+  layerPlayOrder: {},
+  layerChain: {},
 
   updateLayerVolume: (layerId, volume) =>
     set((s) => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } })),
@@ -112,5 +132,7 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
       ...(snapshot.padProgress !== undefined ? { padProgress: snapshot.padProgress } : {}),
       ...(snapshot.layerProgress !== undefined ? { layerProgress: snapshot.layerProgress } : {}),
       ...(snapshot.activeLayerIds !== undefined ? { activeLayerIds: snapshot.activeLayerIds } : {}),
+      ...(snapshot.layerPlayOrder !== undefined ? { layerPlayOrder: snapshot.layerPlayOrder } : {}),
+      ...(snapshot.layerChain !== undefined ? { layerChain: snapshot.layerChain } : {}),
     })),
 }));

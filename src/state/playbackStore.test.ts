@@ -57,6 +57,47 @@ describe("setAudioTick", () => {
     expect(usePlaybackStore.getState().activeLayerIds.has("layer-b")).toBe(true);
   });
 
+  it("updates layerPlayOrder", () => {
+    usePlaybackStore.getState().setAudioTick({
+      layerPlayOrder: { "layer-1": ["s1", "s2", "s3"] },
+    });
+    expect(usePlaybackStore.getState().layerPlayOrder["layer-1"]).toEqual([
+      "s1",
+      "s2",
+      "s3",
+    ]);
+  });
+
+  it("updates layerChain", () => {
+    usePlaybackStore.getState().setAudioTick({
+      layerChain: { "layer-1": ["s2", "s3"] },
+    });
+    expect(usePlaybackStore.getState().layerChain["layer-1"]).toEqual(["s2", "s3"]);
+  });
+
+  it("partial update does not clobber layerPlayOrder / layerChain", () => {
+    usePlaybackStore.getState().setAudioTick({
+      layerPlayOrder: { "layer-1": ["s1", "s2"] },
+      layerChain: { "layer-1": ["s2"] },
+    });
+    usePlaybackStore.getState().setAudioTick({ padVolumes: { "pad-1": 0.5 } });
+    expect(usePlaybackStore.getState().layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
+    expect(usePlaybackStore.getState().layerChain["layer-1"]).toEqual(["s2"]);
+  });
+
+  it("setAudioTick with empty records replaces prior layerPlayOrder / layerChain", () => {
+    usePlaybackStore.getState().setAudioTick({
+      layerPlayOrder: { "layer-1": ["s1"] },
+      layerChain: { "layer-1": ["s1"] },
+    });
+    usePlaybackStore.getState().setAudioTick({
+      layerPlayOrder: {},
+      layerChain: {},
+    });
+    expect(usePlaybackStore.getState().layerPlayOrder).toEqual({});
+    expect(usePlaybackStore.getState().layerChain).toEqual({});
+  });
+
   it("can update multiple fields in one call", () => {
     usePlaybackStore.getState().setAudioTick({
       padVolumes: { "pad-1": 0.3 },
