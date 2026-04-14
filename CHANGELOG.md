@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Duplicate sound, tag, and set IDs in the library are now detected and rejected with a clear error message indicating the offending ID
+- Volume values on layers, sound instances, and layer selections are now validated to stay within the 0–100 range
+- Sound duration and file size fields now reject negative numbers, NaN, and infinite values to prevent invalid audio metadata from being stored
+- Start offset values on sound instances are now validated to be non-negative and finite
 - Fixed a bug where re-triggering a pad during a fade-out could cause the fade's cleanup to stop the newly-started audio voices.
 - Fixed a bug where a pad's layers could get permanently stuck in a "pending" state if an audio error occurred mid-trigger, which would silently prevent those layers from playing again until the app was restarted
 - When one layer in a pad fails to play due to an audio error, the remaining layers now continue to trigger as expected instead of being silently blocked
