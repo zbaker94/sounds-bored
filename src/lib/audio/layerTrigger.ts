@@ -277,14 +277,17 @@ export async function startLayerSound(
     clearLayerProgressInfo(layer.id);
     clearPadProgressInfo(pad.id);
 
+    // Always clear chain and cycle state on any failure so the next trigger
+    // starts fresh rather than resuming from an invalid position (#136).
+    deleteLayerChain(layer.id);
+    deleteLayerCycleIndex(layer.id);
+
     // Circuit-breaker: a chain of consecutive load failures (e.g. entire library
     // missing on disk) would otherwise spawn one toast per sound. Tear the chain
     // down after CHAIN_FAILURE_THRESHOLD consecutive failures and emit a single
     // summary error in place of the per-sound error for that final failure.
     const failureCount = incrementLayerConsecutiveFailures(layer.id);
     if (failureCount >= CHAIN_FAILURE_THRESHOLD) {
-      // Break the chain so no further onended-driven continuations occur.
-      deleteLayerChain(layer.id);
       resetLayerConsecutiveFailures(layer.id);
       emitAudioError(
         new Error(
