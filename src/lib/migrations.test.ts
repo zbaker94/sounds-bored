@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { migrateProject, CURRENT_VERSION, MigrationError } from "./migrations";
+import { migrateProject, migrateLibrary, CURRENT_VERSION, MigrationError } from "./migrations";
+import { CURRENT_LIBRARY_VERSION } from "./constants";
 
 describe("migrateProject", () => {
   it("should pass through a project already at CURRENT_VERSION unchanged", () => {
@@ -223,5 +224,248 @@ describe("migrateProject — future-version guard", () => {
     expect(() => migrateProject({ name: "X", version: "v1.0.0" })).toThrow(MigrationError);
     expect(() => migrateProject({ name: "X", version: "1.2.0-beta" })).toThrow(MigrationError);
     expect(() => migrateProject({ name: "X", version: "" })).toThrow(MigrationError);
+  });
+});
+
+describe("migrateLibrary", () => {
+  it("should pass through a library already at CURRENT_LIBRARY_VERSION unchanged", () => {
+    const raw = {
+      version: CURRENT_LIBRARY_VERSION,
+      sounds: [{ id: "s1", name: "Kick" }],
+      tags: [],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    expect(result).toEqual({
+      version: CURRENT_LIBRARY_VERSION,
+      sounds: [{ id: "s1", name: "Kick" }],
+      tags: [],
+      sets: [],
+    });
+  });
+
+  it("should migrate an unversioned library (0.0.0 seed) to CURRENT_LIBRARY_VERSION", () => {
+    const raw = { sounds: [], tags: [], sets: [] };
+    const result = migrateLibrary(raw);
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+  });
+
+  it("should not mutate the original object", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [{ id: "s1", name: "Kick" }],
+      tags: [],
+      sets: [],
+    };
+    const original = structuredClone(raw);
+    migrateLibrary(raw);
+    expect(raw).toEqual(original);
+  });
+
+  it("does not mutate sound objects when stripping invalid fields", () => {
+    const sound = { id: "s1", name: "Bad", durationMs: -5, fileSizeBytes: Infinity };
+    const raw = { version: "0.0.0", sounds: [sound, sound], tags: [], sets: [] };
+    const soundBefore = { ...sound };
+    migrateLibrary(raw);
+    expect(sound).toEqual(soundBefore);
+  });
+
+  it("deduplicates sound IDs, keeping the first occurrence", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [
+        { id: "s1", name: "First" },
+        { id: "s1", name: "Duplicate" },
+        { id: "s2", name: "Second" },
+      ],
+      tags: [],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const sounds = result.sounds as Array<Record<string, unknown>>;
+    expect(sounds).toHaveLength(2);
+    expect(sounds[0]).toMatchObject({ id: "s1", name: "First" });
+    expect(sounds[1]).toMatchObject({ id: "s2", name: "Second" });
+  });
+
+  it("deduplicates tag IDs, keeping the first occurrence", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [],
+      tags: [
+        { id: "t1", name: "first-tag" },
+        { id: "t1", name: "duplicate-tag" },
+        { id: "t2", name: "second-tag" },
+      ],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const tags = result.tags as Array<Record<string, unknown>>;
+    expect(tags).toHaveLength(2);
+    expect(tags[0]).toMatchObject({ id: "t1", name: "first-tag" });
+    expect(tags[1]).toMatchObject({ id: "t2", name: "second-tag" });
+  });
+
+  it("deduplicates set IDs, keeping the first occurrence", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [],
+      tags: [],
+      sets: [
+        { id: "set1", name: "First Set" },
+        { id: "set1", name: "Duplicate Set" },
+        { id: "set2", name: "Second Set" },
+      ],
+    };
+    const result = migrateLibrary(raw);
+    const sets = result.sets as Array<Record<string, unknown>>;
+    expect(sets).toHaveLength(2);
+    expect(sets[0]).toMatchObject({ id: "set1", name: "First Set" });
+    expect(sets[1]).toMatchObject({ id: "set2", name: "Second Set" });
+  });
+
+  it("strips negative durationMs from sounds", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [{ id: "s1", name: "Kick", durationMs: -5 }],
+      tags: [],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const sounds = result.sounds as Array<Record<string, unknown>>;
+    expect(sounds[0].durationMs).toBeUndefined();
+    expect(sounds[0].id).toBe("s1");
+  });
+
+  it("strips non-finite durationMs from sounds", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [
+        { id: "s1", name: "A", durationMs: Infinity },
+        { id: "s2", name: "B", durationMs: -Infinity },
+        { id: "s3", name: "C", durationMs: NaN },
+      ],
+      tags: [],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const sounds = result.sounds as Array<Record<string, unknown>>;
+    expect(sounds[0].durationMs).toBeUndefined();
+    expect(sounds[1].durationMs).toBeUndefined();
+    expect(sounds[2].durationMs).toBeUndefined();
+  });
+
+  it("leaves valid durationMs untouched", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [
+        { id: "s1", name: "A", durationMs: 1000 },
+        { id: "s2", name: "B", durationMs: 0 },
+      ],
+      tags: [],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const sounds = result.sounds as Array<Record<string, unknown>>;
+    expect(sounds[0].durationMs).toBe(1000);
+    expect(sounds[1].durationMs).toBe(0);
+  });
+
+  it("strips invalid fileSizeBytes from sounds", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [
+        { id: "s1", name: "A", fileSizeBytes: -1 },
+        { id: "s2", name: "B", fileSizeBytes: Infinity },
+        { id: "s3", name: "C", fileSizeBytes: 2048 },
+      ],
+      tags: [],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const sounds = result.sounds as Array<Record<string, unknown>>;
+    expect(sounds[0].fileSizeBytes).toBeUndefined();
+    expect(sounds[1].fileSizeBytes).toBeUndefined();
+    expect(sounds[2].fileSizeBytes).toBe(2048);
+  });
+
+  it("handles missing sounds/tags/sets arrays gracefully", () => {
+    const raw = { version: "0.0.0" };
+    const result = migrateLibrary(raw);
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+    expect(result.sounds).toBeUndefined();
+    expect(result.tags).toBeUndefined();
+    expect(result.sets).toBeUndefined();
+  });
+
+  it("handles non-array sounds/tags/sets fields without crashing", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: "not-an-array",
+      tags: null,
+      sets: 42,
+    };
+    const result = migrateLibrary(raw);
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+    // Non-array values are left alone; Zod will reject them downstream.
+    expect(result.sounds).toBe("not-an-array");
+    expect(result.tags).toBeNull();
+    expect(result.sets).toBe(42);
+  });
+
+  it("drops tags with missing name field", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [],
+      tags: [
+        { id: "t1" },             // no name field at all
+        { id: "t2", name: "ok" },
+      ],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const tags = result.tags as Array<Record<string, unknown>>;
+    expect(tags).toHaveLength(1);
+    expect(tags[0].id).toBe("t2");
+  });
+
+  it("drops tags with empty name and truncates names over 100 chars", () => {
+    const longName = "a".repeat(150);
+    const raw = {
+      version: "0.0.0",
+      sounds: [],
+      tags: [
+        { id: "t1", name: "" },
+        { id: "t2", name: "   " },
+        { id: "t3", name: 42 },
+        { id: "t4", name: longName },
+        { id: "t5", name: "ok" },
+      ],
+      sets: [],
+    };
+    const result = migrateLibrary(raw);
+    const tags = result.tags as Array<Record<string, unknown>>;
+    expect(tags).toHaveLength(2);
+    expect(tags[0].id).toBe("t4");
+    expect((tags[0].name as string).length).toBe(100);
+    expect(tags[1]).toMatchObject({ id: "t5", name: "ok" });
+  });
+
+  it("throws MigrationError when library version is newer than CURRENT_LIBRARY_VERSION", () => {
+    expect(() => migrateLibrary({ version: "99.0.0" })).toThrow(MigrationError);
+    expect(() => migrateLibrary({ version: "99.0.0" })).toThrow(/newer version/i);
+    expect(() => migrateLibrary({ version: "99.0.0" })).toThrow("99.0.0");
+  });
+
+  it("throws MigrationError for a version not in the migration chain (unknown past version)", () => {
+    expect(() => migrateLibrary({ version: "0.5.0" })).toThrow(MigrationError);
+    expect(() => migrateLibrary({ version: "0.5.0" })).toThrow(/No migration path/i);
+  });
+
+  it("throws MigrationError for malformed version strings", () => {
+    expect(() => migrateLibrary({ version: "not.a.version" })).toThrow(MigrationError);
+    expect(() => migrateLibrary({ version: "1.2" })).toThrow(MigrationError);
+    expect(() => migrateLibrary({ version: "v1.0.0" })).toThrow(MigrationError);
+    expect(() => migrateLibrary({ version: "" })).toThrow(MigrationError);
   });
 });
