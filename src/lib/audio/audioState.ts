@@ -375,16 +375,15 @@ export function deleteFadePadTimeout(padId: string): void {
  */
 export function getOrCreateLayerGain(layerId: string, volume: number, padGain: GainNode): GainNode {
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
+  const ctx = getAudioContext();
   const existing = layerGainMap.get(layerId);
   if (existing) {
     // Sync cached gain to the current layer.volume in case it was changed via the config dialog.
     // cancelScheduledValues clears any pending reset from a previous ramp-stop timeout.
-    const ctx = getAudioContext();
     existing.gain.cancelScheduledValues(ctx.currentTime);
     existing.gain.setValueAtTime(clamped, ctx.currentTime);
     return existing;
   }
-  const ctx = getAudioContext();
   const gain = ctx.createGain();
   gain.gain.value = clamped;
   gain.connect(padGain);
