@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Auto-save now shows an error notification ("Auto-save failed — your changes may not be saved to disk.") when it cannot write to disk, so you are no longer silently losing changes.
+- Auto-save error toasts are rate-limited to once per minute, preventing notification spam if a disk or permission problem persists across multiple save attempts.
+- Auto-save keeps retrying on every interval tick after a failure, so your project will be saved automatically once the underlying issue (full disk, disconnected drive, etc.) is resolved.
+- Manual save errors now show a clear "Failed to save project. Please try again." toast when saving via the toolbar or on window close.
 - Fixed an issue where playing a pad with a missing sound library could generate hundreds of error notifications — the audio engine now stops after 3 consecutive load failures and shows a single summary error instead
 - Error notifications from chained sound sequences are no longer silently dropped; failures in sequential/loop playback chains now properly surface as visible errors
 - Re-triggering a pad resets the error counter, so a fresh trigger always gets full error reporting regardless of previous failures

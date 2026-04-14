@@ -18,6 +18,12 @@ export function useSaveGlobalLibrary() {
       // query data could overwrite in-flight Zustand mutations.
       useLibraryStore.getState().clearDirtyFlag();
     },
+    // NOTE: No toast at the mutation level — each call site decides how to
+    // surface the failure (immediate toast for manual saves, debounced toast
+    // for auto-save so a persistent failure doesn't spam the user every 30s).
+    onError: (error) => {
+      console.error("Failed to save library:", error);
+    },
   });
 }
 

@@ -81,8 +81,10 @@ export function useSaveProject() {
     onSuccess: () => {
       clearDirtyFlag();
     },
+    // NOTE: No toast at the mutation level — each call site decides how to
+    // surface the failure (immediate toast for manual saves, debounced toast
+    // for auto-save so a persistent failure doesn't spam the user every 30s).
     onError: (error) => {
-      toast.error("Failed to save project. Please try again.");
       console.error("Failed to save project:", error);
     },
   });
@@ -111,11 +113,10 @@ export function useSaveProjectAs() {
         }
       }
     },
+    // NOTE: No toast at the mutation level — each call site decides how to
+    // surface the failure. Consistent with useSaveProject.
     onError: (error) => {
-      toast.error("Error", {
-        description: error instanceof Error ? error.message : "Failed to save project. Please try again.",
-      });
-      console.error("Failed to save project:", error);
+      console.error("Failed to save project as:", error);
     },
   });
 }

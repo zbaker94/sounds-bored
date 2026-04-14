@@ -73,6 +73,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     if (!isDirty || !folderPath) return;
     saveProjectMutation.mutate({ folderPath, project }, {
       onSuccess: () => toast.success("Project saved"),
+      onError: () => toast.error("Failed to save project. Please try again."),
     });
   }, [project, isTemporary, isDirty, folderPath, saveProjectMutation, openOverlay]);
 
@@ -89,6 +90,12 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
           const cb = onAfterSaveRef.current;
           onAfterSaveRef.current = null;
           cb?.();
+        },
+        onError: () => {
+          // Leave onAfterSaveRef intact — the follow-up action (e.g. window close)
+          // is cancelled because we did not successfully save.
+          onAfterSaveRef.current = null;
+          toast.error("Failed to save project. Please try again.");
         },
       });
     }
