@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Simplified how the sound library is saved internally — actions like adding/removing sounds, tags, and sets are now more reliable and less error-prone
+- Fixed potential bugs where stale library data could be saved when resolving missing files or folders
 - Removed internal developer scaffolding (`greet` command and its tests) that was never part of the user-facing feature set.
 - Playback errors (missing files, decode failures, fade errors) now show as toast notifications in the app UI instead of being silently swallowed or logged only to the console.
 - When a sound file is missing from disk and you try to play it, the app now automatically refreshes the missing-file indicators in the Sounds panel alongside showing the error message.

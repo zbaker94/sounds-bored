@@ -33,8 +33,7 @@ import {
 } from "@/components/ui/item";
 import { Button } from "@/components/ui/button";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { cn } from "@/lib/utils";
 
 const panelClass =
@@ -58,7 +57,7 @@ export function SetsPanel({
   isImporting,
 }: SetsPanelProps) {
   const sets = useLibraryStore((s) => s.sets);
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   const filteredSets = useMemo(() => {
     if (!searchQuery) return sets;
@@ -80,13 +79,7 @@ export function SetsPanel({
     if (!selectedId) return;
     const newSet = useLibraryStore.getState().duplicateSet(selectedId);
     if (!newSet) return;
-    const latest = useLibraryStore.getState();
-    await saveLibrary({
-      version: CURRENT_LIBRARY_VERSION,
-      sounds: latest.sounds,
-      tags: latest.tags,
-      sets: latest.sets,
-    });
+    await saveCurrentLibrary();
     toast.success(`"${newSet.name}" created`);
   }
 
@@ -94,13 +87,7 @@ export function SetsPanel({
     if (!selectedId) return;
     const setName = sets.find((s) => s.id === selectedId)?.name ?? "";
     useLibraryStore.getState().deleteSet(selectedId);
-    const latest = useLibraryStore.getState();
-    await saveLibrary({
-      version: CURRENT_LIBRARY_VERSION,
-      sounds: latest.sounds,
-      tags: latest.tags,
-      sets: latest.sets,
-    });
+    await saveCurrentLibrary();
     onSelect(null);
     setConfirmDeleteSetOpen(false);
     toast.success(`"${setName}" deleted`);

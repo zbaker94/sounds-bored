@@ -60,7 +60,7 @@ vi.mock("@/lib/audio/streamingCache", () => ({
 const mockMutateAsync = vi.fn(() => Promise.resolve());
 
 vi.mock("@/lib/library.queries", () => ({
-  useSaveGlobalLibrary: vi.fn(() => ({ mutateAsync: mockMutateAsync })),
+  useSaveCurrentLibrary: vi.fn(() => ({ saveCurrentLibrary: mockMutateAsync })),
 }));
 
 vi.mock("@/lib/appSettings.queries", () => ({

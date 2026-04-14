@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useAppSettings } from "@/lib/appSettings.queries";
-import { useGlobalLibrary, useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useGlobalLibrary, useSaveCurrentLibrary } from "@/lib/library.queries";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { SYSTEM_TAG_IMPORTED, CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
 /**
  * Loads appSettings and globalLibrary from disk into their respective
@@ -19,7 +19,7 @@ export function useBootLoader() {
   const { data: settings } = useAppSettings();
   const { data: library } = useGlobalLibrary();
 
-  const saveLibraryMutation = useSaveGlobalLibrary();
+  const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
 
   const loadSettings = useAppSettingsStore((s) => s.loadSettings);
   const loadLibrary = useLibraryStore((s) => s.loadLibrary);
@@ -83,18 +83,12 @@ export function useBootLoader() {
 
         // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
         if (useLibraryStore.getState().isDirty) {
-          const latest = useLibraryStore.getState();
-          saveLibraryMutation.mutate({
-            version: CURRENT_LIBRARY_VERSION,
-            sounds: latest.sounds,
-            tags: latest.tags,
-            sets: latest.sets,
-          });
+          saveCurrentLibrarySync();
         }
 
         // Refresh missing-file state after reconciliation
         void refreshMissingState();
       },
     );
-  }, [settings, library, updateLibrary]);
+  }, [settings, library, updateLibrary, saveCurrentLibrarySync]);
 }

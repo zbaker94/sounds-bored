@@ -2,11 +2,10 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
 import { useProjectStore } from "@/state/projectStore";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
 
 // Module-level singleton: ensures at most one reconcile runs at a time across
 // all hook instances (e.g. MainPage and SoundsPanel both mount concurrently).
@@ -20,14 +19,14 @@ export function useReconcileLibrary(): {
 
   const settings = useAppSettingsStore((s) => s.settings);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
-  const { mutate: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
 
-  // Ref-wrap saveLibrary so we always call the latest mutation handle
-  // without adding an unstable TanStack Query reference to the dep array.
-  const saveLibraryRef = useRef(saveLibrary);
+  // Ref-wrap saveCurrentLibrarySync so the reconcile callback stays stable
+  // without adding the TanStack Query mutation reference to its dep array.
+  const saveLibraryRef = useRef(saveCurrentLibrarySync);
   useEffect(() => {
-    saveLibraryRef.current = saveLibrary;
-  }, [saveLibrary]);
+    saveLibraryRef.current = saveCurrentLibrarySync;
+  }, [saveCurrentLibrarySync]);
 
   const reconcile = useCallback(async () => {
     if (!settings || _reconcileInFlight) return;
@@ -83,8 +82,7 @@ export function useReconcileLibrary(): {
       }
 
       if (useLibraryStore.getState().isDirty) {
-        const latest = useLibraryStore.getState();
-        saveLibraryRef.current({ version: CURRENT_LIBRARY_VERSION, sounds: latest.sounds, tags: latest.tags, sets: latest.sets });
+        saveLibraryRef.current();
         // useSaveGlobalLibrary.onSuccess clears the dirty flag after a successful
         // write. Do not clear it here — clearing before save completes means a
         // failed save would silently drop changes.

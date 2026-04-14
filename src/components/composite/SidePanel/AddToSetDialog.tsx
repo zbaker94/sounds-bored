@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveGlobalLibrary } from "@/lib/library.queries";
-import { CURRENT_LIBRARY_VERSION } from "@/lib/constants";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +27,7 @@ export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogP
   const addSet = useLibraryStore((s) => s.addSet);
   const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const { mutateAsync: saveLibrary } = useSaveGlobalLibrary();
+  const { saveCurrentLibrary } = useSaveCurrentLibrary();
   const anchorRef = useComboboxAnchor();
 
   useEffect(() => {
@@ -58,8 +57,7 @@ export function AddToSetDialog({ open, onOpenChange, soundIds }: AddToSetDialogP
     for (const setId of selectedSetIds) {
       addSoundsToSet(soundIds, setId);
     }
-    const { sounds, tags, sets: currentSets } = useLibraryStore.getState();
-    await saveLibrary({ version: CURRENT_LIBRARY_VERSION, sounds, tags, sets: currentSets });
+    await saveCurrentLibrary();
     onOpenChange(false);
   }
 

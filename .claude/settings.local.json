@@ -45,7 +45,8 @@
       "mcp___hypothesi_tauri-mcp-server__webview_execute_js",
       "mcp___hypothesi_tauri-mcp-server__webview_interact",
       "mcp___hypothesi_tauri-mcp-server__webview_find_element",
-      "mcp___hypothesi_tauri-mcp-server__webview_keyboard"
+      "mcp___hypothesi_tauri-mcp-server__webview_keyboard",
+      "Bash(cargo test:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
