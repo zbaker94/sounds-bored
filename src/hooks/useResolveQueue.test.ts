@@ -45,6 +45,14 @@ describe("useResolveQueue", () => {
     expect(result.current.queue).toEqual([]);
   });
 
+  it("resolving the last item transitions to an empty queue", () => {
+    const { result } = renderHook(() => useResolveQueue<string>());
+    act(() => { result.current.setQueue(["only"]); });
+    act(() => { result.current.handleResolved(); });
+    act(() => { result.current.handleClose(); });
+    expect(result.current.queue).toEqual([]);
+  });
+
   it("handles multi-step review chain: resolve-resolve-bail", () => {
     const { result } = renderHook(() => useResolveQueue<string>());
     act(() => { result.current.setQueue(["a", "b", "c"]); });

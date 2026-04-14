@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where resolving the last item in a missing-file dialog queue could leave the dialog in an inconsistent state instead of closing cleanly.
 - Refactored internal dialog queue logic into a shared utility, reducing code duplication with no change to user-facing behavior
 - Auto-save now correctly tracks and persists library changes (sounds, tags, sets) without redundant state subscriptions, improving reliability of auto-save behavior.
 - Simplified how the sound library is saved internally — actions like adding/removing sounds, tags, and sets are now more reliable and less error-prone
