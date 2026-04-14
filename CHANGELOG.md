@@ -1,5 +1,10 @@
 # Changelog
 
+## Current Changes
+- Playback errors (missing files, decode failures, fade errors) now show as toast notifications in the app UI instead of being silently swallowed or logged only to the console.
+- When a sound file is missing from disk and you try to play it, the app now automatically refreshes the missing-file indicators in the Sounds panel alongside showing the error message.
+- Layer volume changes are now saved to the project correctly when you finish dragging the volume slider on a pad.
+
 ## v1.5.4
 
 - Removed deprecated internal audio API alias (`clearFadePadTimeouts`); use `clearAllFadeTracking` directly for any custom integrations.

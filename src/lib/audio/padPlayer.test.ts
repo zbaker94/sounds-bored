@@ -5,7 +5,6 @@ import { isLayerActive, isPadFading } from "./audioState";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
-import { toast } from "sonner";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -34,6 +33,12 @@ vi.mock("./bufferCache", () => ({
 }));
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+
+const mockEmitAudioError = vi.fn();
+vi.mock("./audioEvents", () => ({
+  emitAudioError: (...args: unknown[]) => mockEmitAudioError(...args),
+  setAudioErrorHandler: vi.fn(),
+}));
 
 // Streaming element cache shared by the mock — simulates the real cache's
 // behavior so tests can verify reuse vs. fresh-element creation.
@@ -2553,7 +2558,7 @@ describe("cycle mode — stopPad resets cycle cursor", () => {
 // ─── Error handling — toast instead of console.error ─────────────────────────
 
 describe("crossfadePads error handling", () => {
-  it("calls toast.error when fadePadIn rejects", async () => {
+  it("emits audio error when fadePadIn rejects", async () => {
     const { crossfadePads, clearAllFadeTracking } = await import("./padPlayer");
     const padIn = createMockPad({
       id: "xfade-err-in",
@@ -2567,13 +2572,14 @@ describe("crossfadePads error handling", () => {
     crossfadePads([], [padIn]);
     await tick();
 
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("AudioContext suspended"));
+    // The audio engine now emits errors via the bus rather than calling toast directly.
+    expect(mockEmitAudioError).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
     clearAllFadeTracking();
   });
 });
 
 describe("executeFadeTap error handling", () => {
-  it("calls toast.error when fadePadIn rejects on inactive pad", async () => {
+  it("emits audio error when fadePadIn rejects on inactive pad", async () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-err-pad",
@@ -2587,13 +2593,14 @@ describe("executeFadeTap error handling", () => {
     executeFadeTap(pad);
     await tick();
 
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("AudioContext suspended"));
+    // The audio engine now emits errors via the bus rather than calling toast directly.
+    expect(mockEmitAudioError).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
     clearAllFadeTracking();
   });
 });
 
 describe("startLayerSound error handling", () => {
-  it("calls toast.error for generic playback errors without console.error", async () => {
+  it("emits audio error for generic playback errors without console.error", async () => {
     const consoleSpy = vi.spyOn(console, "error");
     const { triggerPad } = await import("./padPlayer");
     const pad = createMockPad({
@@ -2607,14 +2614,18 @@ describe("startLayerSound error handling", () => {
 
     await triggerPad(pad);
 
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("decode failed"));
+    // The audio engine now emits errors via the bus rather than calling toast directly.
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "decode failed" }),
+      expect.objectContaining({ isMissingFile: false }),
+    );
     expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 });
 
 describe("startLayerSound MissingFileError handling", () => {
-  it("shows a file-not-found toast and calls refreshMissingState on MissingFileError", async () => {
+  it("emits isMissingFile:true error via audio bus on MissingFileError", async () => {
     const { MissingFileError } = await import("./bufferCache");
     const { triggerPad } = await import("./padPlayer");
     const sound = createMockSound({ id: "s1", name: "kick", filePath: "sounds/kick.wav" });
@@ -2630,10 +2641,12 @@ describe("startLayerSound MissingFileError handling", () => {
     await triggerPad(pad);
     await tick();
 
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("file not found"));
-    // refreshMissingState is always called on MissingFileError; it handles the
-    // no-settings case internally (early return). Settings guard is tested in library.reconcile.test.ts.
-    expect(mockRefreshMissingState).toHaveBeenCalledTimes(1);
+    // The audio engine emits via the error bus; the UI-layer handler (useAudioErrorHandler)
+    // is responsible for calling toast.error and refreshMissingState.
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.any(MissingFileError),
+      expect.objectContaining({ isMissingFile: true, soundName: "kick" }),
+    );
   });
 });
 

@@ -9,6 +9,7 @@ import { useAutoSave } from "@/hooks/useAutoSave";
 import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
+import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
@@ -30,6 +31,7 @@ export function MainPage() {
 function MainPageInner() {
   useAutoSave();
   useGlobalHotkeys();
+  useAudioErrorHandler();
 
   const { reconcile } = useReconcileLibrary();
 

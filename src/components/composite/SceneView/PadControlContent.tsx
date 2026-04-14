@@ -40,7 +40,6 @@ import {
   triggerLayer,
   stopLayerWithRamp,
   setLayerVolume,
-  commitLayerVolume,
   setPadVolume,
   skipLayerForward,
   skipLayerBack,
@@ -365,7 +364,7 @@ function LayerRow({
         tooltipLabel={(v) => `${v}%`}
         value={[sliderVol]}
         onValueChange={([v]) => { setLocalLayerVol(v); setLayerVolume(layer.id, v / 100); }}
-        onValueCommit={([v]) => { setLocalLayerVol(null); commitLayerVolume(layer.id, v / 100); }}
+        onValueCommit={([v]) => { setLocalLayerVol(null); useProjectStore.getState().updateLayerVolume(layer.id, v / 100); }}
         min={0}
         max={100}
         step={1}

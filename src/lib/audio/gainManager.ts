@@ -2,7 +2,6 @@
 import { getAudioContext } from "./audioContext";
 import { getPadGain, getLayerGain, cancelPadFade } from "./audioState";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { useProjectStore } from "@/state/projectStore";
 
 /**
  * Set the live volume for a pad's gain node with a short ramp to avoid clicks.
@@ -42,7 +41,7 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   const ctx = getAudioContext();
   // Guard against NaN/Infinity. Default to 1.0 (full volume) rather than 0 — syncing mid-playback
   // to silence would be more disruptive than staying audible, and makes malformed data detectable.
-  // setLayerVolume/commitLayerVolume default NaN to 0 because they are user-driven drag operations
+  // setLayerVolume defaults NaN to 0 because it is a user-driven drag operation
   // where silent failure is a safer fallback.
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
   gain.gain.cancelScheduledValues(ctx.currentTime);
@@ -51,7 +50,8 @@ export function syncLayerVolume(layerId: string, volume: number): void {
 
 /**
  * Set the live volume for a layer's gain node and mirror to the playback store.
- * Pass volume in 0–1 range. Call commitLayerVolume on drag-end to persist to schema.
+ * Pass volume in 0–1 range. On drag-end, persist to the project schema via
+ * `useProjectStore.getState().updateLayerVolume(layerId, volume)`.
  */
 export function setLayerVolume(layerId: string, volume: number): void {
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
@@ -67,11 +67,7 @@ export function setLayerVolume(layerId: string, volume: number): void {
   }
 }
 
-/**
- * Persist the current layer volume to the project schema (call on drag-end / value commit).
- * @param volume - [0,1] normalized gain. The store multiplies by 100 for [0,100] persistence.
- */
-export function commitLayerVolume(layerId: string, volume: number): void {
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
-  useProjectStore.getState().updateLayerVolume(layerId, clamped);
-}
+// commitLayerVolume was removed: persisting layer volume to the project schema
+// is a UI-layer concern. Callers should use
+//   useProjectStore.getState().updateLayerVolume(layerId, volume)
+// directly on drag-end / value commit.
