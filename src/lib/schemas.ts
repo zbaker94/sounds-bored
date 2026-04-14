@@ -40,8 +40,8 @@ export const SoundSchema = z.object({
   sourceUrl: z.string().optional(),        // original web URL for yt-dlp re-download
   tags: z.array(z.string()),               // Tag IDs — resolve against global library
   sets: z.array(z.string()),               // Set IDs — resolve against global library
-  durationMs: z.number().optional(),
-  fileSizeBytes: z.number().optional(),   // file size in bytes — populated at reconcile/download time
+  durationMs: z.number().min(0).finite().optional(),
+  fileSizeBytes: z.number().min(0).finite().optional(),   // file size in bytes — populated at reconcile/download time
 });
 
 export type Sound = z.infer<typeof SoundSchema>;
@@ -76,8 +76,8 @@ export type Set = z.infer<typeof SetSchema>;
 export const SoundInstanceSchema = z.object({
   id: z.string(),
   soundId: z.string(),
-  volume: z.number(),
-  startOffsetMs: z.number().optional(),
+  volume: z.number().min(0).max(100),
+  startOffsetMs: z.number().min(0).finite().optional(),
 });
 
 export type SoundInstance = z.infer<typeof SoundInstanceSchema>;
@@ -95,12 +95,12 @@ export const LayerSelectionSchema = z.discriminatedUnion("type", [
     type: z.literal("tag"),
     tagIds: z.array(z.string()),
     matchMode: z.enum(["any", "all"]).default("any"),
-    defaultVolume: z.number(),
+    defaultVolume: z.number().min(0).max(100).finite(),
   }),
   z.object({
     type: z.literal("set"),
     setId: z.string(),
-    defaultVolume: z.number(),
+    defaultVolume: z.number().min(0).max(100).finite(),
   }),
 ]);
 
@@ -116,12 +116,12 @@ export const LayerSelectionFormSchema = z.discriminatedUnion("type", [
     type: z.literal("tag"),
     tagIds: z.array(z.string()).min(1, "At least one tag is required"),
     matchMode: z.enum(["any", "all"]).default("any"),
-    defaultVolume: z.number(),
+    defaultVolume: z.number().min(0).max(100).finite(),
   }),
   z.object({
     type: z.literal("set"),
     setId: z.string().min(1, "A set must be selected"),
-    defaultVolume: z.number(),
+    defaultVolume: z.number().min(0).max(100).finite(),
   }),
 ]);
 
@@ -135,7 +135,7 @@ export const LayerSchema = z.object({
   cycleMode: z.boolean().default(false),
   playbackMode: PlaybackModeSchema,
   retriggerMode: RetriggerModeSchema,
-  volume: z.number(),
+  volume: z.number().min(0).max(100),
 });
 
 export type Layer = z.infer<typeof LayerSchema>;
@@ -239,6 +239,20 @@ export const GlobalLibrarySchema = z.object({
   sounds: z.array(SoundSchema),
   tags: z.array(TagSchema),
   sets: z.array(SetSchema),
+}).superRefine((data, ctx) => {
+  const checkUnique = (ids: string[], arrayPath: string, label: string) => {
+    const seen = new Set<string>();
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      if (seen.has(id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [arrayPath, i, "id"], message: `Duplicate ${label} ID: "${id}"` });
+      }
+      seen.add(id);
+    }
+  };
+  checkUnique(data.sounds.map((s) => s.id), "sounds", "sound");
+  checkUnique(data.tags.map((t) => t.id), "tags", "tag");
+  checkUnique(data.sets.map((s) => s.id), "sets", "set");
 });
 
 export type GlobalLibrary = z.infer<typeof GlobalLibrarySchema>;

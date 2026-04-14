@@ -5,6 +5,7 @@ import {
   ProjectSchema,
   LayerSelectionSchema,
   LayerSchema,
+  SoundInstanceSchema,
   PlaybackModeSchema,
   RetriggerModeSchema,
   SoundSchema,
@@ -534,6 +535,189 @@ describe("GlobalLibrarySchema", () => {
       sets: [],
     };
     expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
+  });
+
+  it("rejects a library with duplicate sound IDs and includes the offending ID and path in the error", () => {
+    const lib = {
+      version: "1.0.0",
+      sounds: [
+        { id: "s1", name: "Kick", tags: [], sets: [] },
+        { id: "s1", name: "Snare", tags: [], sets: [] },
+      ],
+      tags: [],
+      sets: [],
+    };
+    const result = GlobalLibrarySchema.safeParse(lib);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues[0];
+      expect(issue.message).toContain('"s1"');
+      expect(issue.path).toEqual(["sounds", 1, "id"]);
+    }
+  });
+
+  it("rejects a library with duplicate tag IDs", () => {
+    const lib = {
+      version: "1.0.0",
+      sounds: [],
+      tags: [
+        { id: "t1", name: "Drums" },
+        { id: "t1", name: "Percussion" },
+      ],
+      sets: [],
+    };
+    const result = GlobalLibrarySchema.safeParse(lib);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["tags", 1, "id"]);
+    }
+  });
+
+  it("rejects a library with duplicate set IDs", () => {
+    const lib = {
+      version: "1.0.0",
+      sounds: [],
+      tags: [],
+      sets: [
+        { id: "set1", name: "Set A" },
+        { id: "set1", name: "Set B" },
+      ],
+    };
+    const result = GlobalLibrarySchema.safeParse(lib);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["sets", 1, "id"]);
+    }
+  });
+
+  it("reports issues for multiple collections in a single library (all superRefine checks run)", () => {
+    const lib = {
+      version: "1.0.0",
+      sounds: [
+        { id: "s1", name: "A", tags: [], sets: [] },
+        { id: "s1", name: "B", tags: [], sets: [] },
+      ],
+      tags: [
+        { id: "t1", name: "X" },
+        { id: "t1", name: "Y" },
+      ],
+      sets: [],
+    };
+    const result = GlobalLibrarySchema.safeParse(lib);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // Both the sounds and tags duplicate checks must fire
+      const paths = result.error.issues.map((i) => i.path[0]);
+      expect(paths).toContain("sounds");
+      expect(paths).toContain("tags");
+    }
+  });
+
+  it("accepts a library where all sound/tag/set IDs are unique", () => {
+    const lib = {
+      version: "1.0.0",
+      sounds: [
+        { id: "s1", name: "Kick", tags: [], sets: [] },
+        { id: "s2", name: "Snare", tags: [], sets: [] },
+      ],
+      tags: [
+        { id: "t1", name: "Drums" },
+        { id: "t2", name: "Percussion" },
+      ],
+      sets: [
+        { id: "set1", name: "Set A" },
+        { id: "set2", name: "Set B" },
+      ],
+    };
+    expect(GlobalLibrarySchema.safeParse(lib).success).toBe(true);
+  });
+});
+
+describe("SoundSchema numeric field validation (#189)", () => {
+  it("rejects negative durationMs", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], durationMs: -1 }).success).toBe(false);
+  });
+
+  it("rejects NaN durationMs (rejected by base z.number() before .finite())", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], durationMs: NaN }).success).toBe(false);
+  });
+
+  it("rejects Infinity durationMs (.finite() guards live-stream HTMLAudioElement.duration)", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], durationMs: Infinity }).success).toBe(false);
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], durationMs: -Infinity }).success).toBe(false);
+  });
+
+  it("accepts 0 and positive durationMs", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], durationMs: 0 }).success).toBe(true);
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], durationMs: 3000 }).success).toBe(true);
+  });
+
+  it("rejects negative fileSizeBytes", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], fileSizeBytes: -1 }).success).toBe(false);
+  });
+
+  it("rejects NaN and Infinity fileSizeBytes", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], fileSizeBytes: NaN }).success).toBe(false);
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], fileSizeBytes: Infinity }).success).toBe(false);
+  });
+
+  it("accepts 0 and positive fileSizeBytes", () => {
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], fileSizeBytes: 0 }).success).toBe(true);
+    expect(SoundSchema.safeParse({ id: "s1", name: "Test", tags: [], sets: [], fileSizeBytes: 1024 }).success).toBe(true);
+  });
+
+  it("rejects negative startOffsetMs in SoundInstanceSchema", () => {
+    expect(SoundInstanceSchema.safeParse({ id: "si1", soundId: "s1", volume: 100, startOffsetMs: -1 }).success).toBe(false);
+  });
+
+  it("rejects Infinity startOffsetMs in SoundInstanceSchema", () => {
+    expect(SoundInstanceSchema.safeParse({ id: "si1", soundId: "s1", volume: 100, startOffsetMs: Infinity }).success).toBe(false);
+  });
+
+  it("accepts 0 and positive startOffsetMs in SoundInstanceSchema", () => {
+    expect(SoundInstanceSchema.safeParse({ id: "si1", soundId: "s1", volume: 100, startOffsetMs: 0 }).success).toBe(true);
+    expect(SoundInstanceSchema.safeParse({ id: "si1", soundId: "s1", volume: 100, startOffsetMs: 500 }).success).toBe(true);
+  });
+});
+
+describe("LayerSchema.volume validation (#189)", () => {
+  const baseLayer = {
+    id: "l1",
+    selection: { type: "assigned" as const, instances: [] },
+    arrangement: "simultaneous" as const,
+    cycleMode: false,
+    playbackMode: "one-shot" as const,
+    retriggerMode: "restart" as const,
+  };
+
+  it("accepts volume at boundaries 0 and 100", () => {
+    expect(LayerSchema.safeParse({ ...baseLayer, volume: 0 }).success).toBe(true);
+    expect(LayerSchema.safeParse({ ...baseLayer, volume: 100 }).success).toBe(true);
+  });
+
+  it("rejects volume below 0", () => {
+    expect(LayerSchema.safeParse({ ...baseLayer, volume: -1 }).success).toBe(false);
+  });
+
+  it("rejects volume above 100", () => {
+    expect(LayerSchema.safeParse({ ...baseLayer, volume: 101 }).success).toBe(false);
+  });
+});
+
+describe("SoundInstanceSchema.volume validation (#189)", () => {
+  const baseInstance = { id: "si1", soundId: "s1" };
+
+  it("accepts volume at boundaries 0 and 100", () => {
+    expect(SoundInstanceSchema.safeParse({ ...baseInstance, volume: 0 }).success).toBe(true);
+    expect(SoundInstanceSchema.safeParse({ ...baseInstance, volume: 100 }).success).toBe(true);
+  });
+
+  it("rejects volume below 0", () => {
+    expect(SoundInstanceSchema.safeParse({ ...baseInstance, volume: -1 }).success).toBe(false);
+  });
+
+  it("rejects volume above 100", () => {
+    expect(SoundInstanceSchema.safeParse({ ...baseInstance, volume: 101 }).success).toBe(false);
   });
 });
 
