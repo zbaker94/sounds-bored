@@ -14,6 +14,9 @@ export interface PadVolumeDisplay {
  * - A 300ms stability timer to detect when a fade has settled
  * - A 450ms linger then 220ms fade-out sequence when volume becomes inactive
  *
+ * Note: padVolumes is cleared synchronously in clearVoice (audioState.ts) at the
+ * same time as removePlayingPad, so there is no stale-entry race to guard against here.
+ *
  * @param padId - The pad ID to watch in playbackStore
  * @param isDragging - Whether the user is actively dragging the volume slider
  * @param dragVolume - The instantaneous drag volume (0–1), or null when not dragging

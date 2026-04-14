@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { createMockLayer } from "@/test/factories";
 import { PadButtonProgress } from "./PadButtonProgress";
