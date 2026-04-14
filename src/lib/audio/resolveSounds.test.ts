@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { filterSoundsByTags, resolveLayerSounds } from "./resolveSounds";
-import type { Sound, Layer } from "@/lib/schemas";
+import { createMockLayer } from "@/test/factories";
+import type { Sound } from "@/lib/schemas";
 
 function makeSound(overrides: Partial<Sound> & { id: string }): Sound {
   return {
@@ -12,49 +13,21 @@ function makeSound(overrides: Partial<Sound> & { id: string }): Sound {
   };
 }
 
-function makeAssignedLayer(soundIds: string[]): Layer {
-  return {
-    id: "layer-1",
-    name: "Layer 1",
-    volume: 100,
+function makeAssignedLayer(soundIds: string[]) {
+  return createMockLayer({
     selection: {
       type: "assigned",
       instances: soundIds.map((id, i) => ({ id: `inst-${i}`, soundId: id, volume: 100 })),
     },
-    arrangement: "simultaneous",
-    playbackMode: "one-shot",
-    retriggerMode: "restart",
-    cycleMode: false,
-    fadeDurationMs: null,
-  };
+  });
 }
 
-function makeTagLayer(tagIds: string[], matchMode: "any" | "all" = "any"): Layer {
-  return {
-    id: "layer-tag",
-    name: "Tag Layer",
-    volume: 100,
-    selection: { type: "tag", tagIds, matchMode },
-    arrangement: "simultaneous",
-    playbackMode: "one-shot",
-    retriggerMode: "restart",
-    cycleMode: false,
-    fadeDurationMs: null,
-  };
+function makeTagLayer(tagIds: string[], matchMode: "any" | "all" = "any") {
+  return createMockLayer({ selection: { type: "tag", tagIds, matchMode, defaultVolume: 100 } });
 }
 
-function makeSetLayer(setId: string): Layer {
-  return {
-    id: "layer-set",
-    name: "Set Layer",
-    volume: 100,
-    selection: { type: "set", setId },
-    arrangement: "simultaneous",
-    playbackMode: "one-shot",
-    retriggerMode: "restart",
-    cycleMode: false,
-    fadeDurationMs: null,
-  };
+function makeSetLayer(setId: string) {
+  return createMockLayer({ selection: { type: "set", setId, defaultVolume: 100 } });
 }
 
 describe("filterSoundsByTags", () => {
@@ -146,6 +119,12 @@ describe("resolveLayerSounds", () => {
     it("returns empty array when instances list is empty", () => {
       const layer = makeAssignedLayer([]);
       expect(resolveLayerSounds(layer, allSounds)).toEqual([]);
+    });
+
+    it("returns duplicate entries when the same soundId appears multiple times", () => {
+      // Two instances referencing s1 → both are returned (preserves arrangement order)
+      const layer = makeAssignedLayer(["s1", "s1"]);
+      expect(resolveLayerSounds(layer, allSounds)).toEqual([s1, s1]);
     });
   });
 

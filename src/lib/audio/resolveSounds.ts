@@ -30,6 +30,10 @@ export function resolveLayerSounds(layer: Layer, sounds: Sound[]): Sound[] {
     }
     case "set":
       return sounds.filter((s) => s.sets.includes(sel.setId));
+    default: {
+      const _exhaustive: never = sel;
+      return _exhaustive;
+    }
   }
 }
 
@@ -42,6 +46,11 @@ export function resolveLayerSounds(layer: Layer, sounds: Sound[]): Sound[] {
  * Sounds without a filePath are always excluded.
  * An empty tagIds array always returns an empty result (guards against
  * `.every()` on an empty array returning true).
+ *
+ * NOTE: Unlike `resolveLayerSounds`, this function filters by filePath — it is
+ * intended for UI validation checks (e.g., "are there any playable sounds for
+ * this tag selection?"). New code should prefer `resolveLayerSounds` for
+ * full resolution and apply `.filter(s => !!s.filePath)` explicitly if needed.
  */
 export function filterSoundsByTags(
   sounds: Sound[],

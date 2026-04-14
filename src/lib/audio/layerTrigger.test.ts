@@ -101,7 +101,7 @@ describe("layerTrigger", () => {
       const { resolveSounds } = await import("./layerTrigger");
       const withPath = createMockSound({ id: "t1", filePath: "t1.wav", tags: ["drums"] });
       const noPath = createMockSound({ id: "t2", filePath: undefined, tags: ["drums"] });
-      const layer = createMockLayer({ selection: { type: "tag", tagIds: ["drums"], matchMode: "any" } });
+      const layer = createMockLayer({ selection: { type: "tag", tagIds: ["drums"], matchMode: "any", defaultVolume: 100 } });
       expect(resolveSounds(layer, [withPath, noPath])).toEqual([withPath]);
     });
 
@@ -109,7 +109,7 @@ describe("layerTrigger", () => {
       const { resolveSounds } = await import("./layerTrigger");
       const withPath = createMockSound({ id: "s1", filePath: "s1.wav", sets: ["set-x"] });
       const noPath = createMockSound({ id: "s2", filePath: undefined, sets: ["set-x"] });
-      const layer = createMockLayer({ selection: { type: "set", setId: "set-x" } });
+      const layer = createMockLayer({ selection: { type: "set", setId: "set-x", defaultVolume: 100 } });
       expect(resolveSounds(layer, [withPath, noPath])).toEqual([withPath]);
     });
   });

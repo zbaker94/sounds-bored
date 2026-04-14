@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Layers with the same sound assigned multiple times now correctly play each instance in order, preserving the intended arrangement.
+- Improved internal type safety ensures unrecognized layer selection types are caught at build time rather than silently failing at runtime.
 - Sounds assigned via tags or sets now resolve consistently across playback, UI, export, and preload — fixing potential mismatches where different parts of the app used different logic
 - Tag-based layers with an empty tag list now correctly return no sounds instead of unintended results
 - Large file preloading for tag- and set-based layers now works correctly on scene load
