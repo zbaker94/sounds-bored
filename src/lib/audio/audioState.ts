@@ -53,6 +53,8 @@
  */
 
 import { getAudioContext, getMasterGain } from "./audioContext";
+import { clearAllBuffers } from "./bufferCache";
+import { clearAllStreamingElements, clearAllSizeCache } from "./streamingCache";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { AudioVoice } from "./audioVoice";
 import type { Sound } from "@/lib/schemas";
@@ -775,4 +777,9 @@ export function clearAllAudioState(): void {
   stopAllVoices();
   clearAllLayerGains();
   clearAllPadGains();
+  // Release decoded PCM memory from the closed project and discard pre-buffered
+  // HTMLAudioElements so they do not accumulate across project switches.
+  clearAllBuffers();
+  clearAllStreamingElements();
+  clearAllSizeCache();
 }
