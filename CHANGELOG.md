@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Downloads now correctly handle edge cases: a "completed" download with no output file is treated as a failure instead of silently storing an empty path
+- Late progress events from a cancelled, completed, or failed download are safely ignored, preventing unexpected status changes
+- Download status transitions now properly clear stale fields (speed, ETA, error) when a job moves to a new state
 - Fixed a bug where attempting to stream a sound with no file path would silently pass an invalid value to the audio system — it now throws a clear error immediately.
 - Switching between projects now properly releases audio memory, preventing decoded sound data and streaming buffers from accumulating across project sessions.
 - Fixed a memory leak where completed or cancelled download and export jobs were never removed from internal tracking maps, causing unbounded memory growth over long sessions.
