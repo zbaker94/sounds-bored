@@ -1,6 +1,17 @@
 import type { Layer, Sound } from "@/lib/schemas";
 
 /**
+ * Module-level WeakMap cache: Sound[] reference → Map<id, Sound>.
+ * Re-used across all calls that share the same sounds array reference.
+ * Exported only for test introspection — do not use in production code.
+ *
+ * Why WeakMap: libraryStore uses Immer, so the sounds array reference is
+ * stable until the library changes (at which point Immer produces a new
+ * reference and the old Map is naturally GC-eligible).
+ */
+export const _soundByIdCache = new WeakMap<Sound[], Map<string, Sound>>();
+
+/**
  * Resolve a layer's selection (assigned / tag / set) into the matching Sound[].
  *
  * Does NOT filter by filePath — returns all matching sounds including those
@@ -15,7 +26,12 @@ export function resolveLayerSounds(layer: Layer, sounds: Sound[]): Sound[] {
   const sel = layer.selection;
   switch (sel.type) {
     case "assigned": {
-      const soundById = new Map(sounds.map((s) => [s.id, s]));
+      let cached = _soundByIdCache.get(sounds);
+      if (!cached) {
+        cached = new Map(sounds.map((s) => [s.id, s]));
+        _soundByIdCache.set(sounds, cached);
+      }
+      const soundById = cached;
       return sel.instances
         .map((inst) => soundById.get(inst.soundId))
         .filter((s): s is Sound => s !== undefined);

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved audio playback performance by caching sound lookups — the app no longer rebuilds an internal sound index on every pad trigger, reducing CPU overhead during live performance.
 - Added tests to ensure the audio master gain subscription is only created once, preventing duplicate listeners and redundant gain updates
 - Added integration tests to verify the audio store's selector-based subscriptions correctly filter out unrelated state changes, keeping master volume updates isolated and efficient
 - Fixed master volume control to only respond to volume changes instead of all audio state updates, preventing unnecessary gain node adjustments during high-frequency pad playback tracking (60fps)
