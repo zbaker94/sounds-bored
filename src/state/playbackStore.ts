@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 
 // NOTE: All non-serializable audio engine state (voiceMap, layerVoiceMap, GainNodes,
 // streaming audio, chain queues, fade tracking) lives in src/lib/audio/audioState.ts.
@@ -87,7 +88,7 @@ export const initialPlaybackState = {
   isPreviewPlaying: false,
 };
 
-export const usePlaybackStore = create<PlaybackState>()((set) => ({
+export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((set) => ({
   masterVolume: 100,
   setMasterVolume: (volume) => set({ masterVolume: volume }),
 
@@ -135,4 +136,4 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
       ...(snapshot.layerPlayOrder !== undefined ? { layerPlayOrder: snapshot.layerPlayOrder } : {}),
       ...(snapshot.layerChain !== undefined ? { layerChain: snapshot.layerChain } : {}),
     })),
-}));
+})));
