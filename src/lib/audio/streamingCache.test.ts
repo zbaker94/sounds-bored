@@ -304,6 +304,16 @@ describe("getOrCreateStreamingElement — stale context rebuild", () => {
     expect(third.sourceNode).toBe(second.sourceNode);
     expect(ctx2.createMediaElementSource).toHaveBeenCalledTimes(1);
   });
+
+  it("throws a descriptive error when sound has no filePath", () => {
+    // Expected: getOrCreateStreamingElement must throw rather than silently pass
+    // undefined to convertFileSrc — the non-null assertion (!) was the bug.
+    const sound = createMockSound({ filePath: undefined });
+    const ctx = makeMockCtx();
+    expect(() => getOrCreateStreamingElement(sound, ctx as any)).toThrow(
+      /no filePath/,
+    );
+  });
 });
 
 describe("evictStreamingElement", () => {

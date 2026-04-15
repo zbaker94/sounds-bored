@@ -71,10 +71,14 @@ export function getOrCreateStreamingElement(
   sound: Sound,
   ctx: AudioContext,
 ): { audio: HTMLAudioElement; sourceNode: MediaElementAudioSourceNode } {
+  if (!sound.filePath) {
+    throw new Error(`[streamingCache] Sound "${sound.id}" has no filePath`);
+  }
+
   let entry = streamingElementCache.get(sound.id);
 
   if (!entry) {
-    const url = convertFileSrc(sound.filePath!);
+    const url = convertFileSrc(sound.filePath);
     const audio = createStreamingAudioElement(url);
     entry = { audio, sourceNode: null, ownerCtx: null };
     streamingElementCache.set(sound.id, entry);
