@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, writeTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
-import { join, appLocalDataDir } from "@tauri-apps/api/path";
+import { join, basename, dirname, appLocalDataDir } from "@tauri-apps/api/path";
 import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
@@ -311,7 +311,7 @@ export async function saveProjectAs(
 
   // Temp-folder cleanup is outside the rollback scope: by this point the new project
   // has been successfully written, so any failure here must not undo it.
-  if (currentPath.includes("temp_")) {
+  if (await isTempProjectFolder(currentPath)) {
     await discardTemporaryProject(currentPath);
   }
 
@@ -322,15 +322,46 @@ export async function saveProjectAs(
 }
 
 /**
+ * Normalizes a path for cross-platform comparison: converts backslashes to
+ * forward slashes and strips any trailing separators. Both sides of a path
+ * comparison must pass through this function so that Windows backslash paths,
+ * trailing separators, and differing separators from different Tauri path APIs
+ * do not produce false negatives.
+ */
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+/**
+ * Returns true only when `folderPath` is a legitimate temporary project folder:
+ * it must be a direct child of the app's local-data temp root AND its name must
+ * start with "temp_". Checking both conditions prevents a user project whose
+ * *path* contains "temp_" (e.g. C:/Users/temp_user/MySounds) from being matched.
+ * Paths are normalized before comparison to handle Windows backslashes and
+ * trailing separators.
+ */
+async function isTempProjectFolder(folderPath: string): Promise<boolean> {
+  if (!folderPath) return false;
+  const tempRoot = normalizePath(await join(await appLocalDataDir(), APP_FOLDER));
+  // Normalize the input before extracting components so trailing separators
+  // and backslashes don't cause basename/dirname to return unexpected results.
+  const normalized = normalizePath(folderPath);
+  const folderName = await basename(normalized);
+  const folderParent = normalizePath(await dirname(normalized));
+  return folderParent === tempRoot && folderName.startsWith("temp_");
+}
+
+/**
  * Safely removes a temporary project folder.
- * Only deletes folders whose path contains "temp_" as a safety guard against
- * accidentally deleting user project folders.
- * Swallows removal errors (logs a warning) — callers should not fail if cleanup fails.
+ * Validates that the folder is a direct child of the app's temp root and that
+ * its name starts with "temp_" — substring matching alone is insufficient because
+ * it would also match user paths like C:/Users/temp_user/MyProject.
+ * Swallows removal errors — callers should not fail if cleanup fails.
  *
- * @throws {Error} If the path does not appear to be a temporary folder
+ * @throws {Error} If the path does not appear to be a legitimate temporary folder
  */
 export async function discardTemporaryProject(folderPath: string): Promise<void> {
-  if (!folderPath || !folderPath.includes("temp_")) {
+  if (!(await isTempProjectFolder(folderPath))) {
     throw new Error(
       `Cannot discard folder — path does not appear to be a temporary project: "${folderPath}"`
     );
