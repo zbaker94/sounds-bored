@@ -15,11 +15,14 @@ export function getMasterGain(): GainNode {
     masterGain.gain.value = usePlaybackStore.getState().masterVolume / 100;
     masterGain.connect(c.destination);
 
-    usePlaybackStore.subscribe((state, prevState) => {
-      if (masterGain && state.masterVolume !== prevState.masterVolume) {
-        masterGain.gain.value = state.masterVolume / 100;
-      }
-    });
+    // Subscribe only to masterVolume so the callback never fires for unrelated
+    // state changes (e.g. the per-pad padVolumes tick at 60fps).
+    usePlaybackStore.subscribe(
+      (s) => s.masterVolume,
+      (masterVolume) => {
+        if (masterGain) masterGain.gain.value = masterVolume / 100;
+      },
+    );
   }
   return masterGain;
 }

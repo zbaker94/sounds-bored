@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed master volume control to only respond to volume changes instead of all audio state updates, preventing unnecessary gain node adjustments during high-frequency pad playback tracking (60fps)
 - Auto-save no longer scans the filesystem for missing sound files every 30 seconds, reducing unnecessary disk I/O during normal use.
 - Fixed a bug where projects stored in paths containing "temp_" (e.g. a user folder named `temp_user`) could be accidentally deleted when saving a project to a new location
 - Downloads now correctly handle edge cases: a "completed" download with no output file is treated as a failure instead of silently storing an empty path
