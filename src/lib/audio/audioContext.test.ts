@@ -95,6 +95,14 @@ describe("getMasterGain — masterVolume subscription", () => {
     expect(mockGainValue).toBe(0.5);
   });
 
+  it("subscribes to the store exactly once across multiple getMasterGain() calls", async () => {
+    const { getMasterGain } = await import("./audioContext");
+    getMasterGain();
+    getMasterGain();
+    getMasterGain();
+    expect(mockUsePlaybackStore.subscribe).toHaveBeenCalledTimes(1);
+  });
+
   it("does NOT update gain.value when an unrelated store field changes", async () => {
     const { getMasterGain } = await import("./audioContext");
     getMasterGain();

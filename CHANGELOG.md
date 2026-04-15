@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Added tests to ensure the audio master gain subscription is only created once, preventing duplicate listeners and redundant gain updates
+- Added integration tests to verify the audio store's selector-based subscriptions correctly filter out unrelated state changes, keeping master volume updates isolated and efficient
 - Fixed master volume control to only respond to volume changes instead of all audio state updates, preventing unnecessary gain node adjustments during high-frequency pad playback tracking (60fps)
 - Auto-save no longer scans the filesystem for missing sound files every 30 seconds, reducing unnecessary disk I/O during normal use.
 - Fixed a bug where projects stored in paths containing "temp_" (e.g. a user folder named `temp_user`) could be accidentally deleted when saving a project to a new location
