@@ -664,4 +664,64 @@ describe("discardTemporaryProject", () => {
       discardTemporaryProject("/app-local-data/SoundsBored/temp_Test_123")
     ).resolves.toBeUndefined();
   });
+
+  it("should throw if 'temp_' appears only in a parent directory — not the folder name", async () => {
+    // /Users/temp_user/MyProject passes the old includes("temp_") check but is NOT a temp folder
+    await expect(
+      discardTemporaryProject("/Users/temp_user/MyProject")
+    ).rejects.toThrow("Cannot discard");
+
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
+
+  it("should throw if the folder name starts with 'temp_' but is outside the app temp root", async () => {
+    // Folder name looks right but it's not in the app's data directory
+    await expect(
+      discardTemporaryProject("/some/other/path/temp_MyProject_123")
+    ).rejects.toThrow("Cannot discard");
+
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
+
+  it("handles a valid temp path with a trailing separator", async () => {
+    mockFs.remove.mockResolvedValue(undefined);
+    // Trailing slash must not cause dirname to return the folder itself
+    await discardTemporaryProject("/app-local-data/SoundsBored/temp_Test_123/");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      "/app-local-data/SoundsBored/temp_Test_123/",
+      { recursive: true }
+    );
+  });
+
+  it("handles a valid temp path with Windows-style backslash separators", async () => {
+    mockFs.remove.mockResolvedValue(undefined);
+    mockPath.appLocalDataDir.mockResolvedValueOnce("C:\\app-local-data");
+    mockPath.join.mockImplementationOnce((...p: string[]) => p.join("\\"));
+    await discardTemporaryProject("C:\\app-local-data\\SoundsBored\\temp_Test_123");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      "C:\\app-local-data\\SoundsBored\\temp_Test_123",
+      { recursive: true }
+    );
+  });
+});
+
+describe("saveProjectAs — does not delete non-temp folders containing 'temp_' in path", () => {
+  beforeEach(() => {
+    resetTauriMocks();
+  });
+
+  it("should not delete a permanent folder whose path contains 'temp_' in a parent directory", async () => {
+    // A user whose home path happens to contain "temp_" — must never be deleted
+    const permanentPath = "/Users/temp_user/Projects/MySoundboard";
+    mockDialog.open.mockResolvedValue("/new/location");
+    mockFs.readDir.mockResolvedValue([]);
+    const project = createMockProject({ name: "Test" });
+
+    const result = await saveProjectAs("Test", permanentPath, project);
+
+    expect(result).not.toBeNull();
+    // remove() must never be called at all — no rollback needed on happy path
+    // and the original permanent folder must not be touched
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
 });

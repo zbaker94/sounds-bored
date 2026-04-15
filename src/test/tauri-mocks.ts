@@ -30,6 +30,16 @@ export const mockFs = {
  */
 export const mockPath = {
   join: vi.fn((...paths: string[]) => paths.join("/")),
+  basename: vi.fn((path: string) => {
+    const normalized = path.replace(/\\/g, "/");
+    const parts = normalized.split("/").filter(Boolean);
+    return parts[parts.length - 1] ?? "";
+  }),
+  dirname: vi.fn((path: string) => {
+    const normalized = path.replace(/\\/g, "/");
+    const idx = normalized.lastIndexOf("/");
+    return idx > 0 ? normalized.substring(0, idx) : "/";
+  }),
   tempDir: vi.fn(() => Promise.resolve("/tmp")),
   appDataDir: vi.fn(() => Promise.resolve("/app-data")),
   appLocalDataDir: vi.fn(() => Promise.resolve("/app-local-data")),

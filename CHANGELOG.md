@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where projects stored in paths containing "temp_" (e.g. a user folder named `temp_user`) could be accidentally deleted when saving a project to a new location
 - Downloads now correctly handle edge cases: a "completed" download with no output file is treated as a failure instead of silently storing an empty path
 - Late progress events from a cancelled, completed, or failed download are safely ignored, preventing unexpected status changes
 - Download status transitions now properly clear stale fields (speed, ETA, error) when a job moves to a new state
