@@ -32,8 +32,10 @@ vi.mock("sonner", () => ({
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 import { toast } from "sonner";
+import { refreshMissingState } from "@/lib/library.reconcile";
 
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
+const mockRefreshMissingState = refreshMissingState as ReturnType<typeof vi.fn>;
 
 /**
  * Put projectStore into a state where auto-save is eligible to run:
@@ -62,6 +64,7 @@ beforeEach(() => {
   mockSaveProjectMutate.mockReset();
   mockSaveLibrarySync.mockReset();
   mockToastError.mockReset();
+  mockRefreshMissingState.mockReset();
 });
 
 afterEach(() => {
@@ -283,6 +286,24 @@ describe("useAutoSave", () => {
       libraryOptions.onError(new Error("ENOSPC"));
     });
     expect(mockToastError).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT call refreshMissingState on mount or interval ticks", () => {
+    seedDirtyPermanentProject();
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Initial mount must not trigger a filesystem scan
+    expect(mockRefreshMissingState).not.toHaveBeenCalled();
+
+    // Advance two full intervals — still no filesystem scan
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    // The effect did run (saves were attempted) but the missing-state scan did not
+    expect(mockSaveProjectMutate).toHaveBeenCalled();
+    expect(mockRefreshMissingState).not.toHaveBeenCalled();
   });
 
   it("wires an onError handler to the library save as well", () => {
