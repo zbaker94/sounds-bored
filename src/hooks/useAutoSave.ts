@@ -4,7 +4,6 @@ import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject } from "@/lib/project.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
-import { refreshMissingState } from "@/lib/library.reconcile";
 import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 
 /**
@@ -15,9 +14,16 @@ import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 const AUTO_SAVE_ERROR_DEBOUNCE_MS = 60_000;
 
 /**
- * Hook to periodically save the current project.
+ * Hook to periodically save the current project and library.
  * Only saves when isDirty is true. The interval is stable across project mutations
  * — only restarts when folderPath changes.
+ *
+ * Missing-status checks (`refreshMissingState`) are NOT performed here.
+ * They are triggered on specific events instead (project load, audio errors,
+ * manual reconcile) to avoid O(library size) filesystem scans every 30 seconds.
+ * Consequence: if a user deletes a sound file externally while the app is open,
+ * the Sounds panel will not show it as missing until they next attempt playback,
+ * preview, or manual reconcile. This is an intentional UX tradeoff.
  */
 export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const folderPath = useProjectStore((s) => s.folderPath);
@@ -87,12 +93,10 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
 
     saveCurrentProject();
     saveLibrary();
-    void refreshMissingState();
 
     const intervalId = setInterval(() => {
       saveCurrentProject();
       saveLibrary();
-      void refreshMissingState();
     }, interval);
     return () => clearInterval(intervalId);
   }, [folderPath, isTemporary, interval, saveCurrentLibrarySync]);
