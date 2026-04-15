@@ -1,12 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   loadGlobalLibrary,
   saveGlobalLibrary,
   getLibraryFilePath,
-  LibraryValidationError,
 } from "./library";
-import { mockPath, createMockFileSystem } from "@/test/tauri-mocks";
-import { CURRENT_LIBRARY_VERSION } from "./constants";
+import { mockPath, mockFs, createMockFileSystem } from "@/test/tauri-mocks";
+import { CURRENT_LIBRARY_VERSION, LIBRARY_FILE_NAME } from "./constants";
 import { createMockGlobalLibrary } from "@/test/factories";
 import { GlobalLibrary } from "./schemas";
 
@@ -46,24 +45,44 @@ describe("loadGlobalLibrary", () => {
     expect(result.tags[0].name).toBe("Drums");
   });
 
-  it("throws LibraryValidationError for completely invalid JSON structure", async () => {
+  it("recovers from completely invalid JSON structure — renames file and returns empty library", async () => {
     createMockFileSystem({
       "/app-data/SoundsBored/library.json": JSON.stringify({ invalid: true }),
     });
+    const onCorruption = vi.fn();
 
-    await expect(loadGlobalLibrary()).rejects.toBeInstanceOf(
-      LibraryValidationError,
+    const result = await loadGlobalLibrary({ onCorruption });
+
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/library.json",
+      "/app-data/SoundsBored/library.corrupt.json",
+    );
+    expect(result.sounds).toEqual([]);
+    expect(result.tags).toEqual([]);
+    expect(result.sets).toEqual([]);
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+    expect(onCorruption).toHaveBeenCalledWith(
+      expect.stringContaining(LIBRARY_FILE_NAME),
+    );
+    expect(onCorruption).toHaveBeenCalledWith(
+      expect.stringContaining("was corrupt and has been reset"),
     );
   });
 
-  it("throws LibraryValidationError for SyntaxError (malformed JSON text)", async () => {
+  it("recovers from SyntaxError (malformed JSON text) — renames file and returns empty library", async () => {
     createMockFileSystem({
       "/app-data/SoundsBored/library.json": "{not valid json at all",
     });
+    const onCorruption = vi.fn();
 
-    const err = await loadGlobalLibrary().catch((e) => e);
-    expect(err).toBeInstanceOf(LibraryValidationError);
-    expect((err as LibraryValidationError).message).toContain("Invalid JSON");
+    const result = await loadGlobalLibrary({ onCorruption });
+
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/library.json",
+      "/app-data/SoundsBored/library.corrupt.json",
+    );
+    expect(result.sounds).toEqual([]);
+    expect(onCorruption).toHaveBeenCalledTimes(1);
   });
 
   it("successfully migrates and loads library with duplicate sound IDs", async () => {
@@ -109,7 +128,7 @@ describe("loadGlobalLibrary", () => {
     expect(result.sounds[0].durationMs).toBeUndefined();
   });
 
-  it("throws LibraryValidationError for future library version", async () => {
+  it("recovers from future library version (MigrationError) — renames file and returns empty library", async () => {
     createMockFileSystem({
       "/app-data/SoundsBored/library.json": JSON.stringify({
         version: "99.0.0",
@@ -118,10 +137,46 @@ describe("loadGlobalLibrary", () => {
         sets: [],
       }),
     });
+    const onCorruption = vi.fn();
 
-    const err = await loadGlobalLibrary().catch((e) => e);
-    expect(err).toBeInstanceOf(LibraryValidationError);
-    expect((err as LibraryValidationError).message).toContain("newer version");
+    const result = await loadGlobalLibrary({ onCorruption });
+
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/library.json",
+      "/app-data/SoundsBored/library.corrupt.json",
+    );
+    expect(result.sounds).toEqual([]);
+    expect(onCorruption).toHaveBeenCalledTimes(1);
+  });
+
+  it("works without onCorruption callback — no crash", async () => {
+    createMockFileSystem({
+      "/app-data/SoundsBored/library.json": JSON.stringify({ invalid: true }),
+    });
+
+    const result = await loadGlobalLibrary();
+    expect(result.sounds).toEqual([]);
+    expect(result.tags).toEqual([]);
+    expect(result.sets).toEqual([]);
+  });
+
+  it("proceeds with recovery even if rename fails", async () => {
+    const files = createMockFileSystem({
+      "/app-data/SoundsBored/library.json": JSON.stringify({ invalid: true }),
+    });
+    mockFs.rename.mockRejectedValue(new Error("EEXIST"));
+    const onCorruption = vi.fn();
+
+    const result = await loadGlobalLibrary({ onCorruption });
+
+    expect(result.sounds).toEqual([]);
+    expect(onCorruption).toHaveBeenCalledTimes(1);
+    // Fresh default written
+    const written = files["/app-data/SoundsBored/library.json"];
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written);
+    expect(parsed.version).toBe(CURRENT_LIBRARY_VERSION);
+    expect(parsed.sounds).toEqual([]);
   });
 });
 

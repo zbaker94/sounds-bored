@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- If your sound library or recent projects list becomes corrupted, the app now automatically recovers instead of failing to load — the corrupt file is backed up and a fresh empty one is written in its place
+- A warning notification is shown when corruption recovery occurs, so you know your library or history was reset
+- Unexpected I/O errors (e.g., permission denied) still surface as error notifications and are not silently swallowed
 - When your sound library file is corrupted or contains invalid data, you now see a specific error message explaining what went wrong instead of a generic failure notice.
 - The app can now automatically repair legacy library files that contain duplicate sounds, tags, or sets — keeping the first occurrence of each duplicate rather than failing to load.
 - Sound entries with invalid duration or file size values (negative numbers, infinity) are automatically cleaned up when loading older library files.

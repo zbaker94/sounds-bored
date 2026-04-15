@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   getHistoryFilePath,
   ensureHistoryFile,
@@ -138,27 +138,111 @@ describe("loadProjectHistory", () => {
     expect(result).toEqual([]);
   });
 
-  it("should throw on invalid JSON", async () => {
+  it("recovers from invalid JSON — renames corrupt file, writes empty default, calls onCorruption", async () => {
     mockFs.exists.mockResolvedValue(true);
     mockFs.readTextFile.mockResolvedValue("invalid json {");
+    mockFs.rename.mockResolvedValue(undefined);
+    mockFs.writeTextFile.mockResolvedValue(undefined);
+    const onCorruption = vi.fn();
 
-    await expect(loadProjectHistory()).rejects.toThrow();
+    const result = await loadProjectHistory({ onCorruption });
+
+    expect(result).toEqual([]);
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.corrupt.json"
+    );
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "[]"
+    );
+    expect(onCorruption).toHaveBeenCalledTimes(1);
+    expect(onCorruption.mock.calls[0][0]).toContain("corrupt");
   });
 
-  it("should throw on invalid schema", async () => {
+  it("recovers from invalid schema — renames corrupt file and returns empty history", async () => {
     mockFs.exists.mockResolvedValue(true);
     mockFs.readTextFile.mockResolvedValue(
       JSON.stringify([{ name: "Missing path and date" }])
     );
+    mockFs.rename.mockResolvedValue(undefined);
+    mockFs.writeTextFile.mockResolvedValue(undefined);
+    const onCorruption = vi.fn();
 
-    await expect(loadProjectHistory()).rejects.toThrow();
+    const result = await loadProjectHistory({ onCorruption });
+
+    expect(result).toEqual([]);
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.corrupt.json"
+    );
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "[]"
+    );
+    expect(onCorruption).toHaveBeenCalledTimes(1);
+    expect(onCorruption.mock.calls[0][0]).toContain("corrupt");
   });
 
-  it("should throw when not an array", async () => {
+  it("recovers when JSON is not an array", async () => {
     mockFs.exists.mockResolvedValue(true);
     mockFs.readTextFile.mockResolvedValue(JSON.stringify({ not: "an array" }));
+    mockFs.rename.mockResolvedValue(undefined);
+    mockFs.writeTextFile.mockResolvedValue(undefined);
+    const onCorruption = vi.fn();
 
-    await expect(loadProjectHistory()).rejects.toThrow();
+    const result = await loadProjectHistory({ onCorruption });
+
+    expect(result).toEqual([]);
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.corrupt.json"
+    );
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "[]"
+    );
+    expect(onCorruption).toHaveBeenCalledTimes(1);
+    expect(onCorruption.mock.calls[0][0]).toContain("corrupt");
+  });
+
+  it("works without onCorruption callback — no crash when callback not provided", async () => {
+    mockFs.exists.mockResolvedValue(true);
+    mockFs.readTextFile.mockResolvedValue("invalid json {");
+    mockFs.rename.mockResolvedValue(undefined);
+    mockFs.writeTextFile.mockResolvedValue(undefined);
+
+    const result = await loadProjectHistory();
+
+    expect(result).toEqual([]);
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "[]"
+    );
+  });
+
+  it("rethrows non-corruption I/O errors", async () => {
+    mockFs.exists.mockResolvedValue(true);
+    mockFs.readTextFile.mockRejectedValue(new Error("EPERM: permission denied"));
+
+    await expect(loadProjectHistory()).rejects.toThrow("EPERM: permission denied");
+  });
+
+  it("proceeds with recovery even if rename fails", async () => {
+    mockFs.exists.mockResolvedValue(true);
+    mockFs.readTextFile.mockResolvedValue("invalid json {");
+    mockFs.rename.mockRejectedValue(new Error("EEXIST"));
+    mockFs.writeTextFile.mockResolvedValue(undefined);
+    const onCorruption = vi.fn();
+
+    const result = await loadProjectHistory({ onCorruption });
+
+    expect(result).toEqual([]);
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json",
+      "[]"
+    );
+    expect(onCorruption).toHaveBeenCalledTimes(1);
   });
 });
 

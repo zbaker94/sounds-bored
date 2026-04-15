@@ -22,6 +22,7 @@ export const mockFs = {
   readDir: vi.fn(),
   copyFile: vi.fn(),
   remove: vi.fn(),
+  rename: vi.fn(),
 };
 
 /**
@@ -117,6 +118,7 @@ export function createMockFileSystem(structure: Record<string, string | null>) {
   mockFs.mkdir.mockResolvedValue(undefined);
   mockFs.copyFile.mockResolvedValue(undefined);
   mockFs.remove.mockResolvedValue(undefined);
+  mockFs.rename.mockResolvedValue(undefined);
 
   return files;
 }
