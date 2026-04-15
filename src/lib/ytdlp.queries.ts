@@ -4,8 +4,9 @@ import { toast } from "sonner";
 import { stat } from "@tauri-apps/plugin-fs";
 import { startDownload, cancelDownload, listenToDownloadEvents } from "@/lib/ytdlp";
 import { useDownloadStore } from "@/state/downloadStore";
+import type { DownloadJobUpdate } from "@/state/downloadStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import type { DownloadJob } from "@/lib/schemas";
+import type { DownloadJob, DownloadProgressEvent } from "@/lib/schemas";
 
 export function useStartDownload() {
   const addJob = useDownloadStore((s) => s.addJob);
@@ -54,6 +55,37 @@ export function useCancelDownload() {
   });
 }
 
+/**
+ * Converts a raw DownloadProgressEvent into a typed DownloadJobUpdate.
+ * Each status variant maps to the exact fields that variant requires,
+ * ensuring the store always receives a well-formed update.
+ */
+function buildJobUpdate(event: DownloadProgressEvent): DownloadJobUpdate {
+  switch (event.status) {
+    case "completed":
+      // If the sidecar emits "completed" without an output path the file cannot
+      // be used — treat as a failed download rather than storing an empty path.
+      if (!event.outputPath) {
+        return { status: "failed", error: "Download completed but no output path was reported" };
+      }
+      return { status: "completed", percent: event.percent, outputPath: event.outputPath };
+    case "failed":
+      return { status: "failed", error: event.error ?? "Unknown error" };
+    case "cancelled":
+      return { status: "cancelled" };
+    case "downloading":
+      return { status: "downloading", percent: event.percent, speed: event.speed, eta: event.eta };
+    case "processing":
+      return { status: "processing", percent: event.percent, speed: event.speed, eta: event.eta };
+    case "queued":
+      return { status: "queued" };
+    default: {
+      const _exhaustive: never = event.status;
+      throw new Error(`Unhandled download status: ${_exhaustive}`);
+    }
+  }
+}
+
 export function useDownloadEventListener(downloadFolderId?: string) {
   const updateJob = useDownloadStore((s) => s.updateJob);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
@@ -72,14 +104,7 @@ export function useDownloadEventListener(downloadFolderId?: string) {
     let unlisten: (() => void) | undefined;
 
     listenToDownloadEvents((event) => {
-      updateJob(event.id, {
-        status: event.status,
-        percent: event.percent,
-        ...(event.speed !== undefined && { speed: event.speed }),
-        ...(event.eta !== undefined && { eta: event.eta }),
-        ...(event.error !== undefined && { error: event.error }),
-        ...(event.outputPath !== undefined && { outputPath: event.outputPath }),
-      });
+      updateJob(event.id, buildJobUpdate(event));
 
       if (event.status === "completed" && event.outputPath) {
         const outputPath = event.outputPath;
