@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where attempting to stream a sound with no file path would silently pass an invalid value to the audio system — it now throws a clear error immediately.
 - Switching between projects now properly releases audio memory, preventing decoded sound data and streaming buffers from accumulating across project sessions.
 - Fixed a memory leak where completed or cancelled download and export jobs were never removed from internal tracking maps, causing unbounded memory growth over long sessions.
 - If your sound library or recent projects list becomes corrupted, the app now automatically recovers instead of failing to load — the corrupt file is backed up and a fresh empty one is written in its place
