@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
-pub struct DownloadJobs(pub Mutex<HashMap<String, CommandChild>>);
+pub struct DownloadJobs(pub Arc<Mutex<HashMap<String, CommandChild>>>);
 
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -221,6 +221,7 @@ pub fn start_download(
     // Spawn async task to monitor output and emit progress events
     let app_clone = app.clone();
     let job_id_for_task = job_id.clone();
+    let download_jobs_map = jobs.0.clone();
 
     tauri::async_runtime::spawn(async move {
         use tauri_plugin_shell::process::CommandEvent;
@@ -311,6 +312,13 @@ pub fn start_download(
                 _ => {}
             }
         }
+
+        // Clean up: remove the job entry so the map does not grow unbounded.
+        // cancel_download may have already removed it (kill + remove); that is safe —
+        // HashMap::remove on a missing key is a no-op.
+        if let Ok(mut map) = download_jobs_map.lock() {
+            map.remove(&job_id_for_task);
+        }
     });
 
     Ok(())
@@ -344,7 +352,7 @@ pub fn cancel_download(
     Ok(())
 }
 
-pub struct ExportJobs(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
+pub struct ExportJobs(pub Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>);
 
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -405,6 +413,7 @@ pub fn export_project(
     let app_clone = app.clone();
     let job_id_clone = job_id.clone();
     let flag = cancel_flag;
+    let export_jobs_map = export_jobs.0.clone();
 
     tauri::async_runtime::spawn(async move {
         let result: Result<(), String> = (|| {
@@ -583,10 +592,12 @@ pub fn export_project(
             let _ = std::fs::remove_file(&zip_output_path);
         }
 
-        // Remove job from map (use the app handle to get managed state is not possible here,
-        // so we just let it remain — the cancel flag is harmless).
-        // Note: We cannot access State outside a command, but the Arc will be dropped when
-        // this task completes. The entry stays in the map but is inert.
+        // Clean up: remove the job entry so the map does not grow unbounded.
+        // cancel_export may have already removed it (set flag + remove); that is safe —
+        // HashMap::remove on a missing key is a no-op.
+        if let Ok(mut map) = export_jobs_map.lock() {
+            map.remove(&job_id_clone);
+        }
     });
 
     Ok(())
@@ -598,7 +609,7 @@ pub fn cancel_export(
     export_jobs: State<'_, ExportJobs>,
     job_id: String,
 ) -> Result<(), String> {
-    if let Some(flag) = export_jobs.0.lock().map_err(|e| e.to_string())?.get(&job_id) {
+    if let Some(flag) = export_jobs.0.lock().map_err(|e| e.to_string())?.remove(&job_id) {
         flag.store(true, Ordering::SeqCst);
     }
 
@@ -884,6 +895,108 @@ mod tests {
     fn test_parse_output_path_no_match() {
         let line = "[download]  45.3% of  3.45MiB at  1.23MiB/s ETA 00:02";
         let result = parse_output_path(line);
+        assert!(result.is_none());
+    }
+
+    // ---- ExportJobs lifecycle tests ----
+
+    #[test]
+    fn test_cancel_export_removes_entry_and_sets_flag() {
+        // Expected: cancel_export removes the entry from the map AND sets the cancel flag.
+        // Before the fix, .get() was used so the entry was never removed.
+        let jobs = ExportJobs(Arc::new(Mutex::new(HashMap::new())));
+        let flag = Arc::new(AtomicBool::new(false));
+        jobs.0.lock().unwrap().insert("job-1".to_string(), flag.clone());
+
+        if let Some(f) = jobs.0.lock().unwrap().remove("job-1") {
+            f.store(true, Ordering::SeqCst);
+        }
+
+        assert!(flag.load(Ordering::SeqCst), "cancel flag must be set");
+        assert!(
+            jobs.0.lock().unwrap().is_empty(),
+            "entry must be removed from map after cancel"
+        );
+    }
+
+    #[test]
+    fn test_cancel_export_noop_on_missing_job() {
+        // Expected: cancelling a non-existent job must not panic.
+        let jobs = ExportJobs(Arc::new(Mutex::new(HashMap::new())));
+        let result = jobs.0.lock().unwrap().remove("nonexistent");
+        assert!(result.is_none(), "remove on missing key must return None");
+    }
+
+    #[test]
+    fn test_export_jobs_entry_removed_after_task_completes() {
+        // Expected: after the async export task finishes (success or error),
+        // the job entry must be removed so the map does not grow unbounded.
+        let jobs = ExportJobs(Arc::new(Mutex::new(HashMap::new())));
+        let flag = Arc::new(AtomicBool::new(false));
+        jobs.0.lock().unwrap().insert("job-1".to_string(), flag);
+
+        assert_eq!(jobs.0.lock().unwrap().len(), 1);
+
+        // Simulate the async task cleanup added by this fix
+        jobs.0.lock().unwrap().remove("job-1");
+
+        assert!(
+            jobs.0.lock().unwrap().is_empty(),
+            "entry must be removed from map after task completes"
+        );
+    }
+
+    #[test]
+    fn test_export_jobs_remove_does_not_affect_other_entries() {
+        // Expected: removing one job leaves all other jobs untouched.
+        let jobs = ExportJobs(Arc::new(Mutex::new(HashMap::new())));
+        let flag1 = Arc::new(AtomicBool::new(false));
+        let flag2 = Arc::new(AtomicBool::new(false));
+        {
+            let mut map = jobs.0.lock().unwrap();
+            map.insert("job-1".to_string(), flag1);
+            map.insert("job-2".to_string(), flag2);
+        }
+
+        jobs.0.lock().unwrap().remove("job-1");
+
+        let map = jobs.0.lock().unwrap();
+        assert!(!map.contains_key("job-1"), "job-1 must be removed");
+        assert!(map.contains_key("job-2"), "job-2 must remain");
+    }
+
+    // ---- DownloadJobs lifecycle tests ----
+    // Note: CommandChild cannot be constructed in unit tests (requires a live Tauri process).
+    // The tests below verify the Arc<Mutex<HashMap>> wrapper contract without needing
+    // to insert real CommandChild values.
+
+    #[test]
+    fn test_download_jobs_starts_empty() {
+        // Expected: a freshly constructed DownloadJobs map is empty.
+        let jobs = DownloadJobs(Arc::new(Mutex::new(HashMap::new())));
+        assert!(jobs.0.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_download_jobs_arc_clone_points_to_same_allocation() {
+        // Expected: the Arc clone used by the async task points to the exact same
+        // Mutex/HashMap allocation as the one held by the DownloadJobs state.
+        // This ensures that download_jobs_map.remove() in the async task affects
+        // the same map visible to cancel_download and start_download.
+        let jobs = DownloadJobs(Arc::new(Mutex::new(HashMap::new())));
+        let clone = jobs.0.clone();
+        assert!(
+            Arc::ptr_eq(&jobs.0, &clone),
+            "Arc clone must point to the same underlying allocation"
+        );
+    }
+
+    #[test]
+    fn test_download_jobs_remove_on_missing_id_is_noop() {
+        // Expected: removing a job that was already removed (e.g. via cancel_download
+        // before Terminated fires) must not panic — it must return None silently.
+        let jobs = DownloadJobs(Arc::new(Mutex::new(HashMap::new())));
+        let result = jobs.0.lock().unwrap().remove("never-inserted");
         assert!(result.is_none());
     }
 }

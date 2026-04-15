@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a memory leak where completed or cancelled download and export jobs were never removed from internal tracking maps, causing unbounded memory growth over long sessions.
 - If your sound library or recent projects list becomes corrupted, the app now automatically recovers instead of failing to load — the corrupt file is backed up and a fresh empty one is written in its place
 - A warning notification is shown when corruption recovery occurs, so you know your library or history was reset
 - Unexpected I/O errors (e.g., permission denied) still surface as error notifications and are not silently swallowed

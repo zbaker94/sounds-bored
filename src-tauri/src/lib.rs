@@ -1,7 +1,7 @@
 mod commands;
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,8 +12,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(commands::DownloadJobs(Mutex::new(HashMap::new())))
-        .manage(commands::ExportJobs(Mutex::new(HashMap::new())))
+        .manage(commands::DownloadJobs(Arc::new(Mutex::new(HashMap::new()))))
+        .manage(commands::ExportJobs(Arc::new(Mutex::new(HashMap::new()))))
         .invoke_handler(tauri::generate_handler![
             commands::start_download,
             commands::cancel_download,
