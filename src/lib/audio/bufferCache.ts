@@ -30,3 +30,8 @@ export async function loadBuffer(sound: Sound): Promise<AudioBuffer> {
 export function evictBuffer(soundId: string): void {
   cache.delete(soundId);
 }
+
+/** Clear the entire buffer cache (call on project close / app reset). */
+export function clearAllBuffers(): void {
+  cache.clear();
+}
