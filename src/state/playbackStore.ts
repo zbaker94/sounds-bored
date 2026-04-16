@@ -72,6 +72,13 @@ interface PlaybackState {
 
   /** Batch-set any subset of tick-managed fields in a single Zustand mutation. */
   setAudioTick: (snapshot: AudioTickSnapshot) => void;
+
+  /** Reset padVolumes and layerVolumes to empty objects.
+   *  Called by clearAllAudioState() on project close to ensure stale volumes
+   *  from one session do not leak into the next.
+   *  Callers must ensure stopAudioTick() has been called first; if the RAF tick
+   *  is still active it will repopulate these maps on the next frame. */
+  clearVolumes: () => void;
 }
 
 // Factory ensures each spread gets fresh Set/object instances — prevents tests from sharing mutable state.
@@ -136,4 +143,6 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
       ...(snapshot.layerPlayOrder !== undefined ? { layerPlayOrder: snapshot.layerPlayOrder } : {}),
       ...(snapshot.layerChain !== undefined ? { layerChain: snapshot.layerChain } : {}),
     })),
+
+  clearVolumes: () => set({ padVolumes: {}, layerVolumes: {} }),
 })));

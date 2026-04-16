@@ -893,4 +893,10 @@ export function clearAllAudioState(): void {
   clearAllBuffers();
   clearAllStreamingElements();
   clearAllSizeCache();
+  // Defensive clear of tick-managed volume maps. Production callers are expected to call
+  // stopAudioTick() first (which clears these via _clearAllTickFields), but clearAllAudioState()
+  // may also be called independently (e.g. in tests or future callers). stopAllVoices() above
+  // only clears padVolumes — not layerVolumes — so this is the single authoritative reset
+  // for both maps on tear-down, preventing stale values from leaking into the next session.
+  usePlaybackStore.getState().clearVolumes();
 }
