@@ -4156,6 +4156,67 @@ describe("pending leak guards", () => {
     vi.useRealTimers();
   });
 
+  it("starts all simultaneous layers — both layers become active after triggerPad with a 2-layer pad", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const { isLayerActive } = await import("./audioState");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer1 = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const layer2 = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer1, layer2] });
+
+    await triggerPad(pad);
+
+    // Both layers must be active — neither is blocked waiting for the other.
+    // True parallelism (both layers in-flight simultaneously) is observable only via
+    // microtask interleaving, which is covered by the pending-flag pre-pass test below.
+    expect(isLayerActive(layer1.id)).toBe(true);
+    expect(isLayerActive(layer2.id)).toBe(true);
+  });
+
+  it("sets pending for all layers in a synchronous pre-pass before any layer's async work starts", async () => {
+    // Regression guard for the pre-pass pattern: with the old sequential for-await loop,
+    // layer 2's pending flag was set only after layer 1's entire async chain completed.
+    // With the pre-pass + Promise.all, both flags are set before any applyRetriggerMode await.
+    const { triggerPad } = await import("./padPlayer");
+    const { isLayerPending } = await import("./audioState");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer1 = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const layer2 = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer1, layer2] });
+
+    // Start triggerPad without awaiting. The function yields at `await ensureResumed()` first.
+    const promise = triggerPad(pad);
+
+    // Flush the ensureResumed() microtask — this causes triggerPad to resume and run the
+    // synchronous pre-pass (setting both pending flags) before reaching Promise.all.
+    await Promise.resolve();
+
+    // Both flags must be set: the pre-pass ran synchronously in the single microtask above.
+    // The async layer callbacks have yielded at their first `await` but have not cleared yet.
+    expect(isLayerPending(layer1.id)).toBe(true);
+    expect(isLayerPending(layer2.id)).toBe(true);
+
+    await promise;
+  });
+
   it("clears pending for a layer that throws in the triggerPad loop, allowing other layers to proceed", async () => {
     const { triggerPad } = await import("./padPlayer");
 
