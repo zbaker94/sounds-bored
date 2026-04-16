@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Volume changes during playback now fade smoothly instead of snapping instantly, preventing audio clicks when adjusting pad volume mid-session
+- Invalid volume values (NaN) now default to silence instead of full volume
+- Internal sound reconciliation logic was consolidated into a single utility, improving reliability when sounds are removed from the library
 - Corrupted or invalid volume values in a pad's layer config now default to silence instead of full volume, preventing unexpected loud playback from malformed data.
 - Pads with multiple layers now trigger all layers simultaneously instead of sequentially, so sounds start at the same time as intended.
 - Rapid re-triggers are now correctly debounced across all layers at once, preventing missed or double-triggered sounds during quick pad taps.

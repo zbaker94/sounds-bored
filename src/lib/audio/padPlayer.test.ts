@@ -2973,7 +2973,7 @@ describe("setLayerVolume", () => {
 
     // When layer is playing, tick manages layerVolumes — setLayerVolume only sets the gain node.
     expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeUndefined();
-    expect(getLayerGain(layer.id)?.gain.setValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
+    expect(getLayerGain(layer.id)?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
   });
 
   it("updates the gain node value when the layer gain node exists", async () => {
@@ -3000,9 +3000,9 @@ describe("setLayerVolume", () => {
     setLayerVolume(layer.id, 0.75);
 
     // gains[0] = padGain, gains[1] = layerGain, gains[2] = voiceGain
-    // The layerGain (gains[1]) should have setValueAtTime called with 0.75
+    // The layerGain (gains[1]) should have linearRampToValueAtTime called with 0.75
     const layerGain = gains[1];
-    expect(layerGain.gain.setValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
+    expect(layerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
   });
 
   it("clamps volume to [0, 1] range", async () => {
@@ -3025,15 +3025,15 @@ describe("setLayerVolume", () => {
 
     // Test clamping values greater than 1 — gain node is clamped, tick manages store
     setLayerVolume(layer.id, 1.5);
-    expect(layerGain?.gain.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+    expect(layerGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
 
     // Test clamping values less than 0
     setLayerVolume(layer.id, -0.5);
-    expect(layerGain?.gain.setValueAtTime).toHaveBeenCalledWith(0.0, expect.any(Number));
+    expect(layerGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.0, expect.any(Number));
 
     // Test that values within range are passed through unchanged
     setLayerVolume(layer.id, 0.5);
-    expect(layerGain?.gain.setValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
+    expect(layerGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
 
     // Tick manages layerVolumes for playing layers — store is NOT directly updated
     expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeUndefined();

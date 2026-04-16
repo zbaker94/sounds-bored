@@ -109,19 +109,18 @@ describe("gainManager", () => {
   });
 
   describe("syncLayerVolume", () => {
-    it("updates an active layer gain node immediately (0–1 normalized scale)", async () => {
+    it("ramps an active layer gain node to the new value (0–1 normalized scale)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync");
-      // Initial volume value is irrelevant — syncLayerVolume overwrites it below.
       getOrCreateLayerGain("layer-sync", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync", 0.5);
 
-      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 0);
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 0.016);
     });
 
     it("is a no-op if the layer has no active gain node", async () => {
@@ -140,7 +139,7 @@ describe("gainManager", () => {
 
       syncLayerVolume("layer-sync-hi", 1.5);
 
-      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
     });
 
     it("clamps values below 0 to 0", async () => {
@@ -154,10 +153,10 @@ describe("gainManager", () => {
 
       syncLayerVolume("layer-sync-lo", -0.5);
 
-      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(0, 0);
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
     });
 
-    it("clamps NaN to 1.0 (safe default, full volume)", async () => {
+    it("clamps NaN to 0 (silence is the safe default)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
       mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
@@ -168,7 +167,7 @@ describe("gainManager", () => {
 
       syncLayerVolume("layer-sync-nan", NaN);
 
-      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
     });
   });
 
@@ -184,7 +183,7 @@ describe("gainManager", () => {
 
       setLayerVolume("layer-setlvol", 0.75);
 
-      expect(mockLayerGain.gain.setValueAtTime).toHaveBeenCalledWith(0.75, 0);
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
     });
 
     it("pushes to playback store when layer is not active", async () => {

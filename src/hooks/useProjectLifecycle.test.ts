@@ -11,7 +11,7 @@ const {
   mockToastError,
   mockAllowClose,
   mockDiscardTemporaryProject,
-  mockReconcileProjectSounds,
+  mockApplyProjectSoundReconcile,
   mockOpenOverlay,
   mockCloseOverlay,
   mockRequestSaveAndThen,
@@ -20,7 +20,7 @@ const {
   mockToastError: vi.fn(),
   mockAllowClose: vi.fn(),
   mockDiscardTemporaryProject: vi.fn().mockResolvedValue(undefined),
-  mockReconcileProjectSounds: vi.fn((project: unknown) => ({ project, removedCount: 0 })),
+  mockApplyProjectSoundReconcile: vi.fn(),
   mockOpenOverlay: vi.fn(),
   mockCloseOverlay: vi.fn(),
   mockRequestSaveAndThen: vi.fn(),
@@ -48,8 +48,8 @@ vi.mock("@/lib/project", () => ({
   discardTemporaryProject: mockDiscardTemporaryProject,
 }));
 
-vi.mock("@/lib/projectSoundReconcile", () => ({
-  reconcileProjectSounds: mockReconcileProjectSounds,
+vi.mock("@/lib/reconcileProject", () => ({
+  applyProjectSoundReconcile: mockApplyProjectSoundReconcile,
 }));
 
 vi.mock("@/state/uiStore", () => ({
@@ -85,7 +85,7 @@ describe("useProjectLifecycle — unexpected unload guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDiscardTemporaryProject.mockResolvedValue(undefined);
-    mockReconcileProjectSounds.mockImplementation((project: unknown) => ({ project, removedCount: 0 }));
+    mockApplyProjectSoundReconcile.mockReset();
     useProjectStore.setState({ ...initialProjectState });
   });
 

@@ -9,7 +9,7 @@ import { discardTemporaryProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
-import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
+import { applyProjectSoundReconcile } from "@/lib/reconcileProject";
 
 /**
  * Manages the window close lifecycle for MainPage:
@@ -21,7 +21,6 @@ export function useProjectLifecycle() {
   const folderPath = useProjectStore((s) => s.folderPath);
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const updateProject = useProjectStore((s) => s.updateProject);
   const navigate = useNavigate();
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
@@ -98,14 +97,8 @@ export function useProjectLifecycle() {
     if (cleanedProjectKeyRef.current === key) return;
     cleanedProjectKeyRef.current = key;
 
-    // Read sounds imperatively to avoid re-running this effect whenever the
-    // library changes — useReconcileLibrary handles post-reconcile cleanup.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const { project: cleaned, removedCount } = reconcileProjectSounds(project, useLibraryStore.getState().sounds);
-    if (removedCount > 0) {
-      updateProject(cleaned);
-    }
-  }, [project, folderPath, updateProject]);
+    applyProjectSoundReconcile();
+  }, [project, folderPath]);
 
   // Notify user if missing sounds are used in the loaded project
   useEffect(() => {

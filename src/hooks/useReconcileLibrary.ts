@@ -4,8 +4,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
-import { useProjectStore } from "@/state/projectStore";
+import { applyProjectSoundReconcile } from "@/lib/reconcileProject";
 
 export function useReconcileLibrary(): {
   reconcile: () => Promise<void>;
@@ -75,19 +74,7 @@ export function useReconcileLibrary(): {
       await refreshMissingState();
 
       // Auto-clean orphan soundIds from any loaded project.
-      // Reads state imperatively to avoid stale closure over project/sounds.
-      // Note: useProjectLifecycle runs a similar reconciliation on initial project load.
-      // This path handles the case where sounds are removed from the library *after*
-      // the project is already loaded (e.g., a manual library reconciliation removes
-      // a sound that a loaded project still references).
-      const currentProject = useProjectStore.getState().project;
-      if (currentProject) {
-        const latestSounds = useLibraryStore.getState().sounds;
-        const { project: cleaned, removedCount } = reconcileProjectSounds(currentProject, latestSounds);
-        if (removedCount > 0) {
-          useProjectStore.getState().updateProject(cleaned);
-        }
-      }
+      applyProjectSoundReconcile();
 
       if (useLibraryStore.getState().isDirty) {
         saveLibraryRef.current();
