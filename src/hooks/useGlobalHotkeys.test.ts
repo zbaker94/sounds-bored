@@ -121,10 +121,16 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     expect(hotkeyRegistrations["esc"]?.options).toMatchObject({ enableOnFormTags: true });
   });
 
-  it("does not register left/right with enableOnFormTags (arrows must navigate within sliders, not jump scenes)", () => {
+  it("does not register alt+left/alt+right with enableOnFormTags (modifier guards against interactive-element conflicts)", () => {
     renderHook(() => useGlobalHotkeys());
-    expect(hotkeyRegistrations["left"]?.options).not.toMatchObject({ enableOnFormTags: true });
-    expect(hotkeyRegistrations["right"]?.options).not.toMatchObject({ enableOnFormTags: true });
+    expect(hotkeyRegistrations["alt+left"]?.options).not.toMatchObject({ enableOnFormTags: true });
+    expect(hotkeyRegistrations["alt+right"]?.options).not.toMatchObject({ enableOnFormTags: true });
+  });
+
+  it("does NOT register bare left/right without Alt modifier (bare arrows conflict with inputs/comboboxes — issue #67)", () => {
+    renderHook(() => useGlobalHotkeys());
+    expect(hotkeyRegistrations["left"]).toBeUndefined();
+    expect(hotkeyRegistrations["right"]).toBeUndefined();
   });
 
   it("F callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {
@@ -152,7 +158,10 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
   });
 });
 
-describe("useGlobalHotkeys — arrow-key scene navigation", () => {
+// Note: these are registration-level unit tests — they assert which key strings are
+// passed to useHotkeys and that callbacks produce the right store mutations.
+// They do not exercise real keyboard event dispatch; that is covered by E2E/manual tests.
+describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
@@ -177,52 +186,52 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
 
   // ── Configuration ───────────────────────────────────────────────────────────
 
-  it("registers left and right arrows with preventDefault: true", () => {
+  it("registers alt+left and alt+right with preventDefault: true", () => {
     renderHook(() => useGlobalHotkeys());
-    expect(hotkeyRegistrations["left"]?.options).toMatchObject({ preventDefault: true });
-    expect(hotkeyRegistrations["right"]?.options).toMatchObject({ preventDefault: true });
+    expect(hotkeyRegistrations["alt+left"]?.options).toMatchObject({ preventDefault: true });
+    expect(hotkeyRegistrations["alt+right"]?.options).toMatchObject({ preventDefault: true });
   });
 
   // ── Guard: null / empty ─────────────────────────────────────────────────────
 
-  it("does nothing on right arrow when project is null", () => {
+  it("does nothing on alt+right when project is null", () => {
     useProjectStore.setState({ ...initialProjectState, project: null, activeSceneId: null });
     renderHook(() => useGlobalHotkeys());
-    triggerKey("right");
+    triggerKey("alt+right");
     expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
-  it("does nothing on left arrow when project is null", () => {
+  it("does nothing on alt+left when project is null", () => {
     useProjectStore.setState({ ...initialProjectState, project: null, activeSceneId: null });
     renderHook(() => useGlobalHotkeys());
-    triggerKey("left");
+    triggerKey("alt+left");
     expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
-  it("does nothing on right arrow when scenes array is empty", () => {
+  it("does nothing on alt+right when scenes array is empty", () => {
     const project = createMockProject({ scenes: [] });
     useProjectStore.setState({ ...initialProjectState, project, activeSceneId: null });
     renderHook(() => useGlobalHotkeys());
-    triggerKey("right");
+    triggerKey("alt+right");
     expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
-  it("does nothing on left arrow when scenes array is empty", () => {
+  it("does nothing on alt+left when scenes array is empty", () => {
     const project = createMockProject({ scenes: [] });
     useProjectStore.setState({ ...initialProjectState, project, activeSceneId: null });
     renderHook(() => useGlobalHotkeys());
-    triggerKey("left");
+    triggerKey("alt+left");
     expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
-  // ── Right arrow ─────────────────────────────────────────────────────────────
+  // ── Alt+Right ───────────────────────────────────────────────────────────────
 
-  describe("right arrow", () => {
+  describe("alt+right", () => {
     it("advances to next scene from first scene", () => {
       setupScenes(3, 0);
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("right");
+      triggerKey("alt+right");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-1");
     });
@@ -231,7 +240,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       setupScenes(3, 2);
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("right");
+      triggerKey("alt+right");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
@@ -240,7 +249,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       setupScenes(3, null);
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("right");
+      triggerKey("alt+right");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
@@ -251,7 +260,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       useProjectStore.setState({ activeSceneId: "scene-stale-id" });
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("right");
+      triggerKey("alt+right");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
@@ -263,21 +272,21 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-0" });
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("right");
+      triggerKey("alt+right");
 
       // activeSceneId stays as-is — single-scene guard fires
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
   });
 
-  // ── Left arrow ──────────────────────────────────────────────────────────────
+  // ── Alt+Left ────────────────────────────────────────────────────────────────
 
-  describe("left arrow", () => {
+  describe("alt+left", () => {
     it("moves to previous scene from middle scene", () => {
       setupScenes(3, 1);
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("left");
+      triggerKey("alt+left");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
@@ -286,7 +295,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       setupScenes(3, 0);
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("left");
+      triggerKey("alt+left");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-2");
     });
@@ -295,7 +304,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       setupScenes(3, null);
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("left");
+      triggerKey("alt+left");
 
       // Before fix: (-1 - 1 + 3) % 3 = 1 → scene-1. After fix: scene-0.
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
@@ -306,7 +315,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       useProjectStore.setState({ activeSceneId: "scene-stale-id" });
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("left");
+      triggerKey("alt+left");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
@@ -318,7 +327,7 @@ describe("useGlobalHotkeys — arrow-key scene navigation", () => {
       useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-0" });
       renderHook(() => useGlobalHotkeys());
 
-      triggerKey("left");
+      triggerKey("alt+left");
 
       expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
