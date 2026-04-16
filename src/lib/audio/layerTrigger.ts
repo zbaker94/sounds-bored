@@ -148,7 +148,9 @@ export async function loadLayerVoice(
   voiceVolume: number,
   padId: string,
 ): Promise<{ voice: AudioVoice; audio: HTMLAudioElement | null }> {
-  if (await checkIsLargeFile(sound)) {
+  const isLarge = await checkIsLargeFile(sound);
+
+  if (isLarge) {
     // -- Streaming path (large files) ---
     const { audio: cachedAudio, sourceNode } = getOrCreateStreamingElement(sound, ctx);
     sourceNode.disconnect();

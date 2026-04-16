@@ -78,7 +78,7 @@ export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
 
 // ─── LayerRow ────────────────────────────────────────────────────────────────
 
-function LayerRow({
+const LayerRow = memo(function LayerRow({
   pad,
   layer,
   idx,
@@ -342,7 +342,7 @@ function LayerRow({
       />
     </motion.div>
   );
-}
+});
 
 // ─── PadControlContent ───────────────────────────────────────────────────────
 

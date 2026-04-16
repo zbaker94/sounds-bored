@@ -4,9 +4,11 @@ import type { Sound } from "@/lib/schemas";
 /**
  * Compressed files at or above this size are routed to the HTMLAudioElement
  * streaming path instead of the AudioBuffer decode path.
- * 20 MB: at 128 kbps MP3 ≈ 20 minutes audio; a 20 MB WAV ≈ 55 s.
+ * 5 MB: at 256 kbps MP3 ≈ 2.5 min audio; at 128 kbps MP3 ≈ 5 min; a 5 MB WAV ≈ 28 s.
+ * Keeps short one-shot effects on the buffer path (precise loop/offset control)
+ * while routing long ambience and music tracks to streaming (avoids decodeAudioData cost).
  */
-export const LARGE_FILE_THRESHOLD_BYTES = 20 * 1024 * 1024;
+export const LARGE_FILE_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
 /** Cache: sound.id → isLarge. Avoids a HEAD request on every trigger. */
 const sizeCache = new Map<string, boolean>();
@@ -43,6 +45,10 @@ function createStreamingAudioElement(url: string): HTMLAudioElement {
   audio.crossOrigin = "anonymous";
   audio.preload = "auto";
   audio.src = url;
+  // Explicitly start the download — detached Audio elements (not in the DOM)
+  // do not always honour the preload="auto" hint in Chromium/WebView2 without
+  // an explicit load() call, leaving readyState=0 until play() is called.
+  audio.load();
   return audio;
 }
 
