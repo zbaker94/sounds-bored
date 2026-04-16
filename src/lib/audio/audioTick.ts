@@ -48,6 +48,9 @@ let prevLayerProgress: Record<string, number> = {};
 let prevLayerPlayOrder: Record<string, string[]> = {};
 let prevLayerChain: Record<string, string[]> = {};
 
+/** Exposed for test introspection only — do not use in production code. */
+export const _getPrevActiveLayerIds = (): ReadonlySet<string> => prevActiveLayerIds;
+
 /** Reset all per-frame tracker state. Called on start, self-terminate, and stop. */
 function resetTrackers(): void {
   prevPadVolumes = {};
@@ -106,7 +109,12 @@ function tick(): void {
   let nextActiveLayerIds = prevActiveLayerIds;
   if (activeLayerIdsChanged) {
     nextActiveLayerIds = getActiveLayerIdSet();
-    prevActiveLayerIds = nextActiveLayerIds;
+    // Clone before storing as prev — Set has mutating methods (add/delete/clear) that
+    // make accidental consumer mutation more likely than for plain records. No current
+    // consumer mutates the Set, but the clone is cheap (allocates only on voice-version
+    // changes, not every frame) and enforces the invariant that tick-owned prev state
+    // never aliases published store state.
+    prevActiveLayerIds = new Set(nextActiveLayerIds);
     prevLayerVoiceVersion = currentLayerVoiceVersion;
   }
 
