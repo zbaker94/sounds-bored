@@ -541,7 +541,7 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
-    });
+    }).catch((err: unknown) => { emitAudioError(err); });
   } else {
     // Regular chained mode: advance via the chain queue.
     // Read both BEFORE stop (stop deletes them).
@@ -566,7 +566,7 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
-    });
+    }).catch((err: unknown) => { emitAudioError(err); });
   }
 }
 
@@ -635,7 +635,7 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
-    });
+    }).catch((err: unknown) => { emitAudioError(err); });
   } else {
     // Regular chained mode: calculate position from playOrder + remaining chain.
     // Read BEFORE stop (stop deletes both).
@@ -664,6 +664,6 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
       startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       usePlaybackStore.getState().addPlayingPad(pad.id);
-    });
+    }).catch((err: unknown) => { emitAudioError(err); });
   }
 }

@@ -138,7 +138,11 @@ export function useDownloadEventListener(downloadFolderId?: string) {
           });
           updateJob(eventId, { soundId });
           toast.success("Download complete", { description: job?.outputName });
-        })();
+        })().catch((err: unknown) => {
+          toast.error("Failed to finalize download", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+        });
       }
 
       if (event.status === "failed") {
@@ -154,6 +158,10 @@ export function useDownloadEventListener(downloadFolderId?: string) {
       } else {
         unlisten = fn;
       }
+    }).catch((err: unknown) => {
+      toast.error("Failed to start download listener", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     });
 
     return () => {

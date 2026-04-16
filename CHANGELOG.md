@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Errors during layer skip (forward/back) are now caught and reported instead of silently failing
+- Download listener startup failures now show a toast notification with the error details
+- Download finalization errors now show a toast notification instead of being silently dropped
 - Fixed keyboard shortcuts (F, X, Enter, Escape) not working when a fade-level slider was focused — pressing these keys while adjusting a slider will now correctly trigger the intended action
 - Fixed hotkeys F and X not firing when a slider or input element had focus (e.g. adjusting fade duration on the pad backside or fade levels in multi-fade mode).
 - Fixed a bug where skipping forward or backward through a pad's sounds while a fade-out was in progress would cause the new sound to be silenced — the fade-out's cleanup timer now correctly cancels before the skip voice starts.
