@@ -421,8 +421,8 @@ export function deleteFadePadTimeout(padId: string): void {
  *   (which stores [0,100]) must divide by 100 before passing.
  *   Non-finite values (NaN, Infinity) default to 1 to avoid Web Audio RangeError.
  */
-export function getOrCreateLayerGain(layerId: string, volume: number, padGain: GainNode): GainNode {
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
+export function getOrCreateLayerGain(layerId: string, normalizedVolume: number, padGain: GainNode): GainNode {
+  const clamped = Number.isFinite(normalizedVolume) ? Math.max(0, Math.min(1, normalizedVolume)) : 1;
   const ctx = getAudioContext();
   const existing = layerGainMap.get(layerId);
   if (existing) {
