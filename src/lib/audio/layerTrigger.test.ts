@@ -134,6 +134,35 @@ describe("layerTrigger", () => {
     });
   });
 
+  // ── getLayerNormalizedVolume ──────────────────────────────────────────────
+
+  describe("getLayerNormalizedVolume", () => {
+    it("converts 100 to 1.0", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: 100 }))).toBeCloseTo(1.0);
+    });
+
+    it("converts 0 to 0.0", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: 0 }))).toBeCloseTo(0.0);
+    });
+
+    it("converts 80 to 0.8", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: 80 }))).toBeCloseTo(0.8);
+    });
+
+    it("clamps values above 100 to 1.0", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: 150 }))).toBeCloseTo(1.0);
+    });
+
+    it("clamps negative values to 0.0", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: -10 }))).toBeCloseTo(0.0);
+    });
+  });
+
   // ── applyRetriggerMode ────────────────────────────────────────────────────
 
   describe("applyRetriggerMode", () => {
