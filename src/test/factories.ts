@@ -1,4 +1,4 @@
-import { AppSettings, DownloadJob, GlobalFolder, GlobalLibrary, Layer, Pad, Project, ProjectHistoryEntry, Scene, Sound, SoundInstance, Tag, Set } from "@/lib/schemas";
+import { AppSettings, DownloadJob, GlobalFolder, GlobalLibrary, Layer, Pad, Project, ProjectHistoryEntry, Scene, Sound, SoundInstance, Tag, SoundSet } from "@/lib/schemas";
 import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constants";
 
 /**
@@ -206,7 +206,7 @@ export function createMockTag(overrides?: Partial<Tag>): Tag {
 /**
  * Factory for creating test Sets
  */
-export function createMockSet(overrides?: Partial<Set>): Set {
+export function createMockSet(overrides?: Partial<SoundSet>): SoundSet {
   return {
     id: crypto.randomUUID(),
     name: "Test Set",

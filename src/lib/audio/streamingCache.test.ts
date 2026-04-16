@@ -25,6 +25,7 @@ vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any) {
   this.crossOrigin = "";
   this.preload = "";
   this.pause = vi.fn();
+  this.load = vi.fn();
   this.currentTime = 0;
 }));
 

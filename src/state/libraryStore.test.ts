@@ -285,7 +285,7 @@ describe("libraryStore", () => {
   });
 
   describe("setMissingState", () => {
-    const emptySet = () => new globalThis.Set<string>();
+    const emptySet = () => new Set<string>();
 
     it("should update missingSoundIds and missingFolderIds", () => {
       const soundIds = new Set(["s1", "s2"]);

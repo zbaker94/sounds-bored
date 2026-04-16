@@ -43,8 +43,8 @@ vi.mock("@/lib/library.reconcile", () => ({
   ),
   checkMissingStatus: vi.fn(() =>
     Promise.resolve({
-      missingSoundIds: new globalThis.Set<string>(),
-      missingFolderIds: new globalThis.Set<string>(),
+      missingSoundIds: new Set<string>(),
+      missingFolderIds: new Set<string>(),
     })
   ),
   refreshMissingState: vi.fn(() => Promise.resolve()),

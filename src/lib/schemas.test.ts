@@ -17,6 +17,7 @@ import {
   PadConfigSchema,
   PadSchema,
   TagSchema,
+  SetSchema,
   DownloadProgressEventSchema,
   type ProjectHistoryEntry,
   type ProjectHistory,
@@ -1116,6 +1117,73 @@ describe("TagSchema", () => {
 
   it("accepts a tag name of exactly 100 characters", () => {
     const result = TagSchema.safeParse({ id: "t1", name: "a".repeat(100) });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("SetSchema", () => {
+  it("accepts a valid set with id and name", () => {
+    const result = SetSchema.safeParse({ id: "set-1", name: "My Set" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.id).toBe("set-1");
+      expect(result.data.name).toBe("My Set");
+    }
+  });
+
+  it("rejects a set with an empty name", () => {
+    const result = SetSchema.safeParse({ id: "set-1", name: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a set name longer than 100 characters", () => {
+    const result = SetSchema.safeParse({ id: "set-1", name: "a".repeat(101) });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a set name of exactly 100 characters", () => {
+    const result = SetSchema.safeParse({ id: "set-1", name: "a".repeat(100) });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a set without id", () => {
+    const result = SetSchema.safeParse({ name: "My Set" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a set without name", () => {
+    const result = SetSchema.safeParse({ id: "set-1" });
+    expect(result.success).toBe(false);
+  });
+
+  it("strips extra fields by default", () => {
+    const result = SetSchema.safeParse({
+      id: "set-1",
+      name: "My Set",
+      unexpected: "extra",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Zod's default behavior strips unknown fields
+      expect((result.data as Record<string, unknown>).unexpected).toBeUndefined();
+      expect(result.data).toEqual({ id: "set-1", name: "My Set" });
+    }
+  });
+
+  it("rejects a set with non-string id", () => {
+    const result = SetSchema.safeParse({ id: 123, name: "My Set" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a set with non-string name", () => {
+    const result = SetSchema.safeParse({ id: "set-1", name: 42 });
+    expect(result.success).toBe(false);
+  });
+
+  // Whitespace-only names pass .min(1) since Zod checks length not content —
+  // same behavior as TagSchema (no .trim()). UI enforces meaningful names.
+  it("accepts a whitespace-only name (matches TagSchema convention — no trim)", () => {
+    const result = SetSchema.safeParse({ id: "set-1", name: " " });
     expect(result.success).toBe(true);
   });
 });

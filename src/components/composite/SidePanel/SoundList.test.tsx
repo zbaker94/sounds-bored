@@ -41,8 +41,8 @@ vi.mock("@/lib/library.reconcile", () => ({
   ),
   checkMissingStatus: vi.fn(() =>
     Promise.resolve({
-      missingSoundIds: new globalThis.Set<string>(),
-      missingFolderIds: new globalThis.Set<string>(),
+      missingSoundIds: new Set<string>(),
+      missingFolderIds: new Set<string>(),
     }),
   ),
   refreshMissingState: vi.fn(() => Promise.resolve()),
@@ -96,8 +96,8 @@ vi.mock("@/components/modals/ResolveMissingDialog", () => ({
 interface SoundListProps {
   selectedId: string | null;
   searchQuery: string;
-  selectedSoundIds: globalThis.Set<string>;
-  onSelectionChange: (ids: globalThis.Set<string>) => void;
+  selectedSoundIds: Set<string>;
+  onSelectionChange: (ids: Set<string>) => void;
   onOpenAddToSet: () => void;
   onOpenAddTags: () => void;
 }
@@ -113,7 +113,7 @@ function renderList(props?: Partial<SoundListProps>) {
           selectedId={props?.selectedId ?? null}
           searchQuery={props?.searchQuery ?? ""}
           selectedSoundIds={
-            props?.selectedSoundIds ?? new globalThis.Set<string>()
+            props?.selectedSoundIds ?? new Set<string>()
           }
           onSelectionChange={props?.onSelectionChange ?? vi.fn()}
           onOpenAddToSet={props?.onOpenAddToSet ?? vi.fn()}
@@ -155,7 +155,7 @@ describe("SoundList", () => {
     useLibraryStore.setState({
       ...initialLibraryState,
       sounds: [missing],
-      missingSoundIds: new globalThis.Set<string>(["missing-1"]),
+      missingSoundIds: new Set<string>(["missing-1"]),
     });
 
     renderList();
@@ -178,7 +178,7 @@ describe("SoundList", () => {
     useLibraryStore.setState({
       ...initialLibraryState,
       sounds: [missing],
-      missingSoundIds: new globalThis.Set<string>(["missing-1"]),
+      missingSoundIds: new Set<string>(["missing-1"]),
     });
 
     renderList();
@@ -213,7 +213,7 @@ describe("SoundList", () => {
     });
 
     expect(onSelectionChange).toHaveBeenCalledTimes(1);
-    const nextSet = onSelectionChange.mock.calls[0][0] as globalThis.Set<string>;
+    const nextSet = onSelectionChange.mock.calls[0][0] as Set<string>;
     expect(nextSet.has("k")).toBe(true);
   });
 
@@ -234,7 +234,7 @@ describe("SoundList", () => {
     });
 
     expect(onSelectionChange).toHaveBeenCalledTimes(1);
-    const nextSet = onSelectionChange.mock.calls[0][0] as globalThis.Set<string>;
+    const nextSet = onSelectionChange.mock.calls[0][0] as Set<string>;
     expect(nextSet.has("a")).toBe(true);
     expect(nextSet.has("b")).toBe(true);
     expect(nextSet.size).toBe(2);

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Set names now require at least 1 character and have a maximum length of 100 characters, preventing empty or overly long set names from being saved.
+- The `Set` type has been renamed to `SoundSet` internally to avoid conflicts with JavaScript's built-in `Set` type, improving code reliability.
 - Fixed a bug where stopping a pad could incorrectly silence sounds in a newly loaded project that reused the same pad ID.
 - Errors during layer skip (forward/back) are now caught and reported instead of silently failing
 - Download listener startup failures now show a toast notification with the error details

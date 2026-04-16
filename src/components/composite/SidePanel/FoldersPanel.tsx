@@ -219,7 +219,7 @@ export function FoldersPanel({
 
   function handleRequestDeleteFolder() {
     if (selectedFolder && project) {
-      const folderSoundIds = new globalThis.Set(
+      const folderSoundIds = new Set(
         sounds
           .filter((s) => s.folderId === selectedFolder.id)
           .map((s) => s.id),

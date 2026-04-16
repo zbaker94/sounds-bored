@@ -82,7 +82,7 @@ describe("useBulkRemove", () => {
       useLibraryStore.setState({
         ...initialLibraryState,
         sounds: [present, missing1, missing2],
-        missingSoundIds: new globalThis.Set(["s-missing-1", "s-missing-2"]),
+        missingSoundIds: new Set(["s-missing-1", "s-missing-2"]),
       });
       useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
 
@@ -127,7 +127,7 @@ describe("useBulkRemove", () => {
       useLibraryStore.setState({
         ...initialLibraryState,
         sounds: [missing],
-        missingSoundIds: new globalThis.Set(["s-miss"]),
+        missingSoundIds: new Set(["s-miss"]),
       });
 
       const { result } = renderHook(() => useBulkRemove());
@@ -163,7 +163,7 @@ describe("useBulkRemove", () => {
       useLibraryStore.setState({
         ...initialLibraryState,
         sounds: [folderSound],
-        missingFolderIds: new globalThis.Set(["dl", "imp", "reg"]),
+        missingFolderIds: new Set(["dl", "imp", "reg"]),
       });
 
       const { result } = renderHook(() => useBulkRemove());
@@ -204,7 +204,7 @@ describe("useBulkRemove", () => {
 
       useLibraryStore.setState({
         ...initialLibraryState,
-        missingFolderIds: new globalThis.Set(["dl"]),
+        missingFolderIds: new Set(["dl"]),
       });
 
       useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog");
@@ -246,7 +246,7 @@ describe("useBulkRemove", () => {
       useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
       useLibraryStore.setState({
         ...initialLibraryState,
-        missingFolderIds: new globalThis.Set(["f1"]),
+        missingFolderIds: new Set(["f1"]),
       });
       useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog");
       expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(true);
@@ -266,7 +266,7 @@ describe("useBulkRemove", () => {
       useLibraryStore.setState({
         ...initialLibraryState,
         sounds: [missing],
-        missingSoundIds: new globalThis.Set(["s-missing"]),
+        missingSoundIds: new Set(["s-missing"]),
       });
       useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
       mockSaveLibrary.mockRejectedValueOnce(new Error("disk full"));
@@ -292,7 +292,7 @@ describe("useBulkRemove", () => {
       useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
       useLibraryStore.setState({
         ...initialLibraryState,
-        missingFolderIds: new globalThis.Set(["f1"]),
+        missingFolderIds: new Set(["f1"]),
       });
       mockSaveSettings.mockRejectedValueOnce(new Error("disk full"));
       useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog");
@@ -322,7 +322,7 @@ describe("useBulkRemove", () => {
       useLibraryStore.setState({
         ...initialLibraryState,
         sounds: [],
-        missingFolderIds: new globalThis.Set(["dl", "r1", "r2"]),
+        missingFolderIds: new Set(["dl", "r1", "r2"]),
       });
 
       const { result } = renderHook(() => useBulkRemove());

@@ -1,18 +1,18 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { Sound, Tag, Set, GlobalLibrary } from "@/lib/schemas";
+import { Sound, Tag, SoundSet, GlobalLibrary } from "@/lib/schemas";
 
 interface LibraryState {
   sounds: Sound[];
   tags: Tag[];
-  sets: Set[];
+  sets: SoundSet[];
   isDirty: boolean;  // tracked; auto-save hook wired in Phase 4
   // Runtime-only — never persisted to disk
-  missingSoundIds: globalThis.Set<string>;
-  missingFolderIds: globalThis.Set<string>;
+  missingSoundIds: Set<string>;
+  missingFolderIds: Set<string>;
   /** IDs whose existence could not be determined (permission denied, out-of-scope). */
-  unknownSoundIds: globalThis.Set<string>;
-  unknownFolderIds: globalThis.Set<string>;
+  unknownSoundIds: Set<string>;
+  unknownFolderIds: Set<string>;
   /** True while a full library reconciliation (folder scan + missing-state refresh) is running. */
   isReconciling: boolean;
 }
@@ -26,8 +26,8 @@ interface LibraryActions {
   setIsReconciling: (value: boolean) => void;
   /** Atomically checks and sets isReconciling. Returns true if the lock was acquired, false if already in flight. */
   tryStartReconciling: () => boolean;
-  addSet: (name: string) => Set;
-  duplicateSet: (setId: string) => Set | null;
+  addSet: (name: string) => SoundSet;
+  duplicateSet: (setId: string) => SoundSet | null;
   deleteSet: (setId: string) => void;
   addSoundsToSet: (soundIds: string[], setId: string) => void;
   /** Ensure a tag with the given name exists (case-insensitive match); create if not found. Returns the tag. */
@@ -40,10 +40,10 @@ interface LibraryActions {
   systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
   /** Update runtime missing-file state. Not persisted. */
   setMissingState: (
-    missingSoundIds: globalThis.Set<string>,
-    missingFolderIds: globalThis.Set<string>,
-    unknownSoundIds: globalThis.Set<string>,
-    unknownFolderIds: globalThis.Set<string>,
+    missingSoundIds: Set<string>,
+    missingFolderIds: Set<string>,
+    unknownSoundIds: Set<string>,
+    unknownFolderIds: Set<string>,
   ) => void;
 }
 
@@ -54,10 +54,10 @@ export const initialLibraryState: LibraryState = {
   tags: [],
   sets: [],
   isDirty: false,
-  missingSoundIds: new globalThis.Set<string>(),
-  missingFolderIds: new globalThis.Set<string>(),
-  unknownSoundIds: new globalThis.Set<string>(),
-  unknownFolderIds: new globalThis.Set<string>(),
+  missingSoundIds: new Set<string>(),
+  missingFolderIds: new Set<string>(),
+  unknownSoundIds: new Set<string>(),
+  unknownFolderIds: new Set<string>(),
   isReconciling: false,
 };
 
@@ -99,7 +99,7 @@ export const useLibraryStore = create<LibraryStore>()(
     },
 
     addSet: (name) => {
-      const newSet: Set = { id: crypto.randomUUID(), name };
+      const newSet: SoundSet = { id: crypto.randomUUID(), name };
       set((draft) => {
         draft.sets.push(newSet);
         draft.isDirty = true;
@@ -111,7 +111,7 @@ export const useLibraryStore = create<LibraryStore>()(
       const original = get().sets.find((s) => s.id === setId);
       if (!original) return null;
 
-      const newSet: Set = {
+      const newSet: SoundSet = {
         id: crypto.randomUUID(),
         name: original.name + " (Copy)",
       };

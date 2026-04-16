@@ -63,13 +63,15 @@ export const TagSchema = z.object({
   isSystem: z.boolean().optional(),
 });
 
+// name validation mirrors TagSchema (.min(1).max(100), no trim).
+// The UI enforces non-empty names so no migration is needed for existing library.json data.
 export const SetSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  name: z.string().min(1).max(100),
 });
 
 export type Tag = z.infer<typeof TagSchema>;
-export type Set = z.infer<typeof SetSchema>;
+export type SoundSet = z.infer<typeof SetSchema>;
 
 // ─── SoundInstance (a specific usage of a Sound within a Layer) ──────────────
 

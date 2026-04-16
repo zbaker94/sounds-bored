@@ -669,7 +669,7 @@ describe("refreshMissingState", () => {
   });
 
   it("does nothing when no settings are loaded", async () => {
-    const sentinel = new globalThis.Set(["sentinel"]);
+    const sentinel = new Set(["sentinel"]);
     useLibraryStore.setState({ missingSoundIds: sentinel, missingFolderIds: sentinel });
     await refreshMissingState();
     // Store was not mutated — setMissingState was not called
@@ -752,8 +752,8 @@ describe("refreshMissingState", () => {
     // Simulate stale missing state from a prior check
     useLibraryStore.setState({
       sounds: [sound],
-      missingSoundIds: new globalThis.Set(["s1"]),
-      missingFolderIds: new globalThis.Set(["f1"]),
+      missingSoundIds: new Set(["s1"]),
+      missingFolderIds: new Set(["f1"]),
     });
 
     // Now files are present

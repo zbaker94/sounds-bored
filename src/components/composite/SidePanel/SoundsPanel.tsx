@@ -32,7 +32,7 @@ export function SoundsPanel() {
 
   const [selectedId, setSelectedId] = useState<string | null>(folders[0]?.id ?? sets[0]?.id ?? null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSoundIds, setSelectedSoundIds] = useState<globalThis.Set<string>>(new globalThis.Set());
+  const [selectedSoundIds, setSelectedSoundIds] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [addSetOpen, setAddSetOpen] = useState(false);
@@ -40,7 +40,7 @@ export function SoundsPanel() {
   const [addTagsOpen, setAddTagsOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
 
-  useEffect(() => { setSelectedSoundIds(new globalThis.Set()); }, [selectedId]);
+  useEffect(() => { setSelectedSoundIds(new Set()); }, [selectedId]);
 
   // handleDropImport only reads importSoundsRef.current (a ref, always fresh)
   // and setIsImporting (a stable setState setter), so the empty dep array on
