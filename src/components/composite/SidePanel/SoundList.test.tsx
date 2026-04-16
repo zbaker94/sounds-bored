@@ -9,7 +9,7 @@ import {
   useAppSettingsStore,
   initialAppSettingsState,
 } from "@/state/appSettingsStore";
-import { useUiStore, initialUiState } from "@/state/uiStore";
+import { useUiStore, initialUiState, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import {
   createMockAppSettings,
   createMockSound,
@@ -150,7 +150,7 @@ describe("SoundList", () => {
     expect(screen.getByText("Snare")).toBeInTheDocument();
   });
 
-  it("'Remove All' banner button sets the uiStore confirmRemoveMissingSoundsOpen flag", async () => {
+  it("'Remove All' banner button opens the confirm-remove-missing-sounds overlay", async () => {
     const missing = createMockSound({ id: "missing-1", name: "Ghost" });
     useLibraryStore.setState({
       ...initialLibraryState,
@@ -163,14 +163,14 @@ describe("SoundList", () => {
     // Banner visible
     expect(screen.getByText(/sound missing/i)).toBeInTheDocument();
 
-    expect(useUiStore.getState().confirmRemoveMissingSoundsOpen).toBe(false);
+    expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(false);
 
     const removeAllBtn = screen.getByRole("button", { name: /remove all/i });
     await act(async () => {
       fireEvent.click(removeAllBtn);
     });
 
-    expect(useUiStore.getState().confirmRemoveMissingSoundsOpen).toBe(true);
+    expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(true);
   });
 
   it("clicking a missing sound opens the resolve dialog for that sound", async () => {

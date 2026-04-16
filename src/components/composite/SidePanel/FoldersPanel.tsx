@@ -54,7 +54,7 @@ import { useAddFolder } from "@/hooks/useAddFolder";
 import { useResolveFolderQueue } from "@/hooks/useResolveFolderQueue";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useProjectStore } from "@/state/projectStore";
-import { useUiStore } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
 import { ResolveMissingFolderDialog } from "@/components/modals/ResolveMissingFolderDialog";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
@@ -316,7 +316,7 @@ export function FoldersPanel({
               onClick={() =>
                 useUiStore
                   .getState()
-                  .setConfirmRemoveMissingFoldersOpen(true)
+                  .openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog")
               }
             >
               Remove All

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useUiStore } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useBulkRemove } from "@/hooks/useBulkRemove";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
@@ -28,18 +28,9 @@ export function ConfirmRemoveMissingDialog() {
   const settings = useAppSettingsStore((s) => s.settings);
   const folders = settings?.globalFolders ?? EMPTY_GLOBAL_FOLDERS;
 
-  const confirmRemoveSoundsOpen = useUiStore(
-    (s) => s.confirmRemoveMissingSoundsOpen,
-  );
-  const confirmRemoveFoldersOpen = useUiStore(
-    (s) => s.confirmRemoveMissingFoldersOpen,
-  );
-  const setConfirmRemoveSoundsOpen = useUiStore(
-    (s) => s.setConfirmRemoveMissingSoundsOpen,
-  );
-  const setConfirmRemoveFoldersOpen = useUiStore(
-    (s) => s.setConfirmRemoveMissingFoldersOpen,
-  );
+  const confirmRemoveSoundsOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS));
+  const confirmRemoveFoldersOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS));
+  const closeOverlay = useUiStore((s) => s.closeOverlay);
 
   const {
     isBulkRemoving,
@@ -68,7 +59,7 @@ export function ConfirmRemoveMissingDialog() {
     <>
       <Dialog
         open={confirmRemoveSoundsOpen}
-        onOpenChange={setConfirmRemoveSoundsOpen}
+        onOpenChange={(open) => { if (!open) closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS); }}
       >
         <DialogContent>
           <DialogHeader>
@@ -83,7 +74,7 @@ export function ConfirmRemoveMissingDialog() {
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setConfirmRemoveSoundsOpen(false)}
+              onClick={() => closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)}
               disabled={isBulkRemoving}
             >
               Cancel
@@ -102,7 +93,7 @@ export function ConfirmRemoveMissingDialog() {
       </Dialog>
       <Dialog
         open={confirmRemoveFoldersOpen}
-        onOpenChange={setConfirmRemoveFoldersOpen}
+        onOpenChange={(open) => { if (!open) closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS); }}
       >
         <DialogContent>
           <DialogHeader>
@@ -123,7 +114,7 @@ export function ConfirmRemoveMissingDialog() {
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setConfirmRemoveFoldersOpen(false)}
+              onClick={() => closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)}
               disabled={isBulkRemoving}
             >
               Cancel
