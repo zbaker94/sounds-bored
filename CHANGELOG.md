@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where components sharing the library reconciliation hook could show inconsistent loading states — all instances now correctly reflect when a library scan is in progress
+- Library reconciliation state is now shared globally, preventing duplicate scans from running simultaneously across multiple UI panels
 - Fixed a performance issue where sound selection changes during active playback used slow JSON serialization for comparison — now uses a dedicated field-by-field equality check instead.
 - Auto-save reliability improved: saves no longer skip when project or library data appears unchanged since the last save — the dirty flag alone now controls whether a save fires
 - Streaming audio playback progress now updates correctly when multiple sounds are playing simultaneously on a pad

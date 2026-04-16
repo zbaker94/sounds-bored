@@ -13,6 +13,8 @@ interface LibraryState {
   /** IDs whose existence could not be determined (permission denied, out-of-scope). */
   unknownSoundIds: globalThis.Set<string>;
   unknownFolderIds: globalThis.Set<string>;
+  /** True while a full library reconciliation (folder scan + missing-state refresh) is running. */
+  isReconciling: boolean;
 }
 
 type LibraryData = Pick<LibraryState, "sounds" | "tags" | "sets">;
@@ -21,6 +23,9 @@ interface LibraryActions {
   loadLibrary: (library: GlobalLibrary) => void;
   updateLibrary: (updater: (draft: LibraryData) => void) => void;
   clearDirtyFlag: () => void;
+  setIsReconciling: (value: boolean) => void;
+  /** Atomically checks and sets isReconciling. Returns true if the lock was acquired, false if already in flight. */
+  tryStartReconciling: () => boolean;
   addSet: (name: string) => Set;
   duplicateSet: (setId: string) => Set | null;
   deleteSet: (setId: string) => void;
@@ -53,6 +58,7 @@ export const initialLibraryState: LibraryState = {
   missingFolderIds: new globalThis.Set<string>(),
   unknownSoundIds: new globalThis.Set<string>(),
   unknownFolderIds: new globalThis.Set<string>(),
+  isReconciling: false,
 };
 
 export const useLibraryStore = create<LibraryStore>()(
@@ -83,6 +89,14 @@ export const useLibraryStore = create<LibraryStore>()(
       set((draft) => {
         draft.isDirty = false;
       }),
+
+    setIsReconciling: (value) => set({ isReconciling: value }),
+
+    tryStartReconciling: () => {
+      if (get().isReconciling) return false;
+      set({ isReconciling: true });
+      return true;
+    },
 
     addSet: (name) => {
       const newSet: Set = { id: crypto.randomUUID(), name };
