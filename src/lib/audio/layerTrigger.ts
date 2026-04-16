@@ -21,6 +21,8 @@ import type { Layer, Pad, Sound } from "@/lib/schemas";
 import { emitAudioError } from "./audioEvents";
 import { startAudioTick } from "./audioTick";
 import {
+  addStopCleanupTimeout,
+  deleteStopCleanupTimeout,
   clearLayerVoice,
   clearLayerStreamingAudio,
   deleteLayerChain,
@@ -110,7 +112,8 @@ export function rampStopLayerVoices(
 
   const gain = getLayerGain(layer.id);
   const resetValue = layer.volume / 100;
-  setTimeout(() => {
+  const timeoutId = setTimeout(() => {
+    deleteStopCleanupTimeout(timeoutId);
     for (const v of voices) clearLayerVoice(padId, layer.id, v);
     if (gain) {
       const ctx = getAudioContext();
@@ -118,6 +121,7 @@ export function rampStopLayerVoices(
       gain.gain.setValueAtTime(resetValue, ctx.currentTime);
     }
   }, STOP_RAMP_S * 1000 + 5);
+  addStopCleanupTimeout(timeoutId);
 }
 
 /** Stop all active voices for a layer with a short gain ramp. No-op if no voices. */

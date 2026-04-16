@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stopping a pad could incorrectly silence sounds in a newly loaded project that reused the same pad ID.
 - Errors during layer skip (forward/back) are now caught and reported instead of silently failing
 - Download listener startup failures now show a toast notification with the error details
 - Download finalization errors now show a toast notification instead of being silently dropped
