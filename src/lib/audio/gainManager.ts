@@ -41,8 +41,9 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   const ctx = getAudioContext();
   // Guard against NaN/Infinity. Default to 1.0 (full volume) rather than 0 — syncing mid-playback
   // to silence would be more disruptive than staying audible, and makes malformed data detectable.
-  // setLayerVolume defaults NaN to 0 because it is a user-driven drag operation
-  // where silent failure is a safer fallback.
+  // Intentionally different from getLayerNormalizedVolume (layerTrigger.ts) which defaults to 0:
+  // that function converts untrusted schema data at session boundaries; this runs mid-playback
+  // where abrupt silence is the worse outcome.
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(clamped, ctx.currentTime);

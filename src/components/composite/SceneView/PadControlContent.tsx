@@ -45,6 +45,7 @@ import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { cn } from "@/lib/utils";
+import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
 
 const STAGGER_DELAY = 0.04;
@@ -90,7 +91,7 @@ const LayerRow = memo(function LayerRow({
   layerActive: boolean;
 }) {
   const layerVol = usePlaybackStore(
-    (s) => Math.round((s.layerVolumes[layer.id] ?? (layer.volume / 100)) * 100)
+    (s) => Math.round((s.layerVolumes[layer.id] ?? getLayerNormalizedVolume(layer)) * 100)
   );
   // Local slider value during drag — avoids tick-frame lag on the slider thumb.
   // Cleared on commit (pointer up) so the store value takes over once stable.

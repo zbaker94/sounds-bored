@@ -76,6 +76,10 @@ export function useReconcileLibrary(): {
 
       // Auto-clean orphan soundIds from any loaded project.
       // Reads state imperatively to avoid stale closure over project/sounds.
+      // Note: useProjectLifecycle runs a similar reconciliation on initial project load.
+      // This path handles the case where sounds are removed from the library *after*
+      // the project is already loaded (e.g., a manual library reconciliation removes
+      // a sound that a loaded project still references).
       const currentProject = useProjectStore.getState().project;
       if (currentProject) {
         const latestSounds = useLibraryStore.getState().sounds;
