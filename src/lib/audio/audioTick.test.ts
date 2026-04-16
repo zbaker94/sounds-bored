@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { startAudioTick, stopAudioTick } from "./audioTick";
+import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds } from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 
 vi.mock("./audioState", async (importOriginal) => {
@@ -171,6 +171,42 @@ describe("audioTick", () => {
 
     expect(getActiveLayerIdSet).toHaveBeenCalled();
     expect(usePlaybackStore.getState().activeLayerIds).toBe(newActiveIds);
+
+    rafSpy.mockRestore();
+  });
+
+  it("clones nextActiveLayerIds into prevActiveLayerIds so consumer mutation cannot corrupt the next diff", () => {
+    // Regression guard for: prevActiveLayerIds = new Set(nextActiveLayerIds)
+    // The store receives nextActiveLayerIds; prevActiveLayerIds must be an independent
+    // copy. We verify via _getPrevActiveLayerIds that mutating the store Set does NOT
+    // mutate prevActiveLayerIds.
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+
+    const firstIds = new Set(["layer-a"]);
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(firstIds);
+    vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // tick 1: version 1 vs prev -1 → changed
+
+    // Store receives nextActiveLayerIds (which is firstIds). prevActiveLayerIds must be
+    // a clone — a different object with the same contents.
+    const storedSet = usePlaybackStore.getState().activeLayerIds;
+    expect(storedSet).not.toBe(_getPrevActiveLayerIds()); // must be different objects
+    expect(_getPrevActiveLayerIds().has("layer-a")).toBe(true);
+
+    // Mutate the store reference — prevActiveLayerIds must be unaffected.
+    storedSet.add("layer-mutated");
+    expect(_getPrevActiveLayerIds().has("layer-mutated")).toBe(false);
+    expect(_getPrevActiveLayerIds().has("layer-a")).toBe(true);
 
     rafSpy.mockRestore();
   });
