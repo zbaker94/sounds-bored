@@ -8,7 +8,7 @@ import { basename } from "@tauri-apps/api/path";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
-import { discardTemporaryProject, saveProject } from "@/lib/project";
+import { discardTemporaryProject, saveProject, buildExportZipName } from "@/lib/project";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
@@ -158,7 +158,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     const soundMapJson = JSON.stringify({ version: "1", soundMap: soundMapEntries }, null, 2);
 
     // 5. Build zip name and job id
-    const zipName = `${project.name.replace(/[^a-zA-Z0-9-_]/g, "_")}-export.zip`;
+    const zipName = buildExportZipName(project.name);
     const jobId = crypto.randomUUID();
     exportJobId.current = jobId;
 

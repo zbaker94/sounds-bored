@@ -16,6 +16,8 @@ import {
   saveProject,
   saveProjectAs,
   discardTemporaryProject,
+  sanitizeProjectName,
+  buildExportZipName,
 } from "@/lib/project";
 import {
   mockDialog,
@@ -334,6 +336,82 @@ describe("generateRandomProjectName", () => {
   });
 });
 
+describe("sanitizeProjectName", () => {
+  it("returns the name unchanged when it only has valid ASCII chars", () => {
+    expect(sanitizeProjectName("MyProject")).toBe("MyProject");
+    expect(sanitizeProjectName("my-project_v2")).toBe("my-project_v2");
+  });
+
+  it("replaces spaces with underscores", () => {
+    expect(sanitizeProjectName("My Project")).toBe("My_Project");
+  });
+
+  it("replaces special ASCII characters with underscores", () => {
+    // @ ! # $ % → 4 replacement underscores (% is the last char)
+    expect(sanitizeProjectName("My@Project!#$%")).toBe("My_Project____");
+  });
+
+  it("falls back to 'project' when result is all underscores (pure non-ASCII name)", () => {
+    // CJK characters all map to underscores, triggering the fallback
+    expect(sanitizeProjectName("我的项目")).toBe("project");
+  });
+
+  it("falls back to 'project' when result is empty (empty string input)", () => {
+    expect(sanitizeProjectName("")).toBe("project");
+  });
+
+  it("falls back to 'project' for emoji-only names", () => {
+    expect(sanitizeProjectName("🎵🎶🎸")).toBe("project");
+  });
+
+  it("does NOT fall back when at least one ASCII char is present", () => {
+    // Mixed: the emoji (U+1F3B5, a UTF-16 surrogate pair = 2 code units) becomes "__"
+    // but 'a' survives → result is "a__", not all underscores, so no fallback
+    expect(sanitizeProjectName("a🎵")).toBe("a__");
+  });
+
+  it("preserves hyphens and underscores", () => {
+    expect(sanitizeProjectName("my-project_name")).toBe("my-project_name");
+  });
+
+  it("falls back to 'project' for hyphen-only or mixed hyphen/underscore names", () => {
+    // A name like "---" passes the character filter unchanged, but is still useless
+    // as a folder name, so the broadened fallback covers it.
+    expect(sanitizeProjectName("---")).toBe("project");
+    expect(sanitizeProjectName("-_-")).toBe("project");
+    expect(sanitizeProjectName("___")).toBe("project");
+  });
+
+  it("falls back to 'project' for whitespace-only input", () => {
+    expect(sanitizeProjectName("   ")).toBe("project");
+    expect(sanitizeProjectName("\n\t")).toBe("project");
+  });
+
+  it("returns 'project' unchanged when input is already 'project' (idempotent)", () => {
+    expect(sanitizeProjectName("project")).toBe("project");
+  });
+});
+
+describe("buildExportZipName", () => {
+  it("returns '<sanitized>-export.zip' for a normal ASCII name", () => {
+    expect(buildExportZipName("MyProject")).toBe("MyProject-export.zip");
+  });
+
+  it("sanitizes the name before building the zip filename", () => {
+    expect(buildExportZipName("My Project")).toBe("My_Project-export.zip");
+  });
+
+  it("falls back to 'project-export.zip' for all-non-ASCII project names", () => {
+    expect(buildExportZipName("我的项目")).toBe("project-export.zip");
+    expect(buildExportZipName("🎵🎶")).toBe("project-export.zip");
+  });
+
+  it("falls back to 'project-export.zip' for empty or hyphen/underscore-only names", () => {
+    expect(buildExportZipName("")).toBe("project-export.zip");
+    expect(buildExportZipName("---")).toBe("project-export.zip");
+  });
+});
+
 describe("createProjectFolder", () => {
   beforeEach(() => {
     resetTauriMocks();
@@ -364,6 +442,13 @@ describe("createProjectFolder", () => {
 
     const mkdirCall = mockFs.mkdir.mock.calls[0];
     expect(mkdirCall[0]).toContain("temp_My_Project_____");
+  });
+
+  it("should fall back to 'project' in folder name when project name is all non-ASCII", async () => {
+    await createProjectFolder("我的项目");
+
+    const mkdirCall = mockFs.mkdir.mock.calls[0];
+    expect(mkdirCall[0]).toContain("temp_project_");
   });
 
   it("should include timestamp in folder name", async () => {
@@ -592,6 +677,17 @@ describe("saveProjectAs", () => {
     const result = await saveProjectAs("My@Project!#$%", "/app-local-data/SoundsBored/temp_Test_123", project);
 
     expect(result?.newPath).toBe("/new/location/My_Project____");
+  });
+
+  it("should fall back to 'project' folder name when project name is all non-ASCII", async () => {
+    mockDialog.open.mockResolvedValue("/new/location");
+    mockFs.exists.mockResolvedValue(false);
+    mockFs.readDir.mockResolvedValue([]);
+    const project = createMockProject();
+
+    const result = await saveProjectAs("我的项目", "/app-local-data/SoundsBored/temp_Test_123", project);
+
+    expect(result?.newPath).toBe("/new/location/project");
   });
 
   it("should replace spaces in project name with underscores", async () => {
