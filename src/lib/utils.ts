@@ -5,7 +5,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const isMac = /mac/i.test(navigator.userAgent) && !/iphone|ipad/i.test(navigator.userAgent)
+// navigator.userAgentData (Client Hints API) is not in TypeScript's DOM lib at ES2022.
+// Declare it locally — it exists in Chromium-based runtimes (WebView2, Chrome 89+).
+declare global {
+  interface Navigator {
+    readonly userAgentData?: { readonly platform: string };
+  }
+}
+
+/**
+ * Detect macOS. Prefers the Client Hints API (navigator.userAgentData.platform)
+ * available in Chromium-based runtimes (WebView2 on Windows/Linux).
+ * Falls back to navigator.userAgent for WebKit-based runtimes (WKWebView on macOS),
+ * which do not implement the Client Hints API.
+ */
+export function detectIsMac(): boolean {
+  const platform = navigator.userAgentData?.platform;
+  if (platform) {
+    return /mac/i.test(platform);
+  }
+  // userAgentData not available (WKWebView / older browsers) — fall back.
+  // Exclude iPhone/iPad which also report "Mac" in their user agent on some UA strings.
+  return /mac/i.test(navigator.userAgent) && !/iphone|ipad/i.test(navigator.userAgent);
+}
+
+// Evaluated once at module load time. Tests that need to control this value
+// should mock detectIsMac() directly rather than stubbing navigator after import.
+export const isMac = detectIsMac();
 
 /** Returns "⌘" on Mac, "Ctrl" elsewhere. */
 export const modKey = isMac ? "⌘" : "Ctrl"

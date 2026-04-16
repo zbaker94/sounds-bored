@@ -1,5 +1,114 @@
-import { describe, it, expect } from "vitest";
-import { truncatePath } from "./utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { truncatePath, detectIsMac } from "./utils";
+
+describe("detectIsMac", () => {
+  let originalUADataDescriptor: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    // Capture descriptor so afterEach can restore it — vi.restoreAllMocks() does not
+    // revert Object.defineProperty changes.
+    originalUADataDescriptor = Object.getOwnPropertyDescriptor(navigator, "userAgentData");
+  });
+
+  afterEach(() => {
+    if (originalUADataDescriptor) {
+      Object.defineProperty(navigator, "userAgentData", originalUADataDescriptor);
+    } else {
+      // navigator.userAgentData was not present before the test; remove our definition.
+      delete (navigator as Navigator & { userAgentData?: unknown }).userAgentData;
+    }
+    vi.restoreAllMocks();
+  });
+
+  it("returns true when userAgentData.platform is 'macOS' (Chromium Client Hints path)", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: { platform: "macOS" },
+      configurable: true,
+    });
+    expect(detectIsMac()).toBe(true);
+  });
+
+  it("returns false when userAgentData.platform is 'Windows'", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: { platform: "Windows" },
+      configurable: true,
+    });
+    expect(detectIsMac()).toBe(false);
+  });
+
+  it("returns false when userAgentData.platform is 'Linux'", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: { platform: "Linux" },
+      configurable: true,
+    });
+    expect(detectIsMac()).toBe(false);
+  });
+
+  it("falls back to userAgent when userAgentData is undefined (WKWebView path)", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: undefined,
+      configurable: true,
+    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    );
+    expect(detectIsMac()).toBe(true);
+  });
+
+  it("returns false for Windows userAgent when userAgentData is undefined", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: undefined,
+      configurable: true,
+    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    );
+    expect(detectIsMac()).toBe(false);
+  });
+
+  it("returns false for iPhone userAgent even though it contains 'Mac' (userAgent fallback)", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: undefined,
+      configurable: true,
+    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15"
+    );
+    expect(detectIsMac()).toBe(false);
+  });
+
+  it("returns false for iPad userAgent even though it contains 'Mac' (userAgent fallback)", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: undefined,
+      configurable: true,
+    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15"
+    );
+    expect(detectIsMac()).toBe(false);
+  });
+
+  it("returns false when userAgentData.platform is 'iOS' (Client Hints path — no iphone/ipad check needed)", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: { platform: "iOS" },
+      configurable: true,
+    });
+    // "iOS" does not match /mac/i — no false-positive
+    expect(detectIsMac()).toBe(false);
+  });
+
+  it("falls back to userAgent when userAgentData.platform is empty string (privacy-preserving hint)", () => {
+    Object.defineProperty(navigator, "userAgentData", {
+      value: { platform: "" },
+      configurable: true,
+    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    );
+    // Empty platform string is falsy → falls through to userAgent branch
+    expect(detectIsMac()).toBe(true);
+  });
+});
 
 describe("truncatePath", () => {
   it("returns the path unchanged when it fits within maxLength", () => {
