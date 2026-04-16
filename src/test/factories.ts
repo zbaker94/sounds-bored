@@ -1,5 +1,5 @@
 import { AppSettings, DownloadJob, GlobalFolder, GlobalLibrary, Layer, Pad, Project, ProjectHistoryEntry, Scene, Sound, SoundInstance, Tag, SoundSet } from "@/lib/schemas";
-import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constants";
+import { CURRENT_LIBRARY_VERSION, CURRENT_PROJECT_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constants";
 
 /**
  * Factory for creating test Projects
@@ -7,7 +7,7 @@ import { CURRENT_LIBRARY_VERSION, CURRENT_SETTINGS_VERSION } from "@/lib/constan
 export function createMockProject(overrides?: Partial<Project>): Project {
   return {
     name: "Test Project",
-    version: "1.2.0",
+    version: CURRENT_PROJECT_VERSION,
     description: "A test project",
     lastSaved: new Date().toISOString(),
     scenes: [],
