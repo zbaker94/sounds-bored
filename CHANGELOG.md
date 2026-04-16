@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad progress calculation now reads the audio clock once per animation frame instead of once per pad, improving performance when many pads are active simultaneously.
 - No user-facing changes in this release (internal code cleanup only).
 - Layer volume values outside the 0–100 range are now safely clamped, preventing audio glitches from invalid volume data
 - Clarified when to use `updateProject` vs. specific pad/scene actions in internal documentation.
