@@ -6,6 +6,32 @@ import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
 import { migrateProject, MigrationError } from "./migrations";
 
+/** Fallback folder/zip-base name used when sanitization yields an unusable result. */
+const FALLBACK_PROJECT_NAME = "project";
+
+/**
+ * Sanitizes a project name for use as a filesystem folder name.
+ * Replaces non-alphanumeric characters (except `-` and `_`) with underscores.
+ * Falls back to {@link FALLBACK_PROJECT_NAME} ("project") when the sanitized
+ * result is empty or consists entirely of underscores and hyphens — i.e. when
+ * no alphanumeric character survived (e.g. all-emoji, all-CJK, or all-whitespace
+ * input). This value appears in folder names (`temp_project_<ts>`) and the
+ * export zip filename (`project-export.zip`).
+ */
+export function sanitizeProjectName(name: string): string {
+  const sanitized = name.replace(/[^a-zA-Z0-9-_]/g, "_");
+  if (/^[-_]*$/.test(sanitized)) return FALLBACK_PROJECT_NAME;
+  return sanitized;
+}
+
+/**
+ * Builds the zip filename for a project export.
+ * Uses {@link sanitizeProjectName} so non-ASCII project names produce a safe filename.
+ */
+export function buildExportZipName(projectName: string): string {
+  return `${sanitizeProjectName(projectName)}-export.zip`;
+}
+
 export class ProjectNotFoundError extends Error {
   constructor() {
     super(`${PROJECT_FILE_NAME} not found in the selected folder`);
@@ -145,7 +171,7 @@ export function generateRandomProjectName(): string {
 export async function createProjectFolder(projectName: string): Promise<string> {
   const appDataDir = await appLocalDataDir();
   const timestamp = Date.now();
-  const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "_");
+  const sanitizedName = sanitizeProjectName(projectName);
   const folderName = `temp_${sanitizedName}_${timestamp}`;
   const projectPath = await join(appDataDir, APP_FOLDER, folderName);
 
@@ -262,7 +288,7 @@ export async function saveProjectAs(
   }
 
   // Create the project folder in the selected location
-  const sanitizedName = projectName.replace(/[^a-zA-Z0-9-_]/g, "_");
+  const sanitizedName = sanitizeProjectName(projectName);
   const newProjectPath = await join(selectedPath, sanitizedName);
 
   // Create-or-fail: mkdir with { recursive: false } atomically fails if the folder

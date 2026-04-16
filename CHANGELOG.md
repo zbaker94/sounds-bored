@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Project names with non-ASCII characters (emoji, CJK, etc.) now safely fall back to "project" instead of producing garbled folder or zip filenames
+- Export zip files and project folders use consistent, reliable name sanitization across the app
 - Improved Mac OS detection to correctly identify macOS across all supported runtimes, fixing edge cases where Windows/Linux could be misidentified
 - Fixed a bug where internal audio tick state could be corrupted if the playback store's active layer set was mutated externally
 - No user-facing changes; internal test infrastructure updated to use the project version constant.
