@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Clarified when to use `updateProject` vs. specific pad/scene actions in internal documentation.
 - Fixed a bug where pad and layer volume levels from one session could carry over into the next after closing a project
 - Scene navigation keyboard shortcuts changed from bare arrow keys to **Alt + Left/Right arrow**, preventing conflicts with text inputs, comboboxes, and sliders
 - The scene tab bar now shows a tooltip with the **Alt + ← / →** shortcut hint on hover

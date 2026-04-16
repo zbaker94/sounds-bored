@@ -15,9 +15,10 @@ interface ProjectActions {
   loadProject: (historyEntry: ProjectHistoryEntry, project: Project, isTemporary: boolean) => void;
   /**
    * Replaces the entire project object and marks state as dirty.
-   * @transitional This generic setter will be replaced by specific actions
-   * (e.g., addScene, updatePad, renamePad) in Phase 3+. Prefer specific actions
-   * for any new mutation work. Do not remove until specific actions are in place.
+   *
+   * Use this for bulk reconciliation operations that must atomically replace the whole
+   * project (e.g., stripping references to deleted sounds, resolving missing files on load).
+   * For targeted mutations, prefer specific actions: `addScene`, `updatePad`, `renamePad`, etc.
    */
   updateProject: (project: Project) => void;
   clearDirtyFlag: () => void;
