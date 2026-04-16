@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; internal test infrastructure updated to use the project version constant.
 - Internal refactor: project version is now defined in a single place, eliminating the risk of version mismatches between migrations and new projects.
 - Set names now require at least 1 character and have a maximum length of 100 characters, preventing empty or overly long set names from being saved.
 - The `Set` type has been renamed to `SoundSet` internally to avoid conflicts with JavaScript's built-in `Set` type, improving code reliability.
