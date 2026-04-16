@@ -80,6 +80,7 @@ import {
   getActiveLayerIdSet,
   getLayerVoiceVersion,
   computeAllPadProgress,
+  _padToLayerIds,
 } from "./audioState";
 import type { AudioVoice } from "./audioVoice";
 
@@ -98,7 +99,7 @@ beforeEach(() => {
   clearAllPadProgressInfo();
   clearAllLayerPending();
   clearAllFadeTracking();
-  clearAllVoices();
+  clearAllVoices(); // also clears _padToLayerIds (reverse index)
 });
 
 // ── getPadProgress ───────────────────────────────────────────────────────────
@@ -791,5 +792,103 @@ describe("clearAllAudioState", () => {
     expect(spy).not.toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// padToLayerIds reverse index — guards O(layers_in_pad) behaviour of stopPadVoices
+// ---------------------------------------------------------------------------
+
+describe("padToLayerIds reverse index", () => {
+  it("recordLayerVoice adds the layer to the pad's reverse-index entry", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    expect(_padToLayerIds.get("pad-1")).toEqual(new Set(["layer-1"]));
+  });
+
+  it("recordLayerVoice accumulates multiple layers for the same pad", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-1", "layer-2", makeVoice());
+    expect(_padToLayerIds.get("pad-1")).toEqual(new Set(["layer-1", "layer-2"]));
+  });
+
+  it("recordLayerVoice tracks separate entries for different pads", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-2", "layer-2", makeVoice());
+    expect(_padToLayerIds.get("pad-1")).toEqual(new Set(["layer-1"]));
+    expect(_padToLayerIds.get("pad-2")).toEqual(new Set(["layer-2"]));
+  });
+
+  it("clearLayerVoice removes the layer from the pad's reverse-index when the layer has no remaining voices", () => {
+    const voice = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", voice);
+    clearLayerVoice("pad-1", "layer-1", voice);
+    // Entry for pad should be gone (no more layers)
+    const padEntry = _padToLayerIds.get("pad-1");
+    expect(padEntry === undefined || !padEntry.has("layer-1")).toBe(true);
+  });
+
+  it("clearLayerVoice keeps the layer in the reverse-index while other voices remain in that layer", () => {
+    const v1 = makeVoice();
+    const v2 = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", v1);
+    recordLayerVoice("pad-1", "layer-1", v2);
+    clearLayerVoice("pad-1", "layer-1", v1); // one voice remains
+    expect(_padToLayerIds.get("pad-1")?.has("layer-1")).toBe(true);
+  });
+
+  it("stopPadVoices clears the pad's reverse-index entry", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-1", "layer-2", makeVoice());
+    stopPadVoices("pad-1");
+    expect(_padToLayerIds.has("pad-1")).toBe(false);
+  });
+
+  it("stopPadVoices does NOT touch reverse-index entries for other pads", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-2", "layer-2", makeVoice());
+    stopPadVoices("pad-1");
+    expect(_padToLayerIds.get("pad-2")).toEqual(new Set(["layer-2"]));
+  });
+
+  it("stopLayerVoices removes the stopped layer from the pad's reverse-index", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-1", "layer-2", makeVoice());
+    stopLayerVoices("pad-1", "layer-1");
+    expect(_padToLayerIds.get("pad-1")?.has("layer-1")).toBe(false);
+    expect(_padToLayerIds.get("pad-1")?.has("layer-2")).toBe(true);
+  });
+
+  it("stopLayerVoices removes the pad's reverse-index entry when the last layer is stopped", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    stopLayerVoices("pad-1", "layer-1");
+    expect(_padToLayerIds.has("pad-1")).toBe(false);
+  });
+
+  it("stopAllVoices clears the entire reverse index", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    recordLayerVoice("pad-2", "layer-2", makeVoice());
+    stopAllVoices();
+    expect(_padToLayerIds.size).toBe(0);
+  });
+
+  it("clearAllVoices clears the entire reverse index", () => {
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    clearAllVoices();
+    expect(_padToLayerIds.size).toBe(0);
+  });
+
+  it("stopPadVoices is a no-op on an unknown pad (no throw, index stays empty)", () => {
+    expect(() => stopPadVoices("never-recorded")).not.toThrow();
+    expect(_padToLayerIds.size).toBe(0);
+  });
+
+  it("recording the same voice twice does not corrupt the index on clear", () => {
+    const voice = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", voice);
+    recordLayerVoice("pad-1", "layer-1", voice); // duplicate
+    clearLayerVoice("pad-1", "layer-1", voice);  // removes both duplicates (filter by reference)
+    // Layer should be gone since filter removes all occurrences
+    expect(isLayerActive("layer-1")).toBe(false);
+    expect(_padToLayerIds.has("pad-1")).toBe(false);
   });
 });
