@@ -73,6 +73,14 @@ const voiceMap = new Map<string, AudioVoice[]>();
 const layerVoiceMap = new Map<string, AudioVoice[]>();
 
 /**
+ * Reverse index: pad ID → Set of layer IDs with active voices for that pad.
+ * Maintained alongside layerVoiceMap to allow stopPadVoices to touch only the
+ * layers belonging to the stopped pad — O(layers_in_pad) instead of O(all_layers).
+ * Exported with underscore prefix for test introspection only.
+ */
+export const _padToLayerIds = new Map<string, Set<string>>();
+
+/**
  * Incremented whenever a layer voice is added or removed. The audioTick loop
  * reads this to skip `new Set(layerVoiceMap.keys())` on frames where the active
  * layer set is unchanged — avoids one per-frame Set allocation during stable playback.
@@ -315,6 +323,7 @@ export function clearAllLayerCycleIndexes(): void {
 export function clearAllVoices(): void {
   voiceMap.clear();
   layerVoiceMap.clear();
+  _padToLayerIds.clear();
   layerVoiceVersion++;
 }
 
@@ -601,14 +610,23 @@ export function stopPadVoices(padId: string): void {
   voiceMap.delete(padId);
   usePlaybackStore.getState().removePlayingPad(padId);
   clearPadVolumesEntry(padId);
-  // Also clean layerVoiceMap for layers on this pad
-  for (const [layerId, layerVoices] of layerVoiceMap) {
-    const remaining = layerVoices.filter((v) => !stoppedSet.has(v));
-    if (remaining.length === 0) {
-      layerVoiceMap.delete(layerId);
-    } else {
-      layerVoiceMap.set(layerId, remaining);
+  // Use reverse index to touch only layers belonging to this pad — O(layers_in_pad).
+  // Per invariant, every layer voice is also a pad voice, so stoppedSet covers all
+  // voices in every tracked layer. The `remaining.length > 0` branch is dead under
+  // normal operation but kept defensively; when triggered, the layer stays in the
+  // index so the reverse-index remains consistent.
+  const padLayers = _padToLayerIds.get(padId);
+  if (padLayers) {
+    for (const layerId of padLayers) {
+      const remaining = (layerVoiceMap.get(layerId) ?? []).filter((v) => !stoppedSet.has(v));
+      if (remaining.length === 0) {
+        layerVoiceMap.delete(layerId);
+        padLayers.delete(layerId);
+      } else {
+        layerVoiceMap.set(layerId, remaining);
+      }
     }
+    if (padLayers.size === 0) _padToLayerIds.delete(padId);
   }
   layerVoiceVersion++;
   for (const voice of voices) {
@@ -623,6 +641,7 @@ export function stopAllVoices(): void {
   const allVoices = [...voiceMap.values()].flat();
   voiceMap.clear();
   layerVoiceMap.clear();
+  _padToLayerIds.clear();
   layerVoiceVersion++;
   const store = usePlaybackStore.getState();
   store.clearAllPlayingPads();
@@ -635,6 +654,12 @@ export function stopAllVoices(): void {
 
 export function recordLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
   layerVoiceMap.set(layerId, [...(layerVoiceMap.get(layerId) ?? []), voice]);
+  let padLayers = _padToLayerIds.get(padId);
+  if (!padLayers) {
+    padLayers = new Set();
+    _padToLayerIds.set(padId, padLayers);
+  }
+  padLayers.add(layerId);
   layerVoiceVersion++;
   recordVoice(padId, voice);
 }
@@ -643,6 +668,11 @@ export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoic
   const updated = (layerVoiceMap.get(layerId) ?? []).filter((v) => v !== voice);
   if (updated.length === 0) {
     layerVoiceMap.delete(layerId);
+    const padLayers = _padToLayerIds.get(padId);
+    if (padLayers) {
+      padLayers.delete(layerId);
+      if (padLayers.size === 0) _padToLayerIds.delete(padId);
+    }
   } else {
     layerVoiceMap.set(layerId, updated);
   }
@@ -657,6 +687,11 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   // Clean up maps BEFORE calling stop() — wrapStreamingElement.stop()
   // fires onended synchronously, so clearing first makes clearLayerVoice a safe no-op.
   layerVoiceMap.delete(layerId);
+  const padLayers = _padToLayerIds.get(padId);
+  if (padLayers) {
+    padLayers.delete(layerId);
+    if (padLayers.size === 0) _padToLayerIds.delete(padId);
+  }
   layerVoiceVersion++;
   const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
   if (padVoices.length === 0) {
