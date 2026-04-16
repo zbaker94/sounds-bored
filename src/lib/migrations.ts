@@ -85,23 +85,31 @@ const MIGRATIONS: Migration[] = [
       const next = { ...raw };
       if (!Array.isArray(next.scenes)) return next;
 
-      next.scenes = (next.scenes as Array<Record<string, unknown>>).map((scene) => {
-        if (!Array.isArray(scene.pads)) return scene;
+      next.scenes = (next.scenes as unknown[]).map((scene) => {
+        if (!scene || typeof scene !== "object" || Array.isArray(scene)) return scene;
+        const s = scene as Record<string, unknown>;
+        if (!Array.isArray(s.pads)) return s;
         return {
-          ...scene,
-          pads: (scene.pads as Array<Record<string, unknown>>).map((pad) => {
-            if (!Array.isArray(pad.layers)) return pad;
+          ...s,
+          pads: (s.pads as unknown[]).map((pad) => {
+            if (!pad || typeof pad !== "object" || Array.isArray(pad)) return pad;
+            const p = pad as Record<string, unknown>;
+            if (!Array.isArray(p.layers)) return p;
             return {
-              ...pad,
-              layers: (pad.layers as Array<Record<string, unknown>>).map((layer) => {
-                const sel = layer.selection as Record<string, unknown> | undefined;
-                if (!sel || sel.type !== "tag") return layer;
+              ...p,
+              layers: (p.layers as unknown[]).map((layer) => {
+                if (!layer || typeof layer !== "object" || Array.isArray(layer)) return layer;
+                const l = layer as Record<string, unknown>;
+                const sel = l.selection;
+                if (!sel || typeof sel !== "object" || Array.isArray(sel)) return l;
+                const s2 = sel as Record<string, unknown>;
+                if (s2.type !== "tag") return l;
                 // Convert old single-tag format { tagId } to multi-tag { tagIds }
-                if (typeof sel.tagId === "string" && !Array.isArray(sel.tagIds)) {
-                  const { tagId, ...rest } = sel;
-                  return { ...layer, selection: { ...rest, tagIds: tagId ? [tagId] : [] } };
+                if (typeof s2.tagId === "string" && !Array.isArray(s2.tagIds)) {
+                  const { tagId, ...rest } = s2;
+                  return { ...l, selection: { ...rest, tagIds: tagId ? [tagId] : [] } };
                 }
-                return layer;
+                return l;
               }),
             };
           }),
@@ -115,7 +123,10 @@ const MIGRATIONS: Migration[] = [
 
 export function migrateProject(raw: RawProject): RawProject {
   let current = { ...raw };
-  let version = (current.version as string | undefined) ?? UNVERSIONED_DEFAULT;
+  // Guard against non-string version fields from malformed/untrusted disk data.
+  // An `as` cast would silently succeed and then crash inside compareVersions()
+  // when .split(".") is called on a non-string. Fall back to UNVERSIONED_DEFAULT.
+  let version = typeof current.version === "string" ? current.version : UNVERSIONED_DEFAULT;
 
   // Future-version guard: refuse to open files from a newer app version to
   // prevent silent data loss from Zod stripping unknown fields on next save.
@@ -254,7 +265,10 @@ const LIBRARY_MIGRATIONS: LibraryMigration[] = [
 
 export function migrateLibrary(raw: RawLibrary): RawLibrary {
   let current = { ...raw };
-  let version = (current.version as string | undefined) ?? UNVERSIONED_DEFAULT;
+  // Guard against non-string version fields from malformed/untrusted disk data.
+  // An `as` cast would silently succeed and then crash inside compareVersions()
+  // when .split(".") is called on a non-string. Fall back to UNVERSIONED_DEFAULT.
+  let version = typeof current.version === "string" ? current.version : UNVERSIONED_DEFAULT;
 
   // Future-version guard: refuse to open libraries from a newer app version to
   // prevent silent data loss from Zod stripping unknown fields on next save.
