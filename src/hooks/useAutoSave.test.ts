@@ -144,10 +144,60 @@ describe("useAutoSave", () => {
     });
     expect(options).toEqual(
       expect.objectContaining({
-        onSuccess: expect.any(Function),
         onError: expect.any(Function),
       }),
     );
+    // onSuccess should NOT be present — isDirty drives re-save, not a stored JSON snapshot
+    expect(options.onSuccess).toBeUndefined();
+  });
+
+  it("stops saving on subsequent ticks once a successful save clears isDirty", () => {
+    seedDirtyPermanentProject();
+
+    // Simulate the real useSaveProject behavior: on success, clearDirtyFlag() is called.
+    mockSaveProjectMutate.mockImplementation(() => {
+      useProjectStore.getState().clearDirtyFlag();
+    });
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Initial tick fires and the mock immediately clears isDirty.
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+    expect(useProjectStore.getState().isDirty).toBe(false);
+
+    // Advance one interval — isDirty is now false, so no re-save.
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves on the next interval tick even when project data is identical to the last successful save", () => {
+    // Regression test: the old code had a JSON.stringify equality gate that blocked a
+    // second save if the project data hadn't changed since the last successful save.
+    // isDirty alone must control whether a save fires — if the store says dirty, save.
+    seedDirtyPermanentProject();
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Initial save fires immediately.
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+
+    // Simulate the old-style onSuccess that stored the JSON snapshot (no-op after fix,
+    // but calling it here ensures the test catches any lingering snapshot logic).
+    const firstOptions = mockSaveProjectMutate.mock.calls[0][1];
+    if (firstOptions?.onSuccess) {
+      act(() => { firstOptions.onSuccess(); });
+    }
+
+    // isDirty was never cleared (clearDirtyFlag was not called) — advance one tick.
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    // Must fire again because isDirty is still true.
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(2);
   });
 
   it("shows an error toast when auto-save fails", () => {
@@ -320,10 +370,11 @@ describe("useAutoSave", () => {
     const libOptions = mockSaveLibrarySync.mock.calls[0][0];
     expect(libOptions).toEqual(
       expect.objectContaining({
-        onSuccess: expect.any(Function),
         onError: expect.any(Function),
       }),
     );
+    // onSuccess should NOT be present — isDirty drives re-save, not a stored JSON snapshot
+    expect(libOptions.onSuccess).toBeUndefined();
 
     // A library-save failure also triggers the (debounced) auto-save error toast.
     act(() => {
