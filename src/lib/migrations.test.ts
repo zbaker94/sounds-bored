@@ -189,6 +189,110 @@ describe("migrateProject — 1.1.0 → 1.2.0", () => {
   });
 });
 
+describe("migrateProject — 1.1.0 → 1.2.0 malformed-input guards", () => {
+  it("skips non-object entries in scenes array without crashing", () => {
+    const raw = {
+      name: "X",
+      version: "1.1.0",
+      // null, number, string, array, and valid object mixed together
+      scenes: [null, 42, "bad", [1, 2, 3], { id: "s1", pads: [] }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as unknown[];
+    // All 5 entries preserved; primitives/arrays pass through unchanged
+    expect(scenes).toHaveLength(5);
+    expect(scenes[0]).toBeNull();
+    expect(scenes[1]).toBe(42);
+    expect(scenes[2]).toBe("bad");
+    expect(Array.isArray(scenes[3])).toBe(true);
+    expect((scenes[4] as Record<string, unknown>).id).toBe("s1");
+  });
+
+  it("skips non-object entries in pads array without crashing", () => {
+    const raw = {
+      name: "X",
+      version: "1.1.0",
+      scenes: [{
+        id: "s1",
+        pads: [null, 42, "bad", [1, 2], { id: "p1", layers: [] }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const pads = scenes[0].pads as unknown[];
+    expect(pads).toHaveLength(5);
+    expect(pads[0]).toBeNull();
+    expect((pads[4] as Record<string, unknown>).id).toBe("p1");
+  });
+
+  it("skips non-object entries in layers array without crashing", () => {
+    const raw = {
+      name: "X",
+      version: "1.1.0",
+      scenes: [{
+        id: "s1",
+        pads: [{
+          id: "p1",
+          layers: [null, 42, "bad", [1, 2], { id: "l1", selection: { type: "tag", tagId: "t1" } }],
+        }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const pads = scenes[0].pads as Array<Record<string, unknown>>;
+    const layers = pads[0].layers as unknown[];
+    // Primitives pass through; valid layer is migrated
+    expect(layers).toHaveLength(5);
+    expect(layers[0]).toBeNull();
+    const validLayer = layers[4] as Record<string, unknown>;
+    const sel = validLayer.selection as Record<string, unknown>;
+    expect(sel.tagIds).toEqual(["t1"]);
+    expect(sel.tagId).toBeUndefined();
+  });
+
+  it("leaves layer untouched when selection is null", () => {
+    const raw = {
+      name: "X",
+      version: "1.1.0",
+      scenes: [{
+        id: "s1",
+        pads: [{
+          id: "p1",
+          layers: [{ id: "l1", selection: null }],
+        }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const layers = (scenes[0].pads as Array<Record<string, unknown>>)[0].layers as Array<Record<string, unknown>>;
+    // selection: null must not be modified
+    expect(layers[0].selection).toBeNull();
+  });
+
+  it("leaves layer untouched when selection.tagId is a non-string type", () => {
+    const raw = {
+      name: "X",
+      version: "1.1.0",
+      scenes: [{
+        id: "s1",
+        pads: [{
+          id: "p1",
+          layers: [{ id: "l1", selection: { type: "tag", tagId: 42 } }],
+        }],
+      }],
+    };
+    // tagId is not a string and tagIds is not an array → migration should leave it alone
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const pads = (scenes[0].pads as Array<Record<string, unknown>>);
+    const layers = (pads[0].layers as Array<Record<string, unknown>>);
+    const sel = layers[0].selection as Record<string, unknown>;
+    // Should not have been converted (tagId non-string, tagIds absent → no-op)
+    expect(sel.tagId).toBe(42);
+    expect(sel.tagIds).toBeUndefined();
+  });
+});
+
 describe("migrateProject — future-version guard", () => {
   it("throws MigrationError when project version is newer than CURRENT_VERSION", () => {
     expect(() => migrateProject({ name: "Future Project", version: "99.0.0" })).toThrow(MigrationError);
@@ -234,6 +338,38 @@ describe("migrateProject — future-version guard", () => {
     expect(() => migrateProject({ name: "X", version: "v1.0.0" })).toThrow(MigrationError);
     expect(() => migrateProject({ name: "X", version: "1.2.0-beta" })).toThrow(MigrationError);
     expect(() => migrateProject({ name: "X", version: "" })).toThrow(MigrationError);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (numeric version)", () => {
+    // A numeric version in disk data must not cause compareVersions() to crash
+    // on Number.prototype.split — it should fall back to UNVERSIONED_DEFAULT.
+    const result = migrateProject({ name: "X", version: 1 });
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (object version)", () => {
+    const result = migrateProject({ name: "X", version: { major: 1 } });
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (null version)", () => {
+    const result = migrateProject({ name: "X", version: null });
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (array version)", () => {
+    const result = migrateProject({ name: "X", version: [1, 0, 0] });
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it("treats NaN version as missing (does not hit future-version guard)", () => {
+    const result = migrateProject({ name: "X", version: NaN });
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it("treats boolean version as missing (does not hit future-version guard)", () => {
+    const result = migrateProject({ name: "X", version: true });
+    expect(result.version).toBe(CURRENT_VERSION);
   });
 });
 
@@ -461,6 +597,49 @@ describe("migrateLibrary", () => {
     expect(tags[1]).toMatchObject({ id: "t5", name: "ok" });
   });
 
+  it("skips non-object entries in sounds array without crashing", () => {
+    const raw = {
+      version: "0.0.0",
+      sounds: [
+        null,
+        42,
+        "bad",
+        { id: "s1", name: "Kick", durationMs: -1 },
+      ],
+    };
+    expect(() => migrateLibrary(raw)).not.toThrow();
+    const result = migrateLibrary(raw);
+    const sounds = result.sounds as unknown[];
+    // Primitives pass through; the valid sound has its invalid durationMs stripped
+    expect(sounds).toHaveLength(4);
+    const validSound = sounds[3] as Record<string, unknown>;
+    expect(validSound.durationMs).toBeUndefined();
+  });
+
+  it("skips non-object entries in tags array without crashing", () => {
+    const raw = {
+      version: "0.0.0",
+      tags: [null, 42, "bad", { id: "t1", name: "valid" }],
+    };
+    expect(() => migrateLibrary(raw)).not.toThrow();
+    const result = migrateLibrary(raw);
+    const tags = result.tags as unknown[];
+    // Non-objects pass the filter (they lack a name field check that would catch them)
+    // but the valid tag is kept
+    expect((tags as Array<Record<string, unknown>>).some((t) => t?.id === "t1")).toBe(true);
+  });
+
+  it("skips non-object entries in sets array without crashing", () => {
+    const raw = {
+      version: "0.0.0",
+      sets: [null, 42, "bad", { id: "set1", name: "FX" }],
+    };
+    expect(() => migrateLibrary(raw)).not.toThrow();
+    const result = migrateLibrary(raw);
+    const sets = result.sets as unknown[];
+    expect(sets).toHaveLength(4);
+  });
+
   it("throws MigrationError when library version is newer than CURRENT_LIBRARY_VERSION", () => {
     expect(() => migrateLibrary({ version: "99.0.0" })).toThrow(MigrationError);
     expect(() => migrateLibrary({ version: "99.0.0" })).toThrow(/newer version/i);
@@ -477,5 +656,37 @@ describe("migrateLibrary", () => {
     expect(() => migrateLibrary({ version: "1.2" })).toThrow(MigrationError);
     expect(() => migrateLibrary({ version: "v1.0.0" })).toThrow(MigrationError);
     expect(() => migrateLibrary({ version: "" })).toThrow(MigrationError);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (numeric version)", () => {
+    // A numeric version in disk data must not cause compareVersions() to crash
+    // on Number.prototype.split — it should fall back to UNVERSIONED_DEFAULT.
+    const result = migrateLibrary({ version: 1 });
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (object version)", () => {
+    const result = migrateLibrary({ version: { major: 1 } });
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (null version)", () => {
+    const result = migrateLibrary({ version: null });
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+  });
+
+  it("treats non-string version fields as missing and applies seed migration (array version)", () => {
+    const result = migrateLibrary({ version: [1, 0, 0] });
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+  });
+
+  it("treats NaN version as missing (does not hit future-version guard)", () => {
+    const result = migrateLibrary({ version: NaN });
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
+  });
+
+  it("treats boolean version as missing (does not hit future-version guard)", () => {
+    const result = migrateLibrary({ version: true });
+    expect(result.version).toBe(CURRENT_LIBRARY_VERSION);
   });
 });
