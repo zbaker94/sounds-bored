@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a performance issue where sound selection changes during active playback used slow JSON serialization for comparison — now uses a dedicated field-by-field equality check instead.
 - Auto-save reliability improved: saves no longer skip when project or library data appears unchanged since the last save — the dirty flag alone now controls whether a save fires
 - Streaming audio playback progress now updates correctly when multiple sounds are playing simultaneously on a pad
 - Progress bars for streaming audio tracks reflect the longest-duration sound, consistent with how buffered audio is handled

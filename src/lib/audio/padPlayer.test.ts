@@ -2164,6 +2164,160 @@ describe("syncLayerConfig", () => {
   });
 });
 
+describe("selectionsEqual", () => {
+  it("returns true for identical assigned selections", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const sel = {
+      type: "assigned" as const,
+      instances: [
+        { id: "i1", soundId: "s1", volume: 80 },
+        { id: "i2", soundId: "s2", volume: 100 },
+      ],
+    };
+    expect(selectionsEqual(sel, { ...sel, instances: [...sel.instances] })).toBe(true);
+  });
+
+  it("returns false when assigned instance soundIds differ", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100 }] };
+    const b = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s2", volume: 100 }] };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when assigned instance lists differ in length", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100 }] };
+    const b = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100 }, { id: "i2", soundId: "s2", volume: 100 }] };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when assigned instance volume differs", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 80 }] };
+    const b = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100 }] };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when assigned instance startOffsetMs differs", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100, startOffsetMs: 500 }] };
+    const b = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100 }] };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns true for identical tag selections", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const sel = { type: "tag" as const, tagIds: ["t1", "t2"], matchMode: "any" as const, defaultVolume: 80 };
+    expect(selectionsEqual(sel, { ...sel })).toBe(true);
+  });
+
+  it("returns false when tag matchMode differs", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "tag" as const, tagIds: ["t1"], matchMode: "any" as const, defaultVolume: 80 };
+    const b = { type: "tag" as const, tagIds: ["t1"], matchMode: "all" as const, defaultVolume: 80 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when tag tagIds differ", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "tag" as const, tagIds: ["t1"], matchMode: "any" as const, defaultVolume: 80 };
+    const b = { type: "tag" as const, tagIds: ["t2"], matchMode: "any" as const, defaultVolume: 80 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when tag defaultVolume differs", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "tag" as const, tagIds: ["t1"], matchMode: "any" as const, defaultVolume: 80 };
+    const b = { type: "tag" as const, tagIds: ["t1"], matchMode: "any" as const, defaultVolume: 100 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns true for identical set selections", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const sel = { type: "set" as const, setId: "set-1", defaultVolume: 80 };
+    expect(selectionsEqual(sel, { ...sel })).toBe(true);
+  });
+
+  it("returns false when set setId differs", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "set" as const, setId: "set-1", defaultVolume: 80 };
+    const b = { type: "set" as const, setId: "set-2", defaultVolume: 80 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when set defaultVolume differs", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "set" as const, setId: "set-1", defaultVolume: 80 };
+    const b = { type: "set" as const, setId: "set-1", defaultVolume: 100 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when assigned instances are the same but in different order", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const inst1 = { id: "i1", soundId: "s1", volume: 100 };
+    const inst2 = { id: "i2", soundId: "s2", volume: 100 };
+    const a = { type: "assigned" as const, instances: [inst1, inst2] };
+    const b = { type: "assigned" as const, instances: [inst2, inst1] };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when tag tagIds are same but in different order", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "tag" as const, tagIds: ["t1", "t2"], matchMode: "any" as const, defaultVolume: 80 };
+    const b = { type: "tag" as const, tagIds: ["t2", "t1"], matchMode: "any" as const, defaultVolume: 80 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when selection types differ", async () => {
+    const { selectionsEqual } = await import("./padPlayer");
+    const a = { type: "assigned" as const, instances: [{ id: "i1", soundId: "s1", volume: 100 }] };
+    const b = { type: "set" as const, setId: "set-1", defaultVolume: 100 };
+    expect(selectionsEqual(a, b)).toBe(false);
+  });
+});
+
+describe("syncLayerConfig — selection-only change", () => {
+  it("selection changes only: rebuilds queue with new sounds", async () => {
+    const { triggerPad, syncLayerConfig } = await import("./padPlayer");
+    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
+    setSounds([soundA, soundB, soundC]);
+
+    const layer = createMockLayer({
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+      selection: {
+        type: "assigned",
+        instances: [
+          { id: "inst-a", soundId: soundA.id, volume: 100 },
+          { id: "inst-b", soundId: soundB.id, volume: 100 },
+        ],
+      },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    await triggerPad(pad);
+    await tick();
+
+    // Change only selection: [A, B] → [C] — arrangement stays sequential
+    const updated = {
+      ...layer,
+      selection: {
+        type: "assigned" as const,
+        instances: [{ id: "inst-c", soundId: soundC.id, volume: 100 }],
+      },
+    };
+    syncLayerConfig(updated, layer);
+
+    // A is still playing; chain queue is now [C]. A ends → C plays.
+    createdSources[0].simulateEnd();
+    await tick();
+    expect(createdSources).toHaveLength(2);
+    const loadedIds = mockLoadBuffer.mock.calls.map((c: unknown[]) => (c[0] as { id: string }).id);
+    expect(loadedIds[1]).toBe(soundC.id);
+  });
+});
+
 describe("stopAllPads clears fade tracking", () => {
   it("cancels pending fade timeouts so cleanup callbacks do not fire", async () => {
     vi.useFakeTimers();
