@@ -220,10 +220,11 @@ export function isPadStreaming(padId: string): boolean {
   return !!layerMap && layerMap.size > 0;
 }
 
-export function getPadProgress(padId: string): number | null {
+export function getPadProgress(padId: string, currentTime?: number): number | null {
   const info = padProgressInfo.get(padId);
   if (info) {
-    const elapsed = getAudioContext().currentTime - info.startedAt;
+    const t = currentTime ?? getAudioContext().currentTime;
+    const elapsed = t - info.startedAt;
     if (info.isLooping && info.duration > 0) {
       return (elapsed % info.duration) / info.duration;
     }
@@ -293,12 +294,15 @@ export function getActiveLayerIdSet(): Set<string> {
 /**
  * Compute padProgress for all active pads in one pass.
  * Returns a Record<padId, progress 0–1>. Pads with no progress info are omitted.
- * Delegates to the existing getPadProgress(padId) for each active pad.
+ * Reads AudioContext.currentTime once and passes it to getPadProgress — mirrors computeAllLayerProgress.
  */
 export function computeAllPadProgress(): Record<string, number> {
   const result: Record<string, number> = {};
+  if (voiceMap.size === 0) return result;
+  // Hoist a single currentTime read for all active pads — mirrors computeAllLayerProgress.
+  const currentTime = getAudioContext().currentTime;
   for (const padId of voiceMap.keys()) {
-    const progress = getPadProgress(padId);
+    const progress = getPadProgress(padId, currentTime);
     if (progress !== null) result[padId] = progress;
   }
   return result;

@@ -168,6 +168,13 @@ describe("getPadProgress", () => {
     registerStreamingAudio("pad-1", "layer-1", audio);
     expect(getPadProgress("pad-1")).toBe(0);
   });
+
+  it("uses the provided currentTime instead of calling getAudioContext()", () => {
+    setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: false });
+    // mockCtx.currentTime is 0 by default — passing explicit value overrides it
+    expect(getPadProgress("pad-1", 2)).toBeCloseTo(0.5);
+    expect(getPadProgress("pad-1", 1)).toBeCloseTo(0.25);
+  });
 });
 
 // ── getPadGain ───────────────────────────────────────────────────────────────
