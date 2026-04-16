@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -7,15 +7,21 @@ import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.recon
 import { reconcileProjectSounds } from "@/lib/projectSoundReconcile";
 import { useProjectStore } from "@/state/projectStore";
 
-// Module-level singleton: ensures at most one reconcile runs at a time across
-// all hook instances (e.g. MainPage and SoundsPanel both mount concurrently).
-let _reconcileInFlight = false;
-
 export function useReconcileLibrary(): {
   reconcile: () => Promise<void>;
   isReconciling: boolean;
 } {
-  const [isReconciling, setIsReconciling] = useState(false);
+  // isReconciling lives in libraryStore rather than component-local useState.
+  // This means:
+  //   1. All hook instances (MainPage + FoldersPanel) share the same flag — no
+  //      misleading "false" on a second instance while reconcile is running.
+  //   2. The flag is resetable in tests via useLibraryStore.setState({ ...initialLibraryState })
+  //      — no module-level mutable state that leaks between test files.
+  //   3. React Strict Mode's double-invocation of effects no longer causes the
+  //      second (real) effect to see a stale module-level lock.
+  const isReconciling = useLibraryStore((s) => s.isReconciling);
+  const setIsReconciling = useLibraryStore((s) => s.setIsReconciling);
+  const tryStartReconciling = useLibraryStore((s) => s.tryStartReconciling);
 
   const settings = useAppSettingsStore((s) => s.settings);
   const updateLibrary = useLibraryStore((s) => s.updateLibrary);
@@ -29,9 +35,7 @@ export function useReconcileLibrary(): {
   }, [saveCurrentLibrarySync]);
 
   const reconcile = useCallback(async () => {
-    if (!settings || _reconcileInFlight) return;
-    _reconcileInFlight = true;
-    setIsReconciling(true);
+    if (!settings || !tryStartReconciling()) return;
     try {
       const result = await reconcileGlobalLibrary(
         settings.globalFolders,
@@ -88,10 +92,9 @@ export function useReconcileLibrary(): {
         // failed save would silently drop changes.
       }
     } finally {
-      _reconcileInFlight = false;
       setIsReconciling(false);
     }
-  }, [settings, updateLibrary]);
+  }, [settings, updateLibrary, tryStartReconciling, setIsReconciling]);
 
   return { reconcile, isReconciling };
 }
