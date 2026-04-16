@@ -1,131 +1,39 @@
 # Changelog
 
 ## Current Changes
-- Volume changes during playback now fade smoothly instead of snapping instantly, preventing audio clicks when adjusting pad volume mid-session
-- Invalid volume values (NaN) now default to silence instead of full volume
-- Internal sound reconciliation logic was consolidated into a single utility, improving reliability when sounds are removed from the library
-- Corrupted or invalid volume values in a pad's layer config now default to silence instead of full volume, preventing unexpected loud playback from malformed data.
-- Pads with multiple layers now trigger all layers simultaneously instead of sequentially, so sounds start at the same time as intended.
-- Rapid re-triggers are now correctly debounced across all layers at once, preventing missed or double-triggered sounds during quick pad taps.
-- Pad progress calculation now reads the audio clock once per animation frame instead of once per pad, improving performance when many pads are active simultaneously.
-- No user-facing changes in this release (internal code cleanup only).
-- Layer volume values outside the 0–100 range are now safely clamped, preventing audio glitches from invalid volume data
-- Clarified when to use `updateProject` vs. specific pad/scene actions in internal documentation.
-- Fixed a bug where pad and layer volume levels from one session could carry over into the next after closing a project
-- Scene navigation keyboard shortcuts changed from bare arrow keys to **Alt + Left/Right arrow**, preventing conflicts with text inputs, comboboxes, and sliders
-- The scene tab bar now shows a tooltip with the **Alt + ← / →** shortcut hint on hover
-- Fixed a crash when opening project or library files with corrupted or unexpected version fields (numbers, objects, arrays, null, etc.) — these now load correctly instead of crashing
-- Fixed a crash in project migration when scenes, pads, or layers arrays contain malformed entries (nulls, primitives, nested arrays) — valid entries are preserved and invalid ones are passed through safely
-- When a sound file is missing during playback, the app now silently refreshes the Sounds panel in the background so missing-file indicators update automatically after the error occurs.
-- Project names with non-ASCII characters (emoji, CJK, etc.) now safely fall back to "project" instead of producing garbled folder or zip filenames
-- Export zip files and project folders use consistent, reliable name sanitization across the app
-- Improved Mac OS detection to correctly identify macOS across all supported runtimes, fixing edge cases where Windows/Linux could be misidentified
-- Fixed a bug where internal audio tick state could be corrupted if the playback store's active layer set was mutated externally
-- No user-facing changes; internal test infrastructure updated to use the project version constant.
-- Internal refactor: project version is now defined in a single place, eliminating the risk of version mismatches between migrations and new projects.
-- Set names now require at least 1 character and have a maximum length of 100 characters, preventing empty or overly long set names from being saved.
-- The `Set` type has been renamed to `SoundSet` internally to avoid conflicts with JavaScript's built-in `Set` type, improving code reliability.
-- Fixed a bug where stopping a pad could incorrectly silence sounds in a newly loaded project that reused the same pad ID.
-- Errors during layer skip (forward/back) are now caught and reported instead of silently failing
-- Download listener startup failures now show a toast notification with the error details
-- Download finalization errors now show a toast notification instead of being silently dropped
-- Fixed keyboard shortcuts (F, X, Enter, Escape) not working when a fade-level slider was focused — pressing these keys while adjusting a slider will now correctly trigger the intended action
-- Fixed hotkeys F and X not firing when a slider or input element had focus (e.g. adjusting fade duration on the pad backside or fade levels in multi-fade mode).
-- Fixed a bug where skipping forward or backward through a pad's sounds while a fade-out was in progress would cause the new sound to be silenced — the fade-out's cleanup timer now correctly cancels before the skip voice starts.
-- Fixed a bug where skipping forward or back on a layer during a fade-out could cause the fade's cleanup to stop the newly-started skip voice.
-- Large audio files are now streamed at a lower threshold (5 MB instead of 20 MB), improving playback performance for long ambient tracks and music by avoiding slow audio decoding
-- Streaming audio elements now preload correctly in the background, reducing playback delay when triggering large sound files
-- Auto-save now skips overlapping saves — if a save is still in progress, the next scheduled save tick is deferred until the previous one completes, preventing duplicate write operations.
-- No user-facing behavior changes — this is an internal refactor migrating "Remove All Missing Sounds/Folders" confirmation dialogs from standalone boolean flags to the unified overlay stack system.
-- Fixed a bug where components sharing the library reconciliation hook could show inconsistent loading states — all instances now correctly reflect when a library scan is in progress
-- Library reconciliation state is now shared globally, preventing duplicate scans from running simultaneously across multiple UI panels
-- Fixed a performance issue where sound selection changes during active playback used slow JSON serialization for comparison — now uses a dedicated field-by-field equality check instead.
-- Auto-save reliability improved: saves no longer skip when project or library data appears unchanged since the last save — the dirty flag alone now controls whether a save fires
-- Streaming audio playback progress now updates correctly when multiple sounds are playing simultaneously on a pad
-- Progress bars for streaming audio tracks reflect the longest-duration sound, consistent with how buffered audio is handled
-- Fixed a bug where stale audio metadata could corrupt progress tracking after a sound stopped or restarted
-- Improved audio engine performance: stopping a pad's voices now only processes that pad's layers instead of scanning all active layers, reducing work proportional to active sounds
-- Improved audio playback performance by caching sound lookups — the app no longer rebuilds an internal sound index on every pad trigger, reducing CPU overhead during live performance.
-- Added tests to ensure the audio master gain subscription is only created once, preventing duplicate listeners and redundant gain updates
-- Added integration tests to verify the audio store's selector-based subscriptions correctly filter out unrelated state changes, keeping master volume updates isolated and efficient
-- Fixed master volume control to only respond to volume changes instead of all audio state updates, preventing unnecessary gain node adjustments during high-frequency pad playback tracking (60fps)
-- Auto-save no longer scans the filesystem for missing sound files every 30 seconds, reducing unnecessary disk I/O during normal use.
-- Fixed a bug where projects stored in paths containing "temp_" (e.g. a user folder named `temp_user`) could be accidentally deleted when saving a project to a new location
-- Downloads now correctly handle edge cases: a "completed" download with no output file is treated as a failure instead of silently storing an empty path
-- Late progress events from a cancelled, completed, or failed download are safely ignored, preventing unexpected status changes
-- Download status transitions now properly clear stale fields (speed, ETA, error) when a job moves to a new state
-- Fixed a bug where attempting to stream a sound with no file path would silently pass an invalid value to the audio system — it now throws a clear error immediately.
-- Switching between projects now properly releases audio memory, preventing decoded sound data and streaming buffers from accumulating across project sessions.
-- Fixed a memory leak where completed or cancelled download and export jobs were never removed from internal tracking maps, causing unbounded memory growth over long sessions.
-- If your sound library or recent projects list becomes corrupted, the app now automatically recovers instead of failing to load — the corrupt file is backed up and a fresh empty one is written in its place
-- A warning notification is shown when corruption recovery occurs, so you know your library or history was reset
-- Unexpected I/O errors (e.g., permission denied) still surface as error notifications and are not silently swallowed
-- When your sound library file is corrupted or contains invalid data, you now see a specific error message explaining what went wrong instead of a generic failure notice.
-- The app can now automatically repair legacy library files that contain duplicate sounds, tags, or sets — keeping the first occurrence of each duplicate rather than failing to load.
-- Sound entries with invalid duration or file size values (negative numbers, infinity) are automatically cleaned up when loading older library files.
-- Tags with missing, empty, or non-string names are automatically removed from legacy library files on load to prevent display and search issues.
-- Opening a library file saved by a newer version of the app now shows a clear message asking you to update, rather than silently corrupting data.
-- Duplicate sound, tag, and set IDs in the library are now detected and rejected with a clear error message indicating the offending ID
-- Volume values on layers, sound instances, and layer selections are now validated to stay within the 0–100 range
-- Sound duration and file size fields now reject negative numbers, NaN, and infinite values to prevent invalid audio metadata from being stored
-- Start offset values on sound instances are now validated to be non-negative and finite
-- Fixed a bug where re-triggering a pad during a fade-out could cause the fade's cleanup to stop the newly-started audio voices.
-- Fixed a bug where a pad's layers could get permanently stuck in a "pending" state if an audio error occurred mid-trigger, which would silently prevent those layers from playing again until the app was restarted
-- When one layer in a pad fails to play due to an audio error, the remaining layers now continue to trigger as expected instead of being silently blocked
-- Fixed a minor internal audio engine inefficiency where the audio context was being retrieved twice unnecessarily when updating layer volume.
-- Fixed a bug where layer volume was applied incorrectly — sounds were playing at incorrect volumes due to a unit mismatch (the internal scale was 0–100 but the audio engine expected 0–1)
-- Fixed a bug where sequential layers would resume from an incorrect position after a sound fails to load, instead of restarting from the beginning on the next trigger.
-- Fixed a race condition in "Save As" where two rapid saves to the same folder name could both pass the existence check; the folder is now created atomically before copying begins
-- "Save As" no longer leaves an empty orphaned folder behind if the file copy fails, preventing a confusing "already exists" error on retry
-- "Save As" now correctly recognizes Windows-specific "folder already exists" errors (error code 183) in addition to the Unix equivalent (error code 17)
-- Permission denied and other unexpected filesystem errors during "Save As" are now surfaced with their original message instead of being masked as "already exists"
-- Auto-save now shows an error notification ("Auto-save failed — your changes may not be saved to disk.") when it cannot write to disk, so you are no longer silently losing changes.
-- Auto-save error toasts are rate-limited to once per minute, preventing notification spam if a disk or permission problem persists across multiple save attempts.
-- Auto-save keeps retrying on every interval tick after a failure, so your project will be saved automatically once the underlying issue (full disk, disconnected drive, etc.) is resolved.
-- Manual save errors now show a clear "Failed to save project. Please try again." toast when saving via the toolbar or on window close.
-- Fixed an issue where playing a pad with a missing sound library could generate hundreds of error notifications — the audio engine now stops after 3 consecutive load failures and shows a single summary error instead
-- Error notifications from chained sound sequences are no longer silently dropped; failures in sequential/loop playback chains now properly surface as visible errors
-- Re-triggering a pad resets the error counter, so a fresh trigger always gets full error reporting regardless of previous failures
-- Fixed a visual glitch where the volume bar would briefly flash after a pad finished playing
-- Volume display now hides correctly when a pad stops, without any lingering artifact from the previous playback
-- Pad buttons now update more smoothly during audio playback — high-frequency audio tick re-renders are isolated to smaller sub-components, reducing UI jitter on active pads
-- Playback progress bars and multi-fade volume sliders are now rendered in dedicated sub-components (`PadButtonProgress`, `PadButtonFadeOverlay`) for better performance
-- Volume display logic (show/hide timing during drags and audio fades) has been extracted into a reusable hook, improving consistency across pad interactions
-- Improved app startup reliability: the sound library reconciliation now correctly runs only once, even under React's strict development mode, preventing potential duplicate processing on launch.
-- App now stays fully functional even when settings or sound library files fail to load on startup
-- Duplicate folder detection now correctly reflects the latest settings, preventing silent misses when settings change rapidly
-- Boot sequence runs exactly once regardless of component re-renders, avoiding redundant disk reads
-- User edits to the sound library are no longer overwritten if a background folder scan finishes after the edit was made
-- The loading screen now stays visible until both app settings and the sound library have fully loaded, preventing the app from appearing ready before initialization is complete.
-- Startup errors are now surfaced: if scanning your sound folders fails, a notification appears instead of silently doing nothing
-- If the app can't save your sound library after a scan, you'll now see an error notification rather than losing the save silently
-- Missing-file detection now always runs on startup, even if the folder scan encountered an error
-- App now shows an error notification when settings or the sound library fail to load on startup, instead of silently failing
-- Fixed a bug where test state could leak between test cases in certain store-related tests
-- Fixed a race condition where app settings or sound library changes could be silently overwritten during app startup or after saving
-- App settings and sound library data now load more reliably at startup, with no window where a background data refresh could discard recent changes
-- Fixed a bug where stopping a sound after it had already naturally ended could throw an error instead of completing cleanly.
-- Fixed audio voices not properly disconnecting from the audio graph when stopped, which could cause resource leaks over time.
-- Saving a pad configuration now shows a clear error message if the selected tags or set don't match any sounds in your library, preventing silent misconfiguration.
-- Pads with sequential sound layers now display the currently-playing sound name more reliably and with less UI flicker during playback.
-- Large audio files are now preloaded more efficiently — redundant streaming preloads are skipped when editing pads or scenes if the set of large sounds in the active scene hasn't changed.
-- Layers with the same sound assigned multiple times now correctly play each instance in order, preserving the intended arrangement.
-- Improved internal type safety ensures unrecognized layer selection types are caught at build time rather than silently failing at runtime.
-- Sounds assigned via tags or sets now resolve consistently across playback, UI, export, and preload — fixing potential mismatches where different parts of the app used different logic
-- Tag-based layers with an empty tag list now correctly return no sounds instead of unintended results
-- Large file preloading for tag- and set-based layers now works correctly on scene load
-- Fixed a bug where resolving the last item in a missing-file dialog queue could leave the dialog in an inconsistent state instead of closing cleanly.
-- Refactored internal dialog queue logic into a shared utility, reducing code duplication with no change to user-facing behavior
-- Auto-save now correctly tracks and persists library changes (sounds, tags, sets) without redundant state subscriptions, improving reliability of auto-save behavior.
-- Simplified how the sound library is saved internally — actions like adding/removing sounds, tags, and sets are now more reliable and less error-prone
-- Fixed potential bugs where stale library data could be saved when resolving missing files or folders
-- Removed internal developer scaffolding (`greet` command and its tests) that was never part of the user-facing feature set.
-- Playback errors (missing files, decode failures, fade errors) now show as toast notifications in the app UI instead of being silently swallowed or logged only to the console.
-- When a sound file is missing from disk and you try to play it, the app now automatically refreshes the missing-file indicators in the Sounds panel alongside showing the error message.
-- Layer volume changes are now saved to the project correctly when you finish dragging the volume slider on a pad.
-- Fixed a security vulnerability where malicious path inputs could escape the intended directory during downloads and project exports (path traversal protection)
-- Project exports now reject symlinks and non-audio files, preventing sensitive files from being accidentally bundled into export archives
-- Download filenames are now validated to block path separators and special characters that could cause unexpected behavior
+1. Audio playback correctness: Volume changes now fade smoothly instead of snapping (no audio clicks); invalid/NaN
+  volumes default to silence; pad layers now trigger simultaneously rather than sequentially; retriggers are
+  correctly debounced across all layers at once.                                                                     
+  2. Fade/skip race conditions fixed: Re-triggering or skipping forward/back during a fade-out no longer silences the
+   new sound — fade cleanup timers are cancelled before the next voice starts. Layers stuck in "pending" after an    
+  audio error now recover correctly.                                                                                 
+  3. Audio engine performance: Progress calculation reads the audio clock once per frame (not once per pad); sound   
+  lookups are cached so the index isn't rebuilt on every trigger; stopping a pad scans only that pad's layers; master
+   gain now only reacts to volume changes, not all 60fps playback state updates.                                     
+  4. Auto-save reliability: Overlapping saves are deferred; the dirty flag alone controls whether a save fires;
+  auto-save shows a rate-limited error toast on write failure and keeps retrying until the issue clears.
+  5. Streaming & download improvements: Large-file streaming threshold lowered from 20 MB to 5 MB; streaming elements
+   preload correctly; download status transitions clear stale fields (speed, ETA, error); all download/export errors
+  (including finalization failures) surface as toast notifications.
+  6. Memory & resource management: Audio buffers and streaming data are fully released when switching projects;
+  completed and cancelled download/export jobs are removed from tracking maps, preventing unbounded memory growth.
+  7. Library & file corruption recovery: Corrupt library and history files are auto-backed-up and replaced with empty
+   defaults, with a warning toast; duplicate IDs, invalid durations, negative file sizes, and malformed tags are
+  auto-cleaned on load; newer-version files prompt an upgrade message instead of silently corrupting data.
+  8. Validation hardening: Volume values clamped to 0–100 across layers, sound instances, and selections;
+  duration/file-size fields reject negative, NaN, and infinite values; set names require 1–100 characters; Set type
+  renamed to SoundSet to avoid JavaScript built-in collisions.
+  9. Keyboard shortcuts: Scene navigation moved from bare arrow keys to Alt + Left/Right (with tooltip) to prevent
+  conflicts with text inputs, sliders, and comboboxes; hotkeys F, X, Enter, and Escape now fire correctly when a
+  slider or input is focused.
+  10. App startup reliability: Boot sequence runs exactly once (React StrictMode-safe), preventing duplicate library
+  scans; settings and library load failures surface error notifications; loading screen stays visible until both are
+  ready; save-race conditions during startup are resolved.
+  11. UI rendering: Volume bar no longer flashes after playback ends; high-frequency audio tick re-renders are
+  isolated to dedicated sub-components (PadButtonProgress, PadButtonFadeOverlay), reducing jitter on active pads;
+  sequential-layer current-sound display is more reliable.
+  12. Security: Path traversal protection added to downloads and project exports; symlinks and non-audio files are
+  rejected from export archives; download filenames validated to block path separators and special characters.
 
 ## v1.5.4
 
