@@ -230,6 +230,40 @@ export function syncLayerArrangement(layer: import("@/lib/schemas").Layer): void
 }
 
 /**
+ * Structural equality check for LayerSelection — avoids JSON.stringify overhead.
+ * Compares all fields that affect playback resolution (sounds, volume, match rules).
+ */
+export function selectionsEqual(a: import("@/lib/schemas").LayerSelection, b: import("@/lib/schemas").LayerSelection): boolean {
+  if (a.type !== b.type) return false;
+  switch (a.type) {
+    case "assigned": {
+      const bA = b as Extract<import("@/lib/schemas").LayerSelection, { type: "assigned" }>;
+      if (a.instances.length !== bA.instances.length) return false;
+      return a.instances.every(
+        (inst, i) =>
+          inst.soundId === bA.instances[i].soundId &&
+          inst.id === bA.instances[i].id &&
+          inst.volume === bA.instances[i].volume &&
+          inst.startOffsetMs === bA.instances[i].startOffsetMs,
+      );
+    }
+    case "tag": {
+      const bT = b as Extract<import("@/lib/schemas").LayerSelection, { type: "tag" }>;
+      return (
+        a.matchMode === bT.matchMode &&
+        a.defaultVolume === bT.defaultVolume &&
+        a.tagIds.length === bT.tagIds.length &&
+        a.tagIds.every((id, i) => id === bT.tagIds[i])
+      );
+    }
+    case "set": {
+      const bS = b as Extract<import("@/lib/schemas").LayerSelection, { type: "set" }>;
+      return a.setId === bS.setId && a.defaultVolume === bS.defaultVolume;
+    }
+  }
+}
+
+/**
  * Called when the sound selection for a layer changes while playback is active.
  *
  * For chained arrangements: rebuilds the chain queue with the new resolved sounds.
@@ -264,7 +298,7 @@ export function syncLayerConfig(layer: import("@/lib/schemas").Layer, original: 
   // syncLayerArrangement already rebuilds the queue using the updated selection,
   // so skip syncLayerSelection to avoid a redundant rebuild — especially important
   // for shuffled, where a second call would produce a different random order.
-  if (!arrangementChanged && JSON.stringify(original.selection) !== JSON.stringify(layer.selection)) {
+  if (!arrangementChanged && !selectionsEqual(original.selection, layer.selection)) {
     syncLayerSelection(layer);
   }
   // When cycleMode is toggled off, clear the stale cursor so the next trigger
