@@ -3165,7 +3165,78 @@ describe("skipLayerForward", () => {
     // playOrder must be preserved after skip forward so a subsequent skip back can use it
     expect(getLayerPlayOrder(layer.id)).toHaveLength(3);
   });
+
+  it("cancels an in-progress fade-out before starting the skip voice (chain mode)", async () => {
+    const { triggerPad, skipLayerForward, fadePadOut } = await import("./padPlayer");
+    const { isPadFadingOut } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Start a fade-out — pad is now fading
+    fadePadOut(pad, 2000);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+
+    // Skip forward — should cancel the fade so the cleanup timeout cannot kill the new voice
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    // Fade should be cancelled
+    expect(isPadFadingOut(pad.id)).toBe(false);
+  });
+
+  it("cancels an in-progress fade-out before starting the skip voice (cycle mode)", async () => {
+    const { skipLayerForward, fadePadOut } = await import("./padPlayer");
+    const { isPadFadingOut, setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      cycleMode: true,
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerCycleIndex(layer.id, 0);
+
+    fadePadOut(pad, 2000);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    expect(isPadFadingOut(pad.id)).toBe(false);
+  });
+
+  // Note: a fake-timer "voice survives" test (as in PR #248's triggerPad analog) is
+  // not included here because skipLayerForward is synchronous — its internal async
+  // chain (ensureResumed → loadBuffer → createBufferSource) has multiple microtask
+  // hops that cannot be awaited externally. The isPadFadingOut assertions above prove
+  // cancelPadFade() is called, which by definition clears the stale setTimeout via
+  // clearTimeout(). The cancelPadFade unit tests in audioState.test.ts verify that
+  // behaviour directly.
 });
+
 
 // ─── skipLayerBack ────────────────────────────────────────────────────────────
 
@@ -3325,7 +3396,76 @@ describe("skipLayerBack", () => {
     const chain = getLayerChain(layer.id);
     expect(chain?.length).toBe(2); // [soundB, soundC] — went back to soundA
   });
+
+  it("cancels an in-progress fade-out before starting the skip voice (chain mode)", async () => {
+    const { triggerPad, skipLayerBack, fadePadOut } = await import("./padPlayer");
+    const { isPadFadingOut } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Start a fade-out — pad is now fading
+    fadePadOut(pad, 2000);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+
+    // Skip back — should cancel the fade so the cleanup timeout cannot kill the new voice
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    // Fade should be cancelled
+    expect(isPadFadingOut(pad.id)).toBe(false);
+  });
+
+  it("cancels an in-progress fade-out before starting the skip voice (cycle mode)", async () => {
+    const { skipLayerBack, fadePadOut } = await import("./padPlayer");
+    const { isPadFadingOut, setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+      createMockSound({ filePath: "c.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      cycleMode: true,
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerCycleIndex(layer.id, 2); // cursor at index 2 (C playing, next would be A)
+
+    fadePadOut(pad, 2000);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    expect(isPadFadingOut(pad.id)).toBe(false);
+  });
+
+  // Note: a fake-timer "voice survives" test is not included — same reasoning as
+  // the equivalent comment in skipLayerForward above. The isPadFadingOut assertions
+  // prove cancelPadFade() is invoked; audioState.test.ts verifies it clears the timeout.
 });
+
 
 // ─── fadePadWithLevels ────────────────────────────────────────────────────────
 
