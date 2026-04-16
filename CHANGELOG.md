@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Corrupted or invalid volume values in a pad's layer config now default to silence instead of full volume, preventing unexpected loud playback from malformed data.
 - Pads with multiple layers now trigger all layers simultaneously instead of sequentially, so sounds start at the same time as intended.
 - Rapid re-triggers are now correctly debounced across all layers at once, preventing missed or double-triggered sounds during quick pad taps.
 - Pad progress calculation now reads the audio clock once per animation frame instead of once per pad, improving performance when many pads are active simultaneously.

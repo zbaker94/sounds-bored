@@ -84,15 +84,18 @@ export function liveLayerField<K extends keyof Layer>(
 export function getVoiceVolume(layer: Layer, sound: Sound): number {
   if (layer.selection.type === "assigned") {
     const inst = layer.selection.instances.find((i) => i.soundId === sound.id);
-    return inst ? inst.volume / 100 : 1.0;
+    if (!inst) return 1.0;
+    return Number.isFinite(inst.volume) ? Math.max(0, Math.min(1, inst.volume / 100)) : 0;
   }
   return 1.0;
 }
 
 /** Convert Layer.volume (schema: 0–100) to a Web Audio gain value (0–1).
- *  Clamps to [0, 1] and returns 1 for non-finite values. */
+ *  Clamps to [0, 1] and returns 0 for non-finite values (silence is safer than full volume
+ *  for malformed data — the Zod schema rejects non-finite at parse time, so this path
+ *  is a last-resort guard against data bypassing validation). */
 export function getLayerNormalizedVolume(layer: Layer): number {
-  return Number.isFinite(layer.volume) ? Math.max(0, Math.min(1, layer.volume / 100)) : 1;
+  return Number.isFinite(layer.volume) ? Math.max(0, Math.min(1, layer.volume / 100)) : 0;
 }
 
 /** Resolve a layer's sound selection to playable Sound objects (filePath required). */

@@ -132,6 +132,33 @@ describe("layerTrigger", () => {
       const layer = createMockLayer({ selection: { type: "set", setId: "set-1", defaultVolume: 100 } });
       expect(getVoiceVolume(layer, sound)).toBe(1.0);
     });
+
+    it("returns 1.0 when sound instance is not found in assigned selection", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s-other" });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 80 }] },
+      });
+      expect(getVoiceVolume(layer, sound)).toBe(1.0);
+    });
+
+    it("returns 0 for NaN instance volume (silence is safer than unexpected full-volume playback)", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1" });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: NaN }] },
+      });
+      expect(getVoiceVolume(layer, sound)).toBe(0);
+    });
+
+    it("returns 0 for Infinity instance volume", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1" });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: Infinity }] },
+      });
+      expect(getVoiceVolume(layer, sound)).toBe(0);
+    });
   });
 
   // ── getLayerNormalizedVolume ──────────────────────────────────────────────
@@ -160,6 +187,21 @@ describe("layerTrigger", () => {
     it("clamps negative values to 0.0", async () => {
       const { getLayerNormalizedVolume } = await import("./layerTrigger");
       expect(getLayerNormalizedVolume(createMockLayer({ volume: -10 }))).toBeCloseTo(0.0);
+    });
+
+    it("returns 0 for NaN volume (silence is safer than unexpected full-volume playback)", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: NaN }))).toBe(0);
+    });
+
+    it("returns 0 for Infinity volume", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: Infinity }))).toBe(0);
+    });
+
+    it("returns 0 for -Infinity volume", async () => {
+      const { getLayerNormalizedVolume } = await import("./layerTrigger");
+      expect(getLayerNormalizedVolume(createMockLayer({ volume: -Infinity }))).toBe(0);
     });
   });
 

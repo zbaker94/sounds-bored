@@ -18,6 +18,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { LayerAccordion } from "./LayerAccordion";
 import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
+import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 import { createDefaultLayer } from "./constants";
 
@@ -148,7 +149,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);
       config.layers.forEach((l) => {
-        syncLayerVolume(l.id, l.volume / 100);
+        syncLayerVolume(l.id, getLayerNormalizedVolume(l));
         const originalLayer = initialConfig?.layers?.find((ol) => ol.id === l.id);
         if (originalLayer) syncLayerConfig(l, originalLayer);
       });
