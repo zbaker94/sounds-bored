@@ -31,7 +31,17 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const projectRef = useRef(useProjectStore.getState().project);
   const isDirtyRef = useRef(useProjectStore.getState().isDirty);
   const saveProjectMutation = useSaveProject();
-  const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
+  const { saveCurrentLibrarySync, isPending: isLibrarySavePending } = useSaveCurrentLibrary();
+
+  // Refs updated synchronously on every render so the save closures always read
+  // the latest pending state without restarting the interval on mutation state changes.
+  // TanStack Query creates a new mutation result object each render, so reading
+  // .isPending from the stale closure-captured object would see a stale value.
+  const isProjectSavePendingRef = useRef(saveProjectMutation.isPending);
+  isProjectSavePendingRef.current = saveProjectMutation.isPending;
+
+  const isLibrarySavePendingRef = useRef(isLibrarySavePending);
+  isLibrarySavePendingRef.current = isLibrarySavePending;
 
   // Timestamp (ms) of the most recent auto-save error toast. Used to debounce
   // repeated failure toasts — without this, a persistent write failure would
@@ -60,6 +70,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       const project = projectRef.current;
       if (!project || !folderPath) return;
       if (!isDirtyRef.current) return;
+      if (isProjectSavePendingRef.current) return;
 
       saveProjectMutation.mutate({ folderPath, project }, {
         // Do NOT clear the dirty flag on failure — the hook should keep retrying
@@ -72,6 +83,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     const saveLibrary = () => {
       const { isDirty } = useLibraryStore.getState();
       if (!isDirty) return;
+      if (isLibrarySavePendingRef.current) return;
 
       saveCurrentLibrarySync({
         onError: notifyAutoSaveFailure,

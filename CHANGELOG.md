@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Auto-save now skips overlapping saves — if a save is still in progress, the next scheduled save tick is deferred until the previous one completes, preventing duplicate write operations.
 - No user-facing behavior changes — this is an internal refactor migrating "Remove All Missing Sounds/Folders" confirmation dialogs from standalone boolean flags to the unified overlay stack system.
 - Fixed a bug where components sharing the library reconciliation hook could show inconsistent loading states — all instances now correctly reflect when a library scan is in progress
 - Library reconciliation state is now shared globally, preventing duplicate scans from running simultaneously across multiple UI panels
