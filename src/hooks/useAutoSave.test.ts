@@ -8,13 +8,17 @@ import { createMockProject, createMockHistoryEntry } from "@/test/factories";
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 const mockSaveProjectMutate = vi.fn();
+// Mutable object — tests can set .isPending = true to simulate an in-flight save
+const mockProjectMutation = { mutate: mockSaveProjectMutate, isPending: false };
 vi.mock("@/lib/project.queries", () => ({
-  useSaveProject: () => ({ mutate: mockSaveProjectMutate }),
+  useSaveProject: () => mockProjectMutation,
 }));
 
 const mockSaveLibrarySync = vi.fn();
+// Mutable object — tests can set .isPending = true to simulate an in-flight library save
+const mockLibraryMutation = { saveCurrentLibrarySync: mockSaveLibrarySync, isPending: false };
 vi.mock("@/lib/library.queries", () => ({
-  useSaveCurrentLibrary: () => ({ saveCurrentLibrarySync: mockSaveLibrarySync }),
+  useSaveCurrentLibrary: () => mockLibraryMutation,
 }));
 
 vi.mock("@/lib/library.reconcile", () => ({
@@ -65,6 +69,8 @@ beforeEach(() => {
   mockSaveLibrarySync.mockReset();
   mockToastError.mockReset();
   mockRefreshMissingState.mockReset();
+  mockProjectMutation.isPending = false;
+  mockLibraryMutation.isPending = false;
 });
 
 afterEach(() => {
@@ -336,6 +342,108 @@ describe("useAutoSave", () => {
       libraryOptions.onError(new Error("ENOSPC"));
     });
     expect(mockToastError).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips project save when a previous project save is still in flight", () => {
+    seedDirtyPermanentProject();
+    // Simulate an in-flight save from a previous tick
+    mockProjectMutation.isPending = true;
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Even though isDirty is true, mutate must not be called while isPending is true
+    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+
+    // Advance one full interval — still in flight, still no save
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+  });
+
+  it("resumes project saves once the in-flight save completes", () => {
+    seedDirtyPermanentProject();
+    mockProjectMutation.isPending = true;
+
+    const { rerender } = renderHook(() => useAutoSave(30_000));
+
+    // First tick — skipped because isPending
+    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+
+    // Simulate TanStack Query re-rendering the component when the save completes.
+    // rerender() is required: it re-executes the hook body, which writes the new
+    // isPending value to the ref. Without rerender(), the ref stays stale.
+    mockProjectMutation.isPending = false;
+    rerender();
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    // Next tick fires now that isPending is false and isDirty is still true
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the next interval tick when the initial save (from mount) is still in flight", () => {
+    seedDirtyPermanentProject();
+
+    // Simulate TanStack Query: when mutate() is called, isPending goes true
+    mockSaveProjectMutate.mockImplementation(() => {
+      mockProjectMutation.isPending = true;
+    });
+
+    const { rerender } = renderHook(() => useAutoSave(30_000));
+
+    // Mount fires the first save — mutate is called, which sets isPending = true
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+
+    // Simulate TanStack Query re-rendering the hook with the new isPending = true
+    rerender();
+
+    // Advance one interval — save still in flight, should skip
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips library save when a previous library save is still in flight", () => {
+    seedDirtyPermanentProject();
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
+    mockLibraryMutation.isPending = true;
+
+    renderHook(() => useAutoSave(30_000));
+
+    expect(mockSaveLibrarySync).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    expect(mockSaveLibrarySync).not.toHaveBeenCalled();
+  });
+
+  it("resumes library saves once the in-flight library save completes", () => {
+    seedDirtyPermanentProject();
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
+    mockLibraryMutation.isPending = true;
+
+    const { rerender } = renderHook(() => useAutoSave(30_000));
+
+    expect(mockSaveLibrarySync).not.toHaveBeenCalled();
+
+    // Simulate TanStack Query re-rendering the component when the save completes.
+    // rerender() updates the ref — without it the ref stays stale.
+    mockLibraryMutation.isPending = false;
+    rerender();
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    expect(mockSaveLibrarySync).toHaveBeenCalledTimes(1);
   });
 
   it("does NOT call refreshMissingState on mount or interval ticks", () => {
