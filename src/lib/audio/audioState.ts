@@ -105,8 +105,62 @@ const layerProgressInfo = new Map<string, { startedAt: number; duration: number;
  * pad ID -> layer ID -> Set<HTMLAudioElement>. Per-layer keying ensures 'continue'-mode
  * retriggers preserve progress tracking for layers that do not restart.
  * HTMLAudioElement exposes currentTime/duration after loadedmetadata fires.
+ *
+ * @internal Mutate only via registerStreamingAudio / unregisterStreamingAudio /
+ * clearLayerStreamingAudio / clearAllStreamingAudio so the best-element caches
+ * (_padBestStreamingAudio / _layerBestStreamingAudio) remain consistent.
  */
 const padStreamingAudio = new Map<string, Map<string, Set<HTMLAudioElement>>>();
+
+/**
+ * Cached "best" (longest-duration) streaming element per pad.
+ * Recomputed on register/unregister/clear — never on the RAF hot path.
+ * `getPadProgress` does a single Map lookup instead of a nested linear scan.
+ * Exported with underscore prefix for test introspection only.
+ */
+export const _padBestStreamingAudio = new Map<string, HTMLAudioElement>();
+
+/**
+ * Cached "best" (longest-duration) streaming element per layer.
+ * Same invalidation model as _padBestStreamingAudio.
+ * `computeAllLayerProgress` does a single Map lookup per layer.
+ * Exported with underscore prefix for test introspection only.
+ */
+export const _layerBestStreamingAudio = new Map<string, HTMLAudioElement>();
+
+/** Pick the element with the longest *finite* duration from a Set. NaN-duration elements
+ *  are treated as -Infinity so any finite-duration element wins over an unloaded one. */
+function pickBestStreaming(audioSet: Iterable<HTMLAudioElement>): HTMLAudioElement | null {
+  let best: HTMLAudioElement | null = null;
+  let bestDur = -Infinity;
+  for (const audio of audioSet) {
+    const d = isFinite(audio.duration) ? audio.duration : -Infinity;
+    if (!best || d > bestDur) { best = audio; bestDur = d; }
+  }
+  return best;
+}
+
+/** Recompute the best streaming element for a pad from scratch. */
+function recomputePadBestStreaming(padId: string): void {
+  const layerMap = padStreamingAudio.get(padId);
+  if (!layerMap) { _padBestStreamingAudio.delete(padId); return; }
+  // Flatten all elements across all layers and pick the best
+  function* allElements() {
+    for (const audioSet of layerMap!.values()) yield* audioSet;
+  }
+  const best = pickBestStreaming(allElements());
+  if (best) { _padBestStreamingAudio.set(padId, best); }
+  else { _padBestStreamingAudio.delete(padId); }
+}
+
+/** Recompute the best streaming element for a specific layer. */
+function recomputeLayerBestStreaming(padId: string, layerId: string): void {
+  const audioSet = padStreamingAudio.get(padId)?.get(layerId);
+  if (!audioSet || audioSet.size === 0) { _layerBestStreamingAudio.delete(layerId); return; }
+  const best = pickBestStreaming(audioSet);
+  if (best) { _layerBestStreamingAudio.set(layerId, best); }
+  else { _layerBestStreamingAudio.delete(layerId); }
+}
 
 /** Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
  *  Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted. */
@@ -168,20 +222,8 @@ export function getPadProgress(padId: string): number | null {
     }
     return Math.min(1, Math.max(0, elapsed / info.duration));
   }
-  const layerMap = padStreamingAudio.get(padId);
-  if (layerMap && layerMap.size > 0) {
-    // Pick the element with the longest duration across all streaming layers,
-    // matching how padProgressInfo picks the longest-duration buffer voice.
-    // layerMap.size > 0 and empty Sets are never kept, so best is always assigned.
-    let best: HTMLAudioElement | null = null;
-    for (const audioSet of layerMap.values()) {
-      for (const audio of audioSet) {
-        if (!best || (isFinite(audio.duration) && audio.duration > (best.duration || 0))) {
-          best = audio;
-        }
-      }
-    }
-    if (!best) return 0;
+  const best = _padBestStreamingAudio.get(padId);
+  if (best !== undefined) {
     const d = best.duration;
     if (d > 0 && isFinite(d)) {
       return Math.min(1, Math.max(0, best.currentTime / d));
@@ -276,23 +318,11 @@ export function computeAllLayerProgress(): Record<string, number> {
     }
   }
 
-  // Streaming layers — tracked in padStreamingAudio (pad -> layer -> audio set)
-  for (const [, layerMap] of padStreamingAudio) {
-    for (const [layerId, audioSet] of layerMap) {
-      if (layerId in result) continue; // already from buffer path
-      let best: HTMLAudioElement | null = null;
-      for (const audio of audioSet) {
-        if (!best || (isFinite(audio.duration) && audio.duration > (best.duration || 0))) {
-          best = audio;
-        }
-      }
-      if (!best) {
-        result[layerId] = 0;
-      } else {
-        const d = best.duration;
-        result[layerId] = d > 0 && isFinite(d) ? Math.min(1, Math.max(0, best.currentTime / d)) : 0;
-      }
-    }
+  // Streaming layers — use cached best element per layer (O(1) lookup per layer)
+  for (const [layerId, best] of _layerBestStreamingAudio) {
+    if (layerId in result) continue; // already from buffer path
+    const d = best.duration;
+    result[layerId] = d > 0 && isFinite(d) ? Math.min(1, Math.max(0, best.currentTime / d)) : 0;
   }
 
   return result;
@@ -418,6 +448,8 @@ export function clearLayerStreamingAudio(padId: string, layerId: string): void {
   if (!padLayerMap) return;
   padLayerMap.delete(layerId);
   if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
+  _layerBestStreamingAudio.delete(layerId);
+  recomputePadBestStreaming(padId);
 }
 
 export function registerStreamingAudio(padId: string, layerId: string, el: HTMLAudioElement): void {
@@ -429,6 +461,22 @@ export function registerStreamingAudio(padId: string, layerId: string, el: HTMLA
   const audioSet = padLayerMap.get(layerId) ?? new Set<HTMLAudioElement>();
   audioSet.add(el);
   padLayerMap.set(layerId, audioSet);
+  recomputePadBestStreaming(padId);
+  recomputeLayerBestStreaming(padId, layerId);
+  // If duration is not yet known, re-evaluate once metadata loads so the cache
+  // reflects the true duration rather than NaN.
+  // Membership guard: only recompute if the element is still registered at fire time.
+  // This makes the listener a safe no-op after unregister and prevents stale closures
+  // from corrupting the cache when the same HTMLAudioElement is reused across triggers
+  // (streamingCache reuses elements per sound.id).
+  if (!isFinite(el.duration)) {
+    el.addEventListener("loadedmetadata", () => {
+      if (padStreamingAudio.get(padId)?.get(layerId)?.has(el)) {
+        recomputePadBestStreaming(padId);
+        recomputeLayerBestStreaming(padId, layerId);
+      }
+    }, { once: true });
+  }
 }
 
 export function unregisterStreamingAudio(padId: string, layerId: string, el: HTMLAudioElement): void {
@@ -439,11 +487,15 @@ export function unregisterStreamingAudio(padId: string, layerId: string, el: HTM
   audioSet.delete(el);
   if (audioSet.size === 0) padLayerMap.delete(layerId);
   if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
+  recomputePadBestStreaming(padId);
+  recomputeLayerBestStreaming(padId, layerId);
 }
 
 /** Clear all streaming audio tracking. */
 export function clearAllStreamingAudio(): void {
   padStreamingAudio.clear();
+  _padBestStreamingAudio.clear();
+  _layerBestStreamingAudio.clear();
 }
 
 // ---------------------------------------------------------------------------
