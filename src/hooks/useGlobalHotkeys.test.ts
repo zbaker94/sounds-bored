@@ -30,13 +30,32 @@ vi.mock("@/contexts/ProjectActionsContext", () => ({
   }),
 }));
 
+const mockUiState = {
+  editMode: false,
+  hoveredPadId: null as string | null,
+  padPopoverOpenId: null as string | null,
+  overlayStack: [] as object[],
+  closeOverlay: vi.fn(),
+  toggleOverlay: vi.fn(),
+  openOverlay: vi.fn(),
+  hasOpenOverlay: vi.fn(() => false),
+  isTopOverlay: vi.fn(() => false),
+  isOverlayOpen: vi.fn(() => false),
+  toggleEditMode: vi.fn(),
+  setActiveSceneId: vi.fn(),
+  setHoveredPadId: vi.fn(),
+};
+
 vi.mock("@/state/uiStore", () => ({
-  useUiStore: vi.fn(),
+  useUiStore: Object.assign(vi.fn(), {
+    getState: vi.fn(() => mockUiState),
+  }),
   OVERLAY_ID: {
     EXPORT_PROGRESS_DIALOG: "EXPORT_PROGRESS_DIALOG",
     MENU_DRAWER: "MENU_DRAWER",
     SOUNDS_PANEL: "SOUNDS_PANEL",
     PAD_CONFIG_DRAWER: "PAD_CONFIG_DRAWER",
+    SAVE_PROJECT_DIALOG: "SAVE_PROJECT_DIALOG",
   },
 }));
 
@@ -74,6 +93,64 @@ function triggerKey(key: string) {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe("useGlobalHotkeys — hotkey configuration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
+    useProjectStore.setState({ ...initialProjectState });
+    // Reset mutable fields on the shared mockUiState object
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = null;
+    mockUiState.padPopoverOpenId = null;
+    mockUiState.overlayStack = [];
+  });
+
+  it('registers "f" with enableOnFormTags: true so fade fires even when a slider or input is focused', () => {
+    renderHook(() => useGlobalHotkeys());
+    expect(hotkeyRegistrations["f"]?.options).toMatchObject({ enableOnFormTags: true });
+  });
+
+  it('registers "x" with enableOnFormTags: true so multi-fade fires even when a slider or input is focused', () => {
+    renderHook(() => useGlobalHotkeys());
+    expect(hotkeyRegistrations["x"]?.options).toMatchObject({ enableOnFormTags: true });
+  });
+
+  it('registers "esc" with enableOnFormTags: true (existing behaviour)', () => {
+    renderHook(() => useGlobalHotkeys());
+    expect(hotkeyRegistrations["esc"]?.options).toMatchObject({ enableOnFormTags: true });
+  });
+
+  it("does not register left/right with enableOnFormTags (arrows must navigate within sliders, not jump scenes)", () => {
+    renderHook(() => useGlobalHotkeys());
+    expect(hotkeyRegistrations["left"]?.options).not.toMatchObject({ enableOnFormTags: true });
+    expect(hotkeyRegistrations["right"]?.options).not.toMatchObject({ enableOnFormTags: true });
+  });
+
+  it("F callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = null;
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("f");
+    expect(fadePadWithLevels).not.toHaveBeenCalled();
+  });
+
+  it("X callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {
+    const { useMultiFadeStore } = await import("@/state/multiFadeStore");
+    const mockEnterMultiFade = vi.fn();
+    vi.mocked(useMultiFadeStore.getState).mockReturnValue({
+      active: false,
+      enterMultiFade: mockEnterMultiFade,
+      enterMultiFadeEmpty: vi.fn(),
+    } as unknown as ReturnType<typeof useMultiFadeStore.getState>);
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = null;
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("x");
+    expect(mockEnterMultiFade).not.toHaveBeenCalled();
+  });
+});
 
 describe("useGlobalHotkeys — arrow-key scene navigation", () => {
   beforeEach(() => {
