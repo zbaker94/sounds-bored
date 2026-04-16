@@ -91,6 +91,8 @@ const mockAudioInstances: Array<{
   pause: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
   onended: ((ev: Event) => any) | null;
+  addEventListener: ReturnType<typeof vi.fn>;
+  dispatchEvent: (e: Event) => boolean;
 }> = [];
 
 vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any, src?: string) {
@@ -108,6 +110,17 @@ vi.stubGlobal("Audio", vi.fn().mockImplementation(function (this: any, src?: str
   this.pause = vi.fn();
   this.play = vi.fn().mockResolvedValue(undefined);
   this.onended = null;
+  // Store event listeners so loadedmetadata can be simulated in tests
+  const _listeners = new Map<string, Array<() => void>>();
+  this.addEventListener = vi.fn((event: string, cb: () => void) => {
+    const arr = _listeners.get(event) ?? [];
+    arr.push(cb);
+    _listeners.set(event, arr);
+  });
+  this.dispatchEvent = vi.fn((e: Event) => {
+    for (const cb of _listeners.get(e.type) ?? []) (cb as (ev: Event) => void)(e);
+    return true;
+  });
   mockAudioInstances.push(this);
 }));
 
@@ -797,10 +810,13 @@ describe("streaming path (large files)", () => {
     // short sound: 10 s, 5 s elapsed → 0.5 progress
     Object.defineProperty(mockAudioInstances[0], "duration", { value: 10, configurable: true });
     mockAudioInstances[0].currentTime = 5;
+    // Simulate loadedmetadata so the best-element cache is re-evaluated
+    mockAudioInstances[0].dispatchEvent(new Event("loadedmetadata"));
 
     // long sound: 20 s, 5 s elapsed → 0.25 progress
     Object.defineProperty(mockAudioInstances[1], "duration", { value: 20, configurable: true });
     mockAudioInstances[1].currentTime = 5;
+    mockAudioInstances[1].dispatchEvent(new Event("loadedmetadata"));
 
     // Progress should reflect the longest-duration element (20 s) = 5/20 = 0.25
     expect(getPadProgress(pad.id)).toBeCloseTo(0.25);
