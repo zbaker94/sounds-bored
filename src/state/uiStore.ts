@@ -17,13 +17,13 @@ export const OVERLAY_ID = {
   PAD_CONFIG_DRAWER: "pad-config-drawer",
   SETTINGS_DIALOG: "settings-dialog",
   EXPORT_PROGRESS_DIALOG: "export-progress-dialog",
+  CONFIRM_REMOVE_MISSING_SOUNDS: "confirm-remove-missing-sounds",
+  CONFIRM_REMOVE_MISSING_FOLDERS: "confirm-remove-missing-folders",
 } as const;
 
 interface UiState {
   overlayStack: OverlayEntry[];
   editMode: boolean;
-  confirmRemoveMissingSoundsOpen: boolean;
-  confirmRemoveMissingFoldersOpen: boolean;
   /** The pad currently under the mouse cursor, or null if none. */
   hoveredPadId: string | null;
   /** The pad whose context popover is currently open, or null if none. */
@@ -45,10 +45,6 @@ interface UiActions {
   hasOpenOverlay: () => boolean;
   /** Toggle edit mode on/off. */
   toggleEditMode: () => void;
-  /** Open/close the "Remove All Missing Sounds" confirmation dialog. */
-  setConfirmRemoveMissingSoundsOpen: (open: boolean) => void;
-  /** Open/close the "Remove All Missing Folders" confirmation dialog. */
-  setConfirmRemoveMissingFoldersOpen: (open: boolean) => void;
   /** Set the currently hovered pad id, or null to clear. */
   setHoveredPadId: (id: string | null) => void;
   /** Set the pad whose context popover is open, or null to clear. */
@@ -60,8 +56,6 @@ export type UiStore = UiState & UiActions;
 export const initialUiState: UiState = {
   overlayStack: [],
   editMode: false,
-  confirmRemoveMissingSoundsOpen: false,
-  confirmRemoveMissingFoldersOpen: false,
   hoveredPadId: null,
   padPopoverOpenId: null,
 };
@@ -104,12 +98,6 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   toggleEditMode: () =>
     set((state) => ({ editMode: !state.editMode })),
-
-  setConfirmRemoveMissingSoundsOpen: (open) =>
-    set(() => ({ confirmRemoveMissingSoundsOpen: open })),
-
-  setConfirmRemoveMissingFoldersOpen: (open) =>
-    set(() => ({ confirmRemoveMissingFoldersOpen: open })),
 
   setHoveredPadId: (id) => set({ hoveredPadId: id }),
 

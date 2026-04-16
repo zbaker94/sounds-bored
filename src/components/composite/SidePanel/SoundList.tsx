@@ -38,7 +38,7 @@ import { useDownloadEventListener } from "@/lib/ytdlp.queries";
 import { DownloadItem } from "@/components/composite/DownloadManager/DownloadItem";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
 import { useProjectStore } from "@/state/projectStore";
-import { useUiStore } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
 import { cn } from "@/lib/utils";
 import { SoundListItemTags } from "./SoundListItemTags";
@@ -299,7 +299,7 @@ export function SoundList({
               onClick={() =>
                 useUiStore
                   .getState()
-                  .setConfirmRemoveMissingSoundsOpen(true)
+                  .openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS, "dialog")
               }
             >
               Remove All

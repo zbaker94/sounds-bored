@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { useUiStore } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
@@ -71,7 +71,7 @@ export function useBulkRemove(): {
       toast.error("Failed to remove missing sounds");
     } finally {
       setIsBulkRemoving(false);
-      useUiStore.getState().setConfirmRemoveMissingSoundsOpen(false);
+      useUiStore.getState().closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS);
     }
   }, [settings, allMissingSounds, updateLibrary, saveCurrentLibrary]);
 
@@ -130,7 +130,7 @@ export function useBulkRemove(): {
       toast.error("Failed to remove missing folders");
     } finally {
       setIsBulkRemoving(false);
-      useUiStore.getState().setConfirmRemoveMissingFoldersOpen(false);
+      useUiStore.getState().closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS);
     }
   }, [settings, sounds, allMissingFolders, updateLibrary, saveCurrentLibrary, saveSettings]);
 

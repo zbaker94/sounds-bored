@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useBulkRemove } from "./useBulkRemove";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
-import { useUiStore, initialUiState } from "@/state/uiStore";
+import { useUiStore, initialUiState, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import {
   createMockAppSettings,
   createMockGlobalFolder,
@@ -207,6 +207,8 @@ describe("useBulkRemove", () => {
         missingFolderIds: new globalThis.Set(["dl"]),
       });
 
+      useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog");
+
       const { result } = renderHook(() => useBulkRemove());
       await act(async () => {
         await result.current.handleRemoveAllMissingFolders();
@@ -215,21 +217,46 @@ describe("useBulkRemove", () => {
       expect(mockSaveSettings).not.toHaveBeenCalled();
       expect(mockSaveLibrary).not.toHaveBeenCalled();
       expect(mockToastWarning).toHaveBeenCalled();
+      expect(result.current.isBulkRemoving).toBe(false);
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(false);
     });
   });
 
   describe("state hooks", () => {
     it("closes the sounds confirm dialog via uiStore when the handler completes", async () => {
       useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
-      useUiStore.getState().setConfirmRemoveMissingSoundsOpen(true);
-      expect(useUiStore.getState().confirmRemoveMissingSoundsOpen).toBe(true);
+      useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS, "dialog");
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(true);
 
       const { result } = renderHook(() => useBulkRemove());
       await act(async () => {
         await result.current.handleRemoveAllMissingSounds();
       });
 
-      expect(useUiStore.getState().confirmRemoveMissingSoundsOpen).toBe(false);
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(false);
+    });
+
+    it("closes the folders confirm dialog via uiStore when the handler completes", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/f1" });
+      const settings = createMockAppSettings({
+        globalFolders: [folder],
+        downloadFolderId: undefined,
+        importFolderId: undefined,
+      });
+      useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        missingFolderIds: new globalThis.Set(["f1"]),
+      });
+      useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog");
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(true);
+
+      const { result } = renderHook(() => useBulkRemove());
+      await act(async () => {
+        await result.current.handleRemoveAllMissingFolders();
+      });
+
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(false);
     });
   });
 
@@ -243,7 +270,7 @@ describe("useBulkRemove", () => {
       });
       useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
       mockSaveLibrary.mockRejectedValueOnce(new Error("disk full"));
-      useUiStore.getState().setConfirmRemoveMissingSoundsOpen(true);
+      useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS, "dialog");
 
       const { result } = renderHook(() => useBulkRemove());
       await act(async () => {
@@ -252,7 +279,7 @@ describe("useBulkRemove", () => {
 
       expect(mockToastError).toHaveBeenCalledWith("Failed to remove missing sounds");
       expect(result.current.isBulkRemoving).toBe(false);
-      expect(useUiStore.getState().confirmRemoveMissingSoundsOpen).toBe(false);
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(false);
     });
 
     it("shows error toast and resets isBulkRemoving when saveSettings throws in handleRemoveAllMissingFolders", async () => {
@@ -268,7 +295,7 @@ describe("useBulkRemove", () => {
         missingFolderIds: new globalThis.Set(["f1"]),
       });
       mockSaveSettings.mockRejectedValueOnce(new Error("disk full"));
-      useUiStore.getState().setConfirmRemoveMissingFoldersOpen(true);
+      useUiStore.getState().openOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS, "dialog");
 
       const { result } = renderHook(() => useBulkRemove());
       await act(async () => {
@@ -277,7 +304,7 @@ describe("useBulkRemove", () => {
 
       expect(mockToastError).toHaveBeenCalledWith("Failed to remove missing folders");
       expect(result.current.isBulkRemoving).toBe(false);
-      expect(useUiStore.getState().confirmRemoveMissingFoldersOpen).toBe(false);
+      expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(false);
     });
 
     it("removes only non-assigned folders when some are assigned (mixed case)", async () => {

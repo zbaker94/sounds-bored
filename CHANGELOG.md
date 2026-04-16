@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing behavior changes — this is an internal refactor migrating "Remove All Missing Sounds/Folders" confirmation dialogs from standalone boolean flags to the unified overlay stack system.
 - Fixed a bug where components sharing the library reconciliation hook could show inconsistent loading states — all instances now correctly reflect when a library scan is in progress
 - Library reconciliation state is now shared globally, preventing duplicate scans from running simultaneously across multiple UI panels
 - Fixed a performance issue where sound selection changes during active playback used slow JSON serialization for comparison — now uses a dedicated field-by-field equality check instead.

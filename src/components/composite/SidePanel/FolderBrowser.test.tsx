@@ -9,7 +9,7 @@ import {
   useAppSettingsStore,
   initialAppSettingsState,
 } from "@/state/appSettingsStore";
-import { useUiStore, initialUiState } from "@/state/uiStore";
+import { useUiStore, initialUiState, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import {
   createMockAppSettings,
   createMockGlobalFolder,
@@ -145,7 +145,7 @@ describe("FolderBrowser", () => {
     expect(screen.getByText("Custom Folder")).toBeInTheDocument();
   });
 
-  it("'Remove All' banner button sets the uiStore confirmRemoveMissingFoldersOpen flag", async () => {
+  it("'Remove All' banner button opens the confirm-remove-missing-folders overlay", async () => {
     const folder = createMockGlobalFolder({ id: "missing-f", name: "Missing Folder" });
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
     useLibraryStore.setState({
@@ -159,14 +159,14 @@ describe("FolderBrowser", () => {
     expect(screen.getByText(/folder missing/i)).toBeInTheDocument();
 
     // Initial flag is false
-    expect(useUiStore.getState().confirmRemoveMissingFoldersOpen).toBe(false);
+    expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(false);
 
     const removeAllBtn = screen.getByRole("button", { name: /remove all/i });
     await act(async () => {
       fireEvent.click(removeAllBtn);
     });
 
-    expect(useUiStore.getState().confirmRemoveMissingFoldersOpen).toBe(true);
+    expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(true);
   });
 
   it("'Review →' button opens the folder dialog queue", async () => {
