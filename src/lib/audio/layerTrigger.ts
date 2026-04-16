@@ -89,6 +89,12 @@ export function getVoiceVolume(layer: Layer, sound: Sound): number {
   return 1.0;
 }
 
+/** Convert Layer.volume (schema: 0–100) to a Web Audio gain value (0–1).
+ *  Clamps to [0, 1] and returns 1 for non-finite values. */
+export function getLayerNormalizedVolume(layer: Layer): number {
+  return Number.isFinite(layer.volume) ? Math.max(0, Math.min(1, layer.volume / 100)) : 1;
+}
+
 /** Resolve a layer's sound selection to playable Sound objects (filePath required). */
 export function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
   return resolveLayerSounds(layer, sounds).filter((s) => !!s.filePath);
@@ -111,7 +117,7 @@ export function rampStopLayerVoices(
   for (const v of voices) v.stopWithRamp(STOP_RAMP_S);
 
   const gain = getLayerGain(layer.id);
-  const resetValue = layer.volume / 100;
+  const resetValue = getLayerNormalizedVolume(layer);
   const timeoutId = setTimeout(() => {
     deleteStopCleanupTimeout(timeoutId);
     for (const v of voices) clearLayerVoice(padId, layer.id, v);
