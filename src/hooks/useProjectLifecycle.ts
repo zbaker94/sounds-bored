@@ -115,7 +115,7 @@ export function useProjectLifecycle() {
     if (lastNotifiedProjectKey.current === projectKey) return;
     lastNotifiedProjectKey.current = projectKey;
 
-    const usedSoundIds = new globalThis.Set(
+    const usedSoundIds = new Set(
       project.scenes.flatMap((scene) =>
         scene.pads.flatMap((pad) =>
           pad.layers.flatMap((layer) =>

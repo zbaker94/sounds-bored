@@ -13,7 +13,7 @@ export type ReconcileResult = {
  * Pure function: no side effects, no Zustand access.
  */
 export function reconcileProjectSounds(project: Project, sounds: Sound[]): ReconcileResult {
-  const soundIdSet = new globalThis.Set(sounds.map((s) => s.id));
+  const soundIdSet = new Set(sounds.map((s) => s.id));
   let removedCount = 0;
 
   const cleanedScenes = project.scenes.map((scene) => ({
@@ -45,7 +45,7 @@ export type PadSoundState = "ok" | "partial" | "disabled";
  * - "disabled": no playable sources — all assigned sounds are missing or instances are empty,
  *               AND there are no tag/set layers to fall back on
  */
-export function getPadSoundState(pad: Pad, missingSoundIds: globalThis.Set<string>): PadSoundState {
+export function getPadSoundState(pad: Pad, missingSoundIds: Set<string>): PadSoundState {
   let hasNonAssignedLayer = false;
   let hasMissingSound = false;
   let hasPlayableSound = false;
@@ -82,7 +82,7 @@ export type AffectedPad = {
  * Returns which pads and layers in the project reference any of the given soundIds.
  * Only checks assigned layers — tag/set layers resolve dynamically and are not included.
  */
-export function getAffectedPads(project: Project, soundIds: globalThis.Set<string>): AffectedPad[] {
+export function getAffectedPads(project: Project, soundIds: Set<string>): AffectedPad[] {
   const result: AffectedPad[] = [];
   for (const scene of project.scenes) {
     for (const pad of scene.pads) {

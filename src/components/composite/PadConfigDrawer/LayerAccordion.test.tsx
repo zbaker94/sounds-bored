@@ -141,7 +141,7 @@ describe("LayerAccordion", () => {
   describe("layer warnings", () => {
     it("shows no warning icon on a clean layer", () => {
       const sound = createMockSound({ id: "s1" });
-      useLibraryStore.setState({ sounds: [sound], missingSoundIds: new globalThis.Set<string>() });
+      useLibraryStore.setState({ sounds: [sound], missingSoundIds: new Set<string>() });
       const inst = createMockSoundInstance({ soundId: "s1" });
       const layers = [createMockLayer({ selection: { type: "assigned", instances: [inst] } })];
       render(<Wrapper defaultValues={makeDefaultValues(layers)} />);
@@ -159,7 +159,7 @@ describe("LayerAccordion", () => {
       const sound = createMockSound({ id: "s-missing", name: "Kick 808" });
       useLibraryStore.setState({
         sounds: [sound],
-        missingSoundIds: new globalThis.Set(["s-missing"]),
+        missingSoundIds: new Set(["s-missing"]),
       });
       const inst = createMockSoundInstance({ soundId: "s-missing" });
       const layers = [createMockLayer({ selection: { type: "assigned", instances: [inst] } })];

@@ -50,8 +50,8 @@ const panelClass =
 interface SoundListProps {
   selectedId: string | null;
   searchQuery: string;
-  selectedSoundIds: globalThis.Set<string>;
-  onSelectionChange: (ids: globalThis.Set<string>) => void;
+  selectedSoundIds: Set<string>;
+  onSelectionChange: (ids: Set<string>) => void;
   onOpenAddToSet: () => void;
   onOpenAddTags: () => void;
 }
@@ -150,14 +150,14 @@ export function SoundList({
       selectableIds.length > 0 &&
       selectableIds.every((id) => selectedSoundIds.has(id));
     if (allSelectableSelected) {
-      onSelectionChange(new globalThis.Set());
+      onSelectionChange(new Set());
     } else {
-      onSelectionChange(new globalThis.Set(selectableIds));
+      onSelectionChange(new Set(selectableIds));
     }
   }
 
   function toggleSelection(soundId: string) {
-    const next = new globalThis.Set(selectedSoundIds);
+    const next = new Set(selectedSoundIds);
     if (next.has(soundId)) next.delete(soundId);
     else next.add(soundId);
     onSelectionChange(next);
@@ -205,7 +205,7 @@ export function SoundList({
           missingResult.unknownSoundIds,
           missingResult.unknownFolderIds,
         );
-      onSelectionChange(new globalThis.Set());
+      onSelectionChange(new Set());
       if (failedCount > 0) {
         toast.warning(
           `${deletedFromDisk} of ${count} file${count > 1 ? "s" : ""} deleted; ${failedCount} could not be removed from disk`,

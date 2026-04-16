@@ -54,7 +54,7 @@ export function useBulkRemove(): {
     if (!settings) return;
     setIsBulkRemoving(true);
     try {
-      const idsToRemove = new globalThis.Set(allMissingSounds.map((s) => s.id));
+      const idsToRemove = new Set(allMissingSounds.map((s) => s.id));
       for (const id of idsToRemove) {
         evictBuffer(id);
         evictStreamingElement(id);
@@ -80,7 +80,7 @@ export function useBulkRemove(): {
     setIsBulkRemoving(true);
     try {
       const storeSettings = useAppSettingsStore.getState().settings;
-      const assignedIds = new globalThis.Set(
+      const assignedIds = new Set(
         [
           storeSettings?.downloadFolderId,
           storeSettings?.importFolderId,
@@ -88,7 +88,7 @@ export function useBulkRemove(): {
       );
       const safeToRemove = allMissingFolders.filter((f) => !assignedIds.has(f.id));
       const skippedCount = allMissingFolders.length - safeToRemove.length;
-      const folderIdsToRemove = new globalThis.Set(safeToRemove.map((f) => f.id));
+      const folderIdsToRemove = new Set(safeToRemove.map((f) => f.id));
       if (folderIdsToRemove.size === 0) {
         if (skippedCount > 0) {
           toast.warning(
@@ -104,7 +104,7 @@ export function useBulkRemove(): {
         ),
       };
       await saveSettings(updatedSettings);
-      const soundIdsToRemove = new globalThis.Set(
+      const soundIdsToRemove = new Set(
         sounds
           .filter((s) => s.folderId && folderIdsToRemove.has(s.folderId))
           .map((s) => s.id),

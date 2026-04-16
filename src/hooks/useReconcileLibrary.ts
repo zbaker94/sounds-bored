@@ -56,7 +56,7 @@ export function useReconcileLibrary(): {
       // Merge new sounds into the store by filePath — never replaces existing
       // sounds so any user edits (tags, sets) made during the async scan are
       // always preserved. External filesystem changes are always reflected.
-      const currentPaths = new globalThis.Set(
+      const currentPaths = new Set(
         useLibraryStore.getState().sounds.map((s) => s.filePath).filter(Boolean),
       );
       const soundsToAdd = result.sounds.filter(
