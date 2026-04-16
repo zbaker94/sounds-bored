@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where skipping forward or backward through a pad's sounds while a fade-out was in progress would cause the new sound to be silenced — the fade-out's cleanup timer now correctly cancels before the skip voice starts.
+- Fixed a bug where skipping forward or back on a layer during a fade-out could cause the fade's cleanup to stop the newly-started skip voice.
 - Large audio files are now streamed at a lower threshold (5 MB instead of 20 MB), improving playback performance for long ambient tracks and music by avoiding slow audio decoding
 - Streaming audio elements now preload correctly in the background, reducing playback delay when triggering large sound files
 - Auto-save now skips overlapping saves — if a save is still in progress, the next scheduled save tick is deferred until the previous one completes, preventing duplicate write operations.

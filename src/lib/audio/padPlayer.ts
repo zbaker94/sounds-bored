@@ -533,6 +533,9 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
     setLayerCycleIndex(layerId, newCycleIdx);
     const sound = playOrder[nextIdx];
 
+    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
+    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
+    cancelPadFade(pad.id);
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
@@ -555,6 +558,9 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
     if (playOrder) setLayerPlayOrder(layerId, playOrder);
     setLayerChain(layerId, rest);
 
+    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
+    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
+    cancelPadFade(pad.id);
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
@@ -621,6 +627,9 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
     setLayerCycleIndex(layerId, newCycleIdx);
     const sound = playOrder[prevIdx];
 
+    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
+    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
+    cancelPadFade(pad.id);
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
@@ -647,6 +656,9 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
     setLayerChain(layerId, playOrder.slice(prevIndex + 1));
     const sound = playOrder[prevIndex];
 
+    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
+    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
+    cancelPadFade(pad.id);
     ensureResumed().then((ctx) => {
       const padGain = getPadGain(pad.id);
       const layerGain = getOrCreateLayerGain(layerId, layer.volume / 100, padGain);
