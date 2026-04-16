@@ -17,6 +17,7 @@ const mockPlaybackState = {
   removePlayingPad: vi.fn(),
   clearAllPlayingPads: vi.fn(),
   setAudioTick: vi.fn(),
+  clearVolumes: vi.fn(),
   padVolumes: {} as Record<string, number>,
 };
 
@@ -799,6 +800,14 @@ describe("clearAllAudioState", () => {
     // Global stop timeout should be cancelled — spy must NOT fire
     vi.runAllTimers();
     expect(spy).not.toHaveBeenCalled();
+
+    // playbackStore volume maps should be cleared (padVolumes + layerVolumes)
+    expect(mockPlaybackState.clearVolumes).toHaveBeenCalledOnce();
+    // clearVolumes must fire AFTER stopAllVoices() (which calls setAudioTick({padVolumes:{}})),
+    // ensuring no subsequent write re-populates the maps within clearAllAudioState.
+    const lastSetTickOrder = mockPlaybackState.setAudioTick.mock.invocationCallOrder.at(-1)!;
+    const clearVolOrder = mockPlaybackState.clearVolumes.mock.invocationCallOrder[0];
+    expect(clearVolOrder).toBeGreaterThan(lastSetTickOrder);
 
     vi.useRealTimers();
   });

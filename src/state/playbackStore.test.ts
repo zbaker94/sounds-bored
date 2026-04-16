@@ -124,3 +124,45 @@ describe("updateLayerVolume (non-playing fallback)", () => {
     expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.75);
   });
 });
+
+describe("clearVolumes", () => {
+  beforeEach(() => {
+    usePlaybackStore.setState({ ...initialPlaybackState });
+  });
+
+  it("resets padVolumes to empty object", () => {
+    usePlaybackStore.getState().setAudioTick({ padVolumes: { "pad-1": 0.5, "pad-2": 0.3 } });
+    usePlaybackStore.getState().clearVolumes();
+    expect(usePlaybackStore.getState().padVolumes).toEqual({});
+  });
+
+  it("resets layerVolumes to empty object", () => {
+    usePlaybackStore.getState().setAudioTick({ layerVolumes: { "layer-1": 0.7, "layer-2": 0.2 } });
+    usePlaybackStore.getState().clearVolumes();
+    expect(usePlaybackStore.getState().layerVolumes).toEqual({});
+  });
+
+  it("resets both padVolumes and layerVolumes in a single call", () => {
+    usePlaybackStore.getState().setAudioTick({
+      padVolumes: { "pad-1": 0.5 },
+      layerVolumes: { "layer-1": 0.7 },
+    });
+    usePlaybackStore.getState().clearVolumes();
+    expect(usePlaybackStore.getState().padVolumes).toEqual({});
+    expect(usePlaybackStore.getState().layerVolumes).toEqual({});
+  });
+
+  it("is a no-op when volumes are already empty", () => {
+    usePlaybackStore.getState().clearVolumes();
+    expect(usePlaybackStore.getState().padVolumes).toEqual({});
+    expect(usePlaybackStore.getState().layerVolumes).toEqual({});
+  });
+
+  it("does not affect other store fields", () => {
+    usePlaybackStore.getState().addPlayingPad("pad-1");
+    usePlaybackStore.getState().setAudioTick({ padProgress: { "pad-1": 0.5 } });
+    usePlaybackStore.getState().clearVolumes();
+    expect(usePlaybackStore.getState().playingPadIds.has("pad-1")).toBe(true);
+    expect(usePlaybackStore.getState().padProgress["pad-1"]).toBe(0.5);
+  });
+});
