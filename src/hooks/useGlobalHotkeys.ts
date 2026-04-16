@@ -166,23 +166,33 @@ export function useGlobalHotkeys() {
     if (idx < scenes.length) setActiveSceneId(scenes[idx].id);
   });
 
-  // Left/Right: navigate between scenes with wrapping.
+  // Alt+Left/Right: navigate between scenes with wrapping.
+  // Bare Left/Right are intentionally NOT registered — they conflict with
+  // arrow-key behavior in text inputs, comboboxes, sliders, and radio groups
+  // (see issue #67). Alt avoids those conflicts for standard form elements
+  // because react-hotkeys-hook's default form-tag guard suppresses firing
+  // when focus is inside <input>/<textarea>/<select>.
+  // Known tradeoffs:
+  //   • macOS: Option+Arrow is word-caret navigation — but only in form inputs
+  //     that the guard already protects, so no actual collision in practice.
+  //   • Tauri webview: Alt+Left is the Chromium "Back" shortcut; we suppress
+  //     it via preventDefault: true (the app has no in-webview history anyway).
   // Guard idx === -1: when activeSceneId is null or stale, fall back to the first scene.
-  useHotkeys("left", () => {
+  useHotkeys("alt+left", () => {
     const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
     if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
     setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id);
-  }, { preventDefault: true });
+  }, { preventDefault: true /* suppress webview Alt+Left = Back */ });
 
-  useHotkeys("right", () => {
+  useHotkeys("alt+right", () => {
     const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
     if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
     setActiveSceneId(scenes[(idx + 1) % scenes.length].id);
-  }, { preventDefault: true });
+  }, { preventDefault: true /* suppress webview Alt+Right = Forward */ });
 }

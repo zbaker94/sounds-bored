@@ -52,37 +52,45 @@ export function SceneTabBar() {
       <MenuDrawer />
 
       {scenes.length > 0 && (
-        <div className="min-w-0 max-w-[940px] overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
-          <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
-            <TabsList variant="line">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={sceneIds}
-                  strategy={horizontalListSortingStrategy}
-                >
-                  <AnimatePresence initial={false}>
-                    {scenes.map((scene) => (
-                      <motion.div
-                        key={scene.id}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -8 }}
-                        transition={{ duration: 0.15 }}
-                        layout
-                      >
-                        <SceneTab scene={scene} />
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </SortableContext>
-              </DndContext>
-            </TabsList>
-          </Tabs>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="min-w-0 max-w-[940px] overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
+              <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
+                <TabsList variant="line">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={sceneIds}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      <AnimatePresence initial={false}>
+                        {scenes.map((scene) => (
+                          <motion.div
+                            key={scene.id}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -8 }}
+                            transition={{ duration: 0.15 }}
+                            layout
+                          >
+                            <SceneTab scene={scene} />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </SortableContext>
+                  </DndContext>
+                </TabsList>
+              </Tabs>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>Navigate scenes</p>
+            <Kbd className="ml-2">Alt + ← / →</Kbd>
+          </TooltipContent>
+        </Tooltip>
       )}
 
       <Tooltip>

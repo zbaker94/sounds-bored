@@ -83,20 +83,24 @@
 
 ---
 
-## Test H: Arrow keys — navigate between scenes
+## Test H: Alt+Arrow — navigate between scenes
 
 1. Load a project with 3+ scenes. Active scene is Scene 1.
-2. Press the **Right arrow**.
+2. Press **Alt + Right arrow**.
 
 **Expected:** Scene 2 becomes active.
 
-3. Press the **Left arrow**.
+3. Press **Alt + Left arrow**.
 
 **Expected:** Scene 1 becomes active.
 
-4. From the last scene, press **Right arrow**.
+4. From the last scene, press **Alt + Right arrow**.
 
 **Expected:** Wraps around to Scene 1.
+
+5. Click into a text input (e.g. the project name field or a combobox search box) and press a **bare Right arrow** (no Alt).
+
+**Expected:** Cursor moves within the input as normal; active scene does NOT change. (Regression guard for issue #67.)
 
 ---
 
