@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When a sound file is missing during playback, the app now silently refreshes the Sounds panel in the background so missing-file indicators update automatically after the error occurs.
 - Project names with non-ASCII characters (emoji, CJK, etc.) now safely fall back to "project" instead of producing garbled folder or zip filenames
 - Export zip files and project folders use consistent, reliable name sanitization across the app
 - Improved Mac OS detection to correctly identify macOS across all supported runtimes, fixing edge cases where Windows/Linux could be misidentified
