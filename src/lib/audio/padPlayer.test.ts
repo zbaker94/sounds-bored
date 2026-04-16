@@ -3235,6 +3235,61 @@ describe("skipLayerForward", () => {
   // cancelPadFade() is called, which by definition clears the stale setTimeout via
   // clearTimeout(). The cancelPadFade unit tests in audioState.test.ts verify that
   // behaviour directly.
+
+  it("reports an error via emitAudioError when ensureResumed rejects during skip (chained mode)", async () => {
+    const { ensureResumed } = await import("./audioContext");
+    vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
+
+    const { skipLayerForward } = await import("./padPlayer");
+    const { setLayerPlayOrder, setLayerChain } = await import("./audioState");
+
+    const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerChain(layer.id, [sounds[1]]);
+
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "audio context unavailable" }),
+    );
+  });
+
+  it("reports an error via emitAudioError when ensureResumed rejects during skip (cycleMode)", async () => {
+    const { ensureResumed } = await import("./audioContext");
+    vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
+
+    const { skipLayerForward } = await import("./padPlayer");
+    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+
+    const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      cycleMode: true,
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerCycleIndex(layer.id, 1); // cursor points to B (next after A)
+
+    skipLayerForward(pad, layer.id);
+    await tick();
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "audio context unavailable" }),
+    );
+  });
 });
 
 
@@ -3464,6 +3519,61 @@ describe("skipLayerBack", () => {
   // Note: a fake-timer "voice survives" test is not included — same reasoning as
   // the equivalent comment in skipLayerForward above. The isPadFadingOut assertions
   // prove cancelPadFade() is invoked; audioState.test.ts verifies it clears the timeout.
+
+  it("reports an error via emitAudioError when ensureResumed rejects during skip (chained mode)", async () => {
+    const { ensureResumed } = await import("./audioContext");
+    vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
+
+    const { skipLayerBack } = await import("./padPlayer");
+    const { setLayerPlayOrder, setLayerChain } = await import("./audioState");
+
+    const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" }), createMockSound({ filePath: "c.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerChain(layer.id, [sounds[2]]); // soundC remaining (soundB was playing)
+
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "audio context unavailable" }),
+    );
+  });
+
+  it("reports an error via emitAudioError when ensureResumed rejects during skip (cycleMode)", async () => {
+    const { ensureResumed } = await import("./audioContext");
+    vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
+
+    const { skipLayerBack } = await import("./padPlayer");
+    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+
+    const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" }), createMockSound({ filePath: "c.wav" })];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      playbackMode: "loop",
+      cycleMode: true,
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+    setLayerPlayOrder(layer.id, sounds);
+    setLayerCycleIndex(layer.id, 2); // cursor at C (B was playing, A is previous)
+
+    skipLayerBack(pad, layer.id);
+    await tick();
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "audio context unavailable" }),
+    );
+  });
 });
 
 
