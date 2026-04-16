@@ -29,6 +29,7 @@ vi.mock("./audioTick", () => ({
 const mockLoadBuffer = vi.fn();
 vi.mock("./bufferCache", () => ({
   loadBuffer: (...args: unknown[]) => mockLoadBuffer(...args),
+  clearAllBuffers: vi.fn(),
   MissingFileError: class MissingFileError extends Error {},
 }));
 
@@ -3818,6 +3819,41 @@ describe("stopLayerWithRamp", () => {
     vi.advanceTimersByTime(35);
     expect(createdSources[0].stop).toHaveBeenCalledOnce();
   });
+
+  it("cleanup timeout does not remove pad from playingPadIds when clearAllAudioState fires before it runs", async () => {
+    // Regression guard for issue #137: the post-ramp removePlayingPad check must be
+    // cancelled by clearAllAudioState so it cannot interfere with a new session that
+    // reuses the same pad ID.
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const { triggerPad, stopLayerWithRamp } = await import("./padPlayer");
+    const { clearAllAudioState } = await import("./audioState");
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    stopLayerWithRamp(pad, layer.id);
+
+    // Simulate project close before the ramp timeout fires
+    clearAllAudioState();
+
+    // Simulate new session: manually re-add the pad to playingPadIds as if it's now
+    // playing in the new project, then advance time to where the old timeout would fire
+    usePlaybackStore.getState().addPlayingPad(pad.id);
+    vi.advanceTimersByTime(35);
+
+    // The stale cleanup timeout must NOT have removed the pad from the new session's state
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+  });
 });
 
 // ─── triggerLayer ─────────────────────────────────────────────────────────────
@@ -3915,6 +3951,47 @@ describe("triggerLayer", () => {
     await triggerLayer(pad, layer);
     vi.advanceTimersByTime(35);
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("retriggerMode stop: afterStopCleanup timeout does not fire after clearAllAudioState", async () => {
+    // Regression guard for issue #137: the afterStopCleanup timeout scheduled by
+    // triggerLayer (retriggerMode: "stop") must be cancelled by clearAllAudioState
+    // so it cannot call removePlayingPad in a new session reusing the same pad ID.
+    vi.useFakeTimers();
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { triggerLayer } = await import("./padPlayer");
+    const { clearAllAudioState } = await import("./audioState");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "stop",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // First trigger — starts playback
+    await triggerLayer(pad, layer);
+    await vi.runAllTimersAsync();
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    // Second trigger with retriggerMode stop — schedules afterStopCleanup timeout
+    await triggerLayer(pad, layer);
+
+    // Simulate project close before the cleanup timeout fires
+    clearAllAudioState();
+
+    // Simulate new session: re-add the same pad ID as if it is now playing in a new project
+    usePlaybackStore.getState().addPlayingPad(pad.id);
+
+    // Advance time past where the stale cleanup timeout would have fired
+    vi.advanceTimersByTime(35);
+
+    // The stale cleanup timeout must NOT have removed the pad from the new session's state
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
     vi.useRealTimers();
   });
 

@@ -1118,3 +1118,46 @@ describe("registerStreamingAudio — loadedmetadata listener lifecycle", () => {
     expect(_padBestStreamingAudio.get("pad-1")).toBe(el2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stop cleanup timeout tracking
+// ---------------------------------------------------------------------------
+
+describe("stop cleanup timeout tracking", () => {
+  it("clearAllAudioState cancels registered stop cleanup timeouts so they do not fire", async () => {
+    vi.useFakeTimers();
+    const { clearAllAudioState, addStopCleanupTimeout } = await import("./audioState");
+
+    const spy = vi.fn();
+    const id = setTimeout(spy, 9999);
+    addStopCleanupTimeout(id);
+
+    clearAllAudioState();
+
+    vi.runAllTimers();
+    expect(spy).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("stop cleanup timeout removes itself from tracking when it fires naturally", async () => {
+    vi.useFakeTimers();
+    const { clearAllAudioState, addStopCleanupTimeout, deleteStopCleanupTimeout } = await import("./audioState");
+
+    const spy = vi.fn();
+    const id = setTimeout(() => {
+      deleteStopCleanupTimeout(id);
+      spy();
+    }, 100);
+    addStopCleanupTimeout(id);
+
+    // Let the timeout fire naturally — spy should be called
+    vi.runAllTimers();
+    expect(spy).toHaveBeenCalledOnce();
+
+    // clearAllAudioState after natural completion should be a no-op (set is already empty)
+    expect(() => clearAllAudioState()).not.toThrow();
+
+    vi.useRealTimers();
+  });
+});

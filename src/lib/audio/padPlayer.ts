@@ -9,6 +9,8 @@ import { emitAudioError } from "./audioEvents";
 import { stopAudioTick } from "./audioTick";
 
 import {
+  addStopCleanupTimeout,
+  deleteStopCleanupTimeout,
   cancelPadFade,
   cancelGlobalStopTimeout,
   clearAllFadeTracking,
@@ -454,11 +456,15 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
       pad, layer, isPlaying, ctx, layerGain, resolved,
       // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad
       // still has any active voices and remove it from the playing-pads set if not.
-      () => setTimeout(() => {
-        if (!isPadActive(pad.id)) {
-          usePlaybackStore.getState().removePlayingPad(pad.id);
-        }
-      }, STOP_RAMP_S * 1000 + 10),
+      () => {
+        const timeoutId = setTimeout(() => {
+          deleteStopCleanupTimeout(timeoutId);
+          if (!isPadActive(pad.id)) {
+            usePlaybackStore.getState().removePlayingPad(pad.id);
+          }
+        }, STOP_RAMP_S * 1000 + 10);
+        addStopCleanupTimeout(timeoutId);
+      },
     );
 
     if (action === "skip") {
@@ -498,11 +504,13 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
   rampStopLayerVoices(pad.id, layer, voices);
 
   // After the ramp completes, check if any layers are still active for this pad
-  setTimeout(() => {
+  const stopCleanupId = setTimeout(() => {
+    deleteStopCleanupTimeout(stopCleanupId);
     if (!isPadActive(pad.id)) {
       usePlaybackStore.getState().removePlayingPad(pad.id);
     }
   }, STOP_RAMP_S * 1000 + 10);
+  addStopCleanupTimeout(stopCleanupId);
 }
 
 /** Skip forward in a sequential/shuffled chain. No-op for simultaneous arrangement or if at end of chain. */

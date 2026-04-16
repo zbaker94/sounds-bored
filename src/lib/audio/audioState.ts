@@ -195,6 +195,13 @@ const fadingOutPadIds = new Set<string>();
  */
 let _globalStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * Post-ramp cleanup timeouts from rampStopLayerVoices, stopLayerWithRamp, and the
+ * afterStopCleanup callback in triggerLayer. Tracked so clearAllAudioState() can
+ * cancel them and prevent stale closures from modifying audio state in a new session.
+ */
+const pendingStopCleanupTimeouts = new Set<ReturnType<typeof setTimeout>>();
+
 // ---------------------------------------------------------------------------
 // Public query functions
 // ---------------------------------------------------------------------------
@@ -832,6 +839,22 @@ export function cancelGlobalStopTimeout(): void {
   }
 }
 
+/** Register a post-ramp cleanup timeout so clearAllAudioState() can cancel it. */
+export function addStopCleanupTimeout(id: ReturnType<typeof setTimeout>): void {
+  pendingStopCleanupTimeouts.add(id);
+}
+
+/** Remove a stop cleanup timeout from tracking — called when the timeout fires naturally. */
+export function deleteStopCleanupTimeout(id: ReturnType<typeof setTimeout>): void {
+  pendingStopCleanupTimeouts.delete(id);
+}
+
+/** Cancel all pending stop cleanup timeouts. Called by clearAllAudioState on project close. */
+export function clearAllStopCleanupTimeouts(): void {
+  for (const id of pendingStopCleanupTimeouts) clearTimeout(id);
+  pendingStopCleanupTimeouts.clear();
+}
+
 // ---------------------------------------------------------------------------
 // Consolidated cleanup — instant, no gain ramp (for project close)
 // ---------------------------------------------------------------------------
@@ -849,6 +872,7 @@ export function cancelGlobalStopTimeout(): void {
 export function clearAllAudioState(): void {
   // Cancel any pending stopAllPads post-ramp setTimeout to prevent cross-session contamination.
   cancelGlobalStopTimeout();
+  clearAllStopCleanupTimeouts();
   clearAllFadeTracking();
   clearAllLayerChains();
   clearAllLayerCycleIndexes();
