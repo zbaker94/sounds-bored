@@ -1,4 +1,4 @@
-import { CURRENT_LIBRARY_VERSION } from "./constants";
+import { CURRENT_PROJECT_VERSION, CURRENT_LIBRARY_VERSION } from "./constants";
 
 type RawProject = Record<string, unknown>;
 type MigrationFn = (raw: RawProject) => RawProject;
@@ -9,7 +9,8 @@ interface Migration {
   migrate: MigrationFn;
 }
 
-export const CURRENT_VERSION = "1.2.0";
+// Re-exported for backward compatibility — canonical value lives in constants.ts.
+export const CURRENT_VERSION = CURRENT_PROJECT_VERSION;
 
 /** Thrown by migrateProject when the project version is unresolvable. */
 export class MigrationError extends Error {

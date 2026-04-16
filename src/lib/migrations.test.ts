@@ -1,6 +1,16 @@
 import { describe, it, expect, vi } from "vitest";
 import { migrateProject, migrateLibrary, CURRENT_VERSION, MigrationError } from "./migrations";
-import { CURRENT_LIBRARY_VERSION } from "./constants";
+import { CURRENT_LIBRARY_VERSION, CURRENT_PROJECT_VERSION, DEFAULT_PROJECT_VERSION } from "./constants";
+
+describe("version constant sync", () => {
+  it("CURRENT_VERSION (migrations) equals CURRENT_PROJECT_VERSION (constants) — single source of truth", () => {
+    expect(CURRENT_VERSION).toBe(CURRENT_PROJECT_VERSION);
+  });
+
+  it("DEFAULT_PROJECT_VERSION is an alias for CURRENT_PROJECT_VERSION", () => {
+    expect(DEFAULT_PROJECT_VERSION).toBe(CURRENT_PROJECT_VERSION);
+  });
+});
 
 describe("migrateProject", () => {
   it("should pass through a project already at CURRENT_VERSION unchanged", () => {
