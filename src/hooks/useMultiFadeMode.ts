@@ -99,9 +99,12 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
     clearMultiFadeReopenPadId();
   }, [clearMultiFadeReopenPadId]);
 
-  useHotkeys("enter", execute, { enabled: active && canExecute }, [active, canExecute, execute]);
-  useHotkeys("f,x", execute, { enabled: active && canExecute }, [active, canExecute, execute]);
-  useHotkeys("escape", cancel, { enabled: active }, [active, cancel]);
+  // enableOnFormTags: PadButtonFadeOverlay renders <Slider> controls (role="slider") over
+  // selected pads. The user may focus a slider thumb to set fade levels, then press
+  // F/X/Enter/Escape — those keys must not be blocked by the default form-tag guard.
+  useHotkeys("enter", execute, { enabled: active && canExecute, enableOnFormTags: true }, [active, canExecute, execute]);
+  useHotkeys("f,x", execute, { enabled: active && canExecute, enableOnFormTags: true }, [active, canExecute, execute]);
+  useHotkeys("escape", cancel, { enabled: active, enableOnFormTags: true }, [active, cancel]);
 
   return {
     active,

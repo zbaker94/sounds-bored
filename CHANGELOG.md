@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed keyboard shortcuts (F, X, Enter, Escape) not working when a fade-level slider was focused — pressing these keys while adjusting a slider will now correctly trigger the intended action
+- Fixed hotkeys F and X not firing when a slider or input element had focus (e.g. adjusting fade duration on the pad backside or fade levels in multi-fade mode).
 - Fixed a bug where skipping forward or backward through a pad's sounds while a fade-out was in progress would cause the new sound to be silenced — the fade-out's cleanup timer now correctly cancels before the skip voice starts.
 - Fixed a bug where skipping forward or back on a layer during a fade-out could cause the fade's cleanup to stop the newly-started skip voice.
 - Large audio files are now streamed at a lower threshold (5 MB instead of 20 MB), improving playback performance for long ambient tracks and music by avoiding slow audio decoding

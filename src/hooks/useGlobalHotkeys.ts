@@ -93,6 +93,10 @@ export function useGlobalHotkeys() {
   //   normal mode, hovering, no popover   → single-fade the hovered pad immediately
   //   normal mode, hovering, popover open → no-op (user is interacting with context popover)
   //   normal mode, not hovering           → no-op
+  //
+  // enableOnFormTags: the pad backside contains a fade-duration <Slider> (Radix renders
+  // role="slider"), which is in react-hotkeys-hook's default form-tag block list.
+  // Without this flag, pressing F while the slider thumb has focus is swallowed.
   useHotkeys("f", () => {
     const { editMode, hoveredPadId, padPopoverOpenId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
@@ -115,7 +119,7 @@ export function useGlobalHotkeys() {
         toast.error(`Playback error: audio fade failed — ${message}`);
       });
     }
-  });
+  }, { enableOnFormTags: true });
 
   // X: enter multi-fade mode pre-selecting the hovered pad (mirrors X in the context popover).
   //
@@ -126,6 +130,9 @@ export function useGlobalHotkeys() {
   //   normal mode, hovering, no popover   → enter multi-fade pre-selecting the hovered pad
   //   normal mode, hovering, popover open → no-op (user is interacting with context popover)
   //   normal mode, not hovering           → no-op
+  //
+  // enableOnFormTags: same reasoning as F above — the fade-level <Slider> in the
+  // multi-fade overlay should not swallow this hotkey.
   useHotkeys("x", () => {
     const { editMode, hoveredPadId, padPopoverOpenId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
@@ -141,7 +148,7 @@ export function useGlobalHotkeys() {
       const vol = usePlaybackStore.getState().padVolumes[hoveredPadId] ?? 1.0;
       useMultiFadeStore.getState().enterMultiFade(hoveredPadId, playing, vol);
     }
-  });
+  }, { enableOnFormTags: true });
 
   // Mod+Shift+N: open the pad config drawer for the active scene.
   useHotkeys("mod+shift+n", () => {
