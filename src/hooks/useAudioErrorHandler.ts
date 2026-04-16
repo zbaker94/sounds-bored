@@ -18,7 +18,22 @@ export function useAudioErrorHandler(): void {
   useEffect(() => {
     setAudioErrorHandler((err, { soundName, isMissingFile }) => {
       if (isMissingFile) {
-        void refreshMissingState();
+        // Fire-and-forget: refresh missing-file state in the background so the Sounds
+        // panel indicators update after the filesystem scan completes.
+        // Intentionally not awaited. The AudioErrorHandler contract in audioEvents.ts
+        // discards the return value (return type `void`), so awaiting here would only
+        // delay the toast and any subsequent handler work — it would not backpressure
+        // the audio engine caller. Blocking on a potentially slow filesystem scan is
+        // also undesirable. The toast below fires immediately regardless of scan
+        // completion; users who open the Sounds panel will see updated indicators once
+        // the scan finishes.
+        refreshMissingState().catch((err: unknown) => {
+          // A failed refresh is non-fatal — the Sounds panel will show stale state
+          // until the next successful reconcile. Log in dev so regressions are visible.
+          if (import.meta.env.DEV) {
+            console.warn("[useAudioErrorHandler] refreshMissingState failed:", err);
+          }
+        });
         toast.error(
           soundName
             ? `Failed to play "${soundName}" — file not found. Check the Sounds panel.`
