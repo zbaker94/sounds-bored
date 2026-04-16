@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved Mac OS detection to correctly identify macOS across all supported runtimes, fixing edge cases where Windows/Linux could be misidentified
 - Fixed a bug where internal audio tick state could be corrupted if the playback store's active layer set was mutated externally
 - No user-facing changes; internal test infrastructure updated to use the project version constant.
 - Internal refactor: project version is now defined in a single place, eliminating the risk of version mismatches between migrations and new projects.
