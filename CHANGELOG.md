@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Auto-save reliability improved: saves no longer skip when project or library data appears unchanged since the last save — the dirty flag alone now controls whether a save fires
 - Streaming audio playback progress now updates correctly when multiple sounds are playing simultaneously on a pad
 - Progress bars for streaming audio tracks reflect the longest-duration sound, consistent with how buffered audio is handled
 - Fixed a bug where stale audio metadata could corrupt progress tracking after a sound stopped or restarted

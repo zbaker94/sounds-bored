@@ -30,10 +30,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const projectRef = useRef(useProjectStore.getState().project);
   const isDirtyRef = useRef(useProjectStore.getState().isDirty);
-  const lastSaveRef = useRef<string>("");
   const saveProjectMutation = useSaveProject();
-
-  const lastLibrarySaveRef = useRef<string>("");
   const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
 
   // Timestamp (ms) of the most recent auto-save error toast. Used to debounce
@@ -64,13 +61,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       if (!project || !folderPath) return;
       if (!isDirtyRef.current) return;
 
-      const projectJson = JSON.stringify(project);
-
-      // Secondary guard: skip if data is identical to last save
-      if (projectJson === lastSaveRef.current) return;
-
       saveProjectMutation.mutate({ folderPath, project }, {
-        onSuccess: () => { lastSaveRef.current = projectJson; },
         // Do NOT clear the dirty flag on failure — the hook should keep retrying
         // on the next interval tick so the project is saved once the underlying
         // problem (disk full, permission issue, missing drive) is resolved.
@@ -79,14 +70,10 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     };
 
     const saveLibrary = () => {
-      const { sounds, tags, sets, isDirty } = useLibraryStore.getState();
+      const { isDirty } = useLibraryStore.getState();
       if (!isDirty) return;
 
-      const libraryJson = JSON.stringify({ sounds, tags, sets });
-      if (libraryJson === lastLibrarySaveRef.current) return;
-
       saveCurrentLibrarySync({
-        onSuccess: () => { lastLibrarySaveRef.current = libraryJson; },
         onError: notifyAutoSaveFailure,
       });
     };
