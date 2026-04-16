@@ -396,42 +396,54 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
   // Tick reads gain node value automatically — no store call needed.
 
-  let progressCleared = false;
-
+  // Pre-collect eligible layers and set their pending flags synchronously before any await.
+  // This closes the race window: a rapid re-trigger arriving during async work will see
+  // isLayerPending(layer.id)===true and be correctly debounced.
+  type LayerWork = { layer: (typeof pad.layers)[number]; resolved: ReturnType<typeof resolveSounds> };
+  const layerWork: LayerWork[] = [];
   for (const layer of pad.layers) {
     const resolved = resolveSounds(layer, sounds);
     if (resolved.length === 0) continue;
-
-    // Leading debounce — if startLayerSound is in-flight for this layer, ignore the trigger.
-    // Set pending synchronously BEFORE any await to close the race window between the
-    // check and the first await point.
     if (isLayerPending(layer.id)) continue;
     setLayerPending(layer.id);
-
-    try {
-      const isLayerPlaying = isLayerActive(layer.id);
-      const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
-
-      const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
-      // triggerPad does not pass afterStopCleanup — pad-level playback store state
-      // is managed globally (stopAllPads / clearVoice).
-      if (action === "skip" || action === "chain-advanced") {
-        clearLayerPending(layer.id);
-        continue;
-      }
-
-      if (!progressCleared) {
-        clearPadProgressInfo(pad.id);
-        progressCleared = true;
-      }
-      await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
-      // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
-    } catch (err) {
-      // Unexpected failures in one layer must not block sibling layers or leave pending set.
-      clearLayerPending(layer.id);
-      emitAudioError(err);
-    }
+    layerWork.push({ layer, resolved });
   }
+
+  if (layerWork.length === 0) return;
+
+  // Clear pad progress once before any layer starts playback. In the sequential version this
+  // was guarded by a progressCleared flag; here we clear once upfront so no parallel layer
+  // can accidentally erase progress info that a sibling layer already wrote via setPadProgressInfo.
+  // Note: applyRetriggerMode internally calls clearPadProgressInfo for retriggerMode "next"
+  // chains — that path is inherently serial within a layer and races only in the unlikely
+  // case of two layers simultaneously hitting "next" mode.
+  clearPadProgressInfo(pad.id);
+
+  // Run all eligible layers in parallel. Each layer is independent — all per-layer state
+  // (gains, voices, chains, cycle indexes) is keyed by layerId with no cross-layer reads.
+  await Promise.all(
+    layerWork.map(async ({ layer, resolved }) => {
+      try {
+        const isLayerPlaying = isLayerActive(layer.id);
+        const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
+
+        const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
+        // triggerPad does not pass afterStopCleanup — pad-level playback store state
+        // is managed globally (stopAllPads / clearVoice).
+        if (action === "skip" || action === "chain-advanced") {
+          clearLayerPending(layer.id);
+          return;
+        }
+
+        await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
+        // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
+      } catch (err) {
+        // Unexpected failures in one layer must not block sibling layers or leave pending set.
+        clearLayerPending(layer.id);
+        emitAudioError(err);
+      }
+    }),
+  );
 }
 
 /** Trigger a single layer of a pad in isolation, respecting retrigger mode/arrangement/selection. */

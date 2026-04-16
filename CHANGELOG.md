@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pads with multiple layers now trigger all layers simultaneously instead of sequentially, so sounds start at the same time as intended.
+- Rapid re-triggers are now correctly debounced across all layers at once, preventing missed or double-triggered sounds during quick pad taps.
 - Pad progress calculation now reads the audio clock once per animation frame instead of once per pad, improving performance when many pads are active simultaneously.
 - No user-facing changes in this release (internal code cleanup only).
 - Layer volume values outside the 0–100 range are now safely clamped, preventing audio glitches from invalid volume data
