@@ -5,12 +5,17 @@ import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories";
 import { SettingsDialog } from "./SettingsDialog";
-import { open } from "@tauri-apps/plugin-dialog";
 import { StartScreen } from "@/components/screens/start/StartScreen";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
+vi.mock("@/lib/scope", () => ({
+  pickFolder: vi.fn(),
+  pickFile: vi.fn(),
+  pickFiles: vi.fn(),
+  grantPathAccess: vi.fn().mockResolvedValue(undefined),
+  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("@/contexts/ProjectActionsContext", () => ({
   useProjectActions: vi.fn(() => ({
@@ -40,6 +45,9 @@ vi.mock("@/lib/appSettings.queries", () => ({
   useSaveAppSettings: vi.fn(() => ({ mutate: mockSaveSettings })),
 }));
 
+import { pickFolder } from "@/lib/scope";
+const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
+
 function renderDialog() {
   return render(
     <TooltipProvider>
@@ -58,7 +66,7 @@ beforeEach(() => {
   useUiStore.setState({ ...initialUiState });
   useAppSettingsStore.setState({ ...initialAppSettingsState });
   mockSaveSettings.mockClear();
-  vi.mocked(open).mockReset();
+  mockPickFolder.mockReset();
 });
 
 describe("SettingsDialog — shell", () => {
@@ -193,19 +201,19 @@ describe("SettingsDialog — Folders tab display", () => {
 });
 
 describe("SettingsDialog — Add Folder", () => {
-  it("calls Tauri open with directory:true when Add Folder is clicked", async () => {
+  it("calls pickFolder when Add Folder is clicked", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue(null);
+    mockPickFolder.mockResolvedValue(null);
     setupFolderState();
     renderDialog();
     openDialog();
     await user.click(screen.getByRole("button", { name: /add folder/i }));
-    expect(open).toHaveBeenCalledWith({ directory: true });
+    expect(mockPickFolder).toHaveBeenCalledTimes(1);
   });
 
   it("adds a new folder to the store when a path is returned", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue("/new/folder/path");
+    mockPickFolder.mockResolvedValue("/new/folder/path");
     setupFolderState();
     renderDialog();
     openDialog();
@@ -216,7 +224,7 @@ describe("SettingsDialog — Add Folder", () => {
 
   it("uses the last path segment as the default folder name", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue("/some/path/mysounds");
+    mockPickFolder.mockResolvedValue("/some/path/mysounds");
     setupFolderState();
     renderDialog();
     openDialog();
@@ -227,7 +235,7 @@ describe("SettingsDialog — Add Folder", () => {
 
   it("calls saveSettings after adding a folder", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue("/new/folder");
+    mockPickFolder.mockResolvedValue("/new/folder");
     setupFolderState();
     renderDialog();
     openDialog();
@@ -237,7 +245,7 @@ describe("SettingsDialog — Add Folder", () => {
 
   it("does not modify the store if the picker is cancelled (null)", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue(null);
+    mockPickFolder.mockResolvedValue(null);
     setupFolderState();
     renderDialog();
     openDialog();

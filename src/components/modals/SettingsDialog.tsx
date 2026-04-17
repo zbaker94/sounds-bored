@@ -26,7 +26,7 @@ import { TruncatedPath } from "@/components/ui/truncated-path";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, FolderAddIcon, FolderOpenIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickFolder } from "@/lib/scope";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { exists } from "@tauri-apps/plugin-fs";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -92,9 +92,7 @@ function FoldersTab() {
   }
 
   async function handleAddFolder() {
-    const selected = await open({ directory: true });
-    if (!selected) return;
-    const folderPath = typeof selected === "string" ? selected : selected[0];
+    const folderPath = await pickFolder();
     if (!folderPath) return;
     const name = folderPath.split(/[\\/]/).filter(Boolean).pop() ?? folderPath;
     addGlobalFolder({ id: crypto.randomUUID(), path: folderPath, name });
@@ -189,7 +187,7 @@ function FoldersTab() {
           Add Folder
         </Button>
         <p className="text-xs text-muted-foreground text-center">
-          Folders must be within Music, Documents, Downloads, or Desktop.
+          Folders can be located anywhere on your system.
         </p>
       </div>
     </div>

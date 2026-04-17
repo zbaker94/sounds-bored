@@ -4,7 +4,6 @@ import { useAddFolder } from "./useAddFolder";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories";
-import { open } from "@tauri-apps/plugin-dialog";
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -30,13 +29,21 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/lib/scope", () => ({
+  pickFolder: vi.fn(),
+  pickFile: vi.fn(),
+  grantPathAccess: vi.fn().mockResolvedValue(undefined),
+  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
 import { toast } from "sonner";
+import { pickFolder } from "@/lib/scope";
 
 const mockReconcile = reconcileGlobalLibrary as ReturnType<typeof vi.fn>;
-const mockOpen = open as unknown as ReturnType<typeof vi.fn>;
+const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
 const mockToastSuccess = toast.success as ReturnType<typeof vi.fn>;
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
 
@@ -46,7 +53,7 @@ beforeEach(() => {
   mockSaveLibrary.mockReset();
   mockSaveSettings.mockReset();
   mockReconcile.mockReset();
-  mockOpen.mockReset();
+  mockPickFolder.mockReset();
   mockToastSuccess.mockReset();
   mockToastError.mockReset();
 });
@@ -60,13 +67,13 @@ describe("useAddFolder", () => {
       await result.current.handleAddFolder();
     });
 
-    expect(mockOpen).not.toHaveBeenCalled();
+    expect(mockPickFolder).not.toHaveBeenCalled();
     expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 
   it("bails out silently when the user cancels the directory picker", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
-    mockOpen.mockResolvedValue(null);
+    mockPickFolder.mockResolvedValue(null);
 
     const { result } = renderHook(() => useAddFolder());
     await act(async () => {
@@ -80,7 +87,7 @@ describe("useAddFolder", () => {
   it("shows an error toast and aborts when the folder path is already present", async () => {
     const existing = createMockGlobalFolder({ path: "/music/existing" });
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [existing] }) });
-    mockOpen.mockResolvedValue("/music/existing");
+    mockPickFolder.mockResolvedValue("/music/existing");
 
     const { result } = renderHook(() => useAddFolder());
     await act(async () => {
@@ -91,9 +98,9 @@ describe("useAddFolder", () => {
     expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 
-  it("calls open, saves settings, reconciles, and saves the library when changed", async () => {
+  it("calls pickFolder, saves settings, reconciles, and saves the library when changed", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
-    mockOpen.mockResolvedValue("/music/new");
+    mockPickFolder.mockResolvedValue("/music/new");
     mockReconcile.mockResolvedValue({ changed: true, sounds: [] });
 
     const { result } = renderHook(() => useAddFolder());
@@ -101,7 +108,7 @@ describe("useAddFolder", () => {
       await result.current.handleAddFolder();
     });
 
-    expect(mockOpen).toHaveBeenCalledWith({ directory: true });
+    expect(mockPickFolder).toHaveBeenCalledTimes(1);
     expect(mockSaveSettings).toHaveBeenCalledTimes(1);
     const savedSettings = mockSaveSettings.mock.calls[0][0];
     expect(savedSettings.globalFolders).toHaveLength(1);
@@ -115,7 +122,7 @@ describe("useAddFolder", () => {
 
   it("does not save the library when reconcile reports no changes", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
-    mockOpen.mockResolvedValue("/music/new");
+    mockPickFolder.mockResolvedValue("/music/new");
     mockReconcile.mockResolvedValue({ changed: false, sounds: [] });
 
     const { result } = renderHook(() => useAddFolder());
@@ -131,7 +138,7 @@ describe("useAddFolder", () => {
 
   it("exposes isAddingFolder as false after completion", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
-    mockOpen.mockResolvedValue(null);
+    mockPickFolder.mockResolvedValue(null);
 
     const { result } = renderHook(() => useAddFolder());
     expect(result.current.isAddingFolder).toBe(false);
@@ -145,7 +152,7 @@ describe("useAddFolder", () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
 
     let resolve!: (v: string | null) => void;
-    mockOpen.mockImplementationOnce(
+    mockPickFolder.mockImplementationOnce(
       () =>
         new Promise((r) => {
           resolve = r as (v: string | null) => void;
@@ -186,7 +193,7 @@ describe("useAddFolder", () => {
     });
 
     // Picking the path that NOW exists in settingsB — handler must see the updated list
-    mockOpen.mockResolvedValue("/new-path");
+    mockPickFolder.mockResolvedValue("/new-path");
 
     await act(async () => {
       await result.current.handleAddFolder();

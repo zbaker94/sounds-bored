@@ -39,9 +39,6 @@
       "allow": [
         { "path": "$APPDATA/SoundsBored/**" },
         { "path": "$APPLOCALDATA/SoundsBored/**" },
-        { "path": "$DOCUMENT/**" },
-        { "path": "$DOWNLOAD/**" },
-        { "path": "$DESKTOP/**" },
         { "path": "$AUDIO/**" }
       ]
     },

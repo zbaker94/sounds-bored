@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickFolder } from "@/lib/scope";
 import { basename } from "@tauri-apps/api/path";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -146,8 +146,8 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     const referencedSounds = sounds.filter((s) => referencedSoundIds.has(s.id) && hasFilePath(s)) as (Sound & { filePath: string })[];
 
     // 3. Open folder picker
-    const destPath = await open({ directory: true, multiple: false, title: "Select Export Destination" });
-    if (!destPath || Array.isArray(destPath)) return; // user cancelled
+    const destPath = await pickFolder({ title: "Select Export Destination" });
+    if (!destPath) return;
 
     // 4. Build sound map: { soundId: "sounds/filename" }
     const soundMapEntries: Record<string, string> = {};

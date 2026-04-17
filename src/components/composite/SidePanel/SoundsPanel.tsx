@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { pickFiles, grantParentDirectories } from "@/lib/scope";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -49,6 +49,7 @@ export function SoundsPanel() {
   const handleDropImport = useCallback(async (paths: string[]) => {
     setIsImporting(true);
     try {
+      await grantParentDirectories(paths);
       const count = await importSoundsRef.current(paths);
       if (count > 0) toast.success(`${count} sound(s) imported`);
     } finally {
@@ -60,12 +61,10 @@ export function SoundsPanel() {
     if (!settings) return;
     setIsImporting(true);
     try {
-      const selected = await open({
-        multiple: true,
+      const paths = await pickFiles({
         filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
       });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      if (!paths.length) return;
       const count = await importSounds(paths);
       if (count > 0) toast.success(`${count} sound(s) imported`);
     } finally {

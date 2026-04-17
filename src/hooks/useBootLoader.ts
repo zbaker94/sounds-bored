@@ -5,6 +5,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { loadGlobalLibrary, saveGlobalLibrary } from "@/lib/library";
 import { loadAppSettings } from "@/lib/appSettings";
+import { grantPathAccess } from "@/lib/scope";
 import { getCurrentLibraryPayload } from "@/lib/library.queries";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
@@ -26,8 +27,18 @@ export function useBootLoader(): { ready: boolean } {
   // Both loads are independent and fire in parallel.
   useEffect(() => {
     loadAppSettings()
-      .then((settings) => {
+      .then(async (settings) => {
         useAppSettingsStore.getState().loadSettings(settings);
+        // Re-establish runtime fs-scope grants for all persisted folders.
+        // Tauri's allow_directory grants are session-only and are lost on restart,
+        // so they must be replayed before reconciliation reads those directories.
+        const grantResults = await Promise.allSettled(
+          settings.globalFolders.map((f) => grantPathAccess(f.path))
+        );
+        const failedGrants = grantResults.filter((r) => r.status === "rejected").length;
+        if (failedGrants > 0) {
+          toast.warning(`Could not re-grant access to ${failedGrants} folder(s). Some library folders may be inaccessible.`);
+        }
         setSettingsLoaded(true);
       })
       .catch(() => {

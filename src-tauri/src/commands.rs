@@ -626,6 +626,44 @@ pub fn cancel_export(
     Ok(())
 }
 
+/// Validates the `path` argument to `grant_path_access`. Extracted so the
+/// guard can be unit-tested without constructing a real `AppHandle`.
+fn validate_grant_path(path: &str) -> Result<(), String> {
+    if path.is_empty() {
+        return Err("path must not be empty".to_string());
+    }
+    if path.split(['/', '\\']).any(|c| c == "..") {
+        return Err("path must not contain traversal sequences".to_string());
+    }
+    // Reject filesystem roots (Unix "/" and Windows drive roots like "C:" or "C:\").
+    let trimmed = path.trim_end_matches(['/', '\\']);
+    if trimmed.is_empty() {
+        return Err("path must not be a filesystem root".to_string());
+    }
+    let bytes = trimmed.as_bytes();
+    if bytes.len() == 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
+        return Err("path must not be a drive root".to_string());
+    }
+    // Reject relative paths; only absolute paths produced by native dialogs are valid.
+    if !std::path::Path::new(path).is_absolute() {
+        return Err("path must be absolute".to_string());
+    }
+    Ok(())
+}
+
+/// Grants runtime fs-scope access to a user-selected path.
+/// Called after every dialog that returns a user-chosen folder or file, so that
+/// the broad static $DOCUMENT/**, $DOWNLOAD/**, $DESKTOP/** grants can be removed
+/// from capabilities/default.json.
+#[tauri::command]
+pub fn grant_path_access(app: AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_fs::FsExt;
+    validate_grant_path(&path)?;
+    app.fs_scope()
+        .allow_directory(&path, true)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -998,5 +1036,55 @@ mod tests {
         let jobs = DownloadJobs(Arc::new(Mutex::new(HashMap::new())));
         let result = jobs.0.lock().unwrap().remove("never-inserted");
         assert!(result.is_none());
+    }
+
+    // ---- grant_path_access tests ----
+    // Note: the happy path of grant_path_access requires a real AppHandle with the
+    // fs plugin initialized, which cannot be constructed in a unit-test context.
+    // Those scenarios are covered by integration tests / manual testing. Only the
+    // empty-path guard (extracted into validate_grant_path) is unit-tested here.
+
+    #[test]
+    fn test_validate_grant_path_rejects_empty() {
+        let result = validate_grant_path("");
+        assert!(result.is_err(), "empty path must be rejected");
+        assert!(result.unwrap_err().contains("must not be empty"));
+    }
+
+    #[test]
+    fn test_validate_grant_path_accepts_nonempty() {
+        #[cfg(windows)]
+        {
+            assert!(validate_grant_path("C:/Users/user/Documents/project").is_ok());
+            assert!(validate_grant_path("D:\\Projects\\music").is_ok());
+        }
+        #[cfg(not(windows))]
+        {
+            assert!(validate_grant_path("/home/user/project").is_ok());
+            assert!(validate_grant_path("/Users/user/music").is_ok());
+        }
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_traversal() {
+        assert!(validate_grant_path("/music/../secret").is_err());
+        assert!(validate_grant_path("C:\\Users\\..\\Windows").is_err());
+        assert!(validate_grant_path("..").is_err());
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_filesystem_roots() {
+        assert!(validate_grant_path("/").is_err());
+        assert!(validate_grant_path("C:\\").is_err());
+        assert!(validate_grant_path("C:/").is_err());
+        assert!(validate_grant_path("C:").is_err());
+        assert!(validate_grant_path("D:").is_err());
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_relative_paths() {
+        assert!(validate_grant_path("sounds").is_err());
+        assert!(validate_grant_path("./data").is_err());
+        assert!(validate_grant_path("relative/path").is_err());
     }
 }
