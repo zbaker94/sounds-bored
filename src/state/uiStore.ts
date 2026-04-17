@@ -24,6 +24,10 @@ export const OVERLAY_ID = {
 interface UiState {
   overlayStack: OverlayEntry[];
   editMode: boolean;
+  /** The currently active scene tab, or null when no project is loaded.
+   * Invariant: must be null or a scene id that exists in the current project.
+   * Callers are responsible for validation; `setActiveSceneId` is an unchecked setter. */
+  activeSceneId: string | null;
   /** The pad currently under the mouse cursor, or null if none. */
   hoveredPadId: string | null;
   /** The pad whose context popover is currently open, or null if none. */
@@ -49,6 +53,8 @@ interface UiActions {
   setHoveredPadId: (id: string | null) => void;
   /** Set the pad whose context popover is open, or null to clear. */
   setPadPopoverOpenId: (id: string | null) => void;
+  /** Set the active scene tab. Pass null to clear (e.g., on project close). */
+  setActiveSceneId: (id: string | null) => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -56,6 +62,7 @@ export type UiStore = UiState & UiActions;
 export const initialUiState: UiState = {
   overlayStack: [],
   editMode: false,
+  activeSceneId: null,
   hoveredPadId: null,
   padPopoverOpenId: null,
 };
@@ -102,6 +109,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   setHoveredPadId: (id) => set({ hoveredPadId: id }),
 
   setPadPopoverOpenId: (id) => set({ padPopoverOpenId: id }),
+
+  setActiveSceneId: (id) => set({ activeSceneId: id }),
 }));
 
 // Standalone selector factories for reactive subscriptions via useUiStore().

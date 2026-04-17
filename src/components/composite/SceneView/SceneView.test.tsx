@@ -109,7 +109,7 @@ describe("SceneView", () => {
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
       const entry = createMockHistoryEntry();
       useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
-      useProjectStore.getState().setActiveSceneId("scene-1");
+      useUiStore.setState({ activeSceneId: "scene-1" });
 
       renderSceneView();
 
@@ -121,7 +121,7 @@ describe("SceneView", () => {
       const entry = createMockHistoryEntry();
       useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
       // Bypass setActiveSceneId validation to test the defensive fallback in SceneView
-      useProjectStore.setState({ activeSceneId: "non-existent-id" });
+      useUiStore.setState({ activeSceneId: "non-existent-id" });
 
       renderSceneView();
 

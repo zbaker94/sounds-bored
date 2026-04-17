@@ -72,7 +72,7 @@ describe("SceneTabBar", () => {
       createMockScene({ id: "s1", name: "Scene 1" }),
       createMockScene({ id: "s2", name: "Scene 2" }),
     ]);
-    useProjectStore.getState().setActiveSceneId("s2");
+    useUiStore.setState({ activeSceneId: "s2" });
 
     renderWithTooltip(<SceneTabBar />);
 
@@ -82,7 +82,7 @@ describe("SceneTabBar", () => {
 
   it("should render no tab as active when activeSceneId is null", () => {
     loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
-    useProjectStore.setState({ activeSceneId: null });
+    useUiStore.setState({ activeSceneId: null });
 
     renderWithTooltip(<SceneTabBar />);
 
@@ -111,7 +111,7 @@ describe("SceneTabBar", () => {
     // correct way to test this in a jsdom/happy-dom environment.
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Scene 2" }));
 
-    expect(useProjectStore.getState().activeSceneId).toBe("s2");
+    expect(useUiStore.getState().activeSceneId).toBe("s2");
   });
 
   describe("inline scene rename", () => {
@@ -279,7 +279,7 @@ describe("SceneTabBar", () => {
         createMockScene({ id: "s1", name: "Scene 1" }),
         createMockScene({ id: "s2", name: "Scene 2" }),
       ]);
-      useProjectStore.getState().setActiveSceneId("s1");
+      useUiStore.setState({ activeSceneId: "s1" });
       renderWithTooltip(<SceneTabBar />);
 
       const deleteButtons = screen.getAllByRole("button", { name: /delete scene/i });
@@ -287,7 +287,7 @@ describe("SceneTabBar", () => {
       fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
 
       expect(useProjectStore.getState().project?.scenes).toHaveLength(1);
-      expect(useProjectStore.getState().activeSceneId).toBe("s2");
+      expect(useUiStore.getState().activeSceneId).toBe("s2");
     });
   });
 

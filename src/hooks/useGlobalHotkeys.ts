@@ -152,7 +152,8 @@ export function useGlobalHotkeys() {
 
   // Mod+Shift+N: open the pad config drawer for the active scene.
   useHotkeys("mod+shift+n", () => {
-    const { project, activeSceneId } = useProjectStore.getState();
+    const { project } = useProjectStore.getState();
+    const { activeSceneId } = useUiStore.getState();
     if (activeSceneId && project?.scenes.some((s) => s.id === activeSceneId)) {
       useUiStore.getState().openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
     }
@@ -160,10 +161,10 @@ export function useGlobalHotkeys() {
 
   // 1-9: jump directly to scene by index.
   useHotkeys("1,2,3,4,5,6,7,8,9", (e) => {
-    const { project, setActiveSceneId } = useProjectStore.getState();
+    const { project } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
     const idx = parseInt(e.key) - 1;
-    if (idx < scenes.length) setActiveSceneId(scenes[idx].id);
+    if (idx < scenes.length) useUiStore.getState().setActiveSceneId(scenes[idx].id);
   });
 
   // Alt+Left/Right: navigate between scenes with wrapping.
@@ -179,7 +180,8 @@ export function useGlobalHotkeys() {
   //     it via preventDefault: true (the app has no in-webview history anyway).
   // Guard idx === -1: when activeSceneId is null or stale, fall back to the first scene.
   useHotkeys("alt+left", () => {
-    const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
+    const { project } = useProjectStore.getState();
+    const { activeSceneId, setActiveSceneId } = useUiStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
@@ -188,7 +190,8 @@ export function useGlobalHotkeys() {
   }, { preventDefault: true /* suppress webview Alt+Left = Back */ });
 
   useHotkeys("alt+right", () => {
-    const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
+    const { project } = useProjectStore.getState();
+    const { activeSceneId, setActiveSceneId } = useUiStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
     const idx = scenes.findIndex((s) => s.id === activeSceneId);

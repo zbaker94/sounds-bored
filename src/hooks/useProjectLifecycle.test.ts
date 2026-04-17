@@ -52,12 +52,18 @@ vi.mock("@/lib/reconcileProject", () => ({
   applyProjectSoundReconcile: mockApplyProjectSoundReconcile,
 }));
 
+const mockUiState = {
+  activeSceneId: null as string | null,
+  openOverlay: mockOpenOverlay,
+  closeOverlay: mockCloseOverlay,
+  setActiveSceneId: vi.fn((id: string | null) => { mockUiState.activeSceneId = id; }),
+};
+
 vi.mock("@/state/uiStore", () => ({
-  useUiStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      openOverlay: mockOpenOverlay,
-      closeOverlay: mockCloseOverlay,
-    }),
+  useUiStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector(mockUiState),
+    { getState: () => mockUiState },
+  ),
   OVERLAY_ID: {
     CONFIRM_CLOSE_DIALOG: "CONFIRM_CLOSE_DIALOG",
   },
