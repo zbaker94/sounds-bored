@@ -24,6 +24,13 @@ function isRootPath(path: string): boolean {
     if (/^GLOBALROOT([/\\]|$)/i.test(inner)) return true;
     // Device volume root: \\?\Volume{GUID} — equivalent to a drive root on Windows
     if (/^Volume\{[^}]+\}$/i.test(inner)) return true;
+    // Allowlist catch-all: only permit drive-letter subfolders, UNC subfolders, or
+    // Volume GUID subfolders under \\?\. Everything else (HarddiskVolumeN, PhysicalDriveN,
+    // PIPE, MAILSLOT, BootPartition, etc.) is an unrecognized device-namespace path.
+    const isDriveSubfolder = /^[A-Za-z]:[/\\]/.test(inner);
+    const isUncSubfolder = /^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]/i.test(inner);
+    const isVolumeSubfolder = /^Volume\{[^}]+\}[/\\]/i.test(inner);
+    if (!isDriveSubfolder && !isUncSubfolder && !isVolumeSubfolder) return true;
   }
   // UNC share root: \\server\share or //server/share (no further path segments)
   // Paths starting with \\.\ or \\?\ are already handled above

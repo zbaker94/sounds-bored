@@ -695,6 +695,34 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
                     return Err("path must not be a UNC share root".to_string());
                 }
             }
+            // Allowlist catch-all: only permit drive-letter subfolders, UNC subfolders,
+            // or Volume GUID subfolders under \\?\. Reject everything else (HarddiskVolumeN,
+            // PhysicalDriveN, BootPartition, PIPE, MAILSLOT, etc.).
+            let is_drive_subfolder = inner_bytes.len() >= 3
+                && inner_bytes[0].is_ascii_alphabetic()
+                && inner_bytes[1] == b':'
+                && (inner_bytes[2] == b'\\' || inner_bytes[2] == b'/');
+            // Require non-empty server, non-empty share, and a non-empty subfolder segment
+            // under \\?\UNC\. This is self-sufficient (does not rely on the sep_count==1
+            // early-return above) and mirrors the TS regex: /^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]/i
+            let is_unc_subfolder = (inner_upper.starts_with("UNC\\") || inner_upper.starts_with("UNC/")) && {
+                let rest = &inner[4..]; // skip "UNC\" or "UNC/"
+                let mut segs = rest.split(|c: char| c == '\\' || c == '/');
+                let server = segs.next().unwrap_or("");
+                let share  = segs.next().unwrap_or("");
+                let sub    = segs.next().unwrap_or("");
+                !server.is_empty() && !share.is_empty() && !sub.is_empty()
+            };
+            // Require non-empty GUID and a separator immediately after '}', matching the TS regex.
+            let is_volume_subfolder = inner_upper.starts_with("VOLUME{")
+                && inner.find('}').map_or(false, |i| {
+                    i > 7  // at least one char between '{' and '}'
+                        && inner.as_bytes().get(i + 1).map_or(false, |&b| b == b'\\' || b == b'/')
+                        && !inner[i + 2..].trim_start_matches(['/', '\\']).is_empty()
+                });
+            if !is_drive_subfolder && !is_unc_subfolder && !is_volume_subfolder {
+                return Err("extended-length device namespace paths are not allowed".to_string());
+            }
         } else {
             // Regular UNC path \\server\share — reject share roots.
             let rest = after.trim_end_matches(['/', '\\']);
@@ -1227,6 +1255,21 @@ mod tests {
         let err = validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB")
             .unwrap_err();
         assert!(err.contains("volume root"), "unclosed Volume{{GUID}} must be rejected as volume root, got: {err}");
+
+        // Empty GUID between braces — rejected by the early volume-root check (after `}` is empty).
+        let err = validate_grant_path(r"\\?\Volume{}").unwrap_err();
+        assert!(
+            err.contains("volume root") || err.contains("device namespace"),
+            r"\\?\Volume{{}} (empty GUID) must be rejected, got: {err}"
+        );
+
+        // No separator after closing brace — must be rejected (not a subfolder).
+        let err = validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}suffix")
+            .unwrap_err();
+        assert!(
+            err.contains("device namespace"),
+            r"\\?\Volume{{GUID}}suffix (no sep after '}}') must hit allowlist catch-all, got: {err}"
+        );
     }
 
     #[test]
@@ -1245,5 +1288,76 @@ mod tests {
             validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}/music").is_ok(),
             r"\\?\Volume{{GUID}}/music (forward slash) should be allowed"
         );
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_extended_length_device_namespace_paths() {
+        // Multi-component device-namespace paths: PIPE and MAILSLOT pass through all
+        // explicit denylist checks and must be caught by the allowlist catch-all.
+        // Assert on "device namespace" to confirm the catch-all fires, not the
+        // is_absolute() fallback (which gives a different error on non-Windows).
+        let pipe_err = validate_grant_path(r"\\?\PIPE\foo").unwrap_err();
+        assert!(
+            pipe_err.contains("device namespace"),
+            r"\\?\PIPE\foo should be rejected with 'device namespace' error, got: {pipe_err}"
+        );
+        let mailslot_err = validate_grant_path(r"\\?\MAILSLOT\foo").unwrap_err();
+        assert!(
+            mailslot_err.contains("device namespace"),
+            r"\\?\MAILSLOT\foo should be rejected with 'device namespace' error, got: {mailslot_err}"
+        );
+        // Malformed UNC with empty segments must be rejected (structural check, not just sep count).
+        let empty_server_err = validate_grant_path(r"\\?\UNC\\server\share\folder").unwrap_err();
+        assert!(
+            empty_server_err.contains("device namespace"),
+            r"\\?\UNC\\server (empty server) must be rejected with 'device namespace', got: {empty_server_err}"
+        );
+        let triple_sep_err = validate_grant_path(r"\\?\UNC\\\server\share\folder").unwrap_err();
+        assert!(
+            triple_sep_err.contains("device namespace"),
+            r"\\?\UNC\\\server (triple sep) must be rejected with 'device namespace', got: {triple_sep_err}"
+        );
+        let empty_share_err = validate_grant_path(r"\\?\UNC\server\\share\folder").unwrap_err();
+        assert!(
+            empty_share_err.contains("device namespace"),
+            r"\\?\UNC\server\\share (empty share) must be rejected with 'device namespace', got: {empty_share_err}"
+        );
+        // Multi-level device-namespace paths must also be rejected.
+        let deep_pipe_err = validate_grant_path(r"\\?\PIPE\a\b\c").unwrap_err();
+        assert!(
+            deep_pipe_err.contains("device namespace"),
+            r"\\?\PIPE\a\b\c should be rejected with 'device namespace' error, got: {deep_pipe_err}"
+        );
+        // Forward-slash and mixed-separator prefix variants must also be rejected.
+        let fwd_pipe_err = validate_grant_path("//?/PIPE/foo").unwrap_err();
+        assert!(fwd_pipe_err.contains("device namespace"), "//?/PIPE/foo (forward-slash prefix) should be rejected");
+        assert!(validate_grant_path(r"\\?/PIPE/foo").is_err(), r"\\?/PIPE/foo (mixed-sep prefix) should be rejected");
+        assert!(validate_grant_path("//?/HarddiskVolume3").is_err(), "//?/HarddiskVolume3 should be rejected");
+        // Unknown arbitrary device name (prove allowlist, not extended denylist).
+        let unknown_err = validate_grant_path(r"\\?\UnknownDevice\sub").unwrap_err();
+        assert!(
+            unknown_err.contains("device namespace"),
+            r"\\?\UnknownDevice\sub should be rejected with 'device namespace' error, got: {unknown_err}"
+        );
+        // Single-component device roots must be rejected on all platforms.
+        assert!(validate_grant_path(r"\\?\HarddiskVolume3").is_err(), r"\\?\HarddiskVolume3 should be rejected");
+        assert!(validate_grant_path(r"\\?\PhysicalDrive0").is_err(), r"\\?\PhysicalDrive0 should be rejected");
+        assert!(validate_grant_path(r"\\?\BootPartition").is_err(), r"\\?\BootPartition should be rejected");
+        assert!(validate_grant_path(r"\\?\SystemPartition").is_err(), r"\\?\SystemPartition should be rejected");
+        // On Windows (where these paths are absolute), confirm the allowlist specifically rejects them.
+        #[cfg(windows)]
+        {
+            let hd_err = validate_grant_path(r"\\?\HarddiskVolume3").unwrap_err();
+            assert!(hd_err.contains("device namespace"), r"\\?\HarddiskVolume3 should hit allowlist, got: {hd_err}");
+            let pd_err = validate_grant_path(r"\\?\PhysicalDrive0").unwrap_err();
+            assert!(pd_err.contains("device namespace"), r"\\?\PhysicalDrive0 should hit allowlist, got: {pd_err}");
+        }
+        // Drive and UNC subfolders must still be allowed (Windows-only: is_absolute() check).
+        #[cfg(windows)]
+        {
+            assert!(validate_grant_path(r"\\?\C:\music").is_ok(), r"\\?\C:\music should be allowed");
+            assert!(validate_grant_path(r"\\?\C:/music").is_ok(), r"\\?\C:/music (forward-slash inner sep) should be allowed");
+            assert!(validate_grant_path(r"\\?\UNC\server\share\folder").is_ok(), r"\\?\UNC\server\share\folder should be allowed");
+        }
     }
 }

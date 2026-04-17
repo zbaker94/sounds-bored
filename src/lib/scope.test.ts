@@ -268,6 +268,158 @@ describe("grantParentAccess", () => {
       path: "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music",
     });
   });
+
+  it("does not grant access when dirname returns an empty-GUID Volume root (\\\\?\\\\Volume{})", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\Volume{}");
+
+    await grantParentAccess("\\\\?\\Volume{}\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a Volume GUID path with no separator after '}' (\\\\?\\\\Volume{GUID}suffix)", async () => {
+    mockPath.dirname.mockImplementation(
+      () => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}suffix"
+    );
+
+    await grantParentAccess(
+      "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}suffix\\song.wav"
+    );
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a raw volume device path (\\\\?\\\\HarddiskVolume3)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\HarddiskVolume3");
+
+    await grantParentAccess("\\\\?\\HarddiskVolume3\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a raw physical drive path (\\\\?\\\\PhysicalDrive0)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\PhysicalDrive0");
+
+    await grantParentAccess("\\\\?\\PhysicalDrive0\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a BootPartition device path (\\\\?\\\\BootPartition)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\BootPartition");
+
+    await grantParentAccess("\\\\?\\BootPartition\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a SystemPartition device path (\\\\?\\\\SystemPartition)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\SystemPartition");
+
+    await grantParentAccess("\\\\?\\SystemPartition\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a named pipe device path (\\\\?\\\\PIPE\\\\foo)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\PIPE\\foo");
+
+    await grantParentAccess("\\\\?\\PIPE\\foo\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a mailslot device path (\\\\?\\\\MAILSLOT\\\\foo)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\MAILSLOT\\foo");
+
+    await grantParentAccess("\\\\?\\MAILSLOT\\foo\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns an extended-length UNC subfolder (\\\\?\\\\UNC\\\\server\\\\share\\\\music)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\share\\music");
+
+    await grantParentAccess("\\\\?\\UNC\\server\\share\\music\\song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\?\\UNC\\server\\share\\music",
+    });
+  });
+
+  it("does not grant access for forward-slash extended-length PIPE path (//?/PIPE/foo)", async () => {
+    mockPath.dirname.mockImplementation(() => "//?/PIPE/foo");
+
+    await grantParentAccess("//?/PIPE/foo/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access for forward-slash extended-length raw volume (//?/HarddiskVolume3)", async () => {
+    mockPath.dirname.mockImplementation(() => "//?/HarddiskVolume3");
+
+    await grantParentAccess("//?/HarddiskVolume3/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access for mixed-separator extended-length MAILSLOT (\\\\?/MAILSLOT/foo)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?/MAILSLOT/foo");
+
+    await grantParentAccess("\\\\?/MAILSLOT/foo/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access for multi-level device-namespace path (\\\\?\\\\PIPE\\\\a\\\\b\\\\c)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\PIPE\\a\\b\\c");
+
+    await grantParentAccess("\\\\?\\PIPE\\a\\b\\c\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access for an unknown arbitrary device-namespace path (proves allowlist)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\UnknownDevice\\sub");
+
+    await grantParentAccess("\\\\?\\UnknownDevice\\sub\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns an extended-length drive subfolder with forward-slash inner sep (\\\\?\\\\C:/music)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\C:/music");
+
+    await grantParentAccess("\\\\?\\C:/music/song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\?\\C:/music",
+    });
+  });
+
+  it("grants access when dirname returns an extended-length UNC subfolder with forward slashes (//server/share/music)", async () => {
+    mockPath.dirname.mockImplementation(() => "//?/UNC/server/share/music");
+
+    await grantParentAccess("//?/UNC/server/share/music/song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "//?/UNC/server/share/music",
+    });
+  });
+
+  it("grants access when dirname returns an extended-length Volume GUID subfolder with forward-slash separator (\\\\?\\\\Volume{GUID}/music)", async () => {
+    mockPath.dirname.mockImplementation(
+      () => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music"
+    );
+
+    await grantParentAccess(
+      "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music/song.wav"
+    );
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music",
+    });
+  });
 });
 
 describe("pickFolder", () => {
