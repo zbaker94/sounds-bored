@@ -1,4 +1,5 @@
-import { writeTextFile, rename, remove } from "@tauri-apps/plugin-fs";
+import { writeTextFile, rename, remove, readDir, type DirEntry } from "@tauri-apps/plugin-fs";
+import { dirname, basename, join } from "@tauri-apps/api/path";
 
 /**
  * Atomically writes text to `filePath`. Guarantees all-or-nothing semantics
@@ -15,8 +16,8 @@ import { writeTextFile, rename, remove } from "@tauri-apps/plugin-fs";
  *         its previous contents.
  *
  * Note: unlike a deterministic `.tmp` suffix, UUID-suffixed orphans are not
- * self-healed by subsequent writes. Callers may sweep `<filePath>.*.tmp` on
- * startup to avoid unbounded accumulation after crashes. See issue #307.
+ * self-healed by subsequent writes. Call {@link sweepOrphanedTmpFiles} on
+ * startup to remove any accumulated orphans from prior crashes.
  */
 export async function atomicWriteText(filePath: string, text: string): Promise<void> {
   const tmpPath = `${filePath}.${crypto.randomUUID()}.tmp`;
@@ -37,4 +38,41 @@ export async function atomicWriteText(filePath: string, text: string): Promise<v
  */
 export async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
   await atomicWriteText(filePath, JSON.stringify(data, null, 2));
+}
+
+/**
+ * Removes any orphaned `<basename>.<uuid>.tmp` files left in the same directory
+ * as `filePath` by prior crashed {@link atomicWriteText} calls.
+ *
+ * This is opportunistic cleanup — all errors are silently suppressed so that a
+ * sweep failure never prevents the caller from loading its file.
+ */
+const UUID_TMP_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp$/i;
+
+/**
+ * Removes any orphaned `<basename>.<uuid>.tmp` files left in the same directory
+ * as `filePath` by prior crashed {@link atomicWriteText} calls.
+ *
+ * This is opportunistic cleanup — all errors are silently suppressed so that a
+ * sweep failure never prevents the caller from loading its file.
+ */
+export async function sweepOrphanedTmpFiles(filePath: string): Promise<void> {
+  try {
+    const dir = await dirname(filePath);
+    const base = await basename(filePath);
+    const entries = await readDir(dir);
+    const orphanPaths = await Promise.all(
+      entries
+        .filter((e): e is DirEntry & { name: string } =>
+          typeof e.name === "string" &&
+          e.name.startsWith(`${base}.`) &&
+          UUID_TMP_RE.test(e.name.slice(base.length + 1)),
+        )
+        .map((e) => join(dir, e.name)),
+    );
+    await Promise.allSettled(orphanPaths.map((p) => remove(p)));
+  } catch {
+    // sweep is opportunistic — never block loading on cleanup failures
+  }
 }

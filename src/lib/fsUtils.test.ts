@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { atomicWriteJson, atomicWriteText } from "./fsUtils";
+import { atomicWriteJson, atomicWriteText, sweepOrphanedTmpFiles } from "./fsUtils";
 import { mockFs, createMockFileSystem } from "@/test/tauri-mocks";
 
 describe("atomicWriteText", () => {
@@ -127,5 +127,99 @@ describe("atomicWriteJson", () => {
 
     const written = mockFs.writeTextFile.mock.calls[0][1] as string;
     expect(written).toBe("[]");
+  });
+});
+
+describe("sweepOrphanedTmpFiles", () => {
+  const UUID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+
+  beforeEach(() => {
+    mockFs.readDir.mockReset();
+    mockFs.remove.mockResolvedValue(undefined);
+  });
+
+  it("removes all orphaned <base>.<uuid>.tmp files in the directory", async () => {
+    const uuid2 = "a4e8b2c1-9d3f-4a5b-8c7e-1f2e3d4c5b6a";
+    mockFs.readDir.mockResolvedValue([
+      { name: `file.json.${UUID}.tmp` },
+      { name: `file.json.${uuid2}.tmp` },
+      { name: "file.json" },
+      { name: "other.txt" },
+    ]);
+
+    await sweepOrphanedTmpFiles("/some/dir/file.json");
+
+    expect(mockFs.remove).toHaveBeenCalledTimes(2);
+    expect(mockFs.remove).toHaveBeenCalledWith(`/some/dir/file.json.${UUID}.tmp`);
+    expect(mockFs.remove).toHaveBeenCalledWith(`/some/dir/file.json.${uuid2}.tmp`);
+  });
+
+  it("does nothing when no orphans exist", async () => {
+    mockFs.readDir.mockResolvedValue([{ name: "file.json" }, { name: "other.txt" }]);
+
+    await sweepOrphanedTmpFiles("/some/dir/file.json");
+
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
+
+  it("does not remove files that do not match the base name prefix", async () => {
+    mockFs.readDir.mockResolvedValue([
+      { name: "file.json.bak" },
+      { name: "unrelated.txt" },
+      { name: `settings.json.${UUID}.tmp` },
+    ]);
+
+    await sweepOrphanedTmpFiles("/some/dir/file.json");
+
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
+
+  it("silently ignores remove errors for individual orphans", async () => {
+    mockFs.readDir.mockResolvedValue([{ name: `file.json.${UUID}.tmp` }]);
+    mockFs.remove.mockRejectedValue(new Error("ENOENT"));
+
+    await expect(sweepOrphanedTmpFiles("/some/dir/file.json")).resolves.toBeUndefined();
+  });
+
+  it("does not remove a file matching the base prefix but without .tmp suffix", async () => {
+    mockFs.readDir.mockResolvedValue([
+      { name: `file.json.${UUID}` },
+      { name: "file.json.backup" },
+    ]);
+
+    await sweepOrphanedTmpFiles("/some/dir/file.json");
+
+    expect(mockFs.remove).not.toHaveBeenCalled();
+  });
+
+  it("returns without error when readDir throws (directory does not exist)", async () => {
+    mockFs.readDir.mockRejectedValue(new Error("ENOENT: directory not found"));
+
+    await expect(sweepOrphanedTmpFiles("/nonexistent/dir/file.json")).resolves.toBeUndefined();
+  });
+
+  it("skips entries with undefined name without throwing", async () => {
+    mockFs.readDir.mockResolvedValue([
+      { name: undefined },
+      { name: `file.json.${UUID}.tmp` },
+    ]);
+
+    await sweepOrphanedTmpFiles("/some/dir/file.json");
+
+    expect(mockFs.remove).toHaveBeenCalledTimes(1);
+    expect(mockFs.remove).toHaveBeenCalledWith(`/some/dir/file.json.${UUID}.tmp`);
+  });
+
+  it("does not remove .tmp files with non-UUID suffix (e.g. editor swap files)", async () => {
+    mockFs.readDir.mockResolvedValue([
+      { name: "file.json.editor-swap.tmp" },
+      { name: "file.json.not-a-uuid.tmp" },
+      { name: `file.json.${UUID}.tmp` },
+    ]);
+
+    await sweepOrphanedTmpFiles("/some/dir/file.json");
+
+    expect(mockFs.remove).toHaveBeenCalledTimes(1);
+    expect(mockFs.remove).toHaveBeenCalledWith(`/some/dir/file.json.${UUID}.tmp`);
   });
 });

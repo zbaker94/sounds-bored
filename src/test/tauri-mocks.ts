@@ -127,6 +127,21 @@ export function createMockFileSystem(structure: Record<string, string | null>) {
 
   mockFs.mkdir.mockResolvedValue(undefined);
   mockFs.copyFile.mockResolvedValue(undefined);
+
+  mockFs.readDir.mockImplementation((dirPath: string) => {
+    const normalizedDir = (dirPath as string).replace(/\\/g, "/").replace(/\/$/, "");
+    const names = new Set<string>();
+    for (const p of Object.keys(structure)) {
+      const normalized = p.replace(/\\/g, "/");
+      const lastSlash = normalized.lastIndexOf("/");
+      const parent = normalized.substring(0, lastSlash);
+      if (parent === normalizedDir) {
+        names.add(normalized.substring(lastSlash + 1));
+      }
+    }
+    return Promise.resolve([...names].map((name) => ({ name })));
+  });
+
   mockFs.remove.mockImplementation((path: string) => {
     // Check both maps: writeTextFile writes to both, but defensive check future-proofs
     // against any refactor that might decouple them.

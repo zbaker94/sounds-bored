@@ -76,6 +76,23 @@ describe("loadAppSettings", () => {
     expect(result.globalFolders).toHaveLength(2);
   });
 
+  it("sweeps orphaned .tmp files before reading the settings file", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    const settings = createMockAppSettings();
+    createMockFileSystem({
+      "/app-data/SoundsBored": null,
+      "/app-data/SoundsBored/settings.json": JSON.stringify(settings),
+      [`/app-data/SoundsBored/settings.json.${uuid}.tmp`]: "stale",
+    });
+
+    await loadAppSettings();
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/app-data/SoundsBored");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      `/app-data/SoundsBored/settings.json.${uuid}.tmp`,
+    );
+  });
+
   it("should throw a ZodError if the file contains invalid JSON structure", async () => {
     createMockFileSystem({
       "/app-data/SoundsBored": null,

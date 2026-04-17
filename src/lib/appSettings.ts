@@ -1,7 +1,7 @@
 import { AppSettings, AppSettingsSchema, GlobalFolder } from "./schemas";
 import { appDataDir, audioDir, join } from "@tauri-apps/api/path";
 import { readTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson } from "./fsUtils";
+import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, SETTINGS_FILE_NAME } from "./constants";
 
 export async function getSettingsFilePath(): Promise<string> {
@@ -45,6 +45,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
   const dir = await appDataDir();
   const folderPath = await join(dir, APP_FOLDER);
   const filePath = await join(folderPath, SETTINGS_FILE_NAME);
+  await sweepOrphanedTmpFiles(filePath);
 
   if (!(await exists(folderPath))) {
     await mkdir(folderPath, { recursive: true });

@@ -238,6 +238,20 @@ describe("loadProjectFile", () => {
     );
   });
 
+  it("sweeps orphaned .tmp files before reading the project file", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    const projectData = createMockProject({ name: "My Project" });
+    createMockFileSystem({
+      "/test/path/project.json": createProjectJson(projectData),
+      [`/test/path/project.json.${uuid}.tmp`]: "stale",
+    });
+
+    await loadProjectFile("/test/path/project.json");
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/test/path");
+    expect(mockFs.remove).toHaveBeenCalledWith(`/test/path/project.json.${uuid}.tmp`);
+  });
+
   it("should default scenes and favoritedSetIds to empty arrays after migration", () => {
     // Simulate a 1.0.0 project being migrated — sounds/tags/sets are stripped,
     // favoritedSetIds is added, and the schema defaults scenes to [].
