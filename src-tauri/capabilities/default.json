@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window. Shell plugin (tauri-plugin-shell) is intentionally absent from this list — all sidecar spawn/kill operations are Rust-side only (see src-tauri/src/commands.rs). Do not add shell:allow-spawn or shell:allow-kill here.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -22,8 +22,6 @@
       ]
     },
     "dialog:default",
-    "shell:allow-kill",
-    "shell:allow-spawn",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-read-dir",
