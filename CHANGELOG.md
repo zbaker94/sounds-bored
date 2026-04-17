@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a security issue where file paths with doubled backslashes (e.g. `\\\\server\share`) could bypass UNC share root restrictions and gain unauthorized file access.
 - Fixed a security issue where certain Windows device-namespace paths (e.g., `\\?\PIPE\`, `\\?\MAILSLOT\`, `\\?\HarddiskVolume3`) could bypass file access restrictions.
 - The app now uses an allowlist approach for extended-length paths, permitting only drive-letter, UNC share, and Volume GUID subfolders — all other device paths are blocked.
 - Improved security: Volume GUID paths (e.g. `\\?\Volume{GUID}`) are now correctly blocked from being granted root-level file access
