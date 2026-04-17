@@ -674,6 +674,19 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
             {
                 return Err("device namespace paths are not allowed".to_string());
             }
+            // \\?\Volume{GUID} — device volume root, equivalent to a drive root on Windows.
+            // Allow subfolders (e.g. \\?\Volume{GUID}\music) but reject the root itself.
+            // Use inner (not inner_upper) for the brace search: to_uppercase() may shift byte
+            // offsets for non-ASCII chars, but '{' and '}' are ASCII-stable so this is safe.
+            if inner_upper.starts_with("VOLUME{") {
+                let after = inner
+                    .find('}')
+                    .map(|i| inner[i + 1..].trim_start_matches(['/', '\\']));
+                // after == None means no closing '}' — treat as root-level device path and reject.
+                if after.map_or(true, |s| s.is_empty()) {
+                    return Err("path must not be a volume root".to_string());
+                }
+            }
             // \\?\UNC\server\share — extended-length UNC share root.
             if inner_upper.starts_with("UNC\\") || inner_upper.starts_with("UNC/") {
                 let unc_rest = inner[4..].trim_end_matches(['/', '\\']);
@@ -1184,5 +1197,53 @@ mod tests {
         assert!(validate_grant_path(r"\\.\C:\").is_err(), r"\\.\C:\ should be rejected");
         assert!(validate_grant_path(r"\\.\PhysicalDrive0").is_err(), r"\\.\PhysicalDrive0 should be rejected");
         assert!(validate_grant_path("//./C:/").is_err(), "//./C:/ should be rejected");
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_volume_guid_root() {
+        // Assert on the specific error message to confirm the Volume-GUID branch fires,
+        // not the pre-existing is_absolute() fallback on non-Windows CI.
+        let err = validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}")
+            .unwrap_err();
+        assert!(err.contains("volume root"), "expected 'volume root' error, got: {err}");
+
+        let err = validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}\")
+            .unwrap_err();
+        assert!(err.contains("volume root"), "expected 'volume root' error for trailing slash, got: {err}");
+
+        let err = validate_grant_path(r"\\?\volume{12345678-1234-1234-1234-1234567890AB}")
+            .unwrap_err();
+        assert!(err.contains("volume root"), "lowercase volume{{GUID}} must be rejected (case-insensitive), got: {err}");
+
+        // Forward-slash and mixed-separator extended-length prefix variants
+        let err = validate_grant_path(r"\\?/Volume{12345678-1234-1234-1234-1234567890AB}")
+            .unwrap_err();
+        assert!(err.contains("volume root"), r"\\?/Volume{{GUID}} (mixed sep) must be volume root error, got: {err}");
+        let err = validate_grant_path(r"//?\Volume{12345678-1234-1234-1234-1234567890AB}")
+            .unwrap_err();
+        assert!(err.contains("volume root"), r"//?\Volume{{GUID}} (forward-slash prefix) must be volume root error, got: {err}");
+
+        // Malformed: no closing brace — treated as a root-level device path
+        let err = validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB")
+            .unwrap_err();
+        assert!(err.contains("volume root"), "unclosed Volume{{GUID}} must be rejected as volume root, got: {err}");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_validate_grant_path_allows_volume_guid_subfolder() {
+        assert!(
+            validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}\music").is_ok(),
+            r"\\?\Volume{{GUID}}\music should be allowed"
+        );
+        assert!(
+            validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}\a\b").is_ok(),
+            r"\\?\Volume{{GUID}}\a\b should be allowed"
+        );
+        // Forward-slash separator after closing brace
+        assert!(
+            validate_grant_path(r"\\?\Volume{12345678-1234-1234-1234-1234567890AB}/music").is_ok(),
+            r"\\?\Volume{{GUID}}/music (forward slash) should be allowed"
+        );
     }
 }

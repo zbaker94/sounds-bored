@@ -22,6 +22,8 @@ function isRootPath(path: string): boolean {
     if (/^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]?$/i.test(inner)) return true;
     // Device namespace: \\?\GLOBALROOT\... — can bypass normal ACL checks
     if (/^GLOBALROOT([/\\]|$)/i.test(inner)) return true;
+    // Device volume root: \\?\Volume{GUID} — equivalent to a drive root on Windows
+    if (/^Volume\{[^}]+\}$/i.test(inner)) return true;
   }
   // UNC share root: \\server\share or //server/share (no further path segments)
   // Paths starting with \\.\ or \\?\ are already handled above

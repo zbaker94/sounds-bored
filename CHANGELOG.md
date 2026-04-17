@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved security: Volume GUID paths (e.g. `\\?\Volume{GUID}`) are now correctly blocked from being granted root-level file access
+- Subfolders under Volume GUID paths (e.g. `\\?\Volume{GUID}\music`) continue to work as expected
 - Improved security: the app now blocks granting file access to dangerous Windows path types, including UNC share roots, DOS device namespace paths, and extended-length prefix roots.
 - Subfolders on network shares (e.g. `\\server\share\music`) continue to work as expected.
 - You can now open sound files and folders from anywhere on your system — the previous restriction to Music, Documents, Downloads, and Desktop folders has been removed.
