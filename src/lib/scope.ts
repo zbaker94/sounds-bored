@@ -7,9 +7,25 @@ export async function grantPathAccess(folderPath: string): Promise<void> {
 }
 
 function isRootPath(path: string): boolean {
-  if (path === "/") return true;
+  if (path === "" || path === "/") return true;
   // Windows drive root: "C:", "C:\", "C:/"
   if (/^[A-Za-z]:[/\\]?$/.test(path)) return true;
+  // DOS device namespace \\. or //. — block all forms (never produced by native dialogs)
+  if (/^[/\\]{2}\.[/\\]/.test(path)) return true;
+  // Windows extended-length prefix \\?\ or \\?/ or //?/ variants
+  if (/^[/\\]{2}\?[/\\]/.test(path)) {
+    const inner = path.slice(4).replace(/[/\\]+$/, "");
+    if (inner === "") return true;
+    // Extended-length drive root: \\?\C: or \\?\C:\
+    if (/^[A-Za-z]:[/\\]?$/.test(inner)) return true;
+    // Extended-length UNC share root: \\?\UNC\server\share (forward or backslash)
+    if (/^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]?$/i.test(inner)) return true;
+    // Device namespace: \\?\GLOBALROOT\... — can bypass normal ACL checks
+    if (/^GLOBALROOT([/\\]|$)/i.test(inner)) return true;
+  }
+  // UNC share root: \\server\share or //server/share (no further path segments)
+  // Paths starting with \\.\ or \\?\ are already handled above
+  if (/^[/\\]{2}[^/\\]+[/\\][^/\\]+[/\\]*$/.test(path)) return true;
   return false;
 }
 
