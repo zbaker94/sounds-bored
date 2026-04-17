@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { Pad, PadConfig, Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
+// Cross-store side effect: projectStore calls useUiStore.getState() in loadProject,
+// clearProject, addScene, and deleteScene to keep activeSceneId in sync with scene
+// lifecycle changes. This is a deliberate pragmatic choice — uiStore does not import
+// projectStore, so there is no circular dependency. The inverse (having UI callers
+// update both stores) would require duplicating scene-selection logic across all call
+// sites (SceneTabBar, useGlobalHotkeys, drag-to-add, keyboard shortcuts, etc.).
+import { useUiStore } from "./uiStore";
 
 interface ProjectState {
   project: Project | null;
@@ -8,7 +15,6 @@ interface ProjectState {
   historyEntry: ProjectHistoryEntry | null;
   isTemporary: boolean;
   isDirty: boolean;
-  activeSceneId: string | null;
 }
 
 interface ProjectActions {
@@ -24,7 +30,6 @@ interface ProjectActions {
   clearDirtyFlag: () => void;
   markAsPermanent: (historyEntry: ProjectHistoryEntry, project: Project) => void;
   clearProject: () => void;
-  setActiveSceneId: (sceneId: string) => void;
   addScene: (name?: string) => void;
   renameScene: (sceneId: string, name: string) => void;
   deleteScene: (sceneId: string) => void;
@@ -46,22 +51,22 @@ export const initialProjectState: ProjectState = {
   historyEntry: null,
   isTemporary: false,
   isDirty: false,
-  activeSceneId: null,
 };
 
 export const useProjectStore = create<ProjectStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     ...initialProjectState,
 
-    loadProject: (historyEntry, project, isTemporary) =>
+    loadProject: (historyEntry, project, isTemporary) => {
       set((draft) => {
         draft.historyEntry = historyEntry;
         draft.project = project;
         draft.folderPath = historyEntry.path;
         draft.isTemporary = isTemporary;
         draft.isDirty = false;
-        draft.activeSceneId = project.scenes.length > 0 ? project.scenes[0].id : null;
-      }),
+      });
+      useUiStore.getState().setActiveSceneId(project.scenes.length > 0 ? project.scenes[0].id : null);
+    },
 
     updateProject: (project) =>
       set((draft) => {
@@ -85,16 +90,13 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = false;
       }),
 
-    clearProject: () => set(() => ({ ...initialProjectState })),
+    clearProject: () => {
+      set(() => ({ ...initialProjectState }));
+      useUiStore.getState().setActiveSceneId(null);
+    },
 
-    setActiveSceneId: (sceneId) =>
-      set((draft) => {
-        if (draft.project?.scenes.some((s) => s.id === sceneId)) {
-          draft.activeSceneId = sceneId;
-        }
-      }),
-
-    addScene: (name) =>
+    addScene: (name) => {
+      let newSceneId: string | null = null;
       set((draft) => {
         if (!draft.project) return;
         const newScene: Scene = {
@@ -103,9 +105,11 @@ export const useProjectStore = create<ProjectStore>()(
           pads: [],
         };
         draft.project.scenes.push(newScene);
-        draft.activeSceneId = newScene.id;
         draft.isDirty = true;
-      }),
+        newSceneId = newScene.id;
+      });
+      if (newSceneId) useUiStore.getState().setActiveSceneId(newSceneId);
+    },
 
     renameScene: (sceneId, name) =>
       set((draft) => {
@@ -118,20 +122,24 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = true;
       }),
 
-    deleteScene: (sceneId) =>
+    deleteScene: (sceneId) => {
+      const wasActive = useUiStore.getState().activeSceneId === sceneId;
+      let deletedIdx = -1;
       set((draft) => {
         if (!draft.project) return;
-        const idx = draft.project.scenes.findIndex((s) => s.id === sceneId);
-        if (idx === -1) return;
-        draft.project.scenes.splice(idx, 1);
+        deletedIdx = draft.project.scenes.findIndex((s) => s.id === sceneId);
+        if (deletedIdx === -1) return;
+        draft.project.scenes.splice(deletedIdx, 1);
         draft.isDirty = true;
-        if (draft.activeSceneId === sceneId) {
-          const scenes = draft.project.scenes;
-          draft.activeSceneId = scenes.length > 0
-            ? (scenes[idx] ?? scenes[idx - 1])!.id
-            : null;
-        }
-      }),
+      });
+      if (wasActive && deletedIdx !== -1) {
+        const scenes = get().project?.scenes ?? [];
+        const next = scenes.length > 0
+          ? (scenes[deletedIdx] ?? scenes[deletedIdx - 1])!.id
+          : null;
+        useUiStore.getState().setActiveSceneId(next);
+      }
+    },
 
     addPad: (sceneId, config) =>
       set((draft) => {

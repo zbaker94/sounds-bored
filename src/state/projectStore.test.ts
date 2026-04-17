@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore, initialProjectState } from "./projectStore";
+import { useUiStore, initialUiState } from "./uiStore";
 import { createMockProject, createMockHistoryEntry, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import type { PadConfig } from "@/lib/schemas";
 
@@ -7,9 +8,14 @@ function getState() {
   return useProjectStore.getState();
 }
 
+function getActiveSceneId() {
+  return useUiStore.getState().activeSceneId;
+}
+
 describe("projectStore", () => {
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
+    useUiStore.setState({ ...initialUiState });
   });
 
   describe("initial state", () => {
@@ -19,7 +25,6 @@ describe("projectStore", () => {
       expect(getState().historyEntry).toBeNull();
       expect(getState().isTemporary).toBe(false);
       expect(getState().isDirty).toBe(false);
-      expect(getState().activeSceneId).toBeNull();
     });
   });
 
@@ -142,9 +147,9 @@ describe("projectStore", () => {
     });
   });
 
-  describe("activeSceneId", () => {
-    it("should start as null", () => {
-      expect(getState().activeSceneId).toBeNull();
+  describe("activeSceneId (in uiStore)", () => {
+    it("should start as null in uiStore", () => {
+      expect(getActiveSceneId()).toBeNull();
     });
 
     it("should auto-select first scene on loadProject when scenes exist", () => {
@@ -155,39 +160,27 @@ describe("projectStore", () => {
 
       getState().loadProject(entry, project, false);
 
-      expect(getState().activeSceneId).toBe("s1");
+      expect(getActiveSceneId()).toBe("s1");
     });
 
     it("should remain null on loadProject when scenes is empty", () => {
       const entry = createMockHistoryEntry();
       getState().loadProject(entry, createMockProject({ scenes: [] }), false);
 
-      expect(getState().activeSceneId).toBeNull();
+      expect(getActiveSceneId()).toBeNull();
     });
 
-    it("should update on setActiveSceneId", () => {
+    it("should update when setActiveSceneId is called on uiStore", () => {
       const entry = createMockHistoryEntry();
       const project = createMockProject({
         scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
       });
       getState().loadProject(entry, project, false);
 
-      expect(getState().activeSceneId).toBe("s1"); // pre-condition: loadProject auto-selected first scene
-      getState().setActiveSceneId("s2");
+      expect(getActiveSceneId()).toBe("s1"); // pre-condition: loadProject auto-selected first scene
+      useUiStore.getState().setActiveSceneId("s2");
 
-      expect(getState().activeSceneId).toBe("s2");
-    });
-
-    it("should not update if the sceneId does not exist in the project", () => {
-      const entry = createMockHistoryEntry();
-      const project = createMockProject({
-        scenes: [createMockScene({ id: "s1" })],
-      });
-      getState().loadProject(entry, project, false);
-
-      getState().setActiveSceneId("nonexistent-id");
-
-      expect(getState().activeSceneId).toBe("s1"); // unchanged
+      expect(getActiveSceneId()).toBe("s2");
     });
 
     it("should reset to null on clearProject", () => {
@@ -199,7 +192,7 @@ describe("projectStore", () => {
 
       getState().clearProject();
 
-      expect(getState().activeSceneId).toBeNull();
+      expect(getActiveSceneId()).toBeNull();
     });
 
     it("should preserve activeSceneId through markAsPermanent", () => {
@@ -208,12 +201,12 @@ describe("projectStore", () => {
         scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
       });
       getState().loadProject(tempEntry, project, true);
-      getState().setActiveSceneId("s2");
+      useUiStore.getState().setActiveSceneId("s2");
 
       const permEntry = createMockHistoryEntry({ path: "/projects/My Project" });
       getState().markAsPermanent(permEntry, project);
 
-      expect(getState().activeSceneId).toBe("s2");
+      expect(getActiveSceneId()).toBe("s2");
     });
   });
 
@@ -222,7 +215,7 @@ describe("projectStore", () => {
       getState().addScene();
 
       expect(getState().project).toBeNull();
-      expect(getState().activeSceneId).toBeNull();
+      expect(getActiveSceneId()).toBeNull();
     });
 
     it("should add a scene with empty pads to the project", () => {
@@ -265,7 +258,7 @@ describe("projectStore", () => {
 
       const newSceneId = getState().project?.scenes[0].id;
       expect(newSceneId).toBeTruthy();
-      expect(getState().activeSceneId).toBe(newSceneId);
+      expect(getActiveSceneId()).toBe(newSceneId);
     });
 
     it("should generate unique ids for each scene", () => {
@@ -287,6 +280,111 @@ describe("projectStore", () => {
       getState().addScene();
 
       expect(getState().isDirty).toBe(true);
+    });
+  });
+
+  describe("renameScene", () => {
+    function loadWithScenes() {
+      const entry = createMockHistoryEntry();
+      const scenes = [createMockScene({ id: "s1", name: "Scene 1" }), createMockScene({ id: "s2", name: "Scene 2" })];
+      getState().loadProject(entry, createMockProject({ scenes }), false);
+    }
+
+    it("renames the scene and marks dirty", () => {
+      loadWithScenes();
+      getState().renameScene("s1", "Renamed");
+      expect(getState().project!.scenes[0].name).toBe("Renamed");
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("trims the name", () => {
+      loadWithScenes();
+      getState().renameScene("s1", "  Trimmed  ");
+      expect(getState().project!.scenes[0].name).toBe("Trimmed");
+    });
+
+    it("is a no-op on blank name", () => {
+      loadWithScenes();
+      getState().renameScene("s1", "   ");
+      expect(getState().project!.scenes[0].name).toBe("Scene 1");
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op on unknown sceneId", () => {
+      loadWithScenes();
+      getState().renameScene("nonexistent", "Whatever");
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op when no project is loaded", () => {
+      getState().renameScene("s1", "Name");
+      expect(getState().project).toBeNull();
+    });
+  });
+
+  describe("deleteScene", () => {
+    function loadWithThreeScenes() {
+      const entry = createMockHistoryEntry();
+      const scenes = [
+        createMockScene({ id: "s1" }),
+        createMockScene({ id: "s2" }),
+        createMockScene({ id: "s3" }),
+      ];
+      getState().loadProject(entry, createMockProject({ scenes }), false);
+    }
+
+    it("removes the scene from the project", () => {
+      loadWithThreeScenes();
+      getState().deleteScene("s2");
+      expect(getState().project!.scenes.map((s) => s.id)).toEqual(["s1", "s3"]);
+    });
+
+    it("marks the project as dirty", () => {
+      loadWithThreeScenes();
+      getState().deleteScene("s2");
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("is a no-op when sceneId does not exist — does not touch activeSceneId", () => {
+      loadWithThreeScenes();
+      getState().deleteScene("nonexistent");
+      expect(getState().project!.scenes).toHaveLength(3);
+      expect(getState().isDirty).toBe(false);
+      expect(getActiveSceneId()).toBe("s1"); // unchanged
+    });
+
+    it("is a no-op when no project is loaded", () => {
+      getState().deleteScene("s1");
+      expect(getState().project).toBeNull();
+    });
+
+    it("does not change activeSceneId when a non-active scene is deleted", () => {
+      loadWithThreeScenes();
+      useUiStore.getState().setActiveSceneId("s1");
+      getState().deleteScene("s3");
+      expect(getActiveSceneId()).toBe("s1");
+    });
+
+    it("advances activeSceneId to the next scene when active middle scene is deleted", () => {
+      loadWithThreeScenes();
+      useUiStore.getState().setActiveSceneId("s2");
+      getState().deleteScene("s2");
+      expect(getActiveSceneId()).toBe("s3");
+    });
+
+    it("falls back to the previous scene when the active last scene is deleted", () => {
+      loadWithThreeScenes();
+      useUiStore.getState().setActiveSceneId("s3");
+      getState().deleteScene("s3");
+      expect(getActiveSceneId()).toBe("s2");
+    });
+
+    it("sets activeSceneId to null when the only scene is deleted", () => {
+      const entry = createMockHistoryEntry();
+      getState().loadProject(entry, createMockProject({ scenes: [createMockScene({ id: "only" })] }), false);
+      getState().deleteScene("only");
+      expect(getActiveSceneId()).toBeNull();
+      expect(getState().project!.scenes).toHaveLength(0);
     });
   });
 
