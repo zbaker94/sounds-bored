@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useMultiFadeMode } from "./useMultiFadeMode";
-import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useMultiFadeStore, initialMultiFadeState } from "@/state/multiFadeStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { createMockProject, createMockScene, createMockPad, createMockHistoryEntry } from "@/test/factories";
@@ -31,13 +31,6 @@ function loadPadsInStore(numPads = 2) {
     .loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
   return pads;
 }
-
-const initialMultiFadeState = {
-  active: false,
-  originPadId: null,
-  selectedPads: new Map(),
-  reopenPadId: null,
-};
 
 beforeEach(() => {
   useProjectStore.setState({ ...initialProjectState });

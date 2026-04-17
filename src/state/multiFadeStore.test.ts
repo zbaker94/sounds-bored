@@ -1,14 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { useMultiFadeStore, type SelectedPadFade } from "@/state/multiFadeStore";
+import { useMultiFadeStore, initialMultiFadeState, type SelectedPadFade } from "@/state/multiFadeStore";
 
 describe("multiFadeStore", () => {
   beforeEach(() => {
-    useMultiFadeStore.setState({
-      active: false,
-      originPadId: null,
-      selectedPads: new Map<string, SelectedPadFade>(),
-      reopenPadId: null,
-    });
+    useMultiFadeStore.setState({ ...initialMultiFadeState });
     vi.clearAllMocks();
   });
 
