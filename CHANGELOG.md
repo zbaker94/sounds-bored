@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal documentation for audio gain handling (no behavior change).
 - App settings, project files, sound library, and recent projects history are now saved atomically — if a save is interrupted (crash, power loss), your files will never be left in a partially-written, corrupted state.
 - Improved security: shell command execution is now restricted to the Rust backend only, preventing the frontend from directly spawning or killing system processes.
 1. Audio playback correctness: Volume changes now fade smoothly instead of snapping (no audio clicks); invalid/NaN
