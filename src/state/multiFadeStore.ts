@@ -22,7 +22,7 @@ interface MultiFadeActions {
   clearMultiFadeReopenPadId: () => void;
 }
 
-const initialState: MultiFadeState = {
+export const initialMultiFadeState: MultiFadeState = {
   active: false,
   originPadId: null,
   selectedPads: new Map(),
@@ -30,7 +30,7 @@ const initialState: MultiFadeState = {
 };
 
 export const useMultiFadeStore = create<MultiFadeState & MultiFadeActions>((set) => ({
-  ...initialState,
+  ...initialMultiFadeState,
 
   enterMultiFade: (originPadId, playing, initialVolume) =>
     set(() => {
