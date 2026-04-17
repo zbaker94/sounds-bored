@@ -133,13 +133,19 @@ export function createMockFileSystem(structure: Record<string, string | null>) {
     return Promise.resolve();
   });
   mockFs.rename.mockImplementation((from: string, to: string) => {
-    if (from in structure) {
-      const content = files[from] ?? structure[from] ?? "";
-      structure[to] = structure[from];
-      files[to] = content;
-      delete structure[from];
-      delete files[from];
+    // Check both maps: writeTextFile writes to both, but defensive check future-proofs
+    // against any refactor that might decouple them.
+    if (!(from in structure) && !(from in files)) {
+      return Promise.reject(
+        new Error(`ENOENT: no such file or directory, rename '${from}'`)
+      );
     }
+    if (from === to) return Promise.resolve();
+    const content = files[from] ?? structure[from] ?? "";
+    structure[to] = content;
+    files[to] = content;
+    delete structure[from];
+    delete files[from];
     return Promise.resolve();
   });
 
