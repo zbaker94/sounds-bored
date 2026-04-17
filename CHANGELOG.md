@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved security: shell command execution is now restricted to the Rust backend only, preventing the frontend from directly spawning or killing system processes.
 1. Audio playback correctness: Volume changes now fade smoothly instead of snapping (no audio clicks); invalid/NaN
   volumes default to silence; pad layers now trigger simultaneously rather than sequentially; retriggers are
   correctly debounced across all layers at once.                                                                     
