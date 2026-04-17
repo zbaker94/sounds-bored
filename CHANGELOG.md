@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- You can now open sound files and folders from anywhere on your system — the previous restriction to Music, Documents, Downloads, and Desktop folders has been removed.
+- Sound library folders are automatically re-authorized on app startup, so folders added in a previous session are accessible without manual re-selection.
+- When locating a missing sound file or folder, the file browser now accepts any location on your system.
 - Internal stability improvement: orphaned sound references are now automatically cleaned from pads when sounds are removed from the library, preventing broken pad configurations.
 - Orphaned temporary files left behind by app crashes are now automatically cleaned up on startup, preventing gradual disk space accumulation.
 - Fixed a bug where deleting a non-existent file silently succeeded instead of throwing an error — it now correctly fails with a "file not found" error, matching real filesystem behavior.

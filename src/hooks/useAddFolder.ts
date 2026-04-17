@@ -1,11 +1,11 @@
 import { useState, useCallback } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { pickFolder } from "@/lib/scope";
 import type { GlobalFolder } from "@/lib/schemas";
 
 /**
@@ -34,8 +34,8 @@ export function useAddFolder(): {
     if (!settings) return;
     setIsAddingFolder(true);
     try {
-      const selected = await open({ directory: true });
-      if (!selected || typeof selected !== "string") return;
+      const selected = await pickFolder();
+      if (!selected) return;
       if (settings.globalFolders.some((f) => f.path === selected)) {
         toast.error("That folder is already in your library.");
         return;

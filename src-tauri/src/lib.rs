@@ -19,6 +19,7 @@ pub fn run() {
             commands::cancel_download,
             commands::export_project,
             commands::cancel_export,
+            commands::grant_path_access,
         ]);
 
     #[cfg(debug_assertions)]

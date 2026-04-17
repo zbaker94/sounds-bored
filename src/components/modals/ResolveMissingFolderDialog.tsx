@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { basename, dirname, join } from "@tauri-apps/api/path";
 import { copyFile, rename } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
@@ -10,6 +9,7 @@ import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { pickFolder, pickFile } from "@/lib/scope";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { GlobalFolder, Sound } from "@/lib/schemas";
 import {
@@ -112,8 +112,8 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
   // ─── Step 1: Locate folder ────────────────────────────────────────────────
 
   async function handleLocateFolder() {
-    const selected = await open({ directory: true });
-    if (!selected || typeof selected !== "string") return;
+    const selected = await pickFolder();
+    if (!selected) return;
 
     const selectedName = await basename(selected);
     setNewFolderPath(selected);
@@ -207,11 +207,10 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
   // ─── Step 2: Per-file resolution ──────────────────────────────────────────
 
   async function handlePickFile() {
-    const selected = await open({
-      multiple: false,
+    const selected = await pickFile({
       filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
     });
-    if (!selected || typeof selected !== "string") return;
+    if (!selected) return;
 
     const fileBase = await basename(selected);
     const oldBase = currentSound?.filePath ? await basename(currentSound.filePath) : "";

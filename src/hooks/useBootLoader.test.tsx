@@ -40,6 +40,16 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
+const mockGrantPathAccess = vi.fn();
+vi.mock("@/lib/scope", () => ({
+  grantPathAccess: (...args: unknown[]) => mockGrantPathAccess(...args),
+  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+  pickFolder: vi.fn(),
+  pickFile: vi.fn(),
+  pickFiles: vi.fn(),
+  grantParentDirectories: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 const defaultSettings = createMockAppSettings({ globalFolders: [] });
@@ -54,12 +64,14 @@ beforeEach(() => {
   mockReconcile.mockReset();
   mockRefreshMissingState.mockReset();
   mockSaveGlobalLibrary.mockReset();
+  mockGrantPathAccess.mockReset();
 
   mockLoadAppSettings.mockResolvedValue(defaultSettings);
   mockLoadGlobalLibrary.mockResolvedValue(defaultLibrary);
   mockReconcile.mockResolvedValue({ changed: false, sounds: [], inaccessibleFolderIds: [] });
   mockRefreshMissingState.mockResolvedValue(undefined);
   mockSaveGlobalLibrary.mockResolvedValue(undefined);
+  mockGrantPathAccess.mockResolvedValue(undefined);
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -294,5 +306,60 @@ describe("useBootLoader", () => {
     });
 
     expect(toast.error).toHaveBeenCalledWith("Failed to save sound library");
+  });
+
+  it("grants scope access for each globalFolder before reconciliation", async () => {
+    const folderA = createMockGlobalFolder({ path: "/music/a" });
+    const folderB = createMockGlobalFolder({ path: "/sounds/b" });
+    const settings = createMockAppSettings({ globalFolders: [folderA, folderB] });
+    mockLoadAppSettings.mockResolvedValue(settings);
+
+    const grantCallOrder: string[] = [];
+    mockGrantPathAccess.mockImplementation((p: string) => {
+      grantCallOrder.push(`grant:${p}`);
+      return Promise.resolve();
+    });
+    mockReconcile.mockImplementation((..._args: unknown[]) => {
+      grantCallOrder.push("reconcile");
+      return Promise.resolve({ changed: false, sounds: [], inaccessibleFolderIds: [] });
+    });
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(mockGrantPathAccess).toHaveBeenCalledWith(folderA.path);
+    expect(mockGrantPathAccess).toHaveBeenCalledWith(folderB.path);
+    // Both grants must appear before reconcile in the call order
+    const reconcileIdx = grantCallOrder.indexOf("reconcile");
+    expect(grantCallOrder.indexOf(`grant:${folderA.path}`)).toBeLessThan(reconcileIdx);
+    expect(grantCallOrder.indexOf(`grant:${folderB.path}`)).toBeLessThan(reconcileIdx);
+  });
+
+  it("still becomes ready:true and runs reconciliation when a grant fails", async () => {
+    const { toast } = await import("sonner");
+    const folder = createMockGlobalFolder({ path: "/music/a" });
+    const settings = createMockAppSettings({ globalFolders: [folder] });
+    mockLoadAppSettings.mockResolvedValue(settings);
+    mockGrantPathAccess.mockRejectedValue(new Error("scope denied"));
+
+    const { result } = renderHook(() => useBootLoader());
+    await act(async () => {});
+
+    expect(result.current.ready).toBe(true);
+    expect(mockReconcile).toHaveBeenCalledTimes(1);
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringContaining("Could not re-grant access to 1 folder(s)")
+    );
+  });
+
+  it("does not call grantPathAccess when globalFolders is empty", async () => {
+    mockLoadAppSettings.mockResolvedValue(createMockAppSettings({ globalFolders: [] }));
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(mockGrantPathAccess).not.toHaveBeenCalled();
   });
 });

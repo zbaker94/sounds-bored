@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { basename } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -7,6 +6,7 @@ import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { pickFile } from "@/lib/scope";
 import { AUDIO_EXTENSIONS } from "@/lib/constants";
 import type { Sound } from "@/lib/schemas";
 import {
@@ -59,11 +59,10 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
 
   async function handleLocate() {
     if (!sound) return;
-    const selected = await open({
-      multiple: false,
+    const selected = await pickFile({
       filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
     });
-    if (!selected || typeof selected !== "string") return;
+    if (!selected) return;
 
     const newBasename = await basename(selected);
     const oldBasename = sound.filePath ? await basename(sound.filePath) : "";
@@ -178,7 +177,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
                   </span>
                 )}
                 <span className="block mt-2 text-xs text-muted-foreground">
-                  The replacement file must be within Music, Documents, Downloads, or Desktop.
+                  The replacement file can be located anywhere on your system.
                 </span>
               </DialogDescription>
             </DialogHeader>

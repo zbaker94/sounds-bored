@@ -1,4 +1,3 @@
-import { open } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
 import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
 import { join, basename, dirname, appLocalDataDir } from "@tauri-apps/api/path";
@@ -6,6 +5,7 @@ import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
 import { migrateProject, MigrationError } from "./migrations";
+import { pickFolder, grantPathAccess } from "@/lib/scope";
 
 /** Fallback folder/zip-base name used when sanitization yields an unusable result. */
 const FALLBACK_PROJECT_NAME = "project";
@@ -47,23 +47,8 @@ export class ProjectValidationError extends Error {
   }
 }
 
-/**
- * Opens a native folder picker dialog
- * @returns The selected folder path, or null if cancelled
- */
 export async function selectProjectFolder(): Promise<string | null> {
-  const selectedPath = await open({
-    directory: true,
-    multiple: false,
-    title: "Select Project Folder",
-  });
-
-  // selectedPath can be a string, string[], or null
-  if (Array.isArray(selectedPath)) {
-    return selectedPath[0] || null;
-  }
-
-  return selectedPath;
+  return pickFolder({ title: "Select Project Folder" });
 }
 
 /**
@@ -127,6 +112,9 @@ export async function loadProjectFromPath(folderPath: string): Promise<{
   project: Project;
   folderPath: string;
 }> {
+  // Grant runtime fs-scope access before any reads. Projects loaded from history
+  // may live under paths whose static scope grants were removed in this PR.
+  await grantPathAccess(folderPath);
   const projectFilePath = await validateProjectFolder(folderPath);
   const project = await loadProjectFile(projectFilePath);
 
@@ -278,14 +266,9 @@ export async function saveProjectAs(
   currentPath: string,
   project: Project
 ): Promise<{ newPath: string; project: Project } | null> {
-  // Open folder picker for the parent directory
-  const selectedPath = await open({
-    directory: true,
-    multiple: false,
-    title: "Select Save Location",
-  });
+  const selectedPath = await pickFolder({ title: "Select Save Location" });
 
-  if (!selectedPath || Array.isArray(selectedPath)) {
+  if (!selectedPath) {
     return null; // User cancelled
   }
 

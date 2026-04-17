@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { migrateProject, CURRENT_VERSION } from "./migrations";
 import { ProjectSchema } from "./schemas";
 import {
@@ -20,7 +20,6 @@ import {
   buildExportZipName,
 } from "@/lib/project";
 import {
-  mockDialog,
   mockFs,
   mockPath,
   createMockFileSystem,
@@ -29,42 +28,33 @@ import {
 import { createMockProject, createProjectJson, expectToReject } from "@/test/factories";
 import { PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION } from "@/lib/constants";
 
+vi.mock("@/lib/scope", () => ({
+  pickFolder: vi.fn(),
+  pickFile: vi.fn(),
+  grantPathAccess: vi.fn().mockResolvedValue(undefined),
+  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { pickFolder } from "@/lib/scope";
+const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
+
 describe("selectProjectFolder", () => {
   beforeEach(() => {
     resetTauriMocks();
+    mockPickFolder.mockReset();
   });
 
   it("should return selected folder path", async () => {
-    mockDialog.open.mockResolvedValue("/selected/path");
+    mockPickFolder.mockResolvedValue("/selected/path");
 
     const result = await selectProjectFolder();
 
     expect(result).toBe("/selected/path");
-    expect(mockDialog.open).toHaveBeenCalledWith({
-      directory: true,
-      multiple: false,
-      title: "Select Project Folder",
-    });
+    expect(mockPickFolder).toHaveBeenCalledWith({ title: "Select Project Folder" });
   });
 
   it("should return null when user cancels", async () => {
-    mockDialog.open.mockResolvedValue(null);
-
-    const result = await selectProjectFolder();
-
-    expect(result).toBeNull();
-  });
-
-  it("should handle array return (take first element)", async () => {
-    mockDialog.open.mockResolvedValue(["/first/path", "/second/path"]);
-
-    const result = await selectProjectFolder();
-
-    expect(result).toBe("/first/path");
-  });
-
-  it("should return null for empty array", async () => {
-    mockDialog.open.mockResolvedValue([]);
+    mockPickFolder.mockResolvedValue(null);
 
     const result = await selectProjectFolder();
 
@@ -297,10 +287,11 @@ describe("loadProjectFromPath", () => {
 describe("selectAndLoadProject", () => {
   beforeEach(() => {
     resetTauriMocks();
+    mockPickFolder.mockReset();
   });
 
   it("should select and load a project", async () => {
-    mockDialog.open.mockResolvedValue("/selected/path");
+    mockPickFolder.mockResolvedValue("/selected/path");
     mockFs.exists.mockResolvedValue(true);
     mockFs.readTextFile.mockResolvedValue(
       createProjectJson({ name: "Selected Project" })
@@ -314,7 +305,7 @@ describe("selectAndLoadProject", () => {
   });
 
   it("should return null when user cancels selection", async () => {
-    mockDialog.open.mockResolvedValue(null);
+    mockPickFolder.mockResolvedValue(null);
 
     const result = await selectAndLoadProject();
 
@@ -322,7 +313,7 @@ describe("selectAndLoadProject", () => {
   });
 
   it("should throw when selected folder has no project.json", async () => {
-    mockDialog.open.mockResolvedValue("/selected/path");
+    mockPickFolder.mockResolvedValue("/selected/path");
     mockFs.exists.mockResolvedValue(false);
 
     await expectToReject(selectAndLoadProject(), ProjectNotFoundError);
@@ -604,10 +595,11 @@ describe("saveProject", () => {
 describe("saveProjectAs", () => {
   beforeEach(() => {
     resetTauriMocks();
+    mockPickFolder.mockReset();
   });
 
   it("should save project to new location", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     mockFs.exists.mockResolvedValue(false);
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject({ name: "Test Project" });
@@ -621,7 +613,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should return null when user cancels", async () => {
-    mockDialog.open.mockResolvedValue(null);
+    mockPickFolder.mockResolvedValue(null);
     const project = createMockProject();
 
     const result = await saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project);
@@ -630,7 +622,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should throw when folder already exists", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     // Simulate atomic mkdir failing because the directory already exists
     // (Tauri's plugin-fs surfaces this as an Error with an "os error 17"-style message).
     mockFs.mkdir.mockRejectedValueOnce(new Error("File exists (os error 17)"));
@@ -642,7 +634,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should re-throw non-EEXIST mkdir errors without masking them", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     // Simulate a permission-denied error — this must NOT be surfaced as "already exists".
     mockFs.mkdir.mockRejectedValue(new Error("Permission denied (os error 13)"));
     const project = createMockProject();
@@ -659,7 +651,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should recognise the Windows EEXIST code (os error 183) as a name collision", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     // Windows surfaces ERROR_ALREADY_EXISTS as os error 183, not 17
     mockFs.mkdir.mockRejectedValueOnce(new Error("The file exists. (os error 183)"));
     const project = createMockProject();
@@ -670,7 +662,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should remove the created directory when copyDirectory fails (no orphan left)", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     // mkdir succeeds (directory created), but copy fails mid-way
     mockFs.readDir.mockRejectedValueOnce(new Error("I/O error during copy"));
     const project = createMockProject();
@@ -694,7 +686,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should sanitize folder name", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     mockFs.exists.mockResolvedValue(false);
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject();
@@ -705,7 +697,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should fall back to 'project' folder name when project name is all non-ASCII", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     mockFs.exists.mockResolvedValue(false);
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject();
@@ -716,7 +708,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should replace spaces in project name with underscores", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     mockFs.exists.mockResolvedValue(false);
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject();
@@ -732,7 +724,7 @@ describe("saveProjectAs", () => {
   });
 
   it("should update lastSaved timestamp", async () => {
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     mockFs.exists.mockResolvedValue(false);
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject({ lastSaved: "2020-01-01T00:00:00.000Z" });
@@ -834,7 +826,7 @@ describe("saveProjectAs — does not delete non-temp folders containing 'temp_' 
   it("should not delete a permanent folder whose path contains 'temp_' in a parent directory", async () => {
     // A user whose home path happens to contain "temp_" — must never be deleted
     const permanentPath = "/Users/temp_user/Projects/MySoundboard";
-    mockDialog.open.mockResolvedValue("/new/location");
+    mockPickFolder.mockResolvedValue("/new/location");
     mockFs.readDir.mockResolvedValue([]);
     const project = createMockProject({ name: "Test" });
 
