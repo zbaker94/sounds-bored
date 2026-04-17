@@ -160,18 +160,19 @@ describe("loadGlobalLibrary", () => {
     expect(result.sets).toEqual([]);
   });
 
-  it("proceeds with recovery even if rename fails", async () => {
+  it("proceeds with recovery even if corruption-backup rename fails", async () => {
     const files = createMockFileSystem({
       "/app-data/SoundsBored/library.json": JSON.stringify({ invalid: true }),
     });
-    mockFs.rename.mockRejectedValue(new Error("EEXIST"));
+    // First rename (backup to .corrupt.json) fails — second rename (atomic write) uses createMockFileSystem impl
+    mockFs.rename.mockRejectedValueOnce(new Error("EEXIST"));
     const onCorruption = vi.fn();
 
     const result = await loadGlobalLibrary({ onCorruption });
 
     expect(result.sounds).toEqual([]);
     expect(onCorruption).toHaveBeenCalledTimes(1);
-    // Fresh default written
+    // Fresh default written atomically
     const written = files["/app-data/SoundsBored/library.json"];
     expect(written).toBeDefined();
     const parsed = JSON.parse(written);
@@ -195,5 +196,22 @@ describe("saveGlobalLibrary", () => {
     const parsed: GlobalLibrary = JSON.parse(written);
     expect(parsed.sounds).toHaveLength(1);
     expect(parsed.sounds[0].name).toBe("Kick");
+  });
+
+  it("should write atomically via .tmp then rename", async () => {
+    mockPath.appDataDir.mockResolvedValue("/app-data");
+    createMockFileSystem({});
+    const lib = createMockGlobalLibrary({});
+
+    await saveGlobalLibrary(lib);
+
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/library.json.tmp",
+      expect.any(String)
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/library.json.tmp",
+      "/app-data/SoundsBored/library.json"
+    );
   });
 });

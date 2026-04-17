@@ -46,8 +46,12 @@ describe("loadAppSettings", () => {
     expect(result.downloadFolderId).toBeTruthy();
     expect(result.importFolderId).toBeTruthy();
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/settings.json",
+      "/app-data/SoundsBored/settings.json.tmp",
       expect.stringContaining("globalFolders")
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/settings.json.tmp",
+      "/app-data/SoundsBored/settings.json"
     );
   });
 
@@ -95,5 +99,22 @@ describe("saveAppSettings", () => {
     const parsed: AppSettings = JSON.parse(written);
     expect(parsed.downloadFolderId).toBe(settings.downloadFolderId);
     expect(parsed.globalFolders).toHaveLength(settings.globalFolders.length);
+  });
+
+  it("should write atomically via .tmp then rename", async () => {
+    mockPath.appDataDir.mockResolvedValue("/app-data");
+    createMockFileSystem({ "/app-data/SoundsBored": null });
+    const settings = createMockAppSettings();
+
+    await saveAppSettings(settings);
+
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/settings.json.tmp",
+      expect.stringContaining("globalFolders")
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/settings.json.tmp",
+      "/app-data/SoundsBored/settings.json"
+    );
   });
 });

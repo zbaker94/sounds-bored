@@ -1,6 +1,7 @@
 import { ProjectHistory, ProjectHistorySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { readTextFile, writeTextFile, mkdir, exists, rename } from "@tauri-apps/plugin-fs";
+import { readTextFile, mkdir, exists, rename } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson } from "./fsUtils";
 import { APP_FOLDER, HISTORY_FILE_NAME } from "./constants";
 import { ZodError } from "zod";
 
@@ -21,7 +22,7 @@ export async function ensureHistoryFile(): Promise<string> {
     await mkdir(folderPath, { recursive: true });
   }
   if (!(await exists(filePath))) {
-    await writeTextFile(filePath, "[]");
+    await atomicWriteJson(filePath, []);
   }
   return filePath;
 }
@@ -44,10 +45,10 @@ export async function loadProjectHistory(options?: LoadHistoryOptions): Promise<
         // Swallow rename errors — file may already exist as .corrupt.json,
         // filesystem may not support rename, etc. Recovery proceeds regardless.
       }
-      // If writeTextFile fails (e.g., directory deleted, disk full), the error
+      // If the write fails (e.g., directory deleted, disk full), the error
       // propagates to the caller as an I/O failure, distinct from the original
       // corruption error — callers should handle rejections accordingly.
-      await writeTextFile(filePath, JSON.stringify([], null, 2));
+      await atomicWriteJson(filePath, []);
       options?.onCorruption?.(
         `${HISTORY_FILE_NAME} was corrupt and has been reset. Your recent projects list has been cleared.`
       );
@@ -60,5 +61,5 @@ export async function loadProjectHistory(options?: LoadHistoryOptions): Promise<
 
 export async function saveProjectHistory(history: ProjectHistory): Promise<void> {
   const filePath = await ensureHistoryFile();
-  await writeTextFile(filePath, JSON.stringify(history, null, 2));
+  await atomicWriteJson(filePath, history);
 }

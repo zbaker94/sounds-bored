@@ -1,6 +1,7 @@
 import { AppSettings, AppSettingsSchema, GlobalFolder } from "./schemas";
 import { appDataDir, audioDir, join } from "@tauri-apps/api/path";
-import { readTextFile, writeTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
+import { readTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson } from "./fsUtils";
 import { APP_FOLDER, SETTINGS_FILE_NAME } from "./constants";
 
 export async function getSettingsFilePath(): Promise<string> {
@@ -51,7 +52,7 @@ export async function loadAppSettings(): Promise<AppSettings> {
 
   if (!(await exists(filePath))) {
     const defaults = await createDefaultAppSettings();
-    await writeTextFile(filePath, JSON.stringify(defaults, null, 2));
+    await atomicWriteJson(filePath, defaults);
     return defaults;
   }
 
@@ -62,5 +63,5 @@ export async function loadAppSettings(): Promise<AppSettings> {
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
   const filePath = await getSettingsFilePath();
-  await writeTextFile(filePath, JSON.stringify(settings, null, 2));
+  await atomicWriteJson(filePath, settings);
 }
