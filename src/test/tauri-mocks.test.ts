@@ -90,3 +90,56 @@ describe("createMockFileSystem — rename", () => {
     await expect(mockFs.exists("/dir/file.bak")).resolves.toBe(true);
   });
 });
+
+describe("createMockFileSystem — remove", () => {
+  it("rejects with ENOENT when path does not exist", async () => {
+    createMockFileSystem({});
+
+    await expect(mockFs.remove("/nonexistent/file.json")).rejects.toThrow(
+      "ENOENT: no such file or directory, remove '/nonexistent/file.json'"
+    );
+  });
+
+  it("rejects with ENOENT when path was never written and not in initial structure", async () => {
+    createMockFileSystem({ "/other/file.json": "content" });
+
+    await expect(mockFs.remove("/missing.json")).rejects.toThrow("ENOENT");
+  });
+
+  it("resolves when path exists in initial structure", async () => {
+    createMockFileSystem({ "/dir/file.json": "data" });
+
+    await expect(mockFs.remove("/dir/file.json")).resolves.toBeUndefined();
+  });
+
+  it("resolves when path was written via writeTextFile", async () => {
+    createMockFileSystem({});
+
+    await mockFs.writeTextFile("/dir/file.json.tmp", "hello");
+    await expect(mockFs.remove("/dir/file.json.tmp")).resolves.toBeUndefined();
+  });
+
+  it("path no longer accessible via exists after remove", async () => {
+    createMockFileSystem({ "/dir/file.json": "data" });
+
+    await mockFs.remove("/dir/file.json");
+
+    await expect(mockFs.exists("/dir/file.json")).resolves.toBe(false);
+  });
+
+  it("removes path from the files map", async () => {
+    const files = createMockFileSystem({ "/dir/file.json": "data" });
+
+    await mockFs.remove("/dir/file.json");
+
+    expect("/dir/file.json" in files).toBe(false);
+  });
+
+  it("rejects with ENOENT when removing an already-removed path", async () => {
+    createMockFileSystem({ "/dir/file.json": "data" });
+
+    await mockFs.remove("/dir/file.json");
+
+    await expect(mockFs.remove("/dir/file.json")).rejects.toThrow("ENOENT");
+  });
+});

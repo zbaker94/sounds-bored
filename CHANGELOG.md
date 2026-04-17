@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where deleting a non-existent file silently succeeded instead of throwing an error — it now correctly fails with a "file not found" error, matching real filesystem behavior.
 - Fixed a bug where renaming a file in tests would silently succeed even if the source file didn't exist — it now correctly throws an ENOENT error
 - Fixed test mock rename logic to properly sync content to both internal file maps, preventing stale state after a rename
 - Renaming a file to itself is now a safe no-op instead of potentially corrupting state
