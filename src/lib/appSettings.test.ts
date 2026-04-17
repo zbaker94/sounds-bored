@@ -46,11 +46,11 @@ describe("loadAppSettings", () => {
     expect(result.downloadFolderId).toBeTruthy();
     expect(result.importFolderId).toBeTruthy();
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/settings.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/settings\.json\.[0-9a-f-]{36}\.tmp$/),
       expect.stringContaining("globalFolders")
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/settings.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/settings\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/settings.json"
     );
   });
@@ -109,11 +109,11 @@ describe("saveAppSettings", () => {
     await saveAppSettings(settings);
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/settings.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/settings\.json\.[0-9a-f-]{36}\.tmp$/),
       expect.stringContaining("globalFolders")
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/settings.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/settings\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/settings.json"
     );
   });

@@ -473,11 +473,11 @@ describe("createProjectFile", () => {
     await createProjectFile("/test/path", "My Project");
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/test/path/project.json.tmp",
+      expect.stringMatching(/^\/test\/path\/project\.json\.[0-9a-f-]{36}\.tmp$/),
       expect.stringContaining('"name": "My Project"')
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/test/path/project.json.tmp",
+      expect.stringMatching(/^\/test\/path\/project\.json\.[0-9a-f-]{36}\.tmp$/),
       "/test/path/project.json"
     );
 
@@ -553,11 +553,11 @@ describe("saveProject", () => {
     const after = Date.now();
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/test/path/project.json.tmp",
+      expect.stringMatching(/^\/test\/path\/project\.json\.[0-9a-f-]{36}\.tmp$/),
       expect.any(String)
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/test/path/project.json.tmp",
+      expect.stringMatching(/^\/test\/path\/project\.json\.[0-9a-f-]{36}\.tmp$/),
       "/test/path/project.json"
     );
 

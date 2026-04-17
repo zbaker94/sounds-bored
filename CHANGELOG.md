@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a file corruption risk where concurrent saves to the same file could overwrite each other's temporary files — each save now uses a unique temp filename.
 - Internal test infrastructure improvement: multi-fade store reset logic is now shared from a single exported constant, reducing duplication across test files.
 - Active scene tab tracking moved to UI state (no behavioral change for users); scene navigation via keyboard and tab clicks works the same as before.
 - The sound library's internal state fields (`isDirty`, `missingSoundIds`, `isReconciling`) are now protected against accidental modification when updating sounds, tags, or sets.

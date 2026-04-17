@@ -5,16 +5,21 @@ import { writeTextFile, rename, remove } from "@tauri-apps/plugin-fs";
  * via write-to-temp-then-rename — `filePath` will contain either its previous
  * contents or the new contents, never partial contents from a crashed write.
  *
- * The temp file is placed in the same directory as `filePath` to ensure the
- * rename is a same-filesystem operation (required for atomicity on POSIX/NTFS).
+ * The temp file is placed in the same directory as `filePath` (required for
+ * same-filesystem rename atomicity on POSIX/NTFS) and is given a UUID suffix
+ * so concurrent calls to the same `filePath` each use a distinct temp file.
  *
  * @throws If either `writeTextFile` or `rename` fails, a best-effort cleanup of
  *         the `.tmp` file is attempted (cleanup errors are suppressed) and the
  *         original error is re-thrown. On `rename` failure, `filePath` retains
  *         its previous contents.
+ *
+ * Note: unlike a deterministic `.tmp` suffix, UUID-suffixed orphans are not
+ * self-healed by subsequent writes. Callers may sweep `<filePath>.*.tmp` on
+ * startup to avoid unbounded accumulation after crashes. See issue #307.
  */
 export async function atomicWriteText(filePath: string, text: string): Promise<void> {
-  const tmpPath = filePath + ".tmp";
+  const tmpPath = `${filePath}.${crypto.randomUUID()}.tmp`;
   try {
     await writeTextFile(tmpPath, text);
     await rename(tmpPath, filePath);

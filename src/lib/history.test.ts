@@ -40,11 +40,11 @@ describe("ensureHistoryFile", () => {
       { recursive: true }
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/history.json"
     );
   });
@@ -59,11 +59,11 @@ describe("ensureHistoryFile", () => {
     expect(result).toBe("/app-data/SoundsBored/history.json");
     expect(mockFs.mkdir).not.toHaveBeenCalled();
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/history.json"
     );
   });
@@ -140,7 +140,7 @@ describe("loadProjectHistory", () => {
     const result = await loadProjectHistory();
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(result).toEqual([]);
@@ -161,11 +161,11 @@ describe("loadProjectHistory", () => {
       "/app-data/SoundsBored/history.corrupt.json"
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/history.json"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
@@ -189,11 +189,11 @@ describe("loadProjectHistory", () => {
       "/app-data/SoundsBored/history.corrupt.json"
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/history.json"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
@@ -215,11 +215,11 @@ describe("loadProjectHistory", () => {
       "/app-data/SoundsBored/history.corrupt.json"
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/history.json"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
@@ -236,7 +236,7 @@ describe("loadProjectHistory", () => {
 
     expect(result).toEqual([]);
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
   });
@@ -260,7 +260,7 @@ describe("loadProjectHistory", () => {
 
     expect(result).toEqual([]);
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
@@ -278,11 +278,11 @@ describe("saveProjectHistory", () => {
     await saveProjectHistory([]);
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "[]"
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/history\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/history.json"
     );
   });

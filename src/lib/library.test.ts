@@ -206,11 +206,11 @@ describe("saveGlobalLibrary", () => {
     await saveGlobalLibrary(lib);
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/library.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/library\.json\.[0-9a-f-]{36}\.tmp$/),
       expect.any(String)
     );
     expect(mockFs.rename).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/library.json.tmp",
+      expect.stringMatching(/^\/app-data\/SoundsBored\/library\.json\.[0-9a-f-]{36}\.tmp$/),
       "/app-data/SoundsBored/library.json"
     );
   });
