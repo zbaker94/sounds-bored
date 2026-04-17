@@ -21,6 +21,10 @@ type LibraryData = Pick<LibraryState, "sounds" | "tags" | "sets">;
 
 interface LibraryActions {
   loadLibrary: (library: GlobalLibrary) => void;
+  /** Update sounds, tags, and/or sets via an Immer-style updater.
+   * Defense-in-depth: the draft is a runtime projection of only persisted fields,
+   * so `any`-typed or JS callers cannot reach `isDirty`, `missingSoundIds`, or `isReconciling`.
+   * Both push/splice mutations and whole-array assignment (`draft.sounds = x`) are supported. */
   updateLibrary: (updater: (draft: LibraryData) => void) => void;
   clearDirtyFlag: () => void;
   setIsReconciling: (value: boolean) => void;
@@ -79,9 +83,19 @@ export const useLibraryStore = create<LibraryStore>()(
         // assignTagsToSounds / removeTagFromSounds / systemAssignTagsToSounds
         // so system-tag guards are enforced. updateLibrary is for structural
         // changes (sounds list, sets) not tag assignments.
-        // Pass only the library-data fields to the updater so callers
-        // cannot directly mutate isDirty — that is managed by this action.
-        updater(draft);
+        // Project only the persisted-data fields so callers cannot access or
+        // mutate isDirty, missingSoundIds, or other runtime-only state.
+        // projected.sounds/tags/sets are still the live Immer proxies, so
+        // push/splice/deep-item mutations write through to draft automatically.
+        // The explicit write-back below handles the other pattern used by callers:
+        //   draft.sounds = newArray  (whole-array replacement / filter result)
+        // Unconditional write-back is safe — Immer preserves references for proxies
+        // that were not reassigned, so no spurious copy-on-write fires.
+        const projected: LibraryData = { sounds: draft.sounds, tags: draft.tags, sets: draft.sets };
+        updater(projected);
+        draft.sounds = projected.sounds;
+        draft.tags = projected.tags;
+        draft.sets = projected.sets;
         draft.isDirty = true;
       }),
 

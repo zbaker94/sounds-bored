@@ -56,6 +56,83 @@ describe("libraryStore", () => {
       expect(getState().sounds).toHaveLength(1);
       expect(getState().isDirty).toBe(true);
     });
+
+    it("should expose only sounds, tags, and sets to the updater — not isDirty or runtime fields", () => {
+      let hasIsDirty = true;
+      let hasMissingSoundIds = true;
+      let hasIsReconciling = true;
+      let hasSounds = false;
+      getState().updateLibrary((draft) => {
+        // Check membership while proxy is still live
+        hasIsDirty = "isDirty" in (draft as object);
+        hasMissingSoundIds = "missingSoundIds" in (draft as object);
+        hasIsReconciling = "isReconciling" in (draft as object);
+        hasSounds = "sounds" in (draft as object);
+      });
+      expect(hasIsDirty).toBe(false);
+      expect(hasMissingSoundIds).toBe(false);
+      expect(hasIsReconciling).toBe(false);
+      expect(hasSounds).toBe(true);
+    });
+
+    it("should still propagate mutations to sounds through the projected updater", () => {
+      getState().loadLibrary(createMockGlobalLibrary({
+        sounds: [{ id: "s1", name: "Existing", tags: [], sets: [] }],
+      }));
+      getState().updateLibrary((draft) => {
+        draft.sounds.push({ id: "s2", name: "New", tags: [], sets: [] });
+      });
+      expect(getState().sounds).toHaveLength(2);
+      expect(getState().sounds[1].name).toBe("New");
+    });
+
+    it("should propagate whole-array assignment through the projected updater", () => {
+      getState().loadLibrary(createMockGlobalLibrary({
+        sounds: [{ id: "s1", name: "Old", tags: [], sets: [] }],
+      }));
+      getState().updateLibrary((draft) => {
+        draft.sounds = [{ id: "s2", name: "Replaced", tags: [], sets: [] }];
+      });
+      expect(getState().sounds).toHaveLength(1);
+      expect(getState().sounds[0].id).toBe("s2");
+    });
+
+    it("should propagate filter-reassignment through the projected updater", () => {
+      getState().loadLibrary(createMockGlobalLibrary({
+        sounds: [
+          { id: "s1", name: "Keep", tags: [], sets: [] },
+          { id: "s2", name: "Drop", tags: [], sets: [] },
+        ],
+      }));
+      getState().updateLibrary((draft) => {
+        draft.sounds = draft.sounds.filter((s) => s.id !== "s2");
+      });
+      expect(getState().sounds.map((s) => s.id)).toEqual(["s1"]);
+    });
+
+    it("should propagate deep item mutations through the projected updater", () => {
+      getState().loadLibrary(createMockGlobalLibrary({
+        sounds: [{ id: "s1", name: "Old", filePath: "a.wav", tags: [], sets: [] }],
+      }));
+      getState().updateLibrary((draft) => {
+        const target = draft.sounds.find((s) => s.id === "s1");
+        if (target) { target.name = "New"; target.filePath = "b.wav"; }
+      });
+      expect(getState().sounds[0].name).toBe("New");
+      expect(getState().sounds[0].filePath).toBe("b.wav");
+    });
+
+    it("should not mutate state or set isDirty if the updater throws", () => {
+      getState().loadLibrary(createMockGlobalLibrary({
+        sounds: [{ id: "s1", name: "Kick", tags: [], sets: [] }],
+      }));
+      useLibraryStore.setState({ isDirty: false });
+      expect(() =>
+        getState().updateLibrary(() => { throw new Error("boom"); }),
+      ).toThrow("boom");
+      expect(getState().sounds).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
   });
 
   describe("clearDirtyFlag", () => {

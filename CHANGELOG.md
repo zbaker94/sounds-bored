@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- The sound library's internal state fields (`isDirty`, `missingSoundIds`, `isReconciling`) are now protected against accidental modification when updating sounds, tags, or sets.
 - Improved internal documentation for audio gain handling (no behavior change).
 - App settings, project files, sound library, and recent projects history are now saved atomically — if a save is interrupted (crash, power loss), your files will never be left in a partially-written, corrupted state.
 - Improved security: shell command execution is now restricted to the Rust backend only, preventing the frontend from directly spawning or killing system processes.
