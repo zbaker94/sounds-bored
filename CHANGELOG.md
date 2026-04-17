@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where renaming a file in tests would silently succeed even if the source file didn't exist — it now correctly throws an ENOENT error
+- Fixed test mock rename logic to properly sync content to both internal file maps, preventing stale state after a rename
+- Renaming a file to itself is now a safe no-op instead of potentially corrupting state
 - Fixed a file corruption risk where concurrent saves to the same file could overwrite each other's temporary files — each save now uses a unique temp filename.
 - Internal test infrastructure improvement: multi-fade store reset logic is now shared from a single exported constant, reducing duplication across test files.
 - Active scene tab tracking moved to UI state (no behavioral change for users); scene navigation via keyboard and tab clicks works the same as before.
