@@ -644,6 +644,53 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
     if bytes.len() == 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
         return Err("path must not be a drive root".to_string());
     }
+    // Reject Windows UNC-family paths (\\... or //...).
+    let is_unc_prefix = path.starts_with("\\\\") || path.starts_with("//");
+    if is_unc_prefix {
+        let after = &path[2..];
+        let first = after.bytes().next().unwrap_or(0);
+        let second = after.bytes().nth(1).unwrap_or(0);
+        let is_sep = |b: u8| b == b'\\' || b == b'/';
+        if first == b'.' && is_sep(second) {
+            // DOS device namespace \\. — block all forms.
+            return Err("device namespace paths are not allowed".to_string());
+        }
+        if first == b'?' && is_sep(second) {
+            // Extended-length prefix \\?\ — check inner path.
+            let inner = after[2..].trim_end_matches(['/', '\\']);
+            if inner.is_empty() {
+                return Err("path must not be an extended-length root".to_string());
+            }
+            let inner_bytes = inner.as_bytes();
+            // \\?\C: or \\?\C:\ — extended-length drive root.
+            if inner_bytes.len() == 2 && inner_bytes[1] == b':' && inner_bytes[0].is_ascii_alphabetic() {
+                return Err("path must not be a drive root".to_string());
+            }
+            let inner_upper = inner.to_uppercase();
+            // \\?\GLOBALROOT — device namespace root (require separator or end for precision).
+            if inner_upper == "GLOBALROOT"
+                || inner_upper.starts_with("GLOBALROOT\\")
+                || inner_upper.starts_with("GLOBALROOT/")
+            {
+                return Err("device namespace paths are not allowed".to_string());
+            }
+            // \\?\UNC\server\share — extended-length UNC share root.
+            if inner_upper.starts_with("UNC\\") || inner_upper.starts_with("UNC/") {
+                let unc_rest = inner[4..].trim_end_matches(['/', '\\']);
+                let sep_count = unc_rest.chars().filter(|c| *c == '\\' || *c == '/').count();
+                if sep_count == 1 {
+                    return Err("path must not be a UNC share root".to_string());
+                }
+            }
+        } else {
+            // Regular UNC path \\server\share — reject share roots.
+            let rest = after.trim_end_matches(['/', '\\']);
+            let sep_count = rest.chars().filter(|c| *c == '\\' || *c == '/').count();
+            if sep_count == 1 && !is_sep(rest.bytes().next().unwrap_or(0)) {
+                return Err("path must not be a UNC share root".to_string());
+            }
+        }
+    }
     // Reject relative paths; only absolute paths produced by native dialogs are valid.
     if !std::path::Path::new(path).is_absolute() {
         return Err("path must be absolute".to_string());
@@ -1086,5 +1133,56 @@ mod tests {
         assert!(validate_grant_path("sounds").is_err());
         assert!(validate_grant_path("./data").is_err());
         assert!(validate_grant_path("relative/path").is_err());
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_unc_share_roots() {
+        // UNC share root — exactly two path components after \\
+        assert!(validate_grant_path(r"\\server\share").is_err(), r"\\server\share should be rejected");
+        assert!(validate_grant_path(r"\\server\share\").is_err(), r"\\server\share\ should be rejected");
+        // Forward-slash UNC share root
+        assert!(validate_grant_path("//server/share").is_err(), "//server/share should be rejected");
+        assert!(validate_grant_path("//server/share/").is_err(), "//server/share/ should be rejected");
+        // Mixed-separator UNC share root
+        assert!(validate_grant_path(r"\\server/share").is_err(), r"\\server/share should be rejected");
+        // UNC subfolders must be allowed (Windows-only: is_absolute() requires Windows for these paths)
+        #[cfg(windows)]
+        {
+            assert!(validate_grant_path(r"\\server\share\music").is_ok(), r"\\server\share\music should be allowed");
+            assert!(validate_grant_path(r"\\server\share\a\b").is_ok(), r"\\server\share\a\b should be allowed");
+            assert!(validate_grant_path("//server/share/music").is_ok(), "//server/share/music should be allowed");
+        }
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_extended_length_roots() {
+        // Extended-length drive roots
+        assert!(validate_grant_path(r"\\?\C:\").is_err(), r"\\?\C:\ should be rejected");
+        assert!(validate_grant_path(r"\\?\C:").is_err(), r"\\?\C: should be rejected");
+        assert!(validate_grant_path(r"\\?\D:\").is_err(), r"\\?\D:\ should be rejected");
+        // Forward-slash and mixed-separator extended-length
+        assert!(validate_grant_path(r"\\?/C:\").is_err(), r"\\?/C:\ should be rejected");
+        assert!(validate_grant_path(r"//?\C:\").is_err(), r"//?\C:\ should be rejected");
+        // Bare extended-length prefix with no inner path
+        assert!(validate_grant_path(r"\\?\").is_err(), r"\\?\ (bare prefix) should be rejected");
+        // Extended-length UNC share root
+        assert!(validate_grant_path(r"\\?\UNC\server\share").is_err(), r"\\?\UNC\server\share should be rejected");
+        assert!(validate_grant_path(r"\\?\UNC\server\share\").is_err(), r"\\?\UNC\server\share\ should be rejected");
+        // Extended-length GLOBALROOT device namespace
+        assert!(validate_grant_path(r"\\?\GLOBALROOT\Device\Volume1").is_err(), "GLOBALROOT paths should be rejected");
+        // Extended-length subfolders must be allowed (Windows-only)
+        #[cfg(windows)]
+        {
+            assert!(validate_grant_path(r"\\?\C:\music").is_ok(), r"\\?\C:\music should be allowed");
+            assert!(validate_grant_path(r"\\?\UNC\server\share\music").is_ok(), r"\\?\UNC\server\share\music should be allowed");
+        }
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_device_namespace() {
+        // DOS device namespace \\.\
+        assert!(validate_grant_path(r"\\.\C:\").is_err(), r"\\.\C:\ should be rejected");
+        assert!(validate_grant_path(r"\\.\PhysicalDrive0").is_err(), r"\\.\PhysicalDrive0 should be rejected");
+        assert!(validate_grant_path("//./C:/").is_err(), "//./C:/ should be rejected");
     }
 }

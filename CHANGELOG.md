@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved security: the app now blocks granting file access to dangerous Windows path types, including UNC share roots, DOS device namespace paths, and extended-length prefix roots.
+- Subfolders on network shares (e.g. `\\server\share\music`) continue to work as expected.
 - You can now open sound files and folders from anywhere on your system — the previous restriction to Music, Documents, Downloads, and Desktop folders has been removed.
 - Sound library folders are automatically re-authorized on app startup, so folders added in a previous session are accessible without manual re-selection.
 - When locating a missing sound file or folder, the file browser now accepts any location on your system.
