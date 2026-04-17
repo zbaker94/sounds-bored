@@ -191,6 +191,32 @@ describe("grantParentAccess", () => {
     expect(mockCore.invoke).not.toHaveBeenCalled();
   });
 
+  it("does not grant access when dirname returns doubled-prefix UNC share root (\\\\\\\\server\\share)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\\\\\server\\share");
+
+    await grantParentAccess("\\\\\\\\server\\share\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns doubled-prefix forward-slash UNC share root (////server/share)", async () => {
+    mockPath.dirname.mockImplementation(() => "////server/share");
+
+    await grantParentAccess("////server/share/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns doubled-prefix UNC subfolder (\\\\\\\\server\\share\\music)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\\\\\server\\share\\music");
+
+    await grantParentAccess("\\\\\\\\server\\share\\music\\song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\\\\\server\\share\\music",
+    });
+  });
+
   it("does not grant access when dirname returns a Windows extended-length prefix with forward-slash (\\\\?/C:\\\\)", async () => {
     mockPath.dirname.mockImplementation(() => "\\\\?/C:\\");
 

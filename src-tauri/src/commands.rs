@@ -690,8 +690,11 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
             // \\?\UNC\server\share — extended-length UNC share root.
             if inner_upper.starts_with("UNC\\") || inner_upper.starts_with("UNC/") {
                 let unc_rest = inner[4..].trim_end_matches(['/', '\\']);
-                let sep_count = unc_rest.chars().filter(|c| *c == '\\' || *c == '/').count();
-                if sep_count == 1 {
+                let segment_count = unc_rest
+                    .split(|c: char| c == '\\' || c == '/')
+                    .filter(|s| !s.is_empty())
+                    .count();
+                if segment_count <= 2 {
                     return Err("path must not be a UNC share root".to_string());
                 }
             }
@@ -703,8 +706,13 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
                 && inner_bytes[1] == b':'
                 && (inner_bytes[2] == b'\\' || inner_bytes[2] == b'/');
             // Require non-empty server, non-empty share, and a non-empty subfolder segment
-            // under \\?\UNC\. This is self-sufficient (does not rely on the sep_count==1
+            // under \\?\UNC\. This is self-sufficient (does not rely on the segment_count <= 2
             // early-return above) and mirrors the TS regex: /^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]/i
+            // NOTE: This check intentionally uses positional (non-filtered) segment iteration,
+            // unlike the segment_count check above. Empty segments (from doubled separators like
+            // \\?\UNC\\server\share) produce an empty `server` or `share` here, so `is_unc_subfolder`
+            // is false, and the catch-all below rejects the path. Do NOT change this to filter
+            // empty segments — it is load-bearing defense for doubled-separator UNC subfolder paths.
             let is_unc_subfolder = (inner_upper.starts_with("UNC\\") || inner_upper.starts_with("UNC/")) && {
                 let rest = &inner[4..]; // skip "UNC\" or "UNC/"
                 let mut segs = rest.split(|c: char| c == '\\' || c == '/');
@@ -726,8 +734,11 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
         } else {
             // Regular UNC path \\server\share — reject share roots.
             let rest = after.trim_end_matches(['/', '\\']);
-            let sep_count = rest.chars().filter(|c| *c == '\\' || *c == '/').count();
-            if sep_count == 1 && !is_sep(rest.bytes().next().unwrap_or(0)) {
+            let segment_count = rest
+                .split(|c: char| c == '\\' || c == '/')
+                .filter(|s| !s.is_empty())
+                .count();
+            if segment_count <= 2 {
                 return Err("path must not be a UNC share root".to_string());
             }
         }
@@ -1217,6 +1228,23 @@ mod tests {
             assert!(validate_grant_path(r"\\?\C:\music").is_ok(), r"\\?\C:\music should be allowed");
             assert!(validate_grant_path(r"\\?\UNC\server\share\music").is_ok(), r"\\?\UNC\server\share\music should be allowed");
         }
+    }
+
+    // Doubled-separator UNC paths — should be rejected (issue #321)
+    #[test]
+    fn test_doubled_separator_unc_root_rejected() {
+        let err = validate_grant_path("\\\\\\\\server\\share").unwrap_err();
+        assert!(err.contains("UNC share root"), "expected UNC share root rejection, got: {err}");
+        let err = validate_grant_path("\\\\\\\\server\\\\share").unwrap_err();
+        assert!(err.contains("UNC share root"), "expected UNC share root rejection, got: {err}");
+    }
+
+    #[test]
+    fn test_doubled_separator_extended_unc_root_rejected() {
+        let err = validate_grant_path("\\\\?\\UNC\\\\server\\share").unwrap_err();
+        assert!(err.contains("UNC share root"), "expected UNC share root rejection, got: {err}");
+        let err = validate_grant_path("\\\\?\\UNC\\\\server\\\\share").unwrap_err();
+        assert!(err.contains("UNC share root"), "expected UNC share root rejection, got: {err}");
     }
 
     #[test]
