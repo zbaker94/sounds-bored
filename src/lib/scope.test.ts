@@ -175,6 +175,78 @@ describe("grantParentAccess", () => {
     });
   });
 
+  it("does not grant access when the parent contains a null byte (\\x00)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\x00/evil");
+
+    await grantParentAccess("/music\x00/evil/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains SOH (\\x01)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\x01folder");
+
+    await grantParentAccess("/music\x01folder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a tab character (\\x09)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\x09folder");
+
+    await grantParentAccess("/music\x09folder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a newline character (\\x0A)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\nfolder");
+
+    await grantParentAccess("/music\nfolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a carriage return character (\\x0D)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\rfolder");
+
+    await grantParentAccess("/music\rfolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains an ESC character (\\x1B)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\x1bfolder");
+
+    await grantParentAccess("/music\x1bfolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains US (\\x1F)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\x1ffolder");
+
+    await grantParentAccess("/music\x1ffolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains DEL (\\x7F)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\x7ffolder");
+
+    await grantParentAccess("/music\x7ffolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent is a Windows path containing a null byte (\\x00)", async () => {
+    mockPath.dirname.mockImplementation(() => "C:\\music\x00folder");
+
+    await grantParentAccess("C:\\music\x00folder\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
   it("does not grant access when dirname returns a forward-slash UNC share root (//server/share)", async () => {
     mockPath.dirname.mockImplementation(() => "//server/share");
 
