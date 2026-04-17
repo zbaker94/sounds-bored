@@ -222,6 +222,52 @@ describe("grantParentAccess", () => {
 
     expect(mockCore.invoke).not.toHaveBeenCalled();
   });
+
+  it("does not grant access when dirname returns a Volume GUID root (\\\\?\\\\Volume{GUID})", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}");
+
+    await grantParentAccess("\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a Volume GUID root with trailing backslash", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\");
+
+    await grantParentAccess("\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a lowercase Volume GUID root (case-insensitive)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\volume{12345678-1234-1234-1234-1234567890AB}");
+
+    await grantParentAccess("\\\\?\\volume{12345678-1234-1234-1234-1234567890AB}\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns a forward-slash Volume GUID root (//?/Volume{GUID})", async () => {
+    mockPath.dirname.mockImplementation(() => "//?/Volume{12345678-1234-1234-1234-1234567890AB}");
+
+    await grantParentAccess("//?/Volume{12345678-1234-1234-1234-1234567890AB}/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns a subfolder under a Volume GUID path", async () => {
+    mockPath.dirname.mockImplementation(
+      () => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music"
+    );
+
+    await grantParentAccess(
+      "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music\\song.wav"
+    );
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music",
+    });
+  });
 });
 
 describe("pickFolder", () => {
