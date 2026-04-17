@@ -2,7 +2,7 @@ import { ZodError } from "zod";
 import { GlobalLibrary, GlobalLibrarySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { readTextFile, exists, rename } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson } from "./fsUtils";
+import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, LIBRARY_FILE_NAME, CURRENT_LIBRARY_VERSION } from "./constants";
 import { migrateLibrary, MigrationError } from "./migrations";
 
@@ -39,6 +39,7 @@ export async function loadGlobalLibrary(
   options?: LoadLibraryOptions,
 ): Promise<GlobalLibrary> {
   const filePath = await getLibraryFilePath();
+  await sweepOrphanedTmpFiles(filePath);
 
   if (!(await exists(filePath))) {
     return GlobalLibrarySchema.parse({ sounds: [], tags: [], sets: [] });

@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { exists, readTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson } from "./fsUtils";
+import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
 import { join, basename, dirname, appLocalDataDir } from "@tauri-apps/api/path";
 import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
@@ -94,6 +94,7 @@ export async function validateProjectFolder(
 export async function loadProjectFile(
   projectFilePath: string
 ): Promise<Project> {
+  await sweepOrphanedTmpFiles(projectFilePath);
   try {
     const fileContent = await readTextFile(projectFilePath);
     const raw = JSON.parse(fileContent);

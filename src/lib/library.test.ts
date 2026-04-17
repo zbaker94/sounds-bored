@@ -160,6 +160,22 @@ describe("loadGlobalLibrary", () => {
     expect(result.sets).toEqual([]);
   });
 
+  it("sweeps orphaned .tmp files before reading the library file", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    const lib = createMockGlobalLibrary({});
+    createMockFileSystem({
+      "/app-data/SoundsBored/library.json": JSON.stringify(lib),
+      [`/app-data/SoundsBored/library.json.${uuid}.tmp`]: "stale",
+    });
+
+    await loadGlobalLibrary();
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/app-data/SoundsBored");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      `/app-data/SoundsBored/library.json.${uuid}.tmp`,
+    );
+  });
+
   it("proceeds with recovery even if corruption-backup rename fails", async () => {
     const files = createMockFileSystem({
       "/app-data/SoundsBored/library.json": JSON.stringify({ invalid: true }),

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Orphaned temporary files left behind by app crashes are now automatically cleaned up on startup, preventing gradual disk space accumulation.
 - Fixed a bug where deleting a non-existent file silently succeeded instead of throwing an error — it now correctly fails with a "file not found" error, matching real filesystem behavior.
 - Fixed a bug where renaming a file in tests would silently succeed even if the source file didn't exist — it now correctly throws an ENOENT error
 - Fixed test mock rename logic to properly sync content to both internal file maps, preventing stale state after a rename

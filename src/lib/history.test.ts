@@ -241,6 +241,22 @@ describe("loadProjectHistory", () => {
     );
   });
 
+  it("sweeps orphaned .tmp files before reading the history file", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    createMockFileSystem({
+      "/app-data/SoundsBored": null,
+      "/app-data/SoundsBored/history.json": "[]",
+      [`/app-data/SoundsBored/history.json.${uuid}.tmp`]: "stale",
+    });
+
+    await loadProjectHistory();
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/app-data/SoundsBored");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      `/app-data/SoundsBored/history.json.${uuid}.tmp`,
+    );
+  });
+
   it("rethrows non-corruption I/O errors", async () => {
     mockFs.exists.mockResolvedValue(true);
     mockFs.readTextFile.mockRejectedValue(new Error("EPERM: permission denied"));
