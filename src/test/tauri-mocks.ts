@@ -128,6 +128,13 @@ export function createMockFileSystem(structure: Record<string, string | null>) {
   mockFs.mkdir.mockResolvedValue(undefined);
   mockFs.copyFile.mockResolvedValue(undefined);
   mockFs.remove.mockImplementation((path: string) => {
+    // Check both maps: writeTextFile writes to both, but defensive check future-proofs
+    // against any refactor that might decouple them.
+    if (!(path in structure) && !(path in files)) {
+      return Promise.reject(
+        new Error(`ENOENT: no such file or directory, remove '${path}'`)
+      );
+    }
     delete structure[path];
     delete files[path];
     return Promise.resolve();
