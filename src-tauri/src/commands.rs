@@ -632,6 +632,11 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
     if path.is_empty() {
         return Err("path must not be empty".to_string());
     }
+    // Null bytes and ASCII control characters (0x00–0x1F, 0x7F DEL) — never present in
+    // legitimate dialog-returned paths. Mirrors isRootPath in src/lib/scope.ts.
+    if path.bytes().any(|b| b.is_ascii_control()) {
+        return Err("path must not contain null bytes or control characters".to_string());
+    }
     if path.split(['/', '\\']).any(|c| c == "..") {
         return Err("path must not contain traversal sequences".to_string());
     }
@@ -1386,6 +1391,60 @@ mod tests {
             assert!(validate_grant_path(r"\\?\C:\music").is_ok(), r"\\?\C:\music should be allowed");
             assert!(validate_grant_path(r"\\?\C:/music").is_ok(), r"\\?\C:/music (forward-slash inner sep) should be allowed");
             assert!(validate_grant_path(r"\\?\UNC\server\share\folder").is_ok(), r"\\?\UNC\server\share\folder should be allowed");
+        }
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_null_bytes_and_control_chars() {
+        // Helper: assert the control-char guard fires (not a different validation branch).
+        let assert_rejected = |path: &str, label: &str| {
+            let err = validate_grant_path(path).unwrap_err();
+            assert!(
+                err.contains("null bytes or control characters"),
+                "{label}: expected control-char rejection, got: {err}"
+            );
+        };
+
+        // NUL byte (0x00) — the primary null-truncation attack vector
+        assert_rejected("/music\x00/evil",  "null byte in middle");
+        assert_rejected("\x00/music",       "null byte at start");
+        assert_rejected("/music\x00",       "null byte at end");
+
+        // C0 control range 0x01–0x1F (sampled boundary + common attack values)
+        assert_rejected("/music\x01folder", "SOH \\x01");
+        assert_rejected("/music\x09folder", "TAB \\x09");
+        assert_rejected("/music\x0afolder", "LF \\x0A");
+        assert_rejected("/music\x0bfolder", "VT \\x0B");
+        assert_rejected("/music\x0cfolder", "FF \\x0C");
+        assert_rejected("/music\x0dfolder", "CR \\x0D");
+        assert_rejected("/music\x1bfolder", "ESC \\x1B — terminal-escape injection");
+        assert_rejected("/music\x1ffolder", "US \\x1F");
+
+        // DEL (0x7F) — also a non-printable ASCII control character
+        assert_rejected("/music\x7ffolder", "DEL \\x7F");
+
+        // Windows-style paths — control-char guard runs before is_absolute(), so these
+        // are correctly rejected on all platforms (not just Windows).
+        assert_rejected("C:\\music\x00folder",  "null byte in Windows path");
+        assert_rejected("C:\\music\x1ffolder",  "\\x1F in Windows path");
+
+        // Path consisting entirely of control characters
+        assert_rejected("\x01\x02\x03", "path of only control chars");
+
+        // Boundary: 0x20 (space) is NOT a control character and must not be rejected
+        #[cfg(not(windows))]
+        {
+            assert!(
+                validate_grant_path("/Users/user/My Music/folder").is_ok(),
+                "path with spaces (0x20) must not be rejected"
+            );
+        }
+        #[cfg(windows)]
+        {
+            assert!(
+                validate_grant_path("C:\\Users\\user\\My Music\\folder").is_ok(),
+                "path with spaces (0x20) must not be rejected"
+            );
         }
     }
 }

@@ -8,6 +8,9 @@ export async function grantPathAccess(folderPath: string): Promise<void> {
 
 function isRootPath(path: string): boolean {
   if (path === "" || path === "/") return true;
+  // Null bytes, ASCII control characters (0x00–0x1F), and DEL (0x7F) — never present in
+  // legitimate dialog-returned paths. Mirrors validate_grant_path in src-tauri/src/commands.rs.
+  if (/[\x00-\x1f\x7f]/.test(path)) return true;
   // Windows drive root: "C:", "C:\", "C:/"
   if (/^[A-Za-z]:[/\\]?$/.test(path)) return true;
   // DOS device namespace \\. or //. — block all forms (never produced by native dialogs)

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a security vulnerability where file paths containing null bytes or ASCII control characters could bypass access controls — such paths are now blocked in both the Rust backend and TypeScript frontend.
 - Fixed a security issue where file paths with doubled backslashes (e.g. `\\\\server\share`) could bypass UNC share root restrictions and gain unauthorized file access.
 - Fixed a security issue where certain Windows device-namespace paths (e.g., `\\?\PIPE\`, `\\?\MAILSLOT\`, `\\?\HarddiskVolume3`) could bypass file access restrictions.
 - The app now uses an allowlist approach for extended-length paths, permitting only drive-letter, UNC share, and Volume GUID subfolders — all other device paths are blocked.
