@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { exists, readTextFile, writeTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
+import { exists, readTextFile, mkdir, readDir, copyFile, remove } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson } from "./fsUtils";
 import { join, basename, dirname, appLocalDataDir } from "@tauri-apps/api/path";
 import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
@@ -201,7 +202,7 @@ export async function createProjectFile(
     favoritedSetIds: [],
   };
 
-  await writeTextFile(projectFilePath, JSON.stringify(projectData, null, 2));
+  await atomicWriteJson(projectFilePath, projectData);
   return projectData;
 }
 
@@ -239,7 +240,7 @@ export async function saveProject(
     ...project,
     lastSaved: new Date().toISOString(),
   };
-  await writeTextFile(projectFilePath, JSON.stringify(projectWithTimestamp, null, 2));
+  await atomicWriteJson(projectFilePath, projectWithTimestamp);
   return projectWithTimestamp;
 }
 

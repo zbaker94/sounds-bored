@@ -40,8 +40,12 @@ describe("ensureHistoryFile", () => {
       { recursive: true }
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json.tmp",
+      "/app-data/SoundsBored/history.json"
     );
   });
 
@@ -55,8 +59,12 @@ describe("ensureHistoryFile", () => {
     expect(result).toBe("/app-data/SoundsBored/history.json");
     expect(mockFs.mkdir).not.toHaveBeenCalled();
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json.tmp",
+      "/app-data/SoundsBored/history.json"
     );
   });
 
@@ -132,7 +140,7 @@ describe("loadProjectHistory", () => {
     const result = await loadProjectHistory();
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
     );
     expect(result).toEqual([]);
@@ -153,8 +161,12 @@ describe("loadProjectHistory", () => {
       "/app-data/SoundsBored/history.corrupt.json"
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json.tmp",
+      "/app-data/SoundsBored/history.json"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
     expect(onCorruption.mock.calls[0][0]).toContain("corrupt");
@@ -177,8 +189,12 @@ describe("loadProjectHistory", () => {
       "/app-data/SoundsBored/history.corrupt.json"
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json.tmp",
+      "/app-data/SoundsBored/history.json"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
     expect(onCorruption.mock.calls[0][0]).toContain("corrupt");
@@ -199,8 +215,12 @@ describe("loadProjectHistory", () => {
       "/app-data/SoundsBored/history.corrupt.json"
     );
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json.tmp",
+      "/app-data/SoundsBored/history.json"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
     expect(onCorruption.mock.calls[0][0]).toContain("corrupt");
@@ -216,7 +236,7 @@ describe("loadProjectHistory", () => {
 
     expect(result).toEqual([]);
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
     );
   });
@@ -228,10 +248,11 @@ describe("loadProjectHistory", () => {
     await expect(loadProjectHistory()).rejects.toThrow("EPERM: permission denied");
   });
 
-  it("proceeds with recovery even if rename fails", async () => {
+  it("proceeds with recovery even if corruption-backup rename fails", async () => {
     mockFs.exists.mockResolvedValue(true);
     mockFs.readTextFile.mockResolvedValue("invalid json {");
-    mockFs.rename.mockRejectedValue(new Error("EEXIST"));
+    // First rename (backup to .corrupt.json) fails — second rename (atomic write) resolves
+    mockFs.rename.mockRejectedValueOnce(new Error("EEXIST")).mockResolvedValue(undefined);
     mockFs.writeTextFile.mockResolvedValue(undefined);
     const onCorruption = vi.fn();
 
@@ -239,7 +260,7 @@ describe("loadProjectHistory", () => {
 
     expect(result).toEqual([]);
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
     );
     expect(onCorruption).toHaveBeenCalledTimes(1);
@@ -257,8 +278,12 @@ describe("saveProjectHistory", () => {
     await saveProjectHistory([]);
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/app-data/SoundsBored/history.json",
+      "/app-data/SoundsBored/history.json.tmp",
       "[]"
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/history.json.tmp",
+      "/app-data/SoundsBored/history.json"
     );
   });
 

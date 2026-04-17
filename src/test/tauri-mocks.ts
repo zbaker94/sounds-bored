@@ -127,8 +127,21 @@ export function createMockFileSystem(structure: Record<string, string | null>) {
 
   mockFs.mkdir.mockResolvedValue(undefined);
   mockFs.copyFile.mockResolvedValue(undefined);
-  mockFs.remove.mockResolvedValue(undefined);
-  mockFs.rename.mockResolvedValue(undefined);
+  mockFs.remove.mockImplementation((path: string) => {
+    delete structure[path];
+    delete files[path];
+    return Promise.resolve();
+  });
+  mockFs.rename.mockImplementation((from: string, to: string) => {
+    if (from in structure) {
+      const content = files[from] ?? structure[from] ?? "";
+      structure[to] = structure[from];
+      files[to] = content;
+      delete structure[from];
+      delete files[from];
+    }
+    return Promise.resolve();
+  });
 
   return files;
 }

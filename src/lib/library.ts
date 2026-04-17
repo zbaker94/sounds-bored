@@ -1,7 +1,8 @@
 import { ZodError } from "zod";
 import { GlobalLibrary, GlobalLibrarySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { readTextFile, writeTextFile, exists, rename } from "@tauri-apps/plugin-fs";
+import { readTextFile, exists, rename } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson } from "./fsUtils";
 import { APP_FOLDER, LIBRARY_FILE_NAME, CURRENT_LIBRARY_VERSION } from "./constants";
 import { migrateLibrary, MigrationError } from "./migrations";
 
@@ -64,22 +65,15 @@ export async function loadGlobalLibrary(
         // Swallow rename errors — file may already exist as .corrupt.json,
         // filesystem may not support rename, etc. Recovery proceeds regardless.
       }
-      // If writeTextFile fails (e.g., directory deleted, disk full), the error
+      // If the write fails (e.g., directory deleted, disk full), the error
       // propagates to the caller as an I/O failure, distinct from the original
       // corruption error — callers should handle rejections accordingly.
-      await writeTextFile(
-        filePath,
-        JSON.stringify(
-          {
-            version: CURRENT_LIBRARY_VERSION,
-            sounds: [],
-            tags: [],
-            sets: [],
-          },
-          null,
-          2,
-        ),
-      );
+      await atomicWriteJson(filePath, {
+        version: CURRENT_LIBRARY_VERSION,
+        sounds: [],
+        tags: [],
+        sets: [],
+      });
       options?.onCorruption?.(
         `${LIBRARY_FILE_NAME} was corrupt and has been reset. Your sound library has been cleared.`,
       );
@@ -91,5 +85,5 @@ export async function loadGlobalLibrary(
 
 export async function saveGlobalLibrary(library: GlobalLibrary): Promise<void> {
   const filePath = await getLibraryFilePath();
-  await writeTextFile(filePath, JSON.stringify(library, null, 2));
+  await atomicWriteJson(filePath, library);
 }

@@ -473,8 +473,12 @@ describe("createProjectFile", () => {
     await createProjectFile("/test/path", "My Project");
 
     expect(mockFs.writeTextFile).toHaveBeenCalledWith(
-      "/test/path/project.json",
+      "/test/path/project.json.tmp",
       expect.stringContaining('"name": "My Project"')
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/test/path/project.json.tmp",
+      "/test/path/project.json"
     );
 
     const writtenContent = mockFs.writeTextFile.mock.calls[0][1];
@@ -548,7 +552,14 @@ describe("saveProject", () => {
     await saveProject("/test/path", project);
     const after = Date.now();
 
-    expect(mockFs.writeTextFile).toHaveBeenCalled();
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      "/test/path/project.json.tmp",
+      expect.any(String)
+    );
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/test/path/project.json.tmp",
+      "/test/path/project.json"
+    );
 
     const writtenContent = mockFs.writeTextFile.mock.calls[0][1];
     const parsed = JSON.parse(writtenContent);
