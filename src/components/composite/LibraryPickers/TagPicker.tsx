@@ -17,7 +17,7 @@ export function TagPicker({ value, onChange }: TagPickerProps) {
       value={value}
       onChange={onChange}
       items={userTags}
-      onCreate={(name) => ensureTagExists(name)}
+      onCreate={ensureTagExists}
       placeholder="Search or create tags..."
       emptyText="No tags found."
     />
