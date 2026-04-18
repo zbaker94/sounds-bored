@@ -289,6 +289,58 @@ describe("grantParentAccess", () => {
     });
   });
 
+  it("does not grant access when dirname returns doubled-interior-separator UNC share root (\\\\server\\\\share)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share");
+
+    await grantParentAccess("\\\\server\\\\share\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns doubled-interior-separator UNC share root with trailing sep (\\\\server\\\\share\\)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share\\");
+
+    await grantParentAccess("\\\\server\\\\share\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when dirname returns doubled-interior-separator forward-slash UNC share root (//server//share)", async () => {
+    mockPath.dirname.mockImplementation(() => "//server//share");
+
+    await grantParentAccess("//server//share/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns doubled-interior-separator UNC subfolder (\\\\server\\\\share\\folder)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share\\folder");
+
+    await grantParentAccess("\\\\server\\\\share\\folder\\song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\server\\\\share\\folder",
+    });
+  });
+
+  it("grants access when dirname returns doubled-interior-separator UNC subfolder with doubled sep (\\\\server\\\\share\\\\folder)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share\\\\folder");
+
+    await grantParentAccess("\\\\server\\\\share\\\\folder\\song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\server\\\\share\\\\folder",
+    });
+  });
+
+  it("does not grant access when dirname returns mixed-separator doubled-interior UNC share root (\\\\server/\\\\share)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\server/\\\\share");
+
+    await grantParentAccess("\\\\server/\\\\share\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
   it("does not grant access when dirname returns a Windows extended-length prefix with forward-slash (\\\\?/C:\\\\)", async () => {
     mockPath.dirname.mockImplementation(() => "\\\\?/C:\\");
 
