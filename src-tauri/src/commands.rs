@@ -637,6 +637,18 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
     if path.bytes().any(|b| b.is_ascii_control()) {
         return Err("path must not contain null bytes or control characters".to_string());
     }
+    // Unicode line/paragraph separators (U+2028, U+2029), BIDI controls
+    // (U+200E, U+200F, U+202A–U+202E, U+2066–U+2069), and BOM (U+FEFF) —
+    // never present in legitimate dialog-returned paths. Mirrors isRootPath in src/lib/scope.ts.
+    if path.chars().any(|c| matches!(c,
+        '\u{200E}' | '\u{200F}'
+        | '\u{202A}'..='\u{202E}'
+        | '\u{2028}' | '\u{2029}'
+        | '\u{2066}'..='\u{2069}'
+        | '\u{FEFF}'
+    )) {
+        return Err("path must not contain Unicode separator, BIDI, or BOM characters".to_string());
+    }
     if path.split(['/', '\\']).any(|c| c == "..") {
         return Err("path must not contain traversal sequences".to_string());
     }
@@ -1444,6 +1456,76 @@ mod tests {
             assert!(
                 validate_grant_path("C:\\Users\\user\\My Music\\folder").is_ok(),
                 "path with spaces (0x20) must not be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_grant_path_rejects_unicode_control_and_bidi_chars() {
+        // Helper: assert the Unicode separator/BIDI/BOM guard fires.
+        // NOTE: Uses Windows-style paths so the guard runs before the is_absolute() check
+        // on all platforms (the Unicode check is ordered before is_absolute in validate_grant_path).
+        let assert_rejected = |path: &str, label: &str| {
+            let err = validate_grant_path(path).unwrap_err();
+            assert!(
+                err.contains("Unicode separator") || err.contains("BIDI") || err.contains("BOM"),
+                "{label}: expected Unicode/BIDI/BOM rejection, got: {err}"
+            );
+        };
+
+        // U+2028 LINE SEPARATOR — treated as a line terminator in JavaScript
+        assert_rejected("C:\\music\u{2028}folder", "U+2028 LINE SEPARATOR");
+
+        // U+2029 PARAGRAPH SEPARATOR — treated as a line terminator in JavaScript
+        assert_rejected("C:\\music\u{2029}folder", "U+2029 PARAGRAPH SEPARATOR");
+
+        // U+200E LEFT-TO-RIGHT MARK
+        assert_rejected("C:\\music\u{200E}folder", "U+200E LTR MARK");
+
+        // U+200F RIGHT-TO-LEFT MARK
+        assert_rejected("C:\\music\u{200F}folder", "U+200F RTL MARK");
+
+        // BIDI formatting range U+202A–U+202E — test lower bound, interior, and upper bound
+        assert_rejected("C:\\music\u{202A}folder", "U+202A LRE (lower bound of BIDI range)");
+        assert_rejected("C:\\music\u{202C}folder", "U+202C PDF (interior of BIDI range)");
+        assert_rejected("C:\\music\u{202E}folder", "U+202E RLO (upper bound / classic BIDI spoof)");
+
+        // BIDI isolate range U+2066–U+2069 — test lower bound and upper bound
+        assert_rejected("C:\\music\u{2066}folder", "U+2066 LRI (lower bound of isolate range)");
+        assert_rejected("C:\\music\u{2069}folder", "U+2069 PDI (upper bound of isolate range)");
+
+        // U+FEFF ZERO WIDTH NO-BREAK SPACE / BOM
+        assert_rejected("C:\\music\u{FEFF}folder", "U+FEFF BOM");
+
+        // Unix-style paths: verify the guard covers all 7 categories on non-Windows
+        #[cfg(not(windows))]
+        for (ch, label) in [
+            ('\u{2028}', "U+2028 (Unix)"), ('\u{2029}', "U+2029 (Unix)"),
+            ('\u{200E}', "U+200E (Unix)"), ('\u{200F}', "U+200F (Unix)"),
+            ('\u{202E}', "U+202E (Unix)"), ('\u{2066}', "U+2066 (Unix)"),
+            ('\u{FEFF}', "U+FEFF (Unix)"),
+        ] {
+            assert_rejected(&format!("/music{ch}folder"), label);
+        }
+
+        // Legitimate paths with high Unicode (accented, CJK) must NOT be rejected.
+        // Only testable on non-Windows where forward-slash paths are absolute.
+        #[cfg(not(windows))]
+        {
+            assert!(
+                validate_grant_path("/music/caf\u{00E9}/sounds").is_ok(),
+                "U+00E9 (é) must be allowed"
+            );
+            assert!(
+                validate_grant_path("/music/\u{4E2D}\u{6587}/sounds").is_ok(),
+                "CJK characters must be allowed"
+            );
+        }
+        #[cfg(windows)]
+        {
+            assert!(
+                validate_grant_path("C:\\music\\caf\u{00E9}\\sounds").is_ok(),
+                "U+00E9 (é) must be allowed on Windows"
             );
         }
     }
