@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
+import { useDownloadStore } from "@/state/downloadStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
 import { loadGlobalLibrary, saveGlobalLibrary } from "@/lib/library";
 import { loadAppSettings } from "@/lib/appSettings";
+import { loadDownloadHistory } from "@/lib/downloads";
 import { grantPathAccess } from "@/lib/scope";
 import { getCurrentLibraryPayload } from "@/lib/library.queries";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
@@ -54,6 +56,9 @@ export function useBootLoader(): { ready: boolean } {
         toast.error("Failed to load sound library");
         setLibraryLoaded(true);
       });
+    loadDownloadHistory()
+      .then((jobs) => { useDownloadStore.getState().loadJobs(jobs); })
+      .catch(() => { /* non-critical — silently ignore */ });
   }, []);
 
   useEffect(() => {

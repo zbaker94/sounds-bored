@@ -1,6 +1,20 @@
 # Changelog
 
 ## Current Changes
+- The active download count badge on the Download button has moved from the top-right to the top-left corner.
+- The "Download from URL" button and download status indicator are now combined into a single button group for a cleaner toolbar layout
+- Active download count badge now appears directly on the download status icon
+- The download status button now shows a badge with the count of active downloads in progress, capped at "9+" for 10 or more.
+- The download status button is now always visible in the toolbar, even when no downloads are active
+- Opening the download panel with no downloads shows a "No downloads yet" placeholder message
+- Completed and failed downloads are now saved to disk and restored when you reopen the app
+- Downloads that were in-progress when the app closed are marked as failed on next launch
+- The Downloads panel now stays visible as a persistent header rather than animating away when the list is empty
+- Active downloads are always shown before completed or cancelled ones in the Downloads panel
+- Minor internal performance improvement to the download status button
+- Added a download status button to the sound library toolbar that shows active downloads with a spinning icon and opens a popover with the full download queue
+- Download event listening moved to the main page level so it works regardless of which folder is selected in the sound library
+- Active download jobs are no longer shown inline in the sound list; they now appear exclusively in the download manager popover
 - Internal code cleanup with no user-facing behavior changes
 - Internal code refactoring: download and export progress events now use cleaner constructor methods — no user-facing behavior changes.
 - Exported project ZIP files now use "no compression" (Stored) mode, improving export speed for already-compressed audio files

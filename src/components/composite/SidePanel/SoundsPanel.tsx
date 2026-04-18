@@ -3,10 +3,9 @@ import { pickFiles, grantParentDirectories } from "@/lib/scope";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CloudUploadIcon, Download04Icon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import { CloudUploadIcon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useImportSounds } from "@/hooks/useImportSounds";
@@ -15,6 +14,7 @@ import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
 import { DownloadDialog } from "@/components/modals/DownloadDialog";
+import { DownloadButton } from "@/components/composite/DownloadManager/DownloadStatusButton";
 import { FolderBrowser } from "./FolderBrowser";
 import { SoundList } from "./SoundList";
 import { ConfirmRemoveMissingDialog } from "@/components/modals/ConfirmRemoveMissingDialog";
@@ -105,15 +105,7 @@ export function SoundsPanel() {
           <HugeiconsIcon icon={CloudUploadIcon} size={14} />
           {isImporting ? "Importing..." : "Import Sounds"}
         </Button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="secondary" size="sm" onClick={() => setDownloadDialogOpen(true)}>
-              <HugeiconsIcon icon={Download04Icon} size={14} />
-              Download from URL
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Download from URL</TooltipContent>
-        </Tooltip>
+        <DownloadButton onOpenDialog={() => setDownloadDialogOpen(true)} />
         <div className="relative ml-auto flex items-center">
           <HugeiconsIcon icon={Search01Icon} size={14} className="absolute left-2.5 text-white/50 pointer-events-none" />
           <Input

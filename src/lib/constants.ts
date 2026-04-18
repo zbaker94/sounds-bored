@@ -13,6 +13,7 @@ export const PROJECT_FILE_NAME = "project.json";
 export const HISTORY_FILE_NAME = "history.json";
 export const SETTINGS_FILE_NAME = "settings.json";
 export const LIBRARY_FILE_NAME = "library.json";
+export const DOWNLOADS_FILE_NAME = "downloads.json";
 
 // Timing constants (in milliseconds)
 export const AUTOSAVE_INTERVAL = 30000; // 30 seconds

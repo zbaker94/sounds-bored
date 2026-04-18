@@ -22,12 +22,14 @@ export type DownloadJobUpdate =
  * Late sidecar events arriving after cancel/complete must be silently dropped.
  */
 export const TERMINAL_STATUSES = new Set<DownloadStatus>(["completed", "failed", "cancelled"]);
+export const ACTIVE_STATUSES = new Set<DownloadStatus>(["queued", "downloading", "processing"]);
 
 interface DownloadStoreState {
   jobs: Record<string, DownloadJob>;
 }
 
 interface DownloadStoreActions {
+  loadJobs: (jobs: DownloadJob[]) => void;
   addJob: (job: DownloadJob) => void;
   updateJob: (id: string, update: DownloadJobUpdate) => void;
   removeJob: (id: string) => void;
@@ -39,6 +41,8 @@ export const initialDownloadState: DownloadStoreState = {
 
 export const useDownloadStore = create<DownloadStoreState & DownloadStoreActions>((set) => ({
   ...initialDownloadState,
+  loadJobs: (jobs) =>
+    set(() => ({ jobs: Object.fromEntries(jobs.map((j) => [j.id, j])) })),
   addJob: (job) =>
     set((state) => ({ jobs: { ...state.jobs, [job.id]: job } })),
   updateJob: (id, update) =>

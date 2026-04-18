@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useProjectStore } from "@/state/projectStore";
 import { clearAllAudioState } from "@/lib/audio/audioState";
@@ -10,6 +10,10 @@ import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
+import { useDownloadEventListener } from "@/lib/ytdlp.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useDownloadStore, TERMINAL_STATUSES } from "@/state/downloadStore";
+import { saveDownloadHistory } from "@/lib/downloads";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
@@ -34,6 +38,18 @@ function MainPageInner() {
   useAutoSave();
   useGlobalHotkeys();
   useAudioErrorHandler();
+  const downloadFolderId = useAppSettingsStore((s) => s.settings?.downloadFolderId);
+  useDownloadEventListener(downloadFolderId);
+
+  const jobs = useDownloadStore((s) => s.jobs);
+  const lastSavedTerminalRef = useRef("");
+  useEffect(() => {
+    const terminal = Object.values(jobs).filter((j) => TERMINAL_STATUSES.has(j.status));
+    const serialized = JSON.stringify(terminal.map((j) => j.id + j.status));
+    if (serialized === lastSavedTerminalRef.current) return;
+    lastSavedTerminalRef.current = serialized;
+    void saveDownloadHistory(terminal);
+  }, [jobs]);
 
   const { reconcile } = useReconcileLibrary();
 
