@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Exported project ZIP files now use "no compression" (Stored) mode, improving export speed for already-compressed audio files
+- Folder picker now shows a clear error message if the selected folder cannot be accessed, instead of silently failing
 - Export now warns you when referenced sounds are missing files and lists how many couldn't be included
 - Export now warns you when multiple sounds share the same filename, which could cause conflicts in the exported zip
 - Project dialog logic (save, confirm-close, export progress) moved into a dedicated component for cleaner code organization
