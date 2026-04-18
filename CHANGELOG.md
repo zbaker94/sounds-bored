@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a security bug where UNC network paths with doubled interior separators (e.g., `\\server\\share`) could bypass root path detection and incorrectly gain file access grants.
 - Fixed a security vulnerability where file paths containing null bytes or ASCII control characters could bypass access controls — such paths are now blocked in both the Rust backend and TypeScript frontend.
 - Fixed a security issue where file paths with doubled backslashes (e.g. `\\\\server\share`) could bypass UNC share root restrictions and gain unauthorized file access.
 - Fixed a security issue where certain Windows device-namespace paths (e.g., `\\?\PIPE\`, `\\?\MAILSLOT\`, `\\?\HarddiskVolume3`) could bypass file access restrictions.

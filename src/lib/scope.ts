@@ -37,7 +37,7 @@ function isRootPath(path: string): boolean {
   }
   // UNC share root: \\server\share or //server/share (no further path segments)
   // Paths starting with \\.\ or \\?\ are already handled above
-  if (/^[/\\]{2,}[^/\\]+[/\\][^/\\]+[/\\]*$/.test(path)) return true;
+  if (/^[/\\]{2,}[^/\\]+[/\\]+[^/\\]+[/\\]*$/.test(path)) return true;
   return false;
 }
 
