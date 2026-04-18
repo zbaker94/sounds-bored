@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added TagPicker and SetPicker components for selecting tags and sets from the sound library
 - Added a **Set Picker** component, allowing sounds to be assigned to sets directly from the library picker interface (with inline set creation support).
 - Fixed an internal code issue with tag creation in the Tag Picker (no change to functionality)
 - Added a tag picker component that lets you search for existing tags or create new tags inline when assigning tags to sounds.
