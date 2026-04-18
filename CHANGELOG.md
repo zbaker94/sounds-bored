@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- The active download count badge on the Download button has moved from the top-right to the top-left corner.
 - The "Download from URL" button and download status indicator are now combined into a single button group for a cleaner toolbar layout
 - Active download count badge now appears directly on the download status icon
 - The download status button now shows a badge with the count of active downloads in progress, capped at "9+" for 10 or more.

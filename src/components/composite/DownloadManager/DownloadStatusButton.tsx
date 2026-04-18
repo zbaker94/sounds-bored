@@ -35,7 +35,7 @@ export function DownloadButton({ onOpenDialog }: DownloadButtonProps) {
               className={hasActive ? "animate-spin" : undefined}
             />
             {activeCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold leading-none text-primary-foreground">
+              <span className="absolute -top-1 -left-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold leading-none text-primary-foreground">
                 {activeCount > 9 ? "9+" : activeCount}
               </span>
             )}
