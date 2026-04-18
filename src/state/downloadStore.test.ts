@@ -12,6 +12,8 @@ function makeQueuedJob(overrides: Partial<DownloadJob> = {}): DownloadJob {
     outputName: "My Track",
     status: "queued",
     percent: 0,
+    tags: [],
+    sets: [],
     ...overrides,
   };
 }
@@ -213,6 +215,29 @@ describe("downloadStore", () => {
       // @ts-expect-error — percent is required for 'processing'
       const u: DownloadJobUpdate = { status: "processing" };
       expect(u).toBeDefined();
+    });
+  });
+
+  // ── tags/sets preservation ──────────────────────────────────────────────────
+
+  describe("tags and sets preservation across status transitions", () => {
+    it("preserves tags and sets through queued → downloading → completed", () => {
+      const store = useDownloadStore.getState();
+      store.addJob(makeQueuedJob({ tags: ["tag-a"], sets: ["set-x"] }));
+      store.updateJob("job-1", { status: "downloading", percent: 50 });
+      store.updateJob("job-1", { status: "completed", percent: 100, outputPath: "/p.mp3" });
+      const job = useDownloadStore.getState().jobs["job-1"];
+      expect(job.tags).toEqual(["tag-a"]);
+      expect(job.sets).toEqual(["set-x"]);
+    });
+
+    it("preserves tags and sets through queued → failed", () => {
+      const store = useDownloadStore.getState();
+      store.addJob(makeQueuedJob({ tags: ["tag-b"], sets: ["set-y"] }));
+      store.updateJob("job-1", { status: "failed", error: "network error" });
+      const job = useDownloadStore.getState().jobs["job-1"];
+      expect(job.tags).toEqual(["tag-b"]);
+      expect(job.sets).toEqual(["set-y"]);
     });
   });
 

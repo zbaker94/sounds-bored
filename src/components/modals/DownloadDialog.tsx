@@ -16,6 +16,7 @@ import { useDownloadStore } from "@/state/downloadStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon } from "@hugeicons/core-free-icons";
+import { TagPicker, SetPicker } from "@/components/composite/LibraryPickers";
 
 interface DownloadDialogProps {
   open: boolean;
@@ -27,6 +28,8 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
   const [outputName, setOutputName] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
 
   const settings = useAppSettingsStore((s) => s.settings);
   const { mutateAsync: startDownload, isPending } = useStartDownload();
@@ -108,12 +111,16 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
       outputName: outputName,
       downloadFolderPath: downloadFolder,
       jobId: crypto.randomUUID(),
+      tags: selectedTagIds,
+      sets: selectedSetIds,
     });
 
     setUrl("");
     setOutputName("");
     setUrlError(null);
     setNameError(null);
+    setSelectedTagIds([]);
+    setSelectedSetIds([]);
     onOpenChange(false);
   }
 
@@ -121,6 +128,8 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
     if (!nextOpen) {
       setUrlError(null);
       setNameError(null);
+      setSelectedTagIds([]);
+      setSelectedSetIds([]);
     }
     onOpenChange(nextOpen);
   }
@@ -169,6 +178,20 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
                 Letters, numbers, hyphens, and underscores only. The file extension is added automatically.
               </p>
             )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>
+              Tags{" "}
+              <span className="text-muted-foreground text-xs">(optional)</span>
+            </Label>
+            <TagPicker value={selectedTagIds} onChange={setSelectedTagIds} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>
+              Sets{" "}
+              <span className="text-muted-foreground text-xs">(optional)</span>
+            </Label>
+            <SetPicker value={selectedSetIds} onChange={setSelectedSetIds} />
           </div>
           {!downloadFolder && (
             <p className="text-xs text-destructive">

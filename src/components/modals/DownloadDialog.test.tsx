@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DownloadDialog } from "./DownloadDialog";
 import { useDownloadStore, initialDownloadState } from "@/state/downloadStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
-import { createMockAppSettings, createMockDownloadJob, createMockSound } from "@/test/factories";
+import {
+  createMockAppSettings,
+  createMockDownloadJob,
+  createMockSet,
+  createMockSound,
+  createMockTag,
+} from "@/test/factories";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mockStartDownload = vi.fn().mockResolvedValue(undefined);
@@ -32,7 +38,8 @@ function renderDialog(open = true) {
 }
 
 beforeEach(() => {
-  mockStartDownload.mockClear();
+  vi.clearAllMocks();
+  mockStartDownload.mockResolvedValue(undefined);
   useLibraryStore.setState({ ...initialLibraryState });
   useDownloadStore.setState({ ...initialDownloadState });
   useAppSettingsStore.setState({ ...initialAppSettingsState, settings: mockSettings });
@@ -272,5 +279,218 @@ describe("DownloadDialog — duplicate name validation", () => {
       screen.getByText("A download with this name is already in progress"),
     ).toBeInTheDocument();
     expect(mockStartDownload).not.toHaveBeenCalled();
+  });
+});
+
+describe("DownloadDialog — tags and sets pre-selection", () => {
+  async function fillRequiredFields() {
+    await userEvent.type(
+      screen.getByPlaceholderText("https://..."),
+      "https://example.com/audio",
+    );
+    await userEvent.type(screen.getByPlaceholderText("my-sound"), "my-sound");
+  }
+
+  it("renders the Tags label and combobox when tags exist in the library", () => {
+    const tagA = createMockTag({ name: "drums" });
+    const tagB = createMockTag({ name: "synth" });
+    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA, tagB] });
+
+    renderDialog();
+
+    expect(screen.getByText("Tags")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Search or create tags..."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the Sets label and combobox when sets exist in the library", () => {
+    const setA = createMockSet({ name: "Intro" });
+    const setB = createMockSet({ name: "Outro" });
+    useLibraryStore.setState({ ...initialLibraryState, sets: [setA, setB] });
+
+    renderDialog();
+
+    expect(screen.getByText("Sets")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Search or create sets..."),
+    ).toBeInTheDocument();
+  });
+
+  it("passes selected tag IDs to startDownload when submitted", async () => {
+    const tagA = createMockTag({ name: "drums" });
+    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA] });
+
+    renderDialog();
+    await fillRequiredFields();
+
+    // Open the tag combobox via its input (Base UI opens on focus/click).
+    const tagInput = screen.getByPlaceholderText("Search or create tags...");
+    await userEvent.click(tagInput);
+
+    // Base UI renders options in a portal once the popup is open.
+    // Use findBy to wait for the portal to mount.
+    const tagItem = await screen.findByRole("option", { name: /drums/i });
+    await act(async () => {
+      fireEvent.click(tagItem);
+    });
+
+    // Close the combobox popup so it doesn't mark the dialog's form as inert.
+    await userEvent.keyboard("{Escape}");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /^download$/i }),
+    );
+
+    expect(mockStartDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tags: [tagA.id],
+      }),
+    );
+  });
+
+  it("passes selected set IDs to startDownload when submitted", async () => {
+    const setA = createMockSet({ name: "Intro" });
+    useLibraryStore.setState({ ...initialLibraryState, sets: [setA] });
+
+    renderDialog();
+    await fillRequiredFields();
+
+    const setInput = screen.getByPlaceholderText("Search or create sets...");
+    await userEvent.click(setInput);
+
+    const setItem = await screen.findByRole("option", { name: /intro/i });
+    await act(async () => {
+      fireEvent.click(setItem);
+    });
+
+    await userEvent.keyboard("{Escape}");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /^download$/i }),
+    );
+
+    expect(mockStartDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sets: [setA.id],
+      }),
+    );
+  });
+
+  it("passes empty tags and sets arrays when none are selected", async () => {
+    renderDialog();
+    await fillRequiredFields();
+
+    await userEvent.click(screen.getByRole("button", { name: /download/i }));
+
+    expect(mockStartDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tags: [],
+        sets: [],
+      }),
+    );
+  });
+
+  it("shows empty state in combobox when library has no tags", async () => {
+    renderDialog();
+
+    const tagInput = screen.getByPlaceholderText("Search or create tags...");
+    await userEvent.click(tagInput);
+
+    expect(await screen.findByText("No tags found.")).toBeInTheDocument();
+  });
+
+  it("shows empty state in combobox when library has no sets", async () => {
+    renderDialog();
+
+    const setInput = screen.getByPlaceholderText("Search or create sets...");
+    await userEvent.click(setInput);
+
+    expect(await screen.findByText("No sets found.")).toBeInTheDocument();
+  });
+
+  it("shows Create option when typing a novel tag name and creates the tag on click", async () => {
+    renderDialog();
+
+    const tagInput = screen.getByPlaceholderText("Search or create tags...");
+    await userEvent.click(tagInput);
+    await userEvent.type(tagInput, "brand-new-tag");
+
+    const createItem = await screen.findByRole("option", { name: /create "brand-new-tag"/i });
+    await act(async () => { fireEvent.click(createItem); });
+
+    expect(useLibraryStore.getState().tags.some((t) => t.name === "brand-new-tag")).toBe(true);
+  });
+
+  it("shows Create option when typing a novel set name and creates the set on click", async () => {
+    renderDialog();
+
+    const setInput = screen.getByPlaceholderText("Search or create sets...");
+    await userEvent.click(setInput);
+    await userEvent.type(setInput, "brand-new-set");
+
+    const createItem = await screen.findByRole("option", { name: /create "brand-new-set"/i });
+    await act(async () => { fireEvent.click(createItem); });
+
+    expect(useLibraryStore.getState().sets.some((s) => s.name === "brand-new-set")).toBe(true);
+  });
+
+  it("does not show Create option when input matches an existing tag (case-insensitive)", async () => {
+    const tag = createMockTag({ name: "Drums" });
+    useLibraryStore.setState({ ...initialLibraryState, tags: [tag] });
+    renderDialog();
+
+    const tagInput = screen.getByPlaceholderText("Search or create tags...");
+    await userEvent.click(tagInput);
+    await userEvent.type(tagInput, "drums");
+
+    expect(screen.queryByRole("option", { name: /create "drums"/i })).not.toBeInTheDocument();
+  });
+
+  it("clears selected tags and sets when dialog is cancelled", async () => {
+    const tag = createMockTag({ name: "drums" });
+    const set = createMockSet({ name: "intro" });
+    useLibraryStore.setState({ ...initialLibraryState, tags: [tag], sets: [set] });
+    renderDialog();
+
+    const tagInput = screen.getByPlaceholderText("Search or create tags...");
+    await userEvent.click(tagInput);
+    const tagItem = await screen.findByRole("option", { name: /drums/i });
+    await act(async () => { fireEvent.click(tagItem); });
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByText("drums")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(screen.queryByText("drums")).not.toBeInTheDocument();
+  });
+
+  it("clears selected tags and sets after successful submit", async () => {
+    const tag = createMockTag({ name: "drums" });
+    const set = createMockSet({ name: "intro" });
+    useLibraryStore.setState({ ...initialLibraryState, tags: [tag], sets: [set] });
+    renderDialog();
+    await fillRequiredFields();
+
+    const tagInput = screen.getByPlaceholderText("Search or create tags...");
+    await userEvent.click(tagInput);
+    const tagItem = await screen.findByRole("option", { name: /drums/i });
+    await act(async () => { fireEvent.click(tagItem); });
+    await userEvent.keyboard("{Escape}");
+
+    const setInput = screen.getByPlaceholderText("Search or create sets...");
+    await userEvent.click(setInput);
+    const setItem = await screen.findByRole("option", { name: /intro/i });
+    await act(async () => { fireEvent.click(setItem); });
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByText("drums")).toBeInTheDocument();
+    expect(screen.getByText("intro")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^download$/i }));
+
+    expect(screen.queryByText("drums")).not.toBeInTheDocument();
+    expect(screen.queryByText("intro")).not.toBeInTheDocument();
   });
 });

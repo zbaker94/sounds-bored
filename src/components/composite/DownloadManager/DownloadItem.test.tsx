@@ -18,6 +18,8 @@ function makeJob(overrides: Partial<DownloadJob> = {}): DownloadJob {
     outputName: "My Track",
     status: "queued",
     percent: 0,
+    tags: [],
+    sets: [],
     ...overrides,
   };
 }

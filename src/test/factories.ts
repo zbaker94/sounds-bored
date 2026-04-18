@@ -224,6 +224,8 @@ export function createMockDownloadJob(overrides?: Partial<DownloadJob>): Downloa
     outputName: "test-sound",
     status: "queued",
     percent: 0,
+    tags: [],
+    sets: [],
     ...overrides,
   };
 }

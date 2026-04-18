@@ -285,5 +285,7 @@ export const DownloadJobSchema = z.object({
   error: z.string().optional(),
   outputPath: z.string().optional(),
   soundId: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+  sets: z.array(z.string()).default([]),
 });
 export type DownloadJob = z.infer<typeof DownloadJobSchema>;

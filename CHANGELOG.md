@@ -1,6 +1,18 @@
 # Changelog
 
 ## Current Changes
+- Added a reusable Set Picker component to the "Add to Set" dialog, replacing the inline combobox implementation.
+- The tag and set pickers in the Download dialog now use shared, reusable picker components for a more consistent experience across the app.
+- Added TagPicker and SetPicker components for selecting tags and sets from the sound library
+- Added a **Set Picker** component, allowing sounds to be assigned to sets directly from the library picker interface (with inline set creation support).
+- Fixed an internal code issue with tag creation in the Tag Picker (no change to functionality)
+- Added a tag picker component that lets you search for existing tags or create new tags inline when assigning tags to sounds.
+- Fixed the "Create" option in library pickers to properly select the newly created item after creation.
+- Added a reusable `LibraryItemPicker` component for selecting and creating tags/sets via a searchable chip input with inline "Create" support
+- Internal developer refactor: tag and set picker logic has been extracted into reusable shared components, reducing code duplication with no change to user-facing behavior.
+- When downloading audio via URL, you can now assign tags and sets to the sound before it downloads — they'll be applied automatically when the download completes.
+- New tag and set pickers in the Download dialog support searching existing entries or creating new ones on the fly.
+- Selected tags and sets are cleared when the dialog is cancelled or after a successful download.
 - The active download count badge on the Download button has moved from the top-right to the top-left corner.
 - The "Download from URL" button and download status indicator are now combined into a single button group for a cleaner toolbar layout
 - Active download count badge now appears directly on the download status icon
