@@ -7,6 +7,9 @@ use tauri_plugin_shell::ShellExt;
 
 pub struct DownloadJobs(pub Arc<Mutex<HashMap<String, CommandChild>>>);
 
+const DOWNLOAD_EVENT: &str = "download://progress";
+const EXPORT_EVENT: &str = "export://progress";
+
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadProgressEvent {
@@ -21,6 +24,76 @@ pub struct DownloadProgressEvent {
     pub output_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+impl DownloadProgressEvent {
+    pub(crate) fn queued(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            percent: 0.0,
+            speed: None,
+            eta: None,
+            status: "queued".to_string(),
+            output_path: None,
+            error: None,
+        }
+    }
+
+    pub(crate) fn downloading(id: &str, percent: f64, speed: Option<String>, eta: Option<String>, output_path: Option<String>) -> Self {
+        Self::in_progress(id, percent, speed, eta, output_path, "downloading")
+    }
+
+    pub(crate) fn processing(id: &str, percent: f64, speed: Option<String>, eta: Option<String>, output_path: Option<String>) -> Self {
+        Self::in_progress(id, percent, speed, eta, output_path, "processing")
+    }
+
+    fn in_progress(id: &str, percent: f64, speed: Option<String>, eta: Option<String>, output_path: Option<String>, status: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            percent,
+            speed,
+            eta,
+            status: status.to_string(),
+            output_path,
+            error: None,
+        }
+    }
+
+    pub(crate) fn failed(id: &str, output_path: Option<String>, error: Option<String>) -> Self {
+        Self {
+            id: id.to_string(),
+            percent: 0.0,
+            speed: None,
+            eta: None,
+            status: "failed".to_string(),
+            output_path,
+            error,
+        }
+    }
+
+    pub(crate) fn completed(id: &str, output_path: Option<String>) -> Self {
+        Self {
+            id: id.to_string(),
+            percent: 100.0,
+            speed: None,
+            eta: None,
+            status: "completed".to_string(),
+            output_path,
+            error: None,
+        }
+    }
+
+    pub(crate) fn cancelled(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            percent: 0.0,
+            speed: None,
+            eta: None,
+            status: "cancelled".to_string(),
+            output_path: None,
+            error: None,
+        }
+    }
 }
 
 /// Parse yt-dlp progress output lines.
@@ -165,18 +238,7 @@ pub fn start_download(
     validate_no_traversal(&download_folder_path, "download_folder_path")?;
 
     // Emit initial queued event
-    let _ = app.emit(
-        "download://progress",
-        DownloadProgressEvent {
-            id: job_id.clone(),
-            percent: 0.0,
-            speed: None,
-            eta: None,
-            status: "queued".to_string(),
-            output_path: None,
-            error: None,
-        },
-    );
+    let _ = app.emit(DOWNLOAD_EVENT, DownloadProgressEvent::queued(&job_id));
 
     // Build output template
     let output_template = format!("{}/{}.%(ext)s", download_folder_path, output_name);
@@ -240,23 +302,12 @@ pub fn start_download(
 
                     // Check for progress
                     if let Some((percent, speed, eta)) = parse_progress(&line) {
-                        let status = if percent >= 100.0 {
-                            "processing"
+                        let event = if percent >= 100.0 {
+                            DownloadProgressEvent::processing(&job_id_for_task, percent, speed, eta, last_output_path.clone())
                         } else {
-                            "downloading"
+                            DownloadProgressEvent::downloading(&job_id_for_task, percent, speed, eta, last_output_path.clone())
                         };
-                        let _ = app_clone.emit(
-                            "download://progress",
-                            DownloadProgressEvent {
-                                id: job_id_for_task.clone(),
-                                percent,
-                                speed,
-                                eta,
-                                status: status.to_string(),
-                                output_path: last_output_path.clone(),
-                                error: None,
-                            },
-                        );
+                        let _ = app_clone.emit(DOWNLOAD_EVENT, event);
                     }
                 }
                 CommandEvent::Stderr(line_bytes) => {
@@ -264,49 +315,22 @@ pub fn start_download(
                     // yt-dlp writes some info to stderr; only emit as error if it looks like one
                     if line.contains("ERROR") {
                         let _ = app_clone.emit(
-                            "download://progress",
-                            DownloadProgressEvent {
-                                id: job_id_for_task.clone(),
-                                percent: 0.0,
-                                speed: None,
-                                eta: None,
-                                status: "failed".to_string(),
-                                output_path: None,
-                                error: Some(line.to_string()),
-                            },
+                            DOWNLOAD_EVENT,
+                            DownloadProgressEvent::failed(&job_id_for_task, None, Some(line.to_string())),
                         );
                     }
                 }
                 CommandEvent::Terminated(payload) => {
-                    let status = if payload.code == Some(0) {
-                        "completed"
+                    let event = if payload.code == Some(0) {
+                        DownloadProgressEvent::completed(&job_id_for_task, last_output_path.clone())
                     } else {
-                        "failed"
+                        DownloadProgressEvent::failed(
+                            &job_id_for_task,
+                            last_output_path.clone(),
+                            Some(format!("yt-dlp exited with code {:?}", payload.code)),
+                        )
                     };
-                    let error = if status == "failed" {
-                        Some(format!(
-                            "yt-dlp exited with code {:?}",
-                            payload.code
-                        ))
-                    } else {
-                        None
-                    };
-                    let _ = app_clone.emit(
-                        "download://progress",
-                        DownloadProgressEvent {
-                            id: job_id_for_task.clone(),
-                            percent: if status == "completed" {
-                                100.0
-                            } else {
-                                0.0
-                            },
-                            speed: None,
-                            eta: None,
-                            status: status.to_string(),
-                            output_path: last_output_path.clone(),
-                            error,
-                        },
-                    );
+                    let _ = app_clone.emit(DOWNLOAD_EVENT, event);
                     break;
                 }
                 _ => {}
@@ -336,18 +360,7 @@ pub fn cancel_download(
     }
 
     // Emit cancelled event
-    let _ = app.emit(
-        "download://progress",
-        DownloadProgressEvent {
-            id: job_id,
-            percent: 0.0,
-            speed: None,
-            eta: None,
-            status: "cancelled".to_string(),
-            output_path: None,
-            error: None,
-        },
-    );
+    let _ = app.emit(DOWNLOAD_EVENT, DownloadProgressEvent::cancelled(&job_id));
 
     Ok(())
 }
@@ -363,6 +376,53 @@ pub struct ExportProgressEvent {
     pub zip_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+impl ExportProgressEvent {
+    pub(crate) fn copying(job_id: &str) -> Self {
+        Self {
+            job_id: job_id.to_string(),
+            status: "copying".to_string(),
+            zip_path: None,
+            error: None,
+        }
+    }
+
+    pub(crate) fn zipping(job_id: &str) -> Self {
+        Self {
+            job_id: job_id.to_string(),
+            status: "zipping".to_string(),
+            zip_path: None,
+            error: None,
+        }
+    }
+
+    pub(crate) fn cancelled(job_id: &str) -> Self {
+        Self {
+            job_id: job_id.to_string(),
+            status: "cancelled".to_string(),
+            zip_path: None,
+            error: None,
+        }
+    }
+
+    pub(crate) fn done(job_id: &str, zip_path: String) -> Self {
+        Self {
+            job_id: job_id.to_string(),
+            status: "done".to_string(),
+            zip_path: Some(zip_path),
+            error: None,
+        }
+    }
+
+    pub(crate) fn error(job_id: &str, error: String) -> Self {
+        Self {
+            job_id: job_id.to_string(),
+            status: "error".to_string(),
+            zip_path: None,
+            error: Some(error),
+        }
+    }
 }
 
 #[tauri::command]
@@ -418,15 +478,7 @@ pub fn export_project(
     tauri::async_runtime::spawn(async move {
         let result: Result<(), String> = (|| {
             // Emit copying status
-            let _ = app_clone.emit(
-                "export://progress",
-                ExportProgressEvent {
-                    job_id: job_id_clone.clone(),
-                    status: "copying".to_string(),
-                    zip_path: None,
-                    error: None,
-                },
-            );
+            let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::copying(&job_id_clone));
 
             let zip_output_path = format!("{}/{}", dest_path, zip_name);
 
@@ -450,28 +502,12 @@ pub fn export_project(
             }
 
             // Walk source_path
-            let _ = app_clone.emit(
-                "export://progress",
-                ExportProgressEvent {
-                    job_id: job_id_clone.clone(),
-                    status: "zipping".to_string(),
-                    zip_path: None,
-                    error: None,
-                },
-            );
+            let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::zipping(&job_id_clone));
 
             for entry in walkdir::WalkDir::new(&source_path) {
                 // Check cancellation
                 if flag.load(Ordering::SeqCst) {
-                    let _ = app_clone.emit(
-                        "export://progress",
-                        ExportProgressEvent {
-                            job_id: job_id_clone.clone(),
-                            status: "cancelled".to_string(),
-                            zip_path: None,
-                            error: None,
-                        },
-                    );
+                    let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::cancelled(&job_id_clone));
                     drop(writer);
                     let _ = std::fs::remove_file(&zip_output_path);
                     return Ok(());
@@ -523,15 +559,7 @@ pub fn export_project(
             for extra_path in &extra_sound_paths {
                 // Check cancellation
                 if flag.load(Ordering::SeqCst) {
-                    let _ = app_clone.emit(
-                        "export://progress",
-                        ExportProgressEvent {
-                            job_id: job_id_clone.clone(),
-                            status: "cancelled".to_string(),
-                            zip_path: None,
-                            error: None,
-                        },
-                    );
+                    let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::cancelled(&job_id_clone));
                     drop(writer);
                     let _ = std::fs::remove_file(&zip_output_path);
                     return Ok(());
@@ -565,29 +593,13 @@ pub fn export_project(
             writer.finish().map_err(|e| e.to_string())?;
 
             // Emit done
-            let _ = app_clone.emit(
-                "export://progress",
-                ExportProgressEvent {
-                    job_id: job_id_clone.clone(),
-                    status: "done".to_string(),
-                    zip_path: Some(zip_output_path),
-                    error: None,
-                },
-            );
+            let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::done(&job_id_clone, zip_output_path));
 
             Ok(())
         })();
 
         if let Err(err) = result {
-            let _ = app_clone.emit(
-                "export://progress",
-                ExportProgressEvent {
-                    job_id: job_id_clone.clone(),
-                    status: "error".to_string(),
-                    zip_path: None,
-                    error: Some(err),
-                },
-            );
+            let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::error(&job_id_clone, err));
             // Try to clean up partial zip
             let zip_output_path = format!("{}/{}", dest_path, zip_name);
             let _ = std::fs::remove_file(&zip_output_path);
@@ -614,15 +626,7 @@ pub fn cancel_export(
         flag.store(true, Ordering::SeqCst);
     }
 
-    let _ = app.emit(
-        "export://progress",
-        ExportProgressEvent {
-            job_id,
-            status: "cancelled".to_string(),
-            zip_path: None,
-            error: None,
-        },
-    );
+    let _ = app.emit(EXPORT_EVENT, ExportProgressEvent::cancelled(&job_id));
 
     Ok(())
 }

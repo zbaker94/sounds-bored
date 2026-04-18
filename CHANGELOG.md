@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Internal code cleanup with no user-facing behavior changes
+- Internal code refactoring: download and export progress events now use cleaner constructor methods — no user-facing behavior changes.
 - Exported project ZIP files now use "no compression" (Stored) mode, improving export speed for already-compressed audio files
 - Folder picker now shows a clear error message if the selected folder cannot be accessed, instead of silently failing
 - Export now warns you when referenced sounds are missing files and lists how many couldn't be included
