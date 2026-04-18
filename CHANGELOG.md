@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added a tag picker component that lets you search for existing tags or create new tags inline when assigning tags to sounds.
 - Fixed the "Create" option in library pickers to properly select the newly created item after creation.
 - Added a reusable `LibraryItemPicker` component for selecting and creating tags/sets via a searchable chip input with inline "Create" support
 - Internal developer refactor: tag and set picker logic has been extracted into reusable shared components, reducing code duplication with no change to user-facing behavior.
