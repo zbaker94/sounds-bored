@@ -13,6 +13,7 @@ import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
+import { ProjectDialogs } from "@/components/modals/ProjectDialogs";
 
 export function MainPage() {
   const project = useProjectStore((s) => s.project);
@@ -24,6 +25,7 @@ export function MainPage() {
   return (
     <ProjectActionsProvider>
       <MainPageInner />
+      <ProjectDialogs />
     </ProjectActionsProvider>
   );
 }

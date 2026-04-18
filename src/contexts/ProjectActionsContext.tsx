@@ -4,18 +4,32 @@ import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { pickFolder } from "@/lib/scope";
-import { basename } from "@tauri-apps/api/path";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveProject, useSaveProjectAs } from "@/lib/project.queries";
 import { discardTemporaryProject, saveProject, buildExportZipName } from "@/lib/project";
-import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
-import { SaveProjectDialog } from "@/components/modals/SaveProjectDialog";
-import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
-import { ExportProgressDialog } from "@/components/modals/ExportProgressDialog";
-import type { Sound } from "@/lib/schemas";
-import { hasFilePath } from "@/lib/schemas";
-import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
+import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { resolveReferencedSounds, countMissingReferencedSounds, buildSoundMapJson } from "@/lib/export";
+
+type ExportStatus = "idle" | "copying" | "zipping" | "done" | "error";
+
+interface SaveDialogValue {
+  defaultName: string;
+  isPending: boolean;
+  onSave: (projectName: string) => Promise<void>;
+  onCancel: () => void;
+}
+
+interface NavigateDialogValue {
+  onSave: () => void;
+  onDiscard: () => void | Promise<void>;
+  onCancel: () => void;
+}
+
+interface ExportDialogValue {
+  status: ExportStatus;
+  onCancel: () => Promise<void>;
+}
 
 interface ProjectActionsContextValue {
   /** True when there is something to save (dirty or temporary). */
@@ -30,6 +44,9 @@ interface ProjectActionsContextValue {
   handleSaveAsMenuClick: () => void;
   /** Auto-saves then exports as a zip. Disabled when no project/folderPath. */
   handleExportClick: () => void;
+  saveDialog: SaveDialogValue;
+  navigateDialog: NavigateDialogValue;
+  exportDialog: ExportDialogValue;
 }
 
 const ProjectActionsContext = createContext<ProjectActionsContextValue | null>(null);
@@ -46,9 +63,6 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const saveProjectMutation = useSaveProject();
   const saveProjectAsMutation = useSaveProjectAs();
 
-  const showSaveDialog = useUiStore(selectIsOverlayOpen(OVERLAY_ID.SAVE_PROJECT_DIALOG));
-  const showNavigateConfirm = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG));
-  const showExportDialog = useUiStore(selectIsOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG));
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 
@@ -58,7 +72,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
   const onAfterSaveRef = useRef<(() => void) | null>(null);
 
   // Export state
-  const [exportStatus, setExportStatus] = useState<"idle" | "copying" | "zipping" | "done" | "error">("idle");
+  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
   const exportJobId = useRef<string | null>(null);
   const exportUnlisten = useRef<(() => void) | null>(null);
 
@@ -131,31 +145,24 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       return;
     }
 
-    // 2. Collect ALL referenced sound IDs across all selection types
-    const referencedSoundIds = new Set<string>();
-    for (const scene of project.scenes) {
-      for (const pad of scene.pads) {
-        for (const layer of pad.layers) {
-          for (const sound of resolveLayerSounds(layer, sounds)) {
-            referencedSoundIds.add(sound.id);
-          }
-        }
-      }
-    }
-
-    const referencedSounds = sounds.filter((s) => referencedSoundIds.has(s.id) && hasFilePath(s)) as (Sound & { filePath: string })[];
+    const referencedSounds = resolveReferencedSounds(project, sounds);
+    const missingCount = countMissingReferencedSounds(project, sounds);
 
     // 3. Open folder picker
     const destPath = await pickFolder({ title: "Select Export Destination" });
     if (!destPath) return;
 
-    // 4. Build sound map: { soundId: "sounds/filename" }
-    const soundMapEntries: Record<string, string> = {};
-    for (const sound of referencedSounds) {
-      const name = await basename(sound.filePath);
-      soundMapEntries[sound.id] = `sounds/${name}`;
+    if (missingCount > 0) {
+      toast.warning(`${missingCount} referenced sound${missingCount === 1 ? "" : "s"} could not be included (file${missingCount === 1 ? "" : "s"} missing).`);
     }
-    const soundMapJson = JSON.stringify({ version: "1", soundMap: soundMapEntries }, null, 2);
+
+    // 4. Build sound map: { soundId: "sounds/filename" }
+    const { json: soundMapJson, collisions } = buildSoundMapJson(referencedSounds);
+    if (collisions.length > 0) {
+      toast.warning(
+        `${collisions.length} sound file name${collisions.length === 1 ? "" : "s"} conflict${collisions.length === 1 ? "s" : ""} — some audio may not export correctly: ${collisions.slice(0, 3).join(", ")}${collisions.length > 3 ? "…" : ""}`
+      );
+    }
 
     // 5. Build zip name and job id
     const zipName = buildExportZipName(project.name);
@@ -301,28 +308,27 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     setPendingNavigatePath(null);
   };
 
+  const saveDialog: SaveDialogValue = {
+    defaultName: project?.name ?? "",
+    isPending: saveProjectAsMutation.isPending,
+    onSave: handleSaveAs,
+    onCancel: handleCancelSave,
+  };
+
+  const navigateDialog: NavigateDialogValue = {
+    onSave: handleNavigateSave,
+    onDiscard: handleNavigateDiscard,
+    onCancel: handleNavigateCancel,
+  };
+
+  const exportDialog: ExportDialogValue = {
+    status: exportStatus,
+    onCancel: handleCancelExport,
+  };
+
   return (
-    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick }}>
+    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick, saveDialog, navigateDialog, exportDialog }}>
       {children}
-      <SaveProjectDialog
-        isOpen={showSaveDialog}
-        onSave={handleSaveAs}
-        onCancel={handleCancelSave}
-        defaultName={project?.name ?? ""}
-        isPending={saveProjectAsMutation.isPending}
-      />
-      <ConfirmCloseDialog
-        isOpen={showNavigateConfirm}
-        description="You have unsaved changes. Do you want to save before leaving?"
-        onSave={handleNavigateSave}
-        onDiscard={handleNavigateDiscard}
-        onCancel={handleNavigateCancel}
-      />
-      <ExportProgressDialog
-        isOpen={showExportDialog}
-        status={exportStatus}
-        onCancel={handleCancelExport}
-      />
     </ProjectActionsContext.Provider>
   );
 }
