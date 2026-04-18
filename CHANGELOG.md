@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Paths containing Unicode BIDI control characters, line/paragraph separators, or BOM characters are now blocked from being granted file access, closing a potential path-spoofing security vulnerability.
+- Accented and CJK characters in folder names continue to work correctly and are unaffected by the new restrictions.
 - Fixed a security bug where UNC paths with doubled separators (e.g. `\\?\UNC\\server\share`) could bypass root path detection and gain unauthorized file access
 - Fixed a security bug where UNC network paths with doubled interior separators (e.g., `\\server\\share`) could bypass root path detection and incorrectly gain file access grants.
 - Fixed a security vulnerability where file paths containing null bytes or ASCII control characters could bypass access controls — such paths are now blocked in both the Rust backend and TypeScript frontend.

@@ -247,6 +247,102 @@ describe("grantParentAccess", () => {
     expect(mockCore.invoke).not.toHaveBeenCalled();
   });
 
+  it("does not grant access when the parent contains a LINE SEPARATOR (U+2028)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u2028folder");
+
+    await grantParentAccess("/music\u2028folder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a PARAGRAPH SEPARATOR (U+2029)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u2029folder");
+
+    await grantParentAccess("/music\u2029folder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains LTR MARK (U+200E)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u200efolder");
+
+    await grantParentAccess("/music\u200efolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains RTL MARK (U+200F)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u200ffolder");
+
+    await grantParentAccess("/music\u200ffolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a BIDI override (U+202E)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u202efolder");
+
+    await grantParentAccess("/music\u202efolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a BIDI isolate (U+2066)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u2066folder");
+
+    await grantParentAccess("/music\u2066folder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a BOM (U+FEFF)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\ufefffolder");
+
+    await grantParentAccess("/music\ufefffolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains a BIDI override embedded in a Windows path (U+202E)", async () => {
+    mockPath.dirname.mockImplementation(() => "C:\\music\u202efolder");
+
+    await grantParentAccess("C:\\music\u202efolder\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains U+202A (LRE — lower bound of BIDI formatting range)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u202afolder");
+
+    await grantParentAccess("/music\u202afolder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("does not grant access when the parent contains U+2069 (PDI — upper bound of BIDI isolate range)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u2069folder");
+
+    await grantParentAccess("/music\u2069folder/song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when the parent contains accented Latin characters (é)", async () => {
+    mockPath.dirname.mockImplementation(() => "/music/caf\u00e9");
+
+    await grantParentAccess("/music/caf\u00e9/song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", { path: "/music/caf\u00e9" });
+  });
+
+  it("grants access when the parent contains CJK characters", async () => {
+    mockPath.dirname.mockImplementation(() => "/\u4e2d\u6587/\u97f3\u4e50");
+
+    await grantParentAccess("/\u4e2d\u6587/\u97f3\u4e50/song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", { path: "/\u4e2d\u6587/\u97f3\u4e50" });
+  });
+
   it("does not grant access when dirname returns a forward-slash UNC share root (//server/share)", async () => {
     mockPath.dirname.mockImplementation(() => "//server/share");
 
@@ -769,6 +865,12 @@ describe("grantParentDirectories", () => {
 
   it("does nothing for an empty array", async () => {
     await grantParentDirectories([]);
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("skips parents containing BIDI control characters", async () => {
+    mockPath.dirname.mockImplementation(() => "/music\u202efolder");
+    await grantParentDirectories(["/music\u202efolder/song.wav"]);
     expect(mockCore.invoke).not.toHaveBeenCalled();
   });
 });
