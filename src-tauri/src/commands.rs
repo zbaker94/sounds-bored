@@ -40,24 +40,20 @@ impl DownloadProgressEvent {
     }
 
     pub(crate) fn downloading(id: &str, percent: f64, speed: Option<String>, eta: Option<String>, output_path: Option<String>) -> Self {
-        Self {
-            id: id.to_string(),
-            percent,
-            speed,
-            eta,
-            status: "downloading".to_string(),
-            output_path,
-            error: None,
-        }
+        Self::in_progress(id, percent, speed, eta, output_path, "downloading")
     }
 
     pub(crate) fn processing(id: &str, percent: f64, speed: Option<String>, eta: Option<String>, output_path: Option<String>) -> Self {
+        Self::in_progress(id, percent, speed, eta, output_path, "processing")
+    }
+
+    fn in_progress(id: &str, percent: f64, speed: Option<String>, eta: Option<String>, output_path: Option<String>, status: &str) -> Self {
         Self {
             id: id.to_string(),
             percent,
             speed,
             eta,
-            status: "processing".to_string(),
+            status: status.to_string(),
             output_path,
             error: None,
         }
@@ -384,23 +380,48 @@ pub struct ExportProgressEvent {
 
 impl ExportProgressEvent {
     pub(crate) fn copying(job_id: &str) -> Self {
-        Self { job_id: job_id.to_string(), status: "copying".to_string(), zip_path: None, error: None }
+        Self {
+            job_id: job_id.to_string(),
+            status: "copying".to_string(),
+            zip_path: None,
+            error: None,
+        }
     }
 
     pub(crate) fn zipping(job_id: &str) -> Self {
-        Self { job_id: job_id.to_string(), status: "zipping".to_string(), zip_path: None, error: None }
+        Self {
+            job_id: job_id.to_string(),
+            status: "zipping".to_string(),
+            zip_path: None,
+            error: None,
+        }
     }
 
     pub(crate) fn cancelled(job_id: &str) -> Self {
-        Self { job_id: job_id.to_string(), status: "cancelled".to_string(), zip_path: None, error: None }
+        Self {
+            job_id: job_id.to_string(),
+            status: "cancelled".to_string(),
+            zip_path: None,
+            error: None,
+        }
     }
 
     pub(crate) fn done(job_id: &str, zip_path: String) -> Self {
-        Self { job_id: job_id.to_string(), status: "done".to_string(), zip_path: Some(zip_path), error: None }
+        Self {
+            job_id: job_id.to_string(),
+            status: "done".to_string(),
+            zip_path: Some(zip_path),
+            error: None,
+        }
     }
 
     pub(crate) fn error(job_id: &str, error: String) -> Self {
-        Self { job_id: job_id.to_string(), status: "error".to_string(), zip_path: None, error: Some(error) }
+        Self {
+            job_id: job_id.to_string(),
+            status: "error".to_string(),
+            zip_path: None,
+            error: Some(error),
+        }
     }
 }
 
