@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- When downloading audio via URL, you can now assign tags and sets to the sound before it downloads — they'll be applied automatically when the download completes.
+- New tag and set pickers in the Download dialog support searching existing entries or creating new ones on the fly.
+- Selected tags and sets are cleared when the dialog is cancelled or after a successful download.
 - The active download count badge on the Download button has moved from the top-right to the top-left corner.
 - The "Download from URL" button and download status indicator are now combined into a single button group for a cleaner toolbar layout
 - Active download count badge now appears directly on the download status icon

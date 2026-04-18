@@ -11,7 +11,7 @@ vi.mock("@/lib/ytdlp.queries", () => ({
 }));
 
 function makeJob(id: string, overrides: Partial<DownloadJob> = {}): DownloadJob {
-  return { id, url: "https://example.com", outputName: id, status: "queued", percent: 0, ...overrides };
+  return { id, url: "https://example.com", outputName: id, status: "queued", percent: 0, tags: [], sets: [], ...overrides };
 }
 
 function renderManager() {

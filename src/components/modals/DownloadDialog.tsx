@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Combobox,
+  ComboboxChips,
+  ComboboxChip,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxCollection,
+  ComboboxEmpty,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useStartDownload } from "@/lib/ytdlp.queries";
 import { useDownloadStore } from "@/state/downloadStore";
@@ -27,14 +39,40 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
   const [outputName, setOutputName] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
+  const [tagInputValue, setTagInputValue] = useState("");
+  const [setInputValue, setSetInputValue] = useState("");
 
   const settings = useAppSettingsStore((s) => s.settings);
   const { mutateAsync: startDownload, isPending } = useStartDownload();
+
+  const tags = useLibraryStore((s) => s.tags);
+  const sets = useLibraryStore((s) => s.sets);
+  const ensureTagExists = useLibraryStore((s) => s.ensureTagExists);
+  const addSet = useLibraryStore((s) => s.addSet);
+
+  const userTags = useMemo(() => tags.filter((t) => !t.isSystem), [tags]);
+
+  const tagsAnchorRef = useComboboxAnchor();
+  const setsAnchorRef = useComboboxAnchor();
 
   const downloadFolderId = settings?.downloadFolderId;
   const downloadFolder = settings?.globalFolders.find(
     (f) => f.id === downloadFolderId,
   )?.path;
+
+  const trimmedTagInput = tagInputValue.trim();
+  const tagInputMatchesExisting = userTags.some(
+    (t) => t.name.toLowerCase() === trimmedTagInput.toLowerCase(),
+  );
+  const canCreateTag = trimmedTagInput.length > 0 && !tagInputMatchesExisting;
+
+  const trimmedSetInput = setInputValue.trim();
+  const setInputMatchesExisting = sets.some(
+    (s) => s.name.toLowerCase() === trimmedSetInput.toLowerCase(),
+  );
+  const canCreateSet = trimmedSetInput.length > 0 && !setInputMatchesExisting;
 
   function sanitizeName(value: string): string {
     return value.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-_]/g, "");
@@ -42,6 +80,38 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
 
   function handleOutputNameChange(value: string) {
     setOutputName(sanitizeName(value));
+  }
+
+  function handleTagValueChange(newIds: string[]) {
+    if (newIds.includes("__create__")) {
+      if (!trimmedTagInput) {
+        setSelectedTagIds(newIds.filter((id) => id !== "__create__"));
+        return;
+      }
+      const newTag = ensureTagExists(trimmedTagInput);
+      setSelectedTagIds([
+        ...newIds.filter((id) => id !== "__create__"),
+        newTag.id,
+      ]);
+      return;
+    }
+    setSelectedTagIds(newIds);
+  }
+
+  function handleSetValueChange(newIds: string[]) {
+    if (newIds.includes("__create__")) {
+      if (!trimmedSetInput) {
+        setSelectedSetIds(newIds.filter((id) => id !== "__create__"));
+        return;
+      }
+      const newSet = addSet(trimmedSetInput);
+      setSelectedSetIds([
+        ...newIds.filter((id) => id !== "__create__"),
+        newSet.id,
+      ]);
+      return;
+    }
+    setSelectedSetIds(newIds);
   }
 
   function validate(): boolean {
@@ -108,12 +178,18 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
       outputName: outputName,
       downloadFolderPath: downloadFolder,
       jobId: crypto.randomUUID(),
+      tags: selectedTagIds,
+      sets: selectedSetIds,
     });
 
     setUrl("");
     setOutputName("");
     setUrlError(null);
     setNameError(null);
+    setSelectedTagIds([]);
+    setSelectedSetIds([]);
+    setTagInputValue("");
+    setSetInputValue("");
     onOpenChange(false);
   }
 
@@ -121,6 +197,10 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
     if (!nextOpen) {
       setUrlError(null);
       setNameError(null);
+      setSelectedTagIds([]);
+      setSelectedSetIds([]);
+      setTagInputValue("");
+      setSetInputValue("");
     }
     onOpenChange(nextOpen);
   }
@@ -169,6 +249,86 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
                 Letters, numbers, hyphens, and underscores only. The file extension is added automatically.
               </p>
             )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>
+              Tags{" "}
+              <span className="text-muted-foreground text-xs">(optional)</span>
+            </Label>
+            <Combobox
+              value={selectedTagIds}
+              onValueChange={handleTagValueChange}
+              onInputValueChange={(val) => setTagInputValue(val)}
+              items={userTags}
+              multiple
+            >
+              <ComboboxChips ref={tagsAnchorRef}>
+                {selectedTagIds.map((id) => {
+                  const tag = userTags.find((t) => t.id === id);
+                  return tag ? (
+                    <ComboboxChip key={id}>{tag.name}</ComboboxChip>
+                  ) : null;
+                })}
+                <ComboboxChipsInput placeholder="Search or create tags..." />
+              </ComboboxChips>
+              <ComboboxContent anchor={tagsAnchorRef}>
+                <ComboboxList>
+                  <ComboboxEmpty>No tags found.</ComboboxEmpty>
+                  <ComboboxCollection>
+                    {(t) => (
+                      <ComboboxItem key={t.id} value={t.id}>
+                        {t.name}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxCollection>
+                  {canCreateTag && (
+                    <ComboboxItem value="__create__">
+                      Create "{trimmedTagInput}"
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>
+              Sets{" "}
+              <span className="text-muted-foreground text-xs">(optional)</span>
+            </Label>
+            <Combobox
+              value={selectedSetIds}
+              onValueChange={handleSetValueChange}
+              onInputValueChange={(val) => setSetInputValue(val)}
+              items={sets}
+              multiple
+            >
+              <ComboboxChips ref={setsAnchorRef}>
+                {selectedSetIds.map((id) => {
+                  const set = sets.find((s) => s.id === id);
+                  return set ? (
+                    <ComboboxChip key={id}>{set.name}</ComboboxChip>
+                  ) : null;
+                })}
+                <ComboboxChipsInput placeholder="Search or create sets..." />
+              </ComboboxChips>
+              <ComboboxContent anchor={setsAnchorRef}>
+                <ComboboxList>
+                  <ComboboxEmpty>No sets found.</ComboboxEmpty>
+                  <ComboboxCollection>
+                    {(s) => (
+                      <ComboboxItem key={s.id} value={s.id}>
+                        {s.name}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxCollection>
+                  {canCreateSet && (
+                    <ComboboxItem value="__create__">
+                      Create "{trimmedSetInput}"
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
           {!downloadFolder && (
             <p className="text-xs text-destructive">
