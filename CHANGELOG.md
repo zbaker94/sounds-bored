@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal developer refactor: tag and set picker logic has been extracted into reusable shared components, reducing code duplication with no change to user-facing behavior.
 - When downloading audio via URL, you can now assign tags and sets to the sound before it downloads — they'll be applied automatically when the download completes.
 - New tag and set pickers in the Download dialog support searching existing entries or creating new ones on the fly.
 - Selected tags and sets are cleared when the dialog is cancelled or after a successful download.
