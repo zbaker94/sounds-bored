@@ -570,6 +570,42 @@ describe("grantParentAccess", () => {
       path: "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music",
     });
   });
+
+  it("does not grant access when dirname returns doubled-interior-separator extended-length UNC root (\\\\?\\\\UNC\\\\\\\\server\\\\share)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\\\server\\share");
+
+    await grantParentAccess("\\\\?\\UNC\\\\server\\share\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns doubled-interior-separator extended-length UNC subfolder (\\\\?\\\\UNC\\\\\\\\server\\\\share\\\\music)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\\\server\\share\\music");
+
+    await grantParentAccess("\\\\?\\UNC\\\\server\\share\\music\\song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\?\\UNC\\\\server\\share\\music",
+    });
+  });
+
+  it("does not grant access when dirname returns doubled-separator-after-server extended-length UNC root (\\\\?\\\\UNC\\\\server\\\\\\\\share)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\\\share");
+
+    await grantParentAccess("\\\\?\\UNC\\server\\\\share\\song.wav");
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("grants access when dirname returns doubled-separator-after-server extended-length UNC subfolder (\\\\?\\\\UNC\\\\server\\\\\\\\share\\\\music)", async () => {
+    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\\\share\\music");
+
+    await grantParentAccess("\\\\?\\UNC\\server\\\\share\\music\\song.wav");
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+      path: "\\\\?\\UNC\\server\\\\share\\music",
+    });
+  });
 });
 
 describe("pickFolder", () => {
