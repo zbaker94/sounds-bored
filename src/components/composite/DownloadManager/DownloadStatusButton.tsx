@@ -17,8 +17,6 @@ export function DownloadStatusButton() {
     }),
   );
 
-  if (!hasJobs) return null;
-
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -30,8 +28,16 @@ export function DownloadStatusButton() {
           />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" sideOffset={8} className="w-80 p-2 gap-0">
-        <DownloadManager />
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className="w-80 p-2 gap-0 bg-zinc-900 text-white border-white/10"
+      >
+        {hasJobs ? (
+          <DownloadManager />
+        ) : (
+          <p className="text-xs text-white/40 px-2 py-1">No downloads yet</p>
+        )}
       </PopoverContent>
     </Popover>
   );

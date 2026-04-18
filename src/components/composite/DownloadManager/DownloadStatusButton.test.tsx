@@ -38,15 +38,16 @@ describe("DownloadStatusButton", () => {
     useDownloadStore.setState({ ...initialDownloadState });
   });
 
-  it("renders nothing when there are no jobs", () => {
-    const { container } = renderButton();
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("renders the button when jobs exist", () => {
-    useDownloadStore.getState().addJob(makeJob("job-1", { status: "completed", percent: 100, outputPath: "/a.mp3" }));
+  it("always renders the button even with no jobs", () => {
     renderButton();
     expect(screen.getByRole("button", { name: /download status/i })).toBeInTheDocument();
+  });
+
+  it("shows empty state text in popover when no jobs", async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByRole("button", { name: /download status/i }));
+    expect(await screen.findByText(/no downloads yet/i)).toBeInTheDocument();
   });
 
   it.each(["queued", "downloading", "processing"] as const)(

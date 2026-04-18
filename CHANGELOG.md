@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- The download status button is now always visible in the toolbar, even when no downloads are active
+- Opening the download panel with no downloads shows a "No downloads yet" placeholder message
+- Completed and failed downloads are now saved to disk and restored when you reopen the app
+- Downloads that were in-progress when the app closed are marked as failed on next launch
 - The Downloads panel now stays visible as a persistent header rather than animating away when the list is empty
 - Active downloads are always shown before completed or cancelled ones in the Downloads panel
 - Minor internal performance improvement to the download status button

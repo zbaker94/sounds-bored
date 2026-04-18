@@ -29,6 +29,7 @@ interface DownloadStoreState {
 }
 
 interface DownloadStoreActions {
+  loadJobs: (jobs: DownloadJob[]) => void;
   addJob: (job: DownloadJob) => void;
   updateJob: (id: string, update: DownloadJobUpdate) => void;
   removeJob: (id: string) => void;
@@ -40,6 +41,8 @@ export const initialDownloadState: DownloadStoreState = {
 
 export const useDownloadStore = create<DownloadStoreState & DownloadStoreActions>((set) => ({
   ...initialDownloadState,
+  loadJobs: (jobs) =>
+    set(() => ({ jobs: Object.fromEntries(jobs.map((j) => [j.id, j])) })),
   addJob: (job) =>
     set((state) => ({ jobs: { ...state.jobs, [job.id]: job } })),
   updateJob: (id, update) =>
