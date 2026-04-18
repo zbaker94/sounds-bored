@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Exported project ZIP files now use "no compression" (Stored) mode, improving export speed for already-compressed audio files
+- Folder picker now shows a clear error message if the selected folder cannot be accessed, instead of silently failing
+- Export now warns you when referenced sounds are missing files and lists how many couldn't be included
+- Export now warns you when multiple sounds share the same filename, which could cause conflicts in the exported zip
+- Project dialog logic (save, confirm-close, export progress) moved into a dedicated component for cleaner code organization
 - Paths containing Unicode BIDI control characters, line/paragraph separators, or BOM characters are now blocked from being granted file access, closing a potential path-spoofing security vulnerability.
 - Accented and CJK characters in folder names continue to work correctly and are unaffected by the new restrictions.
 - Fixed a security bug where UNC paths with doubled separators (e.g. `\\?\UNC\\server\share`) could bypass root path detection and gain unauthorized file access

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { dirname } from "@tauri-apps/api/path";
 import { open, type OpenDialogOptions } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 
 export async function grantPathAccess(folderPath: string): Promise<void> {
   await invoke("grant_path_access", { path: folderPath });
@@ -71,7 +72,13 @@ export interface FilePickerOptions {
 export async function pickFolder(options?: FolderPickerOptions): Promise<string | null> {
   const selected = await open({ ...options, directory: true, multiple: false });
   const path = Array.isArray(selected) ? (selected[0] ?? null) : selected;
-  if (path) await grantPathAccess(path);
+  if (!path) return null;
+  try {
+    await grantPathAccess(path);
+  } catch (err) {
+    toast.error(`Cannot use that folder: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
   return path;
 }
 

@@ -433,7 +433,8 @@ pub fn export_project(
             // Create zip file
             let file = std::fs::File::create(&zip_output_path).map_err(|e| e.to_string())?;
             let mut writer = zip::ZipWriter::new(file);
-            let options = zip::write::SimpleFileOptions::default();
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
 
             // Collect existing sound basenames from source_path/sounds/
             let sounds_dir = format!("{}/sounds", source_path);
