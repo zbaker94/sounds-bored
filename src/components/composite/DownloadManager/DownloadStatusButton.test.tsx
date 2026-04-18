@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { DownloadStatusButton } from "./DownloadStatusButton";
+import { DownloadButton } from "./DownloadStatusButton";
 import { useDownloadStore, initialDownloadState } from "@/state/downloadStore";
 import type { DownloadJob } from "@/lib/schemas";
 
@@ -18,24 +18,33 @@ function makeJob(id: string, overrides: Partial<DownloadJob> = {}): DownloadJob 
   };
 }
 
+const mockOpenDialog = vi.fn();
+
 function renderButton() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <TooltipProvider>
-        <DownloadStatusButton />
+        <DownloadButton onOpenDialog={mockOpenDialog} />
       </TooltipProvider>
     </QueryClientProvider>,
   );
 }
 
-describe("DownloadStatusButton", () => {
+describe("DownloadButton", () => {
   beforeEach(() => {
     useDownloadStore.setState({ ...initialDownloadState });
   });
 
   afterEach(() => {
     useDownloadStore.setState({ ...initialDownloadState });
+  });
+
+  it("calls onOpenDialog when Download from URL is clicked", async () => {
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByRole("button", { name: /download from url/i }));
+    expect(mockOpenDialog).toHaveBeenCalledTimes(1);
   });
 
   it("always renders the button even with no jobs", () => {

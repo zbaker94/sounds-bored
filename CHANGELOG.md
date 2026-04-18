@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- The "Download from URL" button and download status indicator are now combined into a single button group for a cleaner toolbar layout
+- Active download count badge now appears directly on the download status icon
 - The download status button now shows a badge with the count of active downloads in progress, capped at "9+" for 10 or more.
 - The download status button is now always visible in the toolbar, even when no downloads are active
 - Opening the download panel with no downloads shows a "No downloads yet" placeholder message

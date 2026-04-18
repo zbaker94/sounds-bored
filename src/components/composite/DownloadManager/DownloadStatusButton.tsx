@@ -2,11 +2,16 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon, Download04Icon } from "@hugeicons/core-free-icons";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDownloadStore, ACTIVE_STATUSES } from "@/state/downloadStore";
 import { DownloadManager } from "./DownloadManager";
 
-export function DownloadStatusButton() {
+interface DownloadButtonProps {
+  onOpenDialog: () => void;
+}
+
+export function DownloadButton({ onOpenDialog }: DownloadButtonProps) {
   const { hasJobs, hasActive, activeCount } = useDownloadStore(
     useShallow((s) => {
       const all = Object.values(s.jobs);
@@ -21,20 +26,26 @@ export function DownloadStatusButton() {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="secondary" size="icon-sm" aria-label="Download status" className="relative">
-          <HugeiconsIcon
-            icon={hasActive ? Loading03Icon : Download04Icon}
-            size={14}
-            className={hasActive ? "animate-spin" : undefined}
-          />
-          {activeCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold leading-none text-primary-foreground">
-              {activeCount > 9 ? "9+" : activeCount}
-            </span>
-          )}
+      <ButtonGroup>
+        <PopoverTrigger asChild>
+          <Button variant="secondary" size="icon-sm" aria-label="Download status" className="relative">
+            <HugeiconsIcon
+              icon={hasActive ? Loading03Icon : Download04Icon}
+              size={14}
+              className={hasActive ? "animate-spin" : undefined}
+            />
+            {activeCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold leading-none text-primary-foreground">
+                {activeCount > 9 ? "9+" : activeCount}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <ButtonGroupSeparator />
+        <Button variant="secondary" size="sm" onClick={onOpenDialog}>
+          Download from URL
         </Button>
-      </PopoverTrigger>
+      </ButtonGroup>
       <PopoverContent
         align="start"
         sideOffset={8}
