@@ -7,12 +7,14 @@ import { useDownloadStore, ACTIVE_STATUSES } from "@/state/downloadStore";
 import { DownloadManager } from "./DownloadManager";
 
 export function DownloadStatusButton() {
-  const { hasJobs, hasActive } = useDownloadStore(
+  const { hasJobs, hasActive, activeCount } = useDownloadStore(
     useShallow((s) => {
       const all = Object.values(s.jobs);
+      const active = all.filter((j) => ACTIVE_STATUSES.has(j.status));
       return {
         hasJobs: all.length > 0,
-        hasActive: all.some((j) => ACTIVE_STATUSES.has(j.status)),
+        hasActive: active.length > 0,
+        activeCount: active.length,
       };
     }),
   );
@@ -20,12 +22,17 @@ export function DownloadStatusButton() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="secondary" size="icon-sm" aria-label="Download status">
+        <Button variant="secondary" size="icon-sm" aria-label="Download status" className="relative">
           <HugeiconsIcon
             icon={hasActive ? Loading03Icon : Download04Icon}
             size={14}
             className={hasActive ? "animate-spin" : undefined}
           />
+          {activeCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold leading-none text-primary-foreground">
+              {activeCount > 9 ? "9+" : activeCount}
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent

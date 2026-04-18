@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- The download status button now shows a badge with the count of active downloads in progress, capped at "9+" for 10 or more.
 - The download status button is now always visible in the toolbar, even when no downloads are active
 - Opening the download panel with no downloads shows a "No downloads yet" placeholder message
 - Completed and failed downloads are now saved to disk and restored when you reopen the app

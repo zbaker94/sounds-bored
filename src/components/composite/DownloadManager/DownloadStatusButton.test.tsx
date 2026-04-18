@@ -67,6 +67,27 @@ describe("DownloadStatusButton", () => {
     expect(screen.getByRole("button", { name: /download status/i }).querySelector("svg")).toHaveClass("animate-spin");
   });
 
+  it("shows active count badge when downloads are in progress", () => {
+    useDownloadStore.getState().addJob(makeJob("a", { status: "downloading", percent: 10 }));
+    useDownloadStore.getState().addJob(makeJob("b", { status: "processing", percent: 80 }));
+    renderButton();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("shows 9+ badge when more than 9 active downloads", () => {
+    for (let i = 0; i < 10; i++) {
+      useDownloadStore.getState().addJob(makeJob(`j${i}`, { status: "downloading", percent: 0 }));
+    }
+    renderButton();
+    expect(screen.getByText("9+")).toBeInTheDocument();
+  });
+
+  it("hides badge when no active downloads", () => {
+    useDownloadStore.getState().addJob(makeJob("a", { status: "completed", percent: 100, outputPath: "/a.mp3" }));
+    renderButton();
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
+  });
+
   it("does not apply animate-spin when all downloads are completed", () => {
     useDownloadStore.getState().addJob(makeJob("job-1", { status: "completed", percent: 100, outputPath: "/a.mp3" }));
     renderButton();
