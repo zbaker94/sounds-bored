@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- The Downloads panel now stays visible as a persistent header rather than animating away when the list is empty
+- Active downloads are always shown before completed or cancelled ones in the Downloads panel
+- Minor internal performance improvement to the download status button
 - Added a download status button to the sound library toolbar that shows active downloads with a spinning icon and opens a popover with the full download queue
 - Download event listening moved to the main page level so it works regardless of which folder is selected in the sound library
 - Active download jobs are no longer shown inline in the sound list; they now appear exclusively in the download manager popover

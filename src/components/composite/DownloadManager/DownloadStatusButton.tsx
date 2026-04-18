@@ -1,21 +1,21 @@
-import { useMemo } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon, Download04Icon } from "@hugeicons/core-free-icons";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDownloadStore, ACTIVE_STATUSES } from "@/state/downloadStore";
 import { DownloadManager } from "./DownloadManager";
 
 export function DownloadStatusButton() {
-  const jobs = useDownloadStore((s) => s.jobs);
-
-  const { hasJobs, hasActive } = useMemo(() => {
-    const all = Object.values(jobs);
-    return {
-      hasJobs: all.length > 0,
-      hasActive: all.some((j) => ACTIVE_STATUSES.has(j.status)),
-    };
-  }, [jobs]);
+  const { hasJobs, hasActive } = useDownloadStore(
+    useShallow((s) => {
+      const all = Object.values(s.jobs);
+      return {
+        hasJobs: all.length > 0,
+        hasActive: all.some((j) => ACTIVE_STATUSES.has(j.status)),
+      };
+    }),
+  );
 
   if (!hasJobs) return null;
 
