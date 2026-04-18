@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal developer tooling plan added for extracting reusable tag and set picker components (no user-facing changes in this commit).
 - Added a reusable Set Picker component to the "Add to Set" dialog, replacing the inline combobox implementation.
 - The tag and set pickers in the Download dialog now use shared, reusable picker components for a more consistent experience across the app.
 - Added TagPicker and SetPicker components for selecting tags and sets from the sound library
