@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed the "Create" option in library pickers to properly select the newly created item after creation.
 - Added a reusable `LibraryItemPicker` component for selecting and creating tags/sets via a searchable chip input with inline "Create" support
 - Internal developer refactor: tag and set picker logic has been extracted into reusable shared components, reducing code duplication with no change to user-facing behavior.
 - When downloading audio via URL, you can now assign tags and sets to the sound before it downloads — they'll be applied automatically when the download completes.

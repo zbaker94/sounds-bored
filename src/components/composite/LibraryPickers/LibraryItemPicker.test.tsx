@@ -76,13 +76,14 @@ describe("LibraryItemPicker", () => {
     expect(screen.queryByRole("option", { name: /create/i })).not.toBeInTheDocument();
   });
 
-  it("calls onCreate with the typed name when Create is clicked", async () => {
-    const { onCreate } = renderPicker();
+  it("calls onCreate with the typed name when Create is clicked and includes returned id in onChange", async () => {
+    const { onChange, onCreate } = renderPicker();
     const input = screen.getByPlaceholderText("Pick something...");
     await userEvent.click(input);
     await userEvent.type(input, "Gamma");
     const createItem = await screen.findByRole("option", { name: /create "Gamma"/i });
     await act(async () => { fireEvent.click(createItem); });
     expect(onCreate).toHaveBeenCalledWith("Gamma");
+    expect(onChange).toHaveBeenCalledWith(["new-1"]);
   });
 });
