@@ -10,6 +10,8 @@ import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
+import { useDownloadEventListener } from "@/lib/ytdlp.queries";
+import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
@@ -34,6 +36,8 @@ function MainPageInner() {
   useAutoSave();
   useGlobalHotkeys();
   useAudioErrorHandler();
+  const downloadFolderId = useAppSettingsStore((s) => s.settings?.downloadFolderId);
+  useDownloadEventListener(downloadFolderId);
 
   const { reconcile } = useReconcileLibrary();
 

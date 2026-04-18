@@ -22,6 +22,7 @@ export type DownloadJobUpdate =
  * Late sidecar events arriving after cancel/complete must be silently dropped.
  */
 export const TERMINAL_STATUSES = new Set<DownloadStatus>(["completed", "failed", "cancelled"]);
+export const ACTIVE_STATUSES = new Set<DownloadStatus>(["queued", "downloading", "processing"]);
 
 interface DownloadStoreState {
   jobs: Record<string, DownloadJob>;

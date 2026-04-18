@@ -33,9 +33,6 @@ import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
 import { useResolveSoundQueue } from "@/hooks/useResolveSoundQueue";
-import { useDownloadStore } from "@/state/downloadStore";
-import { useDownloadEventListener } from "@/lib/ytdlp.queries";
-import { DownloadItem } from "@/components/composite/DownloadManager/DownloadItem";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
@@ -70,7 +67,6 @@ export function SoundList({
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const project = useProjectStore((s) => s.project);
 
-  const settings = useAppSettingsStore((s) => s.settings);
   const { saveCurrentLibrary } = useSaveCurrentLibrary();
 
   const { previewingId, togglePreview, stopPreview } = useSoundPreview();
@@ -84,24 +80,6 @@ export function SoundList({
     handleSoundDialogResolved,
     handleSoundDialogClose,
   } = useResolveSoundQueue();
-
-  const downloadJobs = useDownloadStore((s) => s.jobs);
-  const downloadFolderId = settings?.downloadFolderId;
-  const isDownloadsFolderSelected =
-    !!downloadFolderId && selectedId === downloadFolderId;
-  const activeDownloadJobs = useMemo(
-    () =>
-      isDownloadsFolderSelected
-        ? Object.values(downloadJobs).filter(
-            (j) =>
-              j.status === "queued" ||
-              j.status === "downloading" ||
-              j.status === "processing",
-          )
-        : [],
-    [downloadJobs, isDownloadsFolderSelected],
-  );
-  useDownloadEventListener(downloadFolderId);
 
   const soundsForSelectedId = useMemo(
     () =>
@@ -314,12 +292,6 @@ export function SoundList({
         </div>
       )}
       <div className="overflow-y-auto p-2 flex-1">
-        {activeDownloadJobs.map((job) => (
-          <DownloadItem key={job.id} job={job} />
-        ))}
-        {activeDownloadJobs.length > 0 && filteredSounds.length > 0 && (
-          <div className="border-t border-white/10 my-1" />
-        )}
         {filteredSounds.map((sound) => {
           const isSoundMissing = missingSoundIds.has(sound.id);
           return (

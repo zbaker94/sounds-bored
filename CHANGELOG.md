@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Added a download status button to the sound library toolbar that shows active downloads with a spinning icon and opens a popover with the full download queue
+- Download event listening moved to the main page level so it works regardless of which folder is selected in the sound library
+- Active download jobs are no longer shown inline in the sound list; they now appear exclusively in the download manager popover
 - Internal code cleanup with no user-facing behavior changes
 - Internal code refactoring: download and export progress events now use cleaner constructor methods — no user-facing behavior changes.
 - Exported project ZIP files now use "no compression" (Stored) mode, improving export speed for already-compressed audio files

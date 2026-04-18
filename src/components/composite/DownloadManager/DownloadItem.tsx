@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCancelDownload } from "@/lib/ytdlp.queries";
+import { ACTIVE_STATUSES } from "@/state/downloadStore";
 import { cn } from "@/lib/utils";
 import type { DownloadJob } from "@/lib/schemas";
 
@@ -21,7 +22,7 @@ interface DownloadItemProps {
 function getDisplayName(job: DownloadJob): string {
   if (job.outputPath) {
     const segments = job.outputPath.split(/[\\/]/);
-    return segments[segments.length - 1] ?? job.outputName;
+    return segments[segments.length - 1] || job.outputName;
   }
   return job.outputName;
 }
@@ -55,10 +56,7 @@ export function DownloadItem({ job }: DownloadItemProps) {
   const { mutate: cancelDownload, isPending: isCancelling } =
     useCancelDownload();
 
-  const isActive =
-    job.status === "queued" ||
-    job.status === "downloading" ||
-    job.status === "processing";
+  const isActive = ACTIVE_STATUSES.has(job.status);
 
   const elapsed = useElapsedTime(job.status === "processing");
 
