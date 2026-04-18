@@ -21,8 +21,8 @@ function isRootPath(path: string): boolean {
     if (inner === "") return true;
     // Extended-length drive root: \\?\C: or \\?\C:\
     if (/^[A-Za-z]:[/\\]?$/.test(inner)) return true;
-    // Extended-length UNC share root: \\?\UNC\server\share (forward or backslash)
-    if (/^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]?$/i.test(inner)) return true;
+    // Extended-length UNC share root: \\?\UNC\server\share (one or more separators at each interior position)
+    if (/^UNC[/\\]+[^/\\]+[/\\]+[^/\\]+[/\\]?$/i.test(inner)) return true;
     // Device namespace: \\?\GLOBALROOT\... — can bypass normal ACL checks
     if (/^GLOBALROOT([/\\]|$)/i.test(inner)) return true;
     // Device volume root: \\?\Volume{GUID} — equivalent to a drive root on Windows
@@ -31,7 +31,7 @@ function isRootPath(path: string): boolean {
     // Volume GUID subfolders under \\?\. Everything else (HarddiskVolumeN, PhysicalDriveN,
     // PIPE, MAILSLOT, BootPartition, etc.) is an unrecognized device-namespace path.
     const isDriveSubfolder = /^[A-Za-z]:[/\\]/.test(inner);
-    const isUncSubfolder = /^UNC[/\\][^/\\]+[/\\][^/\\]+[/\\]/i.test(inner);
+    const isUncSubfolder = /^UNC[/\\]+[^/\\]+[/\\]+[^/\\]+[/\\]/i.test(inner);
     const isVolumeSubfolder = /^Volume\{[^}]+\}[/\\]/i.test(inner);
     if (!isDriveSubfolder && !isUncSubfolder && !isVolumeSubfolder) return true;
   }
