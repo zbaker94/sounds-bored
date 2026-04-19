@@ -65,6 +65,19 @@ describe("PadBackFace", () => {
     });
   });
 
+  it("restores original name when blurred with empty value", async () => {
+    const { pad } = loadPad();
+    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+
+    const input = screen.getByDisplayValue("Kick");
+    await userEvent.clear(input);
+    fireEvent.blur(input);
+
+    expect(screen.getByDisplayValue("Kick")).toBeInTheDocument();
+    const storedPad = useProjectStore.getState().project!.scenes[0].pads[0];
+    expect(storedPad.name).toBe("Kick");
+  });
+
   it("renders a layer row for each layer", () => {
     const { pad } = loadPad();
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);

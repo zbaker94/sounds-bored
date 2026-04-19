@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Clearing a pad's name field and leaving it blank now restores the original name instead of saving an empty name
+- Dragging the fade level slider no longer resets the slider position mid-drag when playback state changes
+- Minor internal cleanup: removed an unused prop from the layer row component
 - The "Synchronized Fades" keyboard shortcut tooltip now shows only `X` (previously showed `F / X`).
 - Pads with a single layer now correctly disable the "Remove Layer" button, preventing accidental deletion of the last layer.
 - Pads now have an editable back face with per-layer controls: play/stop individual layers, adjust layer volume, skip forward/back in sequential arrangements, and edit or remove layers inline

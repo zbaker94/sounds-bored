@@ -64,7 +64,6 @@ const BackFaceLayerRow = memo(function BackFaceLayerRow({
   pad: Pad;
   layer: Layer;
   index: number;
-  sceneId: string;
   canRemove: boolean;
   onEditLayer: () => void;
   onRemoveLayer: () => void;
@@ -246,6 +245,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
 
   function handleNameBlur() {
     const trimmed = localName.trim();
+    if (!trimmed) { setLocalName(pad.name); return; }
     if (trimmed === pad.name) return;
     updatePad(sceneId, pad.id, { ...padToConfig(pad), name: trimmed });
   }
@@ -258,7 +258,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const setPadFadeLevels = useProjectStore((s) => s.setPadFadeLevels);
 
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying && !startThumbDraggingRef.current) {
       setFadeLevels([
         Math.round((pad.fadeLowVol ?? 0) * 100),
         Math.round((pad.fadeHighVol ?? 1) * 100),
@@ -388,9 +388,9 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
             tooltipLabel={(v) => `${v}%`}
             value={fadeLevels}
             onValueChange={(v) => {
-              const next = v as [number, number];
-              if (isPlaying && next[1] !== fadeLevels[1]) setPadVolume(pad.id, next[1] / 100);
-              setFadeLevels(next);
+              const [low, high] = v;
+              if (isPlaying && high !== fadeLevels[1]) setPadVolume(pad.id, high / 100);
+              setFadeLevels([low, high]);
             }}
             onPointerUp={() => {
               startThumbDraggingRef.current = false;
@@ -451,7 +451,6 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
                 pad={pad}
                 layer={layer}
                 index={i}
-                sceneId={sceneId}
                 canRemove={pad.layers.length > 1}
                 onEditLayer={() => handleEditLayer(i)}
                 onRemoveLayer={() => handleRemoveLayer(i)}
