@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking a pad now flips it in place to reveal an inline editing surface, replacing the separate config drawer.
+- Pad name, color, layers, and fade settings can be edited directly on the pad's back face without opening a modal.
+- Per-layer configuration (sound selection, playback mode) is now accessible via a focused dialog opened from the back face.
+- New pads are created and immediately flipped to edit mode, so you can configure them without extra steps.
 - New pads now open immediately in edit mode when added to a scene
 - New pads are created with correct default fade volume settings applied automatically
 - Clicking "Add Pad" now immediately creates the pad and opens the editor, rather than requiring a two-step flow through a dialog first.
