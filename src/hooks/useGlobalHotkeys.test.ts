@@ -34,7 +34,7 @@ const mockUiState = {
   editMode: false,
   activeSceneId: null as string | null,
   hoveredPadId: null as string | null,
-  padPopoverOpenId: null as string | null,
+  editingPadId: null as string | null,
   overlayStack: [] as object[],
   closeOverlay: vi.fn(),
   toggleOverlay: vi.fn(),
@@ -45,6 +45,7 @@ const mockUiState = {
   toggleEditMode: vi.fn(),
   setActiveSceneId: vi.fn((id: string | null) => { mockUiState.activeSceneId = id; }),
   setHoveredPadId: vi.fn(),
+  setEditingPadId: vi.fn((id: string | null) => { mockUiState.editingPadId = id; }),
 };
 
 vi.mock("@/state/uiStore", () => ({
@@ -104,7 +105,7 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     mockUiState.editMode = false;
     mockUiState.activeSceneId = null;
     mockUiState.hoveredPadId = null;
-    mockUiState.padPopoverOpenId = null;
+    mockUiState.editingPadId = null;
     mockUiState.overlayStack = [];
   });
 
@@ -146,7 +147,7 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     });
     mockUiState.editMode = false;
     mockUiState.hoveredPadId = "pad-1";
-    mockUiState.padPopoverOpenId = null;
+    mockUiState.editingPadId = null;
 
     renderHook(() => useGlobalHotkeys());
     triggerKey("f");

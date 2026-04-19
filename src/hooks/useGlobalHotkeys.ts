@@ -6,6 +6,8 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { toast } from "sonner";
+import { createDefaultLayer } from "@/components/composite/PadConfigDrawer/constants";
+import type { PadConfig } from "@/lib/schemas";
 
 /**
  * All keyboard shortcuts for the main editor in one place.
@@ -96,7 +98,7 @@ export function useGlobalHotkeys() {
   // role="slider"), which is in react-hotkeys-hook's default form-tag block list.
   // Without this flag, pressing F while the slider thumb has focus is swallowed.
   useHotkeys("f", () => {
-    const { editMode, hoveredPadId, padPopoverOpenId } = useUiStore.getState();
+    const { editMode, hoveredPadId, editingPadId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
 
     if (editMode) {
@@ -105,7 +107,7 @@ export function useGlobalHotkeys() {
     }
 
     // Normal mode: single-fade the hovered pad if no context popover is open
-    if (hoveredPadId && !padPopoverOpenId) {
+    if (hoveredPadId && !editingPadId) {
       const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
       if (!pad) return;
@@ -131,7 +133,7 @@ export function useGlobalHotkeys() {
   // enableOnFormTags: same reasoning as F above — the fade-level <Slider> in the
   // multi-fade overlay should not swallow this hotkey.
   useHotkeys("x", () => {
-    const { editMode, hoveredPadId, padPopoverOpenId } = useUiStore.getState();
+    const { editMode, hoveredPadId, editingPadId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
 
     if (editMode) {
@@ -140,20 +142,28 @@ export function useGlobalHotkeys() {
     }
 
     // Normal mode: enter multi-fade if hovering a pad and no context popover is open
-    if (hoveredPadId && !padPopoverOpenId) {
+    if (hoveredPadId && !editingPadId) {
       const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
       useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
     }
   }, { enableOnFormTags: true });
 
-  // Mod+Shift+N: open the pad config drawer for the active scene.
+  // Mod+Shift+N: add a new pad to the active scene and flip it into edit mode.
   useHotkeys("mod+shift+n", () => {
-    const { project } = useProjectStore.getState();
-    const { activeSceneId } = useUiStore.getState();
-    if (activeSceneId && project?.scenes.some((s) => s.id === activeSceneId)) {
-      useUiStore.getState().openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
-    }
+    const { project, addPad } = useProjectStore.getState();
+    const { activeSceneId, setEditingPadId } = useUiStore.getState();
+    if (!activeSceneId || !project?.scenes.some((s) => s.id === activeSceneId)) return;
+    const newId = crypto.randomUUID();
+    const config: PadConfig = {
+      name: "",
+      layers: [createDefaultLayer()],
+      muteTargetPadIds: [],
+      fadeLowVol: 0,
+      fadeHighVol: 1,
+    };
+    addPad(activeSceneId, config, newId);
+    setEditingPadId(newId);
   });
 
   // 1-9: jump directly to scene by index.
