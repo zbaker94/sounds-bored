@@ -138,10 +138,17 @@ describe("LayerConfigDialog", () => {
   });
 
   it("renders layer-specific content (sound selector) when opened with an assigned layer", () => {
-    renderDialog();
+    const layer = createMockLayer({
+      id: "layer-1",
+      volume: 73,
+      selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 100 }] },
+    });
+    renderDialog({ layer });
     openDialog();
 
-    expect(screen.getByTestId("sound-selector")).toBeInTheDocument();
+    // Asserts the layer's own volume (73) — derived from the layer prop,
+    // not from any static boilerplate — is rendered in the dialog.
+    expect(screen.getByText("73%")).toBeInTheDocument();
   });
 
   it("calls syncLayerVolume and syncLayerConfig after a successful save", async () => {
