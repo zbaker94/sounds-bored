@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Removed an outdated test comment referencing a deleted component (`PadControlContent`)
+- Internal code cleanup: `createDefaultLayer` now imports directly from its source module instead of a re-export
 - Right-clicking a pad now flips it in place to reveal an inline editing surface, replacing the separate config drawer.
 - Pad name, color, layers, and fade settings can be edited directly on the pad's back face without opening a modal.
 - Per-layer configuration (sound selection, playback mode) is now accessible via a focused dialog opened from the back face.

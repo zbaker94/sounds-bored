@@ -33,7 +33,7 @@ import {
 } from "@/lib/audio/padPlayer";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
-import { createDefaultLayer } from "@/components/composite/PadConfigDrawer/constants";
+import { createDefaultLayer } from "@/lib/padDefaults";
 import { LayerConfigDialog } from "@/components/composite/PadConfigDrawer/LayerConfigDialog";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
 import { toast } from "sonner";

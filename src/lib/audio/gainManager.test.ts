@@ -212,7 +212,5 @@ describe("gainManager", () => {
   });
 
   // commitLayerVolume was removed from gainManager — persisting layer volume to
-  // the project schema is a UI-layer concern. Coverage for the onValueCommit path
-  // that calls useProjectStore.getState().updateLayerVolume() lives in
-  // PadControlContent.test.tsx.
+  // the project schema is a UI-layer concern.
 });
