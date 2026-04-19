@@ -54,7 +54,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
 
   const isFlipped = editMode || editingPadId === pad.id;
 
-  const padWrapperRef = useRef<HTMLDivElement>(null);
+  const padWrapperRef = useRef<HTMLDivElement | null>(null);
 
   // Click-outside: when individually flipped (not global editMode), clicking outside clears editingPadId — unless an overlay is open.
   useEffect(() => {
@@ -62,12 +62,12 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     function handlePointerDown(e: PointerEvent) {
       if (useUiStore.getState().hasOpenOverlay()) return;
       if (!padWrapperRef.current?.contains(e.target as Node)) {
-        setEditingPadId(null);
+        useUiStore.getState().setEditingPadId(null);
       }
     }
     document.addEventListener("pointerdown", handlePointerDown, { capture: true });
     return () => document.removeEventListener("pointerdown", handlePointerDown, { capture: true });
-  }, [editingPadId, pad.id, editMode, setEditingPadId]);
+  }, [editingPadId, pad.id, editMode]);
 
   // Clear hover/editing state if this pad unmounts while it owns either slot
   useEffect(() => {
@@ -154,9 +154,14 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
       : "border-teal-400 ring-2 ring-teal-400";
   }, [isMultiFadeSelected, isPlaying]);
 
+  const mergedRef = useCallback((el: HTMLDivElement | null) => {
+    setNodeRef(el);
+    padWrapperRef.current = el;
+  }, [setNodeRef]);
+
   return (
     <div
-      ref={(el) => { setNodeRef(el); (padWrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = el; }}
+      ref={mergedRef}
       style={dndStyle}
       className={cn("relative w-full h-full", isSortableDragging && "opacity-50")}
       {...(editMode ? attributes : {})}

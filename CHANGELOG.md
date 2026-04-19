@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking a pad to edit it now dismisses more reliably when clicking outside
 - Improved internal test reliability for right-click behavior on pads (no user-facing change)
 - Right-clicking a pad now flips it to its back face inline instead of opening a popover/drawer overlay
 - Individual pads can now flip independently via right-click; clicking outside flips them back
