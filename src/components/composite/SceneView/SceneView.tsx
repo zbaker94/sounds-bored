@@ -1,12 +1,12 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Pad, Sound } from "@/lib/schemas";
+import type { Sound, Layer, PadConfig } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { PAD_STAGGER_MS, padEnterAnimation } from "./padAnimations";
 import { MultiFadePill } from "./MultiFadePill";
-import { PadConfigDrawer } from "../PadConfigDrawer/PadConfigDrawer";
+import { createDefaultLayer } from "../PadConfigDrawer/constants";
 import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,8 +60,9 @@ export function SceneView() {
     () => scenes.find((sc) => sc.id === activeSceneId) ?? null,
     [scenes, activeSceneId],
   );
-  const openOverlay = useUiStore((s) => s.openOverlay);
   const librarySounds = useLibraryStore((s) => s.sounds);
+  const addPad = useProjectStore((s) => s.addPad);
+  const setEditingPadId = useUiStore((s) => s.setEditingPadId);
 
   // Pre-warm HTMLAudioElements for large sounds so the browser has already
   // buffered the file by the time the user triggers the pad.
@@ -114,7 +115,6 @@ export function SceneView() {
   }, [activeScene, librarySounds]);
 
   const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
-  const [editingPad, setEditingPad] = useState<Pad | null>(null);
 
   const addScene = useProjectStore((s) => s.addScene);
   const reorderPads = useProjectStore((s) => s.reorderPads);
@@ -139,10 +139,17 @@ export function SceneView() {
   const pads = activeScene?.pads ?? [];
   const multiFadeActive = useMultiFadeStore((s) => s.active);
 
-  const handleEditClick = useCallback((pad: Pad) => {
-    setEditingPad(pad);
-    openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
-  }, [openOverlay]);
+  const handleAddPad = useCallback(() => {
+    if (!activeSceneId) return;
+    const newId = crypto.randomUUID();
+    const config: PadConfig = {
+      name: "",
+      layers: [createDefaultLayer() as unknown as Layer],
+      muteTargetPadIds: [],
+    };
+    addPad(activeSceneId, config, newId);
+    setEditingPadId(newId);
+  }, [activeSceneId, addPad, setEditingPadId]);
 
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
   const safePage = Math.min(page, totalPages - 1);
@@ -214,7 +221,7 @@ export function SceneView() {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <button
-          onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
+          onClick={handleAddPad}
           className={cn("aspect-square w-40", addPadButtonClass)}
           aria-label="Add pad"
         >
@@ -224,7 +231,6 @@ export function SceneView() {
             className="text-foreground/60"
           />
         </button>
-        <PadConfigDrawer sceneId={activeScene.id} />
       </div>
     );
   }
@@ -262,7 +268,6 @@ export function SceneView() {
                   pad={pad}
                   sceneId={activeScene.id}
                   index={i}
-                  onEditClick={handleEditClick}
                 />
               </div>
             ))}
@@ -272,7 +277,7 @@ export function SceneView() {
                 style={{ animation: padEnterAnimation(displayPads.length * PAD_STAGGER_MS) }}
               >
                 <button
-                  onClick={() => openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog")}
+                  onClick={handleAddPad}
                   className={cn("w-full h-full", addPadButtonClass)}
                   aria-label="Add pad"
                 >
@@ -331,24 +336,6 @@ export function SceneView() {
         )}
       </AnimatePresence>
 
-      <PadConfigDrawer
-        sceneId={activeScene.id}
-        padId={editingPad?.id}
-        initialConfig={
-          editingPad
-            ? {
-                name: editingPad.name,
-                layers: editingPad.layers,
-                muteTargetPadIds: editingPad.muteTargetPadIds,
-                muteGroupId: editingPad.muteGroupId,
-                color: editingPad.color,
-                icon: editingPad.icon,
-                fadeDurationMs: editingPad.fadeDurationMs,
-              }
-            : undefined
-        }
-        onClose={() => setEditingPad(null)}
-      />
     </div>
   );
 }

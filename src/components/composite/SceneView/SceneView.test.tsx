@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
-import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import {
   createMockHistoryEntry,
@@ -86,21 +86,21 @@ describe("SceneView", () => {
     expect(screen.getByRole("button", { name: /add pad/i })).toBeInTheDocument();
   });
 
-  it("clicking Add Pad opens the PAD_CONFIG_DRAWER overlay", async () => {
+  it("clicking Add Pad sets editingPadId in uiStore and adds a pad", async () => {
     renderSceneView();
 
     await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
 
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.PAD_CONFIG_DRAWER)).toBe(true);
+    expect(useUiStore.getState().editingPadId).not.toBeNull();
+    expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(1);
   });
 
-  it("does NOT call addPad directly when Add Pad is clicked (overlay opens first)", async () => {
+  it("clicking Add Pad immediately adds a pad to the store", async () => {
     renderSceneView();
 
     await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
 
-    // No pad created yet — it's created by PadConfigDrawer on form submit
-    expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(0);
+    expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(1);
   });
 
   describe("activeScene derivation", () => {
