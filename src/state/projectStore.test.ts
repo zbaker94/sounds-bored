@@ -437,22 +437,10 @@ describe("projectStore", () => {
     });
 
     it("uses the supplied id when provided", () => {
-      const { loadProject, addPad } = useProjectStore.getState();
-      const project = createMockProject({ scenes: [createMockScene({ id: "scene-1", pads: [] })] });
-      const entry = createMockHistoryEntry();
-      loadProject(entry, project, false);
-
-      const layer = createMockLayer();
-      addPad("scene-1", {
-        name: "Test",
-        layers: [layer],
-        muteTargetPadIds: [],
-        fadeLowVol: 0,
-        fadeHighVol: 1,
-      }, "my-custom-id");
-
-      const pads = useProjectStore.getState().project!.scenes[0].pads;
-      expect(pads[0].id).toBe("my-custom-id");
+      const sceneId = loadWithScene();
+      const config: PadConfig = { name: "Test", layers: [], muteTargetPadIds: [] };
+      getState().addPad(sceneId, config, "my-custom-id");
+      expect(getState().project?.scenes[0].pads[0].id).toBe("my-custom-id");
     });
   });
 
