@@ -182,6 +182,51 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
   });
 });
 
+// ── Mod+Shift+N ───────────────────────────────────────────────────────────────
+
+describe("useGlobalHotkeys — mod+shift+n (add pad)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
+    useProjectStore.setState({ ...initialProjectState });
+    mockUiState.activeSceneId = null;
+    mockUiState.editingPadId = null;
+  });
+
+  it("is a no-op when activeSceneId is null", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: [] }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = null;
+
+    const addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("mod+shift+n");
+
+    expect(addPadSpy).not.toHaveBeenCalled();
+    expect(mockUiState.setEditingPadId).not.toHaveBeenCalled();
+  });
+
+  it("calls addPad and setEditingPadId with a UUID on the happy path", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: [] }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+
+    const addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("mod+shift+n");
+
+    expect(addPadSpy).toHaveBeenCalledTimes(1);
+    const [calledSceneId, , calledId] = addPadSpy.mock.calls[0];
+    expect(calledSceneId).toBe("scene-1");
+    expect(calledId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(mockUiState.setEditingPadId).toHaveBeenCalledWith(calledId);
+  });
+});
+
 // Note: these are registration-level unit tests — they assert which key strings are
 // passed to useHotkeys and that callbacks produce the right store mutations.
 // They do not exercise real keyboard event dispatch; that is covered by E2E/manual tests.

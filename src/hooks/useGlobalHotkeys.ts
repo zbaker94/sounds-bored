@@ -6,8 +6,8 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { toast } from "sonner";
-import { createDefaultLayer } from "@/components/composite/PadConfigDrawer/constants";
-import type { PadConfig } from "@/lib/schemas";
+import { createDefaultLayer } from "@/lib/padDefaults";
+import type { Layer, PadConfig } from "@/lib/schemas";
 
 /**
  * All keyboard shortcuts for the main editor in one place.
@@ -157,10 +157,8 @@ export function useGlobalHotkeys() {
     const newId = crypto.randomUUID();
     const config: PadConfig = {
       name: "",
-      layers: [createDefaultLayer()],
+      layers: [createDefaultLayer() as Layer],
       muteTargetPadIds: [],
-      fadeLowVol: 0,
-      fadeHighVol: 1,
     };
     addPad(activeSceneId, config, newId);
     setEditingPadId(newId);

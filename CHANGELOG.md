@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- New pads added via keyboard shortcut now automatically open in edit mode for immediate configuration
 - Pressing `Mod+Shift+N` now immediately creates a new pad in the active scene and opens it for editing, instead of just opening an empty config drawer.
 - Keyboard shortcuts (`F` for fade, `X` for multi-fade) now correctly check whether a pad is being edited before activating, preventing unintended hotkey triggers during pad editing.
 - Pad editing now uses a backface panel instead of a context popover — clicking a pad to configure it will show its settings on a flipped card face
