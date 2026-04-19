@@ -85,12 +85,6 @@ describe("PadButton", () => {
       useUiStore.setState({ ...initialUiState, editMode: true });
     });
 
-    it("shows the back face when editMode is true", () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
-    });
-
     it("renders PadBackFace on the back face in edit mode", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
@@ -285,10 +279,7 @@ describe("right-click / context menu", () => {
     useUiStore.setState({ ...initialUiState, editMode: true });
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
-    const padName = screen.getByTestId("pad-name");
-    // eslint-disable-next-line testing-library/no-node-access
-    const wrapper = padName.closest("div[style]") ?? padName.parentElement!.parentElement!.parentElement!.parentElement!.parentElement!;
-    fireEvent.contextMenu(wrapper);
+    fireEvent.contextMenu(screen.getByTestId("pad-name"));
     expect(useUiStore.getState().editingPadId).toBeNull();
   });
 
