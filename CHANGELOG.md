@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an edge case where the layer editor dialog could render in a broken state if the target layer was missing or invalid.
 - No user-facing changes; internal test comments removed (no functional impact).
 - Improved test coverage for the Layer Config dialog to verify layer-specific data (volume) is correctly displayed when opening a configured layer.
 - Improved test coverage for the Layer Config Dialog, including validation of sound selector rendering, sync behavior on save, and tag-selection error handling.

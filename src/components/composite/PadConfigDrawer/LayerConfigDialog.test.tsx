@@ -88,15 +88,17 @@ describe("LayerConfigDialog", () => {
 
   it("calls onClose without calling updatePad when Cancel is clicked", async () => {
     const onClose = vi.fn();
-    const updatePadSpy = vi.spyOn(useProjectStore.getState(), "updatePad");
 
     renderDialog({ onClose });
+    const layersBefore = useProjectStore.getState().project?.scenes[0].pads[0].layers;
     openDialog();
 
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(onClose).toHaveBeenCalled();
-    expect(updatePadSpy).not.toHaveBeenCalled();
+    // Assert the pad's layers are unchanged — i.e. updatePad was not called.
+    const layersAfter = useProjectStore.getState().project?.scenes[0].pads[0].layers;
+    expect(layersAfter).toEqual(layersBefore);
   });
 
   it("overlay is open while component is mounted with open state", () => {
@@ -165,13 +167,13 @@ describe("LayerConfigDialog", () => {
 
   it("shows validation error and does not call updatePad when tag selection matches no sounds", async () => {
     const onClose = vi.fn();
-    const updatePadSpy = vi.spyOn(useProjectStore.getState(), "updatePad");
 
     const tagLayer = createMockLayer({
       id: "layer-1",
       selection: { type: "tag", tagIds: ["some-tag"], matchMode: "any", defaultVolume: 100 },
     });
     renderDialog({ onClose, layer: tagLayer });
+    const layersBefore = useProjectStore.getState().project?.scenes[0].pads[0].layers;
     openDialog();
 
     await userEvent.click(screen.getByRole("button", { name: /save layer/i }));
@@ -179,7 +181,9 @@ describe("LayerConfigDialog", () => {
     await waitFor(() => {
       expect(screen.getByText(/no sounds in library match these tags/i)).toBeInTheDocument();
     });
-    expect(updatePadSpy).not.toHaveBeenCalled();
+    // Assert the pad's layers are unchanged — i.e. updatePad was not called.
+    const layersAfter = useProjectStore.getState().project?.scenes[0].pads[0].layers;
+    expect(layersAfter).toEqual(layersBefore);
     expect(onClose).not.toHaveBeenCalled();
   });
 });

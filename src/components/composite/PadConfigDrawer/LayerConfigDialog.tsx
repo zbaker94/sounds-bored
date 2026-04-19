@@ -56,30 +56,36 @@ export interface LayerConfigDialogProps {
   onClose: () => void;
 }
 
-export function LayerConfigDialog({ pad, sceneId, layerIndex, onClose }: LayerConfigDialogProps) {
+export function LayerConfigDialog(props: LayerConfigDialogProps) {
+  const layer = props.pad.layers[props.layerIndex];
+  if (!layer) return null;
+  return <LayerConfigDialogInner {...props} layer={layer} />;
+}
+
+interface LayerConfigDialogInnerProps extends LayerConfigDialogProps {
+  layer: Layer;
+}
+
+function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: LayerConfigDialogInnerProps) {
   const isOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG));
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const updatePad = useProjectStore((s) => s.updatePad);
-
-  const layer = pad.layers[layerIndex];
 
   const methods = useForm<PadConfigForm>({
     resolver: zodResolver(PadConfigSchema) as Resolver<PadConfigForm>,
     defaultValues: {
       name: pad.name,
-      layers: layer
-        ? [
-            {
-              id: layer.id,
-              selection: layer.selection as LayerConfigForm["selection"],
-              arrangement: layer.arrangement,
-              cycleMode: layer.cycleMode,
-              playbackMode: layer.playbackMode,
-              retriggerMode: layer.retriggerMode,
-              volume: layer.volume,
-            },
-          ]
-        : [],
+      layers: [
+        {
+          id: layer.id,
+          selection: layer.selection as LayerConfigForm["selection"],
+          arrangement: layer.arrangement,
+          cycleMode: layer.cycleMode,
+          playbackMode: layer.playbackMode,
+          retriggerMode: layer.retriggerMode,
+          volume: layer.volume,
+        },
+      ],
       fadeDurationMs: pad.fadeDurationMs,
       fadeLowVol: pad.fadeLowVol ?? 0,
       fadeHighVol: pad.fadeHighVol ?? 1,
@@ -90,7 +96,7 @@ export function LayerConfigDialog({ pad, sceneId, layerIndex, onClose }: LayerCo
 
   // Re-populate form when the overlay opens or the target layer changes.
   useEffect(() => {
-    if (!isOpen || !layer) return;
+    if (!isOpen) return;
     reset({
       name: pad.name,
       layers: [
@@ -109,7 +115,7 @@ export function LayerConfigDialog({ pad, sceneId, layerIndex, onClose }: LayerCo
       fadeHighVol: pad.fadeHighVol ?? 1,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, layer?.id]);
+  }, [isOpen, layer.id]);
 
   function handleClose() {
     closeOverlay(OVERLAY_ID.LAYER_CONFIG_DIALOG);
@@ -162,9 +168,6 @@ export function LayerConfigDialog({ pad, sceneId, layerIndex, onClose }: LayerCo
 
     handleClose();
   }
-
-  // If the layer at layerIndex doesn't exist, render nothing.
-  if (!layer) return null;
 
   return (
     <FormProvider {...methods}>
