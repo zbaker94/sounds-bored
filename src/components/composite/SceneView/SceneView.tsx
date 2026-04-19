@@ -1,12 +1,12 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Sound, Layer, PadConfig } from "@/lib/schemas";
+import type { Sound, PadConfig } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { PAD_STAGGER_MS, padEnterAnimation } from "./padAnimations";
 import { MultiFadePill } from "./MultiFadePill";
-import { createDefaultLayer } from "../PadConfigDrawer/constants";
+import { createDefaultStoreLayer } from "@/lib/padDefaults";
 import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +47,6 @@ const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
 
 export function SceneView() {
-  // Register multi-fade hotkeys (escape=cancel, enter=execute)
   useMultiFadeMode();
 
   // Split into two selectors + useMemo so the O(n) .find() scan only runs when
@@ -128,13 +127,13 @@ export function SceneView() {
 
   const page = activeScene ? (pageByScene[activeScene.id] ?? 0) : 0;
 
-  function setPage(updater: (prev: number) => number) {
+  const setPage = useCallback((updater: (prev: number) => number) => {
     if (!activeScene) return;
     setPageByScene((prev) => ({
       ...prev,
       [activeScene.id]: updater(prev[activeScene.id] ?? 0),
     }));
-  }
+  }, [activeScene]);
 
   const pads = activeScene?.pads ?? [];
   const multiFadeActive = useMultiFadeStore((s) => s.active);
@@ -144,8 +143,10 @@ export function SceneView() {
     const newId = crypto.randomUUID();
     const config: PadConfig = {
       name: "",
-      layers: [createDefaultLayer() as unknown as Layer],
+      layers: [createDefaultStoreLayer()],
       muteTargetPadIds: [],
+      fadeLowVol: 0,
+      fadeHighVol: 1,
     };
     addPad(activeSceneId, config, newId);
     setEditingPadId(newId);

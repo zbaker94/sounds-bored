@@ -86,21 +86,14 @@ describe("SceneView", () => {
     expect(screen.getByRole("button", { name: /add pad/i })).toBeInTheDocument();
   });
 
-  it("clicking Add Pad sets editingPadId in uiStore and adds a pad", async () => {
+  it("clicking Add Pad sets editingPadId to the new pad's id in uiStore", async () => {
     renderSceneView();
 
     await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
 
-    expect(useUiStore.getState().editingPadId).not.toBeNull();
-    expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(1);
-  });
-
-  it("clicking Add Pad immediately adds a pad to the store", async () => {
-    renderSceneView();
-
-    await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
-
-    expect(useProjectStore.getState().project?.scenes[0].pads).toHaveLength(1);
+    const pads = useProjectStore.getState().project?.scenes[0].pads;
+    expect(pads).toHaveLength(1);
+    expect(useUiStore.getState().editingPadId).toBe(pads![0].id);
   });
 
   describe("activeScene derivation", () => {

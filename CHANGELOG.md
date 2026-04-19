@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- New pads now open immediately in edit mode when added to a scene
+- New pads are created with correct default fade volume settings applied automatically
 - Clicking "Add Pad" now immediately creates the pad and opens the editor, rather than requiring a two-step flow through a dialog first.
 - Right-clicking a pad to edit it now dismisses more reliably when clicking outside
 - Improved internal test reliability for right-click behavior on pads (no user-facing change)
