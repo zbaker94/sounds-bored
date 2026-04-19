@@ -429,6 +429,15 @@ describe("projectStore", () => {
       expect(getState().project?.scenes[0].pads[0].id).toBeTruthy();
     });
 
+    it("should return the new pad's ID", () => {
+      const sceneId = loadWithScene();
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      const returnedId = getState().addPad(sceneId, config);
+      expect(returnedId).toBeTruthy();
+      expect(typeof returnedId).toBe("string");
+      expect(returnedId).toBe(getState().project?.scenes[0].pads[0].id);
+    });
+
     it("should mark project as dirty", () => {
       const sceneId = loadWithScene();
       const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };

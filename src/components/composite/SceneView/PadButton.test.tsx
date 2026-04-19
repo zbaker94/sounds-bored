@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
@@ -29,22 +28,15 @@ vi.mock("@/components/ui/drawer", () => ({
 
 vi.mock("./PadControlContent", () => ({
   PadControlContent: ({
-    pad,
-    onEditClick,
     onClose,
   }: {
-    pad: { name: string; id: string };
-    onEditClick?: (pad: { name: string; id: string }) => void;
-    onClose: () => void;
+    pad?: { name: string; id: string };
+    onClose?: () => void;
   }) => (
     <div data-testid="pad-control-content">
-      <button
-        type="button"
-        aria-label="Edit pad"
-        onClick={() => { onEditClick?.(pad); onClose(); }}
-      />
       <button type="button" aria-label="Duplicate pad" />
       <button type="button" aria-label="Delete pad" />
+      <button type="button" aria-label="Close" onClick={() => onClose?.()} />
     </div>
   ),
 }));
@@ -121,7 +113,6 @@ describe("PadButton", () => {
     it("shows the edit overlay with action buttons", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.getByRole("button", { name: /edit pad/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /duplicate pad/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /delete pad/i })).toBeInTheDocument();
     });
@@ -130,15 +121,6 @@ describe("PadButton", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
       expect(screen.getByTestId("pad-control-content")).toBeInTheDocument();
-    });
-
-    it("clicking edit button calls onEditClick with the pad", async () => {
-      const pad = loadPadInStore();
-      const onEditClick = vi.fn();
-      render(<PadButton pad={pad} sceneId="scene-1" onEditClick={onEditClick} />);
-      await userEvent.click(screen.getByRole("button", { name: /edit pad/i }));
-      expect(onEditClick).toHaveBeenCalledTimes(1);
-      expect(onEditClick).toHaveBeenCalledWith(pad);
     });
 
   });

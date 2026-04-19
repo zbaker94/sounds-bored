@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Clicking "Add Pad" now instantly creates a pad with default settings and opens its control popover — no longer requires filling out a form first.
+- Pad names are now edited inline directly in the pad control popover, with changes saved automatically after a short delay.
+- Layer sounds, arrangement, playback mode, and retrigger mode are now configurable directly in the pad popover via pill selectors and a sound picker dialog — the separate "Edit Pad" drawer has been removed.
+- Layers can be added and removed from the pad popover without opening a separate configuration drawer.
+- The `Mod+Shift+N` shortcut now immediately creates a new pad in the active scene instead of opening a configuration form.
 - Internal developer tooling plan added for extracting reusable tag and set picker components (no user-facing changes in this commit).
 - Added a reusable Set Picker component to the "Add to Set" dialog, replacing the inline combobox implementation.
 - The tag and set pickers in the Download dialog now use shared, reusable picker components for a more consistent experience across the app.

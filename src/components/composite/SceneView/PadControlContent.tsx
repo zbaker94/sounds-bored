@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/kbd";
 import { Slider } from "@/components/ui/slider";
@@ -18,11 +19,11 @@ import {
   NextIcon,
   PreviousIcon,
   ListMusicIcon,
-  PencilEdit01Icon,
   Copy01Icon,
   Delete02Icon,
   Settings01Icon,
   Layers01Icon,
+  Add01Icon,
 } from "@hugeicons/core-free-icons";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
@@ -40,13 +41,16 @@ import {
   skipLayerForward,
   skipLayerBack,
 } from "@/lib/audio/padPlayer";
-import type { Pad, Sound, Layer } from "@/lib/schemas";
+import type { Pad, PadConfig, Sound, Layer, LayerSelection, Arrangement, PlaybackMode, RetriggerMode } from "@/lib/schemas";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { cn } from "@/lib/utils";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
+import { PillRow } from "./PillRow";
+import { SoundPickerDialog } from "./SoundPickerDialog";
+import { createDefaultLayer } from "@/lib/pad-defaults";
 
 const STAGGER_DELAY = 0.04;
 
@@ -62,7 +66,6 @@ export interface PadControlContentProps {
   pad: Pad;
   sceneId: string;
   onClose?: () => void;
-  onEditClick?: (pad: Pad) => void;
   /** Called after enterMultiFade — allows the caller to exit edit mode in the same
    *  event-handler flush so React 18 batches it with the store update, preventing
    *  the useMultiFadeMode "cancel when editMode && active" effect from firing. */
@@ -71,6 +74,8 @@ export interface PadControlContentProps {
    *  "backface": no local hotkeys (global f/x in useGlobalHotkeys handle edit mode);
    *  tooltip on Synchronized Fades shows both keys. */
   context: "popover" | "backface";
+  /** When true, auto-focuses the pad name input on mount (e.g., pad just created). */
+  isNewPad?: boolean;
 }
 
 export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
@@ -81,14 +86,20 @@ export function getSoundsForLayer(layer: Layer, sounds: Sound[]): Sound[] {
 
 const LayerRow = memo(function LayerRow({
   pad,
+  sceneId,
   layer,
   idx,
   layerActive,
+  canRemove,
+  updatePad,
 }: {
   pad: Pad;
+  sceneId: string;
   layer: Pad["layers"][number];
   idx: number;
   layerActive: boolean;
+  canRemove: boolean;
+  updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
 }) {
   const layerVol = usePlaybackStore(
     (s) => Math.round((s.layerVolumes[layer.id] ?? getLayerNormalizedVolume(layer)) * 100)
@@ -182,6 +193,42 @@ const LayerRow = memo(function LayerRow({
     setIsOverflow(el.scrollWidth > el.clientWidth);
   }, [displayText]);
 
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const applyLayerUpdate = useCallback(
+    (patch: Partial<Layer>) => {
+      const { id, ...config } = pad;
+      const nextLayers = pad.layers.map((l) =>
+        l.id === layer.id ? ({ ...l, ...patch } as Layer) : l
+      );
+      updatePad(sceneId, id, { ...config, layers: nextLayers });
+    },
+    [pad, sceneId, layer.id, updatePad]
+  );
+
+  const handleSelectionChange = useCallback(
+    (selection: LayerSelection) => applyLayerUpdate({ selection }),
+    [applyLayerUpdate]
+  );
+  const handleArrangementChange = useCallback(
+    (arrangement: Arrangement) => applyLayerUpdate({ arrangement }),
+    [applyLayerUpdate]
+  );
+  const handlePlaybackModeChange = useCallback(
+    (playbackMode: PlaybackMode) => applyLayerUpdate({ playbackMode }),
+    [applyLayerUpdate]
+  );
+  const handleRetriggerModeChange = useCallback(
+    (retriggerMode: RetriggerMode) => applyLayerUpdate({ retriggerMode }),
+    [applyLayerUpdate]
+  );
+
+  const handleRemoveLayer = useCallback(() => {
+    const { id, ...config } = pad;
+    const nextLayers = pad.layers.filter((l) => l.id !== layer.id);
+    updatePad(sceneId, id, { ...config, layers: nextLayers });
+  }, [pad, sceneId, layer.id, updatePad]);
+
   return (
     <motion.div
       key={layer.id}
@@ -261,6 +308,23 @@ const LayerRow = memo(function LayerRow({
             </button>
           </>
         )}
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="p-0.5 rounded hover:bg-muted transition-colors"
+          aria-label={`Select sounds for ${layer.name || `Layer ${idx + 1}`}`}
+        >
+          <HugeiconsIcon icon={ListMusicIcon} size={12} />
+        </button>
+        <button
+          type="button"
+          onClick={handleRemoveLayer}
+          disabled={!canRemove}
+          className="p-0.5 rounded hover:bg-destructive/20 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+          aria-label={`Remove ${layer.name || `Layer ${idx + 1}`}`}
+        >
+          <HugeiconsIcon icon={Delete02Icon} size={12} />
+        </button>
       </div>
       {allSounds.length > 0 && (
         <div className="flex items-center gap-1" data-testid="layer-sound-display">
@@ -341,6 +405,22 @@ const LayerRow = memo(function LayerRow({
         max={100}
         step={1}
       />
+      <PillRow
+        layerId={layer.id}
+        arrangement={layer.arrangement}
+        playbackMode={layer.playbackMode}
+        retriggerMode={layer.retriggerMode}
+        onArrangementChange={handleArrangementChange}
+        onPlaybackModeChange={handlePlaybackModeChange}
+        onRetriggerModeChange={handleRetriggerModeChange}
+      />
+      <SoundPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        layerId={layer.id}
+        currentSelection={layer.selection}
+        onSelectionChange={handleSelectionChange}
+      />
     </motion.div>
   );
 });
@@ -351,9 +431,9 @@ export const PadControlContent = memo(function PadControlContent({
   pad,
   sceneId,
   onClose,
-  onEditClick,
   onMultiFade,
   context,
+  isNewPad,
 }: PadControlContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("full");
@@ -361,10 +441,48 @@ export const PadControlContent = memo(function PadControlContent({
   const [subPopover, setSubPopover] = useState<null | "fade" | "layers">(null);
   const fadeOptionsAnchorRef = useRef<HTMLButtonElement>(null);
   const layersAnchorRef = useRef<HTMLButtonElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [nameDraft, setNameDraft] = useState(pad.name);
+  const lastSyncedNameRef = useRef(pad.name);
+  const shouldAutoFocusRef = useRef(isNewPad ?? false);
+  const padIdRef = useRef(pad.id);
+  const sceneIdRef = useRef(sceneId);
 
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
   const deletePad = useProjectStore((s) => s.deletePad);
   const updatePad = useProjectStore((s) => s.updatePad);
+
+  useEffect(() => {
+    if (pad.name !== lastSyncedNameRef.current) {
+      lastSyncedNameRef.current = pad.name;
+      setNameDraft(pad.name);
+    }
+  }, [pad.name]);
+
+  useLayoutEffect(() => {
+    if (shouldAutoFocusRef.current) nameInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => { padIdRef.current = pad.id; }, [pad.id]);
+  useEffect(() => { sceneIdRef.current = sceneId; }, [sceneId]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const store = useProjectStore.getState();
+      const scene = store.project?.scenes.find((s) => s.id === sceneIdRef.current);
+      const freshPad = scene?.pads.find((p) => p.id === padIdRef.current);
+      if (!freshPad || freshPad.name === nameDraft) return;
+      const { id, ...config } = freshPad;
+      lastSyncedNameRef.current = nameDraft;
+      store.updatePad(sceneIdRef.current, id, { ...config, name: nameDraft });
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [nameDraft]);
+
+  const handleAddLayer = useCallback(() => {
+    const { id, ...config } = pad;
+    updatePad(sceneId, id, { ...config, layers: [...pad.layers, createDefaultLayer()] });
+  }, [pad, sceneId, updatePad]);
 
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
@@ -543,11 +661,24 @@ export const PadControlContent = memo(function PadControlContent({
         <LayerRow
           key={layer.id}
           pad={pad}
+          sceneId={sceneId}
           layer={layer}
           idx={idx}
           layerActive={activeLayerIds.has(layer.id)}
+          canRemove={pad.layers.length > 1}
+          updatePad={updatePad}
         />
       ))}
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-label="Add layer"
+        onClick={handleAddLayer}
+        className="mt-1 gap-1.5 border border-dashed border-muted-foreground/40 text-xs"
+      >
+        <HugeiconsIcon icon={Add01Icon} size={12} />
+        Add Layer
+      </Button>
     </div>
   );
 
@@ -568,17 +699,14 @@ export const PadControlContent = memo(function PadControlContent({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
         >
-          <h3 className="font-deathletter tracking-wider text-base font-semibold truncate flex-1 min-w-0">
-            {pad.name}
-          </h3>
-          <Button
-            size="icon-xs"
-            variant="default"
-            aria-label="Edit pad"
-            onClick={() => { onEditClick?.(pad); onClose?.(); }}
-          >
-            <HugeiconsIcon icon={PencilEdit01Icon} size={12} />
-          </Button>
+          <Input
+            ref={nameInputRef}
+            aria-label="Pad name"
+            placeholder="New Pad"
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            className="h-7 flex-1 min-w-0 font-deathletter tracking-wider text-base font-semibold"
+          />
           <Button
             size="icon-xs"
             variant="secondary"

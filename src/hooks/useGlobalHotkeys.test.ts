@@ -55,7 +55,6 @@ vi.mock("@/state/uiStore", () => ({
     EXPORT_PROGRESS_DIALOG: "EXPORT_PROGRESS_DIALOG",
     MENU_DRAWER: "MENU_DRAWER",
     SOUNDS_PANEL: "SOUNDS_PANEL",
-    PAD_CONFIG_DRAWER: "PAD_CONFIG_DRAWER",
     SAVE_PROJECT_DIALOG: "SAVE_PROJECT_DIALOG",
   },
 }));
@@ -336,5 +335,80 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
       expect(mockUiState.activeSceneId).toBe("scene-0");
     });
+  });
+});
+
+describe("useGlobalHotkeys — mod+shift+n adds a pad", () => {
+  let addPadSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
+    useProjectStore.setState({ ...initialProjectState });
+    mockUiState.activeSceneId = null;
+    addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+  });
+
+  it("does nothing when project is null", () => {
+    useProjectStore.setState({ ...initialProjectState, project: null });
+    mockUiState.activeSceneId = "scene-0";
+    addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+    renderHook(() => useGlobalHotkeys());
+
+    triggerKey("mod+shift+n");
+
+    expect(addPadSpy).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when activeSceneId is null", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-0", name: "Scene 1", pads: [] }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = null;
+    addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+    renderHook(() => useGlobalHotkeys());
+
+    triggerKey("mod+shift+n");
+
+    expect(addPadSpy).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when activeSceneId is not in scenes (stale)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-0", name: "Scene 1", pads: [] }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-stale-id";
+    addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+    renderHook(() => useGlobalHotkeys());
+
+    triggerKey("mod+shift+n");
+
+    expect(addPadSpy).not.toHaveBeenCalled();
+  });
+
+  it("calls addPad with the active scene ID and default pad config", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-0", name: "Scene 1", pads: [] }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-0";
+    addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
+    renderHook(() => useGlobalHotkeys());
+
+    triggerKey("mod+shift+n");
+
+    expect(addPadSpy).toHaveBeenCalledTimes(1);
+    expect(addPadSpy).toHaveBeenCalledWith(
+      "scene-0",
+      expect.objectContaining({
+        name: "New Pad",
+        muteTargetPadIds: [],
+        layers: expect.arrayContaining([expect.any(Object)]),
+      }),
+    );
+    const callArgs = addPadSpy.mock.calls[0][1] as { layers: unknown[] };
+    expect(callArgs.layers).toHaveLength(1);
   });
 });

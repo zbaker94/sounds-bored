@@ -7,6 +7,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { isPadActive } from "@/lib/audio/audioState";
 import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { createDefaultLayer } from "@/lib/pad-defaults";
 import { toast } from "sonner";
 
 /**
@@ -18,7 +19,7 @@ export function useGlobalHotkeys() {
 
   // Esc: toggle the menu drawer when nothing is open, otherwise close the topmost overlay.
   // enableOnFormTags: the global Esc handler owns escape for all overlays, including dialogs
-  // with focused inputs (e.g. PadConfigDrawer's name field).
+  // with focused inputs.
   // Exception: EXPORT_PROGRESS_DIALOG is non-dismissible — it owns its own Esc handling.
   // Also: Multi-fade mode owns escape — its useHotkeys handler in useMultiFadeMode
   // cancels the fade. Don't also open the menu drawer.
@@ -150,12 +151,16 @@ export function useGlobalHotkeys() {
     }
   }, { enableOnFormTags: true });
 
-  // Mod+Shift+N: open the pad config drawer for the active scene.
+  // Mod+Shift+N: add a new pad to the active scene with default config.
   useHotkeys("mod+shift+n", () => {
-    const { project } = useProjectStore.getState();
+    const { project, addPad } = useProjectStore.getState();
     const { activeSceneId } = useUiStore.getState();
     if (activeSceneId && project?.scenes.some((s) => s.id === activeSceneId)) {
-      useUiStore.getState().openOverlay(OVERLAY_ID.PAD_CONFIG_DRAWER, "dialog");
+      addPad(activeSceneId, {
+        name: "New Pad",
+        layers: [createDefaultLayer()],
+        muteTargetPadIds: [],
+      });
     }
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { PadControlContent, getSoundsForLayer } from "./PadControlContent";
@@ -14,8 +14,47 @@ vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
     open ? <div>{children}</div> : null,
   PopoverAnchor: () => null,
+  PopoverTrigger: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
+    <button type="button" {...rest}>{children}</button>
+  ),
   PopoverContent: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="popover-content">{children}</div>
+  ),
+}));
+
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? <div role="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock("@/components/ui/select", () => ({
+  Select: ({
+    value,
+    onValueChange,
+    children,
+  }: {
+    value: string;
+    onValueChange: (v: string) => void;
+    children: React.ReactNode;
+  }) => (
+    <select
+      data-testid="set-select"
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SelectValue: () => null,
+  SelectContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => (
+    <option value={value}>{children}</option>
   ),
 }));
 
@@ -51,9 +90,9 @@ function loadPadInStore(padOverrides = {}) {
 
 function renderContent(
   padOverrides = {},
-  onEditClick = vi.fn(),
   onClose = vi.fn(),
-  context: "popover" | "backface" = "popover"
+  context: "popover" | "backface" = "popover",
+  isNewPad = false,
 ) {
   const pad = loadPadInStore(padOverrides);
   render(
@@ -62,12 +101,12 @@ function renderContent(
         pad={pad}
         sceneId="scene-1"
         onClose={onClose}
-        onEditClick={onEditClick}
         context={context}
+        isNewPad={isNewPad}
       />
     </TooltipProvider>
   );
-  return { pad, onEditClick, onClose };
+  return { pad, onClose };
 }
 
 describe("PadControlContent", () => {
@@ -83,23 +122,18 @@ describe("PadControlContent", () => {
   });
 
   describe("header", () => {
-    it("renders pad name in header", () => {
+    it("renders pad name in an editable input", () => {
       renderContent();
-      expect(screen.getByText("Kick")).toBeInTheDocument();
+      const input = screen.getByRole("textbox", { name: /pad name/i }) as HTMLInputElement;
+      expect(input).toBeInTheDocument();
+      expect(input.value).toBe("Kick");
     });
 
-    it("renders Edit, Duplicate, and Delete buttons", () => {
+    it("renders Duplicate and Delete buttons (Edit button removed)", () => {
       renderContent();
-      expect(screen.getByRole("button", { name: /edit pad/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /edit pad/i })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: /duplicate pad/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /delete pad/i })).toBeInTheDocument();
-    });
-
-    it("clicking Edit calls onEditClick with the pad and onClose", async () => {
-      const { pad, onEditClick, onClose } = renderContent();
-      await userEvent.click(screen.getByRole("button", { name: /edit pad/i }));
-      expect(onEditClick).toHaveBeenCalledWith(pad);
-      expect(onClose).toHaveBeenCalled();
     });
 
     it("clicking Duplicate calls duplicatePad and onClose", async () => {
@@ -246,27 +280,32 @@ describe("PadControlContent — hotkeys", () => {
   });
 
   it("pressing f in popover context triggers fade", async () => {
-    renderContent({}, vi.fn(), vi.fn(), "popover");
+    renderContent({}, vi.fn(), "popover");
+    // Focus away from the pad-name input so the hotkey is captured on document
+    (document.activeElement as HTMLElement | null)?.blur();
     await userEvent.keyboard("f");
     const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
     expect(fadePadWithLevels).toHaveBeenCalled();
   });
 
   it("pressing x in popover context enters multi-fade mode", async () => {
-    renderContent({}, vi.fn(), vi.fn(), "popover");
+    renderContent({}, vi.fn(), "popover");
+    (document.activeElement as HTMLElement | null)?.blur();
     await userEvent.keyboard("x");
     expect(useMultiFadeStore.getState().active).toBe(true);
   });
 
   it("pressing f in backface context does NOT trigger fade", async () => {
-    renderContent({}, vi.fn(), vi.fn(), "backface");
+    renderContent({}, vi.fn(), "backface");
+    (document.activeElement as HTMLElement | null)?.blur();
     await userEvent.keyboard("f");
     const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
     expect(fadePadWithLevels).not.toHaveBeenCalled();
   });
 
   it("pressing x in backface context does NOT enter multi-fade mode", async () => {
-    renderContent({}, vi.fn(), vi.fn(), "backface");
+    renderContent({}, vi.fn(), "backface");
+    (document.activeElement as HTMLElement | null)?.blur();
     await userEvent.keyboard("x");
     expect(useMultiFadeStore.getState().active).toBe(false);
   });
@@ -304,7 +343,7 @@ describe("PadControlContent — tooltips", () => {
 
   it("Fade In button shows [F] tooltip in popover context (full mode)", async () => {
     mockResizeObserverWithHeight(300);
-    renderContent({}, vi.fn(), vi.fn(), "popover");
+    renderContent({}, vi.fn(), "popover");
     await userEvent.hover(screen.getByRole("button", { name: /fade in/i }));
     const fKeys = await screen.findAllByText("F", {}, { timeout: 2000 });
     expect(fKeys.length).toBeGreaterThanOrEqual(1);
@@ -312,7 +351,7 @@ describe("PadControlContent — tooltips", () => {
 
   it("Synchronized Fades button shows [X] tooltip in popover context (full mode)", async () => {
     mockResizeObserverWithHeight(300);
-    renderContent({}, vi.fn(), vi.fn(), "popover");
+    renderContent({}, vi.fn(), "popover");
     await userEvent.hover(screen.getByRole("button", { name: /synchronized fades/i }));
     const xKeys = await screen.findAllByText("X", {}, { timeout: 2000 });
     expect(xKeys.length).toBeGreaterThanOrEqual(1);
@@ -320,7 +359,7 @@ describe("PadControlContent — tooltips", () => {
 
   it("Synchronized Fades button shows [F] / [X] tooltip in backface context (full mode)", async () => {
     mockResizeObserverWithHeight(300);
-    renderContent({}, vi.fn(), vi.fn(), "backface");
+    renderContent({}, vi.fn(), "backface");
     await userEvent.hover(screen.getByRole("button", { name: /synchronized fades/i }));
     // Both Kbd elements appear in the tooltip
     const fKeys = await screen.findAllByText("F", {}, { timeout: 2000 });
@@ -331,7 +370,7 @@ describe("PadControlContent — tooltips", () => {
 
   it("Fade In button has no tooltip in backface context (full mode)", async () => {
     mockResizeObserverWithHeight(300);
-    renderContent({}, vi.fn(), vi.fn(), "backface");
+    renderContent({}, vi.fn(), "backface");
     await userEvent.hover(screen.getByRole("button", { name: /fade in/i }));
     // Wait a tick to give tooltip time to appear if it were going to
     await new Promise((r) => setTimeout(r, 50));
@@ -486,6 +525,174 @@ describe("PadControlContent — layer sound display (store-driven)", () => {
     // "Kick · Snare" joined display
     const hits = screen.getAllByText(/Kick · Snare/);
     expect(hits.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("PadControlContent — inline pad name editing", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useLibraryStore.setState({ ...initialLibraryState });
+    useMultiFadeStore.setState({
+      active: false, originPadId: null, selectedPads: new Map(), reopenPadId: null,
+    });
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("pad name input is editable", async () => {
+    const user = userEvent.setup();
+    renderContent();
+    const input = screen.getByRole("textbox", { name: /pad name/i }) as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "Snare");
+    expect(input.value).toBe("Snare");
+  });
+
+  it("auto-focuses the pad name input when isNewPad is true", () => {
+    renderContent({}, vi.fn(), "popover", true);
+    const input = screen.getByRole("textbox", { name: /pad name/i });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("does NOT auto-focus the pad name input when isNewPad is false", () => {
+    renderContent({}, vi.fn(), "popover", false);
+    const input = screen.getByRole("textbox", { name: /pad name/i });
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it("debounces 300ms before calling updatePad with the new name", async () => {
+    vi.useFakeTimers();
+    renderContent();
+    const input = screen.getByRole("textbox", { name: /pad name/i }) as HTMLInputElement;
+
+    act(() => {
+      fireEvent.change(input, { target: { value: "Snare" } });
+    });
+
+    // Before 300ms elapses the store should still show the old name
+    expect(useProjectStore.getState().project!.scenes[0].pads[0].name).toBe("Kick");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(useProjectStore.getState().project!.scenes[0].pads[0].name).toBe("Snare");
+  });
+
+  it("debounce resets on rapid edits — only writes the final value", async () => {
+    vi.useFakeTimers();
+    renderContent();
+    const input = screen.getByRole("textbox", { name: /pad name/i }) as HTMLInputElement;
+
+    act(() => {
+      fireEvent.change(input, { target: { value: "Snar" } });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+
+    act(() => {
+      fireEvent.change(input, { target: { value: "Snare" } });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+
+    // After 200ms + 200ms = 400ms total but the timer was reset; store should still have old name
+    expect(useProjectStore.getState().project!.scenes[0].pads[0].name).toBe("Kick");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    // 200ms + 100ms = 300ms since the second edit — final value written
+    expect(useProjectStore.getState().project!.scenes[0].pads[0].name).toBe("Snare");
+  });
+});
+
+describe("PadControlContent — layer management", () => {
+  beforeEach(() => {
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useLibraryStore.setState({ ...initialLibraryState });
+    useMultiFadeStore.setState({
+      active: false, originPadId: null, selectedPads: new Map(), reopenPadId: null,
+    });
+    vi.clearAllMocks();
+    vi.spyOn(HTMLDivElement.prototype, "getBoundingClientRect").mockReturnValue({
+      height: 350, width: 300,
+      top: 0, left: 0, bottom: 350, right: 300,
+      x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders a sound-picker button per layer", () => {
+    renderContent();
+    expect(screen.getByRole("button", { name: /select sounds for/i })).toBeInTheDocument();
+  });
+
+  it("clicking the sound-picker button opens the SoundPickerDialog", async () => {
+    renderContent();
+    const btn = screen.getByRole("button", { name: /select sounds for/i });
+    await userEvent.click(btn);
+    expect(await screen.findByTestId("sound-picker-dialog-layer-1")).toBeInTheDocument();
+  });
+
+  it("renders a PillRow per layer", () => {
+    renderContent();
+    expect(screen.getByTestId("pill-row-layer-1")).toBeInTheDocument();
+  });
+
+  it("Add Layer button calls updatePad with a new layer appended", async () => {
+    renderContent();
+    await userEvent.click(screen.getByRole("button", { name: /add layer/i }));
+    const pad = useProjectStore.getState().project!.scenes[0].pads[0];
+    expect(pad.layers).toHaveLength(2);
+  });
+
+  it("Remove Layer button calls updatePad with that layer removed", async () => {
+    const extraLayer = createMockLayer({ id: "layer-2" });
+    const firstLayer = createMockLayer({ id: "layer-1" });
+    const pad = createMockPad({
+      id: "pad-1", name: "Kick", layers: [firstLayer, extraLayer],
+    });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    useProjectStore.getState().loadProject(
+      createMockHistoryEntry(),
+      createMockProject({ scenes: [scene] }),
+      false,
+    );
+
+    render(
+      <TooltipProvider>
+        <PadControlContent pad={pad} sceneId="scene-1" context="popover" />
+      </TooltipProvider>
+    );
+
+    const removeButtons = screen.getAllByRole("button", { name: /^remove /i });
+    expect(removeButtons).toHaveLength(2);
+    expect(removeButtons[0]).not.toBeDisabled();
+    await userEvent.click(removeButtons[0]);
+    const stored = useProjectStore.getState().project!.scenes[0].pads[0];
+    expect(stored.layers).toHaveLength(1);
+    expect(stored.layers[0].id).toBe("layer-2");
+  });
+
+  it("Remove Layer button is disabled when only one layer exists", () => {
+    renderContent();
+    const removeBtn = screen.getByRole("button", { name: /^remove /i });
+    expect(removeBtn).toBeDisabled();
   });
 });
 

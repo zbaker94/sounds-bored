@@ -1,6 +1,6 @@
-import type { LayerConfigForm } from "@/lib/schemas";
+import { Layer } from "@/lib/schemas";
 
-export function createDefaultLayer(): LayerConfigForm {
+export function createDefaultLayer(): Layer {
   return {
     id: crypto.randomUUID(),
     selection: { type: "assigned", instances: [] },

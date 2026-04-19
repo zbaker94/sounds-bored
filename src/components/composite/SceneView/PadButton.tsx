@@ -27,14 +27,16 @@ interface PadButtonProps {
   pad: Pad;
   sceneId: string;
   index?: number;
-  onEditClick?: (pad: Pad) => void;
+  autoOpenPopover?: boolean;
+  isNewPad?: boolean;
+  onAutoOpened?: () => void;
 }
 
 // Overdamped spring config: settles in ~5 frames instead of 22+, reducing the
 // RAF tail while preserving the smooth tilt feel.
 const TILT_SPRING = { stiffness: 1200, damping: 80 } as const;
 
-export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEditClick }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, autoOpenPopover, isNewPad, onAutoOpened }: PadButtonProps) {
   // isPlaying drives styling (border, background, drop-shadow, pulse ring).
   // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
@@ -114,6 +116,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
       clearReopenPadId();
     }
   }, [reopenPadId, pad.id, clearReopenPadId]);
+
+  // Auto-open popover on mount for newly created pads.
+  useEffect(() => {
+    if (autoOpenPopover) {
+      setPopoverOpen(true);
+      onAutoOpened?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     attributes,
@@ -363,7 +374,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
                   // same React render (editMode=false, active=true), preventing useMultiFadeMode
                   // from immediately cancelling and reopening the live-control popover.
                   onMultiFade={toggleEditMode}
-                  onEditClick={onEditClick}
+                  isNewPad={isNewPad}
                 />
               </div>
             </div>
@@ -376,7 +387,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
           sceneId={sceneId}
           context="popover"
           onClose={() => setPopoverOpen(false)}
-          onEditClick={onEditClick}
+          isNewPad={isNewPad}
         />
       </PopoverContent>
       </Popover>
@@ -390,7 +401,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
               sceneId={sceneId}
               context="popover"
               onClose={() => setPopoverOpen(false)}
-              onEditClick={onEditClick}
+              isNewPad={isNewPad}
             />
           </div>
         </DrawerContent>
