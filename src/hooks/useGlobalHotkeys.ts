@@ -3,8 +3,6 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { usePlaybackStore } from "@/state/playbackStore";
-import { isPadActive } from "@/lib/audio/audioState";
 import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { toast } from "sonner";
@@ -76,9 +74,9 @@ export function useGlobalHotkeys() {
     useUiStore.getState().toggleEditMode();
     const { enterMultiFade, enterMultiFadeEmpty } = useMultiFadeStore.getState();
     if (hoveredPadId) {
-      const playing = isPadActive(hoveredPadId);
-      const vol = usePlaybackStore.getState().padVolumes[hoveredPadId] ?? 1.0;
-      enterMultiFade(hoveredPadId, playing, vol);
+      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+      const pad = pads.find((p) => p.id === hoveredPadId);
+      enterMultiFade(hoveredPadId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
     } else {
       enterMultiFadeEmpty();
     }
@@ -111,10 +109,9 @@ export function useGlobalHotkeys() {
       const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
       if (!pad) return;
-      const vol = usePlaybackStore.getState().padVolumes[hoveredPadId] ?? 1.0;
       const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
       const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-      fadePadWithLevels(pad, duration, 0, vol).catch((err: unknown) => {
+      fadePadWithLevels(pad, duration).catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         toast.error(`Playback error: audio fade failed — ${message}`);
       });
@@ -144,9 +141,9 @@ export function useGlobalHotkeys() {
 
     // Normal mode: enter multi-fade if hovering a pad and no context popover is open
     if (hoveredPadId && !padPopoverOpenId) {
-      const playing = isPadActive(hoveredPadId);
-      const vol = usePlaybackStore.getState().padVolumes[hoveredPadId] ?? 1.0;
-      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, playing, vol);
+      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+      const pad = pads.find((p) => p.id === hoveredPadId);
+      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
     }
   }, { enableOnFormTags: true });
 

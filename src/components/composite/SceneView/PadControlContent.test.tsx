@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { PadControlContent, getSoundsForLayer } from "./PadControlContent";
@@ -150,6 +150,21 @@ describe("PadControlContent", () => {
 
     it("renders Fade In button when pad is not playing", () => {
       renderContent();
+      expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
+    });
+
+    it("renders Fade Out button when pad is playing and not fading out", () => {
+      renderContent();
+      act(() => { usePlaybackStore.getState().addPlayingPad("pad-1"); });
+      expect(screen.getByRole("button", { name: /fade out/i })).toBeInTheDocument();
+    });
+
+    it("renders Fade In button when pad is playing and fading out (reverse direction)", () => {
+      renderContent();
+      act(() => {
+        usePlaybackStore.getState().addPlayingPad("pad-1");
+        usePlaybackStore.getState().addFadingOutPad("pad-1");
+      });
       expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
     });
 

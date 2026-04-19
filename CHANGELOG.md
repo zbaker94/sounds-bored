@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- You can now configure custom **fade volume levels** (low and high endpoints) per pad — set them in the Pad Config drawer or by dragging the fade slider, and they are saved with your project
+- The **Fade In / Fade Out** button label now correctly shows "Fade In" when a pad is mid-fade-out (reversing), instead of always reading from play state
+- Fade level adjustments made in the pad control overlay are now **persisted** when you release the slider
 - Internal developer tooling plan added for extracting reusable tag and set picker components (no user-facing changes in this commit).
 - Added a reusable Set Picker component to the "Add to Set" dialog, replacing the inline combobox implementation.
 - The tag and set pickers in the Download dialog now use shared, reusable picker components for a more consistent experience across the app.

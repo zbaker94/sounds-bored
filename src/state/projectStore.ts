@@ -41,6 +41,7 @@ interface ProjectActions {
   reorderPads: (sceneId: string, fromIndex: number, toIndex: number) => void;
   updateLayerVolume: (layerId: string, volumePct: number) => void;
   setPadFadeDuration: (sceneId: string, padId: string, durationMs: number | undefined) => void;
+  setPadFadeLevels: (sceneId: string, padId: string, lowVol: number, highVol: number) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -247,6 +248,18 @@ export const useProjectStore = create<ProjectStore>()(
         const pad = scene.pads.find((p) => p.id === padId);
         if (!pad) return;
         pad.fadeDurationMs = durationMs;
+        draft.isDirty = true;
+      }),
+
+    setPadFadeLevels: (sceneId, padId, lowVol, highVol) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const scene = draft.project.scenes.find((s) => s.id === sceneId);
+        if (!scene) return;
+        const pad = scene.pads.find((p) => p.id === padId);
+        if (!pad) return;
+        pad.fadeLowVol = lowVol;
+        pad.fadeHighVol = highVol;
         draft.isDirty = true;
       }),
   }))

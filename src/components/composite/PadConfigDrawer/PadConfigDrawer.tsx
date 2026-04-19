@@ -39,6 +39,8 @@ function defaultPadValues(): PadConfigForm {
     name: "",
     layers: [createDefaultLayer()],
     fadeDurationMs: undefined,
+    fadeLowVol: 0,
+    fadeHighVol: 1,
   };
 }
 
@@ -86,6 +88,8 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
           volume: l.volume,
         })),
         fadeDurationMs: initialConfig.fadeDurationMs,
+        fadeLowVol: initialConfig.fadeLowVol ?? 0,
+        fadeHighVol: initialConfig.fadeHighVol ?? 1,
       });
     } else {
       reset(defaultPadValues());
@@ -145,6 +149,8 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
       // (no-op for a new pad; both fields are optional in PadSchema).
       muteGroupId: initialConfig?.muteGroupId,
       color: initialConfig?.color,
+      fadeLowVol: data.fadeLowVol,
+      fadeHighVol: data.fadeHighVol,
     };
     if (isEditMode && padId) {
       updatePad(sceneId, padId, config);
@@ -186,6 +192,7 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
             </div>
             <LayerAccordion />
             <FadeDurationField />
+            <FadeLevelsField />
           </div>
         }
         footer={
@@ -198,6 +205,57 @@ export function PadConfigDrawer({ sceneId, padId, initialConfig, onClose }: PadC
         }
       />
     </FormProvider>
+  );
+}
+
+function FadeLevelsField() {
+  const { control, watch } = useFormContext<PadConfigForm>();
+  const lowVal = watch("fadeLowVol") ?? 0;
+  const highVal = watch("fadeHighVol") ?? 1;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <Label>Fade Levels</Label>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" tabIndex={-1}
+                className="inline-flex items-center text-muted-foreground hover:text-foreground cursor-help">
+                <HugeiconsIcon icon={InformationCircleIcon} size={14} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">The low and high volume endpoints used when fading this pad in or out.</TooltipContent>
+          </Tooltip>
+        </div>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {Math.round(lowVal * 100)}% – {Math.round(highVal * 100)}%
+        </span>
+      </div>
+      <Controller
+        name="fadeLowVol"
+        control={control}
+        render={({ field: lowField }) => (
+          <Controller
+            name="fadeHighVol"
+            control={control}
+            render={({ field: highField }) => (
+              <Slider
+                min={0}
+                max={100}
+                step={1}
+                value={[Math.round(lowVal * 100), Math.round(highVal * 100)]}
+                onValueChange={([low, high]) => {
+                  lowField.onChange(low / 100);
+                  highField.onChange(high / 100);
+                }}
+              />
+            )}
+          />
+        )}
+      />
+      <p className="text-xs text-muted-foreground">Fade in heads to the high level; fade out heads to the low level.</p>
+    </div>
   );
 }
 

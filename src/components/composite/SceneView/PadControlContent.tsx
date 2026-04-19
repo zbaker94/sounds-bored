@@ -28,7 +28,6 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
-import { isPadActive } from "@/lib/audio/audioState";
 import {
   triggerPad,
   stopPad,
@@ -365,9 +364,10 @@ export const PadControlContent = memo(function PadControlContent({
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
   const deletePad = useProjectStore((s) => s.deletePad);
   const updatePad = useProjectStore((s) => s.updatePad);
+  const setPadFadeLevels = useProjectStore((s) => s.setPadFadeLevels);
 
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
-  const padVolume = usePlaybackStore((s) => s.padVolumes[pad.id] ?? 1.0);
+  const isFadingOut = usePlaybackStore((s) => s.fadingOutPadIds.has(pad.id));
   const activeLayerIds = usePlaybackStore((s) => s.activeLayerIds);
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
   const globalFadeDurationMs = useAppSettingsStore(
@@ -375,7 +375,10 @@ export const PadControlContent = memo(function PadControlContent({
   );
   const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
 
-  const [fadeLevels, setFadeLevels] = useState<[number, number]>([0, 100]);
+  const [fadeLevels, setFadeLevels] = useState<[number, number]>(() => [
+    Math.round((pad.fadeLowVol ?? 0) * 100),
+    Math.round((pad.fadeHighVol ?? 1) * 100),
+  ]);
   const startThumbDraggingRef = useRef(false);
 
   // ResizeObserver — switches display mode based on available height
@@ -390,20 +393,15 @@ export const PadControlContent = memo(function PadControlContent({
     return () => ro.disconnect();
   }, []);
 
-  // Reset end thumb when pad stops
+  // When pad stops, sync slider back to configured levels
   useEffect(() => {
-    if (!isPlaying) setFadeLevels([0, 100]);
-  }, [isPlaying]);
-
-  // Sync right thumb from padVolume when not actively dragging
-  useEffect(() => {
-    if (!startThumbDraggingRef.current) {
-      setFadeLevels((prev) => {
-        const newRight = Math.round(padVolume * 100);
-        return prev[1] === newRight ? prev : [prev[0], newRight];
-      });
+    if (!isPlaying) {
+      setFadeLevels([
+        Math.round((pad.fadeLowVol ?? 0) * 100),
+        Math.round((pad.fadeHighVol ?? 1) * 100),
+      ]);
     }
-  }, [padVolume]);
+  }, [isPlaying, pad.fadeLowVol, pad.fadeHighVol]);
 
   // Clear startThumbDraggingRef on pointer release anywhere
   useEffect(() => {
@@ -433,21 +431,18 @@ export const PadControlContent = memo(function PadControlContent({
   }, [isPlaying, pad]);
 
   const handleFade = useCallback(() => {
-    const fromLevel = fadeLevels[0] / 100;
-    const toLevel = fadeLevels[1] / 100;
-    fadePadWithLevels(pad, fadeDuration, fromLevel, toLevel).catch((err: unknown) => {
+    fadePadWithLevels(pad, fadeDuration).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Playback error: audio fade failed — ${message}`);
     });
     onClose?.();
-  }, [pad, fadeLevels, fadeDuration, onClose]);
+  }, [pad, fadeDuration, onClose]);
 
   const handleMultiFade = useCallback(() => {
-    const playing = isPadActive(pad.id);
-    enterMultiFade(pad.id, playing, padVolume);
+    enterMultiFade(pad.id, pad.fadeLowVol ?? 0, pad.fadeHighVol ?? 1);
     onMultiFade?.();
     onClose?.();
-  }, [pad.id, padVolume, enterMultiFade, onMultiFade, onClose]);
+  }, [pad, enterMultiFade, onMultiFade, onClose]);
 
   // Popover-scoped hotkeys: only active when this component is mounted as a popover/drawer.
   // In backface context, f/x are handled globally by useGlobalHotkeys (edit-mode handler).
@@ -474,6 +469,7 @@ export const PadControlContent = memo(function PadControlContent({
           if (startThumbDraggingRef.current) {
             startThumbDraggingRef.current = false;
           }
+          setPadFadeLevels(sceneId, pad.id, fadeLevels[0] / 100, fadeLevels[1] / 100);
         }}
         onThumbPointerDown={(index) => {
           if (index === 1) startThumbDraggingRef.current = true;
@@ -521,7 +517,7 @@ export const PadControlContent = memo(function PadControlContent({
           <TooltipTrigger asChild>
             <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
               <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-              {isPlaying ? "Fade Out" : "Fade In"}
+              {isPlaying && !isFadingOut ? "Fade Out" : "Fade In"}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top">
@@ -531,7 +527,7 @@ export const PadControlContent = memo(function PadControlContent({
       ) : (
         <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
           <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-          {isPlaying ? "Fade Out" : "Fade In"}
+          {isPlaying && !isFadingOut ? "Fade Out" : "Fade In"}
         </Button>
       )}
     </div>
@@ -748,7 +744,7 @@ export const PadControlContent = memo(function PadControlContent({
                       className="flex-1 gap-1 text-xs"
                     >
                       <HugeiconsIcon icon={VolumeHighIcon} size={12} />
-                      {isPlaying ? "Fade Out" : "Fade In"}
+                      {isPlaying && !isFadingOut ? "Fade Out" : "Fade In"}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
@@ -763,7 +759,7 @@ export const PadControlContent = memo(function PadControlContent({
                   className="flex-1 gap-1 text-xs"
                 >
                   <HugeiconsIcon icon={VolumeHighIcon} size={12} />
-                  {isPlaying ? "Fade Out" : "Fade In"}
+                  {isPlaying && !isFadingOut ? "Fade Out" : "Fade In"}
                 </Button>
               )}
 

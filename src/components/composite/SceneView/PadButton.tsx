@@ -8,7 +8,6 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { usePadVolumeDisplay } from "@/hooks/usePadVolumeDisplay";
-import { isPadActive } from "@/lib/audio/audioState";
 import { getPadSoundState } from "@/lib/projectSoundReconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
@@ -171,9 +170,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0, onEd
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      const vol = usePlaybackStore.getState().padVolumes[pad.id] ?? 1.0;
-      const playing = isPadActive(pad.id);
-      toggleMultiFadePad(pad.id, playing, vol);
+      toggleMultiFadePad(pad.id, pad.fadeLowVol ?? 0, pad.fadeHighVol ?? 1);
     },
   }), [toggleMultiFadePad, pad.id]);
 

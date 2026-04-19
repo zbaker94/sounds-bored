@@ -135,6 +135,27 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     expect(hotkeyRegistrations["right"]).toBeUndefined();
   });
 
+  it("F callback uses pad.fadeLowVol/fadeHighVol from the pad object (not padVolumes)", async () => {
+    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    vi.mocked(fadePadWithLevels).mockResolvedValue(undefined);
+
+    const pad = { id: "pad-1", layers: [], isFadeable: true, fadeLowVol: 0.1, fadeHighVol: 0.9 } as unknown as import("@/lib/schemas").Pad;
+    useProjectStore.setState({
+      ...initialProjectState,
+      project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),
+    });
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = "pad-1";
+    mockUiState.padPopoverOpenId = null;
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("f");
+
+    // fadePadWithLevels is called with just pad and duration — levels come from the pad itself
+    expect(fadePadWithLevels).toHaveBeenCalledWith(expect.anything(), expect.any(Number));
+    expect(fadePadWithLevels).toHaveBeenCalledTimes(1);
+  });
+
   it("F callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {
     const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
     mockUiState.editMode = false;

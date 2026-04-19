@@ -15,6 +15,7 @@ import {
   stopPadVoices,
 } from "./audioState";
 import { resetPadGain } from "./gainManager";
+import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
 
 /**
@@ -65,6 +66,7 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
 
   // 4. Mark this pad as fading out so a reverse fade-in can be detected
   addFadingOutPad(pad.id);
+  usePlaybackStore.getState().addFadingOutPad(pad.id);
 
   // 5. Schedule cleanup. Inlines stopPad behavior via audioState functions directly
   //    to avoid a circular dependency on padPlayer.ts.
@@ -74,6 +76,7 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
     // was pending), skip cleanup so newly-started voices are not killed.
     if (!isPadFadingOut(pad.id)) return;
     removeFadingOutPad(pad.id);
+    usePlaybackStore.getState().removeFadingOutPad(pad.id);
     if (endVol === 0) {
       // Inline stopPad: cancel fade, clear per-layer chain state, stop voices
       cancelPadFade(pad.id);
@@ -97,6 +100,7 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
 export function fadePadInFromCurrent(pad: Pad, durationMs: number, toVolume?: number): void {
   // 1. Cancel the fade-out
   cancelPadFade(pad.id);
+  usePlaybackStore.getState().removeFadingOutPad(pad.id);
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);

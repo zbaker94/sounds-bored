@@ -631,6 +631,61 @@ describe("PadConfigDrawer", () => {
     });
   });
 
+  describe("FadeLevelsField", () => {
+    it("renders a Fade Levels label", () => {
+      renderDrawer();
+      openDrawer();
+      expect(screen.getByText("Fade Levels")).toBeInTheDocument();
+    });
+
+    it("preserves fadeLowVol through a save cycle", async () => {
+      const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 1 }] } });
+      const pad = createMockPad({ id: "pad-1", name: "FX", layers: [layer], fadeLowVol: 0.2, fadeHighVol: 0.8 });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      useLibraryStore.setState({ sounds: [createMockSound({ id: "s1", name: "FX Sound" })], tags: [], sets: [], isDirty: false });
+
+      render(
+        <TooltipProvider>
+          <PadConfigDrawer
+            sceneId="scene-1"
+            padId="pad-1"
+            initialConfig={{ name: "FX", layers: [layer], muteTargetPadIds: [], fadeLowVol: 0.2, fadeHighVol: 0.8 }}
+          />
+        </TooltipProvider>,
+      );
+      openDrawer();
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        const saved = useProjectStore.getState().project?.scenes[0].pads[0];
+        expect(saved?.fadeLowVol).toBeCloseTo(0.2, 2);
+        expect(saved?.fadeHighVol).toBeCloseTo(0.8, 2);
+      });
+    });
+
+    it("saves default fade levels (0 and 1) when no initialConfig levels are provided", async () => {
+      const sound = createMockSound({ id: "sound-1", name: "Kick" });
+      useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+
+      renderDrawer();
+      openDrawer();
+
+      await userEvent.type(screen.getByLabelText(/pad name/i), "Kick");
+
+      const checkbox = await screen.findByRole("checkbox", { name: /kick/i });
+      await userEvent.click(checkbox);
+
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        const saved = useProjectStore.getState().project?.scenes[0].pads[0];
+        expect(saved?.fadeLowVol).toBe(0);
+        expect(saved?.fadeHighVol).toBe(1);
+      });
+    });
+  });
+
   describe("FadeDurationField", () => {
     it("renders a Fade Duration info icon tooltip", () => {
       renderDrawer();

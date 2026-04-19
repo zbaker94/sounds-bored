@@ -34,6 +34,12 @@ interface PlaybackState {
   removePlayingPad: (padId: string) => void;
   clearAllPlayingPads: () => void;
 
+  // Which pad IDs are currently fading out (for label direction in UI)
+  // Push-based: set when a fade-out ramp starts, cleared on completion or cancel.
+  fadingOutPadIds: Set<string>;
+  addFadingOutPad: (padId: string) => void;
+  removeFadingOutPad: (padId: string) => void;
+
   // Whether a sound preview is currently playing (for Stop All button state)
   isPreviewPlaying: boolean;
   setIsPreviewPlaying: (v: boolean) => void;
@@ -85,6 +91,7 @@ interface PlaybackState {
 export const initialPlaybackState = {
   masterVolume: 100,
   get playingPadIds() { return new Set<string>(); },
+  get fadingOutPadIds() { return new Set<string>(); },
   get padVolumes() { return {} as Record<string, number>; },
   get layerVolumes() { return {} as Record<string, number>; },
   get padProgress() { return {} as Record<string, number>; },
@@ -118,6 +125,22 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
     }),
 
   clearAllPlayingPads: () => set({ playingPadIds: new Set() }),
+
+  fadingOutPadIds: new Set<string>(),
+  addFadingOutPad: (padId) =>
+    set((s) => {
+      if (s.fadingOutPadIds.has(padId)) return s;
+      const next = new Set(s.fadingOutPadIds);
+      next.add(padId);
+      return { fadingOutPadIds: next };
+    }),
+  removeFadingOutPad: (padId) =>
+    set((s) => {
+      if (!s.fadingOutPadIds.has(padId)) return s;
+      const next = new Set(s.fadingOutPadIds);
+      next.delete(padId);
+      return { fadingOutPadIds: next };
+    }),
 
   isPreviewPlaying: false,
   setIsPreviewPlaying: (v) => set({ isPreviewPlaying: v }),

@@ -61,29 +61,31 @@ describe("useMultiFadeMode — selectedPads management", () => {
   });
 
   it("adds a pad after togglePad()", () => {
+    const pads = loadPadsInStore(2);
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => {
-      result.current.enter("pad-0");
+      result.current.enter(pads[0].id);
     });
     act(() => {
-      result.current.togglePad("pad-1", false, 1.0);
+      result.current.togglePad(pads[1].id);
     });
-    expect(result.current.selectedPads.has("pad-1")).toBe(true);
+    expect(result.current.selectedPads.has(pads[1].id)).toBe(true);
   });
 
   it("removes the pad when togglePad() is called again for the same pad", () => {
+    const pads = loadPadsInStore(2);
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => {
-      result.current.enter("pad-0");
+      result.current.enter(pads[0].id);
     });
     act(() => {
-      result.current.togglePad("pad-1", false, 1.0);
+      result.current.togglePad(pads[1].id);
     });
-    expect(result.current.selectedPads.has("pad-1")).toBe(true);
+    expect(result.current.selectedPads.has(pads[1].id)).toBe(true);
     act(() => {
-      result.current.togglePad("pad-1", false, 1.0);
+      result.current.togglePad(pads[1].id);
     });
-    expect(result.current.selectedPads.has("pad-1")).toBe(false);
+    expect(result.current.selectedPads.has(pads[1].id)).toBe(false);
   });
 });
 
@@ -200,7 +202,7 @@ describe("useMultiFadeMode — execute()", () => {
     });
     // Toggle to add a second pad
     act(() => {
-      result.current.togglePad(pads[1].id, false, 1.0);
+      result.current.togglePad(pads[1].id);
     });
 
     act(() => {
@@ -237,45 +239,38 @@ describe("useMultiFadeMode — execute()", () => {
     expect(fadePadWithLevels).not.toHaveBeenCalled();
   });
 
-  it("execute() passes correct fromLevel and toLevel to fadePadWithLevels", async () => {
+  it("execute() uses pad.fadeLowVol and pad.fadeHighVol (not multiFadeStore levels)", async () => {
     const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
-    // Set up: one non-playing pad with custom levels
     const pads = loadPadsInStore(1);
     const pad = pads[0];
 
-    // Enter multi-fade and set specific levels [20, 75]
     act(() => {
-      useMultiFadeStore.getState().enterMultiFade("some-origin", false);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, false, 0.75);
-      useMultiFadeStore.getState().setMultiFadeLevels(pad.id, [20, 75]);
+      useMultiFadeStore.getState().enterMultiFade("some-origin", 0, 1);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, 0, 0.75);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => { result.current.execute(); });
 
-    expect(fadePadWithLevels).toHaveBeenCalledWith(pad, 1000, 0.20, 0.75);
-    // Note: 1000 comes from the mocked resolveFadeDuration
+    // fadePadWithLevels now reads from pad — no level args passed
+    expect(fadePadWithLevels).toHaveBeenCalledWith(pad, 1000);
   });
 
   it("execute() calls fadePadWithLevels for both playing and non-playing pads", async () => {
     const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
-    // Two pads: one playing, one not
     const pads = loadPadsInStore(2);
     const [pad0, pad1] = pads;
 
     act(() => {
-      useMultiFadeStore.getState().enterMultiFade("some-origin", false);
-      // pad0: playing=true, pad1: playing=false
-      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, true, 0.8);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, false, 0.5);
+      useMultiFadeStore.getState().enterMultiFade("some-origin", 0, 1);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, 0, 0.8);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, 0, 0.5);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => { result.current.execute(); });
 
-    // Both pads should be called
     expect(fadePadWithLevels).toHaveBeenCalledTimes(2);
-    // Verify each pad was called with its correct pad object
     const calledPadIds = (fadePadWithLevels as ReturnType<typeof vi.fn>).mock.calls.map(
       (call) => (call[0] as { id: string }).id
     );
@@ -349,14 +344,10 @@ describe("executeMultiFadeNow integration", () => {
     expect(fadePadWithLevels).toHaveBeenCalledWith(
       expect.objectContaining({ id: "pad-exec-1" }),
       expect.any(Number),
-      0,       // levels[0] / 100
-      0.8,     // levels[1] / 100
     );
     expect(fadePadWithLevels).toHaveBeenCalledWith(
       expect.objectContaining({ id: "pad-exec-2" }),
       expect.any(Number),
-      0.2,     // levels[0] / 100
-      1.0,     // levels[1] / 100
     );
 
     // Store should be reset after execute

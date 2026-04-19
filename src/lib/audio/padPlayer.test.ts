@@ -2897,8 +2897,8 @@ describe("fadePadIn — custom fromVolume and toVolume", () => {
 
 // ─── executeFadeTap — custom volumes ─────────────────────────────────────────
 
-describe("executeFadeTap — custom fromVolume and toVolume", () => {
-  it("fades out to custom toVolume when pad is active", async () => {
+describe("executeFadeTap — pad.fadeLowVol and pad.fadeHighVol", () => {
+  it("fades out to pad.fadeLowVol when pad is active", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
     const gain = makeMockGain();
@@ -2907,6 +2907,8 @@ describe("executeFadeTap — custom fromVolume and toVolume", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-custom-out-pad",
+      fadeLowVol: 0.2,
+      fadeHighVol: 1.0,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -2914,13 +2916,13 @@ describe("executeFadeTap — custom fromVolume and toVolume", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-    executeFadeTap(pad, undefined, 1.0, 0.2);
+    executeFadeTap(pad);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
     clearAllFadeTracking();
   });
 
-  it("fades in to custom toVolume when pad is not active", async () => {
+  it("fades in to pad.fadeHighVol when pad is not active", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
     const gain = makeMockGain();
@@ -2929,13 +2931,15 @@ describe("executeFadeTap — custom fromVolume and toVolume", () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-custom-in-pad",
+      fadeLowVol: 0,
+      fadeHighVol: 0.7,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
       sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
-    executeFadeTap(pad, undefined, 0.0, 0.7);
+    executeFadeTap(pad);
     await tick();
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, expect.any(Number));
@@ -3581,7 +3585,7 @@ describe("skipLayerBack", () => {
 // ─── fadePadWithLevels ────────────────────────────────────────────────────────
 
 describe("fadePadWithLevels", () => {
-  it("calls fadePadOut (volume transition) with SWAPPED levels when pad is playing", async () => {
+  it("fades out to pad.fadeLowVol when pad is playing", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
     mockCtx.createGain.mockReturnValue(makeMockGain());
@@ -3589,6 +3593,8 @@ describe("fadePadWithLevels", () => {
     const { triggerPad, fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-playing-pad",
+      fadeLowVol: 0.2,
+      fadeHighVol: 0.8,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3598,20 +3604,74 @@ describe("fadePadWithLevels", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-
-    // fadePadWithLevels(pad, 1000, fromLevel=0.2, toLevel=0.8)
-    // Since pad is playing, should call fadePadOut with swapped args:
-    //   fadePadOut(pad, 1000, fromVolume=0.8, toVolume=0.2)
-    // This ramps the gain from 0.8 down to 0.2.
     const gain = (await import("./padPlayer")).getPadGain(pad.id);
-    fadePadWithLevels(pad, 1000, 0.2, 0.8);
+    fadePadWithLevels(pad, 1000);
 
-    // fadePadOut schedules a ramp — verify the ramp was called with the toVolume=0.2 (swapped fromLevel)
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
     clearAllFadeTracking();
   });
 
-  it("shows volume transition when pad is playing", async () => {
+  it("starts fade-out from current gain, not from fadeHighVol, when pad is playing", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const mockGain = makeMockGain();
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(mockGain);
+
+    const { triggerPad, fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-current-gain-pad",
+      fadeLowVol: 0.2,
+      fadeHighVol: 0.8,
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    // Simulate pad playing at 0.6 (distinct from fadeHighVol=0.8)
+    mockGain.gain.value = 0.6;
+    mockGain.gain.setValueAtTime.mockClear();
+
+    fadePadWithLevels(pad, 1000);
+
+    // Ramp should start from current gain (0.6), not from fadeHighVol (0.8)
+    expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
+    expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("inactive fade-in always starts from silence (0), ignoring fadeLowVol", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const mockGain = makeMockGain();
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(mockGain);
+
+    const { fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-silence-start-pad",
+      fadeLowVol: 0.3,
+      fadeHighVol: 0.8,
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    fadePadWithLevels(pad, 1000);
+    await tick();
+
+    // Should start from 0 (silence), not from fadeLowVol=0.3
+    expect(mockGain.gain.setValueAtTime).not.toHaveBeenCalledWith(0.3, expect.any(Number));
+    expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("shows volume transition when pad is playing (default levels)", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
     mockCtx.createGain.mockReturnValue(makeMockGain());
@@ -3628,7 +3688,7 @@ describe("fadePadWithLevels", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-    fadePadWithLevels(pad, 1000, 0.0, 1.0);
+    fadePadWithLevels(pad, 1000);
 
     expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
@@ -3651,14 +3711,13 @@ describe("fadePadWithLevels", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-    const result = fadePadWithLevels(pad, 1000, 0.0, 1.0);
+    const result = fadePadWithLevels(pad, 1000);
 
-    // Playing path returns Promise.resolve()
     await expect(result).resolves.toBeUndefined();
     clearAllFadeTracking();
   });
 
-  it("fades in (ramps gain up) when pad is not playing", async () => {
+  it("fades in (ramps gain up to fadeHighVol) when pad is not playing", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
     mockCtx.createGain.mockReturnValue(makeMockGain());
@@ -3666,6 +3725,8 @@ describe("fadePadWithLevels", () => {
     const { fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-not-playing-pad",
+      fadeLowVol: 0,
+      fadeHighVol: 0.8,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3674,11 +3735,8 @@ describe("fadePadWithLevels", () => {
       sets: [],
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
-    // Pad is NOT playing — fadePadWithLevels should call fadePadIn(pad, 1000, 0.0, 0.8)
-    // fadePadIn triggers the pad then ramps gain up to toLevel=0.8
-    const resultPromise = fadePadWithLevels(pad, 1000, 0.0, 0.8);
+    const resultPromise = fadePadWithLevels(pad, 1000);
 
-    // fadePadIn path triggers the pad and starts a volume transition
     await vi.waitFor(() => {
       expect(isPadFading(pad.id)).toBe(true);
     });
@@ -3686,7 +3744,7 @@ describe("fadePadWithLevels", () => {
     clearAllFadeTracking();
   });
 
-  it("ramps gain to toLevel (not 1.0) when pad is not playing", async () => {
+  it("ramps gain to fadeHighVol (not 1.0) when pad is not playing", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     const mockGain = makeMockGain();
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
@@ -3695,6 +3753,8 @@ describe("fadePadWithLevels", () => {
     const { fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-ramp-level-pad",
+      fadeLowVol: 0,
+      fadeHighVol: 0.6,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3703,12 +3763,113 @@ describe("fadePadWithLevels", () => {
       sets: [],
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
-    // fromLevel=0.0, toLevel=0.6 — fadePadIn should ramp to 0.6, not 1.0
-    fadePadWithLevels(pad, 1000, 0.0, 0.6);
+    fadePadWithLevels(pad, 1000);
 
     await vi.waitFor(() => {
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
     });
+    clearAllFadeTracking();
+  });
+
+  it("reverses an in-progress fade-out to fadeHighVol instead of starting a new fade-out", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const mockGain = makeMockGain();
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(mockGain);
+
+    const { triggerPad, fadePadWithLevels, clearAllFadeTracking } = await import("./padPlayer");
+    const { fadePadOut } = await import("./fadeMixer");
+    const { isPadFadingOut } = await import("./audioState");
+    const pad = createMockPad({
+      id: "fpl-reverse-fadeout-pad",
+      fadeLowVol: 0,
+      fadeHighVol: 1.0,
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    await triggerPad(pad);
+    fadePadOut(pad, 2000);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+
+    mockGain.gain.linearRampToValueAtTime.mockClear();
+    fadePadWithLevels(pad, 1000);
+
+    // Should ramp UP to fadeHighVol=1.0, not DOWN to fadeLowVol=0
+    expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+    expect(isPadFadingOut(pad.id)).toBe(false);
+    clearAllFadeTracking();
+  });
+
+  it("reverses an in-progress fade-in by ramping down from current gain to fadeLowVol", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const mockGain = makeMockGain();
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(mockGain);
+
+    const { fadePadWithLevels, clearAllFadeTracking, isPadFading } = await import("./padPlayer");
+    const pad = createMockPad({
+      id: "fpl-reverse-fadein-pad",
+      fadeLowVol: 0,
+      fadeHighVol: 0.8,
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    // Start a fade-in (pad not playing → fadePadIn triggers + ramps to fadeHighVol=0.8)
+    fadePadWithLevels(pad, 2000);
+    await tick();
+
+    expect(isPadFading(pad.id)).toBe(true);
+
+    // Simulate mid-fade-in: gain is partway between 0 and 0.8
+    mockGain.gain.value = 0.4;
+    mockGain.gain.linearRampToValueAtTime.mockClear();
+    mockGain.gain.setValueAtTime.mockClear();
+
+    // Reverse: ramp from current (0.4) → fadeLowVol (0), not from fadeHighVol (0.8) → 0
+    fadePadWithLevels(pad, 1000);
+
+    expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.4, expect.any(Number));
+    expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+    clearAllFadeTracking();
+  });
+
+  it("is a no-op when pad is not playing and already fading", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const mockGain = makeMockGain();
+    mockCtx.createBufferSource.mockReturnValue(makeMockSource());
+    mockCtx.createGain.mockReturnValue(mockGain);
+
+    const { fadePadWithLevels, clearAllFadeTracking, isPadFading } = await import("./padPlayer");
+    const { setFadePadTimeout } = await import("./audioState");
+    const pad = createMockPad({
+      id: "fpl-noop-fading-pad",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
+    });
+    useLibraryStore.setState({
+      sounds: [createMockSound({ id: "s1", filePath: "sounds/test.wav" })],
+      tags: [],
+      sets: [],
+    } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
+
+    const fakeTimeout = setTimeout(() => {}, 99999);
+    setFadePadTimeout(pad.id, fakeTimeout);
+    expect(isPadFading(pad.id)).toBe(true);
+
+    mockGain.gain.linearRampToValueAtTime.mockClear();
+    await fadePadWithLevels(pad, 1000);
+
+    expect(mockGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    clearTimeout(fakeTimeout);
     clearAllFadeTracking();
   });
 });

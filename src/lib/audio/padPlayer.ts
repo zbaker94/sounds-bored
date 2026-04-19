@@ -40,6 +40,7 @@ import {
   isLayerActive,
   isLayerPending,
   isPadActive,
+  isPadFading,
   isPadFadingOut,
   nullAllOnEnded,
   setFadePadTimeout,
@@ -136,25 +137,44 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
 }
 
 /**
+ * Shared 3-state fade toggle: reverse an in-progress fade-out, start a fade-out,
+ * or fade in — depending on current audio state.
+ *
+ * Reads fadeLowVol/fadeHighVol from the pad (defaulting to 0/1) so every trigger
+ * path uses the same configured endpoints without callers needing to supply them.
+ */
+function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
+  const lowVol = pad.fadeLowVol ?? 0;
+  const highVol = pad.fadeHighVol ?? 1;
+
+  if (isPadActive(pad.id)) {
+    if (isPadFadingOut(pad.id)) {
+      fadePadInFromCurrent(pad, duration, highVol);
+      return Promise.resolve();
+    }
+    // Active (fading-in or not fading): fade out from current gain toward lowVol.
+    // fadePadOut cancels any in-progress fade-in before starting the ramp.
+    fadePadOut(pad, duration, undefined, lowVol);
+    return Promise.resolve();
+  }
+  // Not playing — leave any in-progress fade alone
+  if (isPadFading(pad.id)) return Promise.resolve();
+  // Always start from silence; lowVol is only the fade-out endpoint
+  return fadePadIn(pad, duration, undefined, highVol);
+}
+
+/**
  * Orchestration entry point for a single-pad fade tap (fade mode).
  * Determines whether to reverse a fade-out, start a fade-out, or fade in
  * based on current audio state — keeping that decision in the audio layer
  * rather than in the UI hook.
  */
-export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number, fromVolume?: number, toVolume?: number): void {
+export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
   if (!isFadeablePad(pad)) return;
   const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-  if (isPadActive(pad.id)) {
-    if (isPadFadingOut(pad.id)) {
-      fadePadInFromCurrent(pad, duration, toVolume);
-    } else {
-      fadePadOut(pad, duration, fromVolume, toVolume);
-    }
-  } else {
-    fadePadIn(pad, duration, fromVolume, toVolume).catch((err: unknown) => {
-      emitAudioError(err);
-    });
-  }
+  applyFadeToggle(pad, duration).catch((err: unknown) => {
+    emitAudioError(err);
+  });
 }
 
 /**
@@ -314,6 +334,7 @@ export function syncLayerConfig(layer: import("@/lib/schemas").Layer, original: 
 /** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
   cancelPadFade(pad.id);
+  usePlaybackStore.getState().removeFadingOutPad(pad.id);
   for (const layer of pad.layers) {
     deleteLayerChain(layer.id);
     deleteLayerCycleIndex(layer.id);
@@ -474,6 +495,7 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
           deleteStopCleanupTimeout(timeoutId);
           if (!isPadActive(pad.id)) {
             usePlaybackStore.getState().removePlayingPad(pad.id);
+            usePlaybackStore.getState().removeFadingOutPad(pad.id);
           }
         }, STOP_RAMP_S * 1000 + 10);
         addStopCleanupTimeout(timeoutId);
@@ -521,6 +543,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
     deleteStopCleanupTimeout(stopCleanupId);
     if (!isPadActive(pad.id)) {
       usePlaybackStore.getState().removePlayingPad(pad.id);
+      usePlaybackStore.getState().removeFadingOutPad(pad.id);
     }
   }, STOP_RAMP_S * 1000 + 10);
   addStopCleanupTimeout(stopCleanupId);
@@ -592,30 +615,13 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
 }
 
 /**
- * Fade a pad in or out based on its current playback state, using slider-convention level endpoints.
+ * Fade a pad in or out based on its current playback state.
  *
- * Level convention (matches the UI slider layout):
- *   - `fromLevel` is the LEFT thumb — the LOWER volume endpoint (end of fade-out / start of fade-in)
- *   - `toLevel` is the RIGHT thumb — the HIGHER volume endpoint (start of fade-out / end of fade-in)
- *
- * When the pad is PLAYING (fade-out): fades from `toLevel` → `fromLevel` (high → low).
- * When the pad is NOT PLAYING (fade-in): fades from `fromLevel` → `toLevel` (low → high).
+ * Uses pad.fadeLowVol (lower endpoint) and pad.fadeHighVol (higher endpoint),
+ * defaulting to 0 and 1. The toggle direction is determined by current audio state.
  */
-export function fadePadWithLevels(
-  pad: Pad,
-  duration: number,
-  fromLevel: number,
-  toLevel: number,
-): Promise<void> {
-  const playing = isPadActive(pad.id);
-  if (playing) {
-    // fromLevel is the lower end-level, toLevel is the higher start-level (per UI convention)
-    // fadePadOut expects (fromVolume=start/current, toVolume=end/lower)
-    fadePadOut(pad, duration, toLevel, fromLevel);
-    return Promise.resolve();
-  } else {
-    return fadePadIn(pad, duration, fromLevel, toLevel);
-  }
+export function fadePadWithLevels(pad: Pad, duration: number): Promise<void> {
+  return applyFadeToggle(pad, duration);
 }
 
 /** Skip back in a sequential/shuffled chain. No-op for simultaneous arrangement. */

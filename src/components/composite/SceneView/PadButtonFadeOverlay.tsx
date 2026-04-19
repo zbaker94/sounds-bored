@@ -34,6 +34,7 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
   const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
 
   const setPadFadeDuration = useProjectStore((s) => s.setPadFadeDuration);
+  const setPadFadeLevels = useProjectStore((s) => s.setPadFadeLevels);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs);
 
   const resolvedFadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
@@ -63,8 +64,10 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
               }
               setMultiFadeLevels(pad.id, [v[0], v[1]]);
             }}
-            // Level changes persist immediately via onValueChange — no onPointerUp action needed.
-            onPointerUp={() => {}}
+            onPointerUp={() => {
+              const levels = useMultiFadeStore.getState().selectedPads.get(pad.id)?.levels;
+              if (levels) setPadFadeLevels(sceneId, pad.id, levels[0] / 100, levels[1] / 100);
+            }}
             min={0}
             max={100}
             step={1}

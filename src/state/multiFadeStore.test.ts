@@ -10,7 +10,7 @@ describe("multiFadeStore", () => {
   describe("enterMultiFade", () => {
     it("should set active to true and initialize originPadId", () => {
       const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", true, 0.8);
+      enterMultiFade("pad-1", 0, 0.8);
 
       const state = useMultiFadeStore.getState();
       expect(state.active).toBe(true);
@@ -24,7 +24,7 @@ describe("multiFadeStore", () => {
       });
 
       const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", true, 0.5);
+      enterMultiFade("pad-1", 0, 0.5);
 
       const state = useMultiFadeStore.getState();
       expect(state.selectedPads.size).toBe(1);
@@ -32,9 +32,9 @@ describe("multiFadeStore", () => {
       expect(state.reopenPadId).toBeNull();
     });
 
-    it("should add originPadId to selectedPads with correct levels when playing", () => {
+    it("should add originPadId to selectedPads with levels from fadeLow/fadeHigh", () => {
       const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", true, 0.75);
+      enterMultiFade("pad-1", 0, 0.75);
 
       const state = useMultiFadeStore.getState();
       const padEntry = state.selectedPads.get("pad-1");
@@ -42,37 +42,28 @@ describe("multiFadeStore", () => {
       expect(padEntry?.levels).toEqual([0, 75]); // Math.round(0.75 * 100)
     });
 
-    it("should add originPadId with [0, 100] levels when not playing", () => {
+    it("should use both fadeLow and fadeHigh to set levels", () => {
       const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", false, 0.5);
+      enterMultiFade("pad-1", 0.2, 0.8);
 
       const state = useMultiFadeStore.getState();
       const padEntry = state.selectedPads.get("pad-1");
       expect(padEntry).toBeDefined();
-      expect(padEntry?.levels).toEqual([0, 100]);
+      expect(padEntry?.levels).toEqual([20, 80]);
     });
 
-    it("should use default initialVolume of 1.0 when not provided", () => {
+    it("should use [0, 100] levels when fadeLow=0 and fadeHigh=1", () => {
       const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", true);
-
-      const state = useMultiFadeStore.getState();
-      const padEntry = state.selectedPads.get("pad-1");
-      expect(padEntry?.levels).toEqual([0, 100]); // Math.round(1.0 * 100)
-    });
-
-    it("should use default initialVolume even when playing is false", () => {
-      const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", false);
+      enterMultiFade("pad-1", 0, 1);
 
       const state = useMultiFadeStore.getState();
       const padEntry = state.selectedPads.get("pad-1");
       expect(padEntry?.levels).toEqual([0, 100]);
     });
 
-    it("should round volume correctly when playing", () => {
+    it("should round fractional levels correctly", () => {
       const { enterMultiFade } = useMultiFadeStore.getState();
-      enterMultiFade("pad-1", true, 0.555);
+      enterMultiFade("pad-1", 0, 0.555);
 
       const state = useMultiFadeStore.getState();
       const padEntry = state.selectedPads.get("pad-1");
@@ -83,7 +74,7 @@ describe("multiFadeStore", () => {
   describe("toggleMultiFadePad", () => {
     it("should add a pad to selectedPads when it does not exist", () => {
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", true, 0.8);
+      toggleMultiFadePad("pad-1", 0, 0.8);
 
       const state = useMultiFadeStore.getState();
       expect(state.selectedPads.has("pad-1")).toBe(true);
@@ -98,24 +89,24 @@ describe("multiFadeStore", () => {
       });
 
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", true, 0.8);
+      toggleMultiFadePad("pad-1", 0, 0.8);
 
       const state = useMultiFadeStore.getState();
       expect(state.selectedPads.has("pad-1")).toBe(false);
     });
 
-    it("should use [0, 100] levels when not playing", () => {
+    it("should use both fadeLow and fadeHigh to set levels", () => {
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", false, 0.5);
+      toggleMultiFadePad("pad-1", 0.2, 0.8);
 
       const state = useMultiFadeStore.getState();
       const padEntry = state.selectedPads.get("pad-1");
-      expect(padEntry?.levels).toEqual([0, 100]);
+      expect(padEntry?.levels).toEqual([20, 80]);
     });
 
-    it("should use [0, Math.round(vol * 100)] levels when playing", () => {
+    it("should set levels from fadeLow/fadeHigh regardless of playing state", () => {
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", true, 0.65);
+      toggleMultiFadePad("pad-1", 0, 0.65);
 
       const state = useMultiFadeStore.getState();
       const padEntry = state.selectedPads.get("pad-1");
@@ -124,8 +115,8 @@ describe("multiFadeStore", () => {
 
     it("should allow toggling multiple pads independently", () => {
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", true, 0.8);
-      toggleMultiFadePad("pad-2", false, 0.5);
+      toggleMultiFadePad("pad-1", 0, 0.8);
+      toggleMultiFadePad("pad-2", 0, 0.5);
 
       const state = useMultiFadeStore.getState();
       expect(state.selectedPads.size).toBe(2);
@@ -142,7 +133,7 @@ describe("multiFadeStore", () => {
       });
 
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", true, 0.8);
+      toggleMultiFadePad("pad-1", 0, 0.8);
 
       const state = useMultiFadeStore.getState();
       expect(state.selectedPads.size).toBe(1);
@@ -352,7 +343,7 @@ describe("multiFadeStore", () => {
   describe("state isolation", () => {
     it("should not share selectedPads Map between store instances", () => {
       const { enterMultiFade: enter1 } = useMultiFadeStore.getState();
-      enter1("pad-1", true, 0.8);
+      enter1("pad-1", 0, 0.8);
 
       const state1 = useMultiFadeStore.getState();
       expect(state1.selectedPads.get("pad-1")).toBeDefined();
@@ -372,12 +363,12 @@ describe("multiFadeStore", () => {
 
     it("should create new Map instances on toggleMultiFadePad", () => {
       const { toggleMultiFadePad } = useMultiFadeStore.getState();
-      toggleMultiFadePad("pad-1", true, 0.8);
+      toggleMultiFadePad("pad-1", 0, 0.8);
 
       const state1 = useMultiFadeStore.getState();
       const map1 = state1.selectedPads;
 
-      toggleMultiFadePad("pad-2", true, 0.5);
+      toggleMultiFadePad("pad-2", 0, 0.5);
 
       const state2 = useMultiFadeStore.getState();
       const map2 = state2.selectedPads;

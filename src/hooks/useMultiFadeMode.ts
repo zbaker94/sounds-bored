@@ -5,7 +5,6 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
-import { isPadActive } from "@/lib/audio/audioState";
 import { toast } from "sonner";
 
 export type { SelectedPadFade } from "@/state/multiFadeStore";
@@ -16,11 +15,11 @@ export function executeMultiFadeNow(): void {
   const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
   const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
 
-  for (const [padId, fade] of selectedPads) {
+  for (const [padId] of selectedPads) {
     const pad = pads.find((p) => p.id === padId);
     if (!pad) continue;
     const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-    fadePadWithLevels(pad, duration, fade.levels[0] / 100, fade.levels[1] / 100).catch((err: unknown) => {
+    fadePadWithLevels(pad, duration).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       toast.error(`Playback error: audio fade failed — ${message}`);
     });
@@ -32,8 +31,8 @@ export interface UseMultiFadeModeReturn {
   active: boolean;
   originPadId: string | null;
   selectedPads: ReturnType<typeof useMultiFadeStore.getState>["selectedPads"];
-  enter: (originPadId: string, currentVolume?: number) => void;
-  togglePad: (padId: string, playing: boolean, currentVolume?: number) => void;
+  enter: (originPadId: string) => void;
+  togglePad: (padId: string) => void;
   setFadeLevels: (padId: string, levels: [number, number]) => void;
   canExecute: boolean;
   execute: () => void;
@@ -72,14 +71,16 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
 
   const canExecute = active && selectedPads.size >= 1;
 
-  const enter = useCallback((padId: string, currentVolume?: number) => {
-    const playing = isPadActive(padId);
-    const vol = currentVolume ?? 1.0;
-    enterMultiFade(padId, playing, vol);
+  const enter = useCallback((padId: string) => {
+    const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+    const pad = pads.find((p) => p.id === padId);
+    enterMultiFade(padId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
   }, [enterMultiFade]);
 
-  const togglePad = useCallback((padId: string, playing: boolean, currentVolume?: number) => {
-    toggleMultiFadePad(padId, playing, currentVolume ?? 1.0);
+  const togglePad = useCallback((padId: string) => {
+    const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+    const pad = pads.find((p) => p.id === padId);
+    toggleMultiFadePad(padId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
   }, [toggleMultiFadePad]);
 
   const setFadeLevels = useCallback((padId: string, levels: [number, number]) => {
