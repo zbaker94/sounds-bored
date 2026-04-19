@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Pads now have an editable back face with per-layer controls: play/stop individual layers, adjust layer volume, skip forward/back in sequential arrangements, and edit or remove layers inline
+- You can rename a pad and change its color directly from the pad back face
+- Added layer management to pads: add new layers or remove existing ones without opening a separate drawer
+- Fade controls are now accessible from the pad back face, including fade in/out, configurable fade levels, fade duration, and synchronized multi-fade
 - Fixed an edge case where the layer editor dialog could render in a broken state if the target layer was missing or invalid.
 - No user-facing changes; internal test comments removed (no functional impact).
 - Improved test coverage for the Layer Config dialog to verify layer-specific data (volume) is correctly displayed when opening a configured layer.
