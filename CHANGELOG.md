@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- The "Synchronized Fades" keyboard shortcut tooltip now shows only `X` (previously showed `F / X`).
+- Pads with a single layer now correctly disable the "Remove Layer" button, preventing accidental deletion of the last layer.
 - Pads now have an editable back face with per-layer controls: play/stop individual layers, adjust layer volume, skip forward/back in sequential arrangements, and edit or remove layers inline
 - You can rename a pad and change its color directly from the pad back face
 - Added layer management to pads: add new layers or remove existing ones without opening a separate drawer

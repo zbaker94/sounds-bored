@@ -105,4 +105,10 @@ describe("PadBackFace", () => {
       expect(updatedPad.layers[0].id).toBe("layer-2");
     });
   });
+
+  it("disables remove layer button when only 1 layer", () => {
+    const { pad } = loadPad();
+    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /remove layer 1/i })).toBeDisabled();
+  });
 });

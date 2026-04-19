@@ -467,7 +467,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
                 Synchronized Fades
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top"><><Kbd>F</Kbd> / <Kbd>X</Kbd></></TooltipContent>
+            <TooltipContent side="top"><Kbd>X</Kbd></TooltipContent>
           </Tooltip>
         </div>
       </div>
