@@ -7,6 +7,8 @@ import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LayerConfigDialog } from "./LayerConfigDialog";
+import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
+import type { Layer } from "@/lib/schemas";
 
 vi.mock("./SoundSelector", () => ({
   SoundSelector: () => <div data-testid="sound-selector" />,
@@ -22,8 +24,9 @@ function renderDialog(props: {
   sceneId?: string;
   layerIndex?: number;
   onClose?: () => void;
+  layer?: Layer;
 } = {}) {
-  const layer = createMockLayer({
+  const layer = props.layer ?? createMockLayer({
     id: "layer-1",
     selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 100 }] },
   });
@@ -132,5 +135,46 @@ describe("LayerConfigDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)).toBe(false);
+  });
+
+  it("renders layer-specific content (sound selector) when opened with an assigned layer", () => {
+    renderDialog();
+    openDialog();
+
+    expect(screen.getByTestId("sound-selector")).toBeInTheDocument();
+  });
+
+  it("calls syncLayerVolume and syncLayerConfig after a successful save", async () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    openDialog();
+
+    await userEvent.click(screen.getByRole("button", { name: /save layer/i }));
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    expect(vi.mocked(syncLayerVolume)).toHaveBeenCalled();
+    expect(vi.mocked(syncLayerConfig)).toHaveBeenCalled();
+  });
+
+  it("shows validation error and does not call updatePad when tag selection matches no sounds", async () => {
+    const onClose = vi.fn();
+    const updatePadSpy = vi.spyOn(useProjectStore.getState(), "updatePad");
+
+    const tagLayer = createMockLayer({
+      id: "layer-1",
+      selection: { type: "tag", tagIds: ["some-tag"], matchMode: "any", defaultVolume: 100 },
+    });
+    renderDialog({ onClose, layer: tagLayer });
+    openDialog();
+
+    await userEvent.click(screen.getByRole("button", { name: /save layer/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/no sounds in library match these tags/i)).toBeInTheDocument();
+    });
+    expect(updatePadSpy).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved test coverage for the Layer Config Dialog, including validation of sound selector rendering, sync behavior on save, and tag-selection error handling.
 - Added a new "Edit Layer" dialog that lets you configure individual pad layers — including sound selection, playback mode, retrigger behavior, arrangement, and volume — without editing the entire pad at once.
 - New pads added via keyboard shortcut now automatically open in edit mode for immediate configuration
 - Pressing `Mod+Shift+N` now immediately creates a new pad in the active scene and opens it for editing, instead of just opening an empty config drawer.
