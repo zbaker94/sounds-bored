@@ -146,8 +146,6 @@ describe("LayerConfigDialog", () => {
     renderDialog({ layer });
     openDialog();
 
-    // Asserts the layer's own volume (73) — derived from the layer prop,
-    // not from any static boilerplate — is rendered in the dialog.
     expect(screen.getByText("73%")).toBeInTheDocument();
   });
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; internal test comments removed (no functional impact).
 - Improved test coverage for the Layer Config dialog to verify layer-specific data (volume) is correctly displayed when opening a configured layer.
 - Improved test coverage for the Layer Config Dialog, including validation of sound selector rendering, sync behavior on save, and tag-selection error handling.
 - Added a new "Edit Layer" dialog that lets you configure individual pad layers — including sound selection, playback mode, retrigger behavior, arrangement, and volume — without editing the entire pad at once.
