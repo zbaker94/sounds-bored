@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking a pad now flips it to its back face inline instead of opening a popover/drawer overlay
+- Individual pads can now flip independently via right-click; clicking outside flips them back
+- The 3D flip animation now triggers for both global edit mode and per-pad right-click
 - Clearing a pad's name field and leaving it blank now restores the original name instead of saving an empty name
 - Dragging the fade level slider no longer resets the slider position mid-drag when playback state changes
 - Minor internal cleanup: removed an unused prop from the layer row component

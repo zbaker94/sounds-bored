@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
@@ -10,42 +9,9 @@ import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio/padPlayer";
 
-// Popover always renders its children (the anchor div) regardless of `open`.
-// PopoverContent renders null — on desktop the popover is not exercised in these tests.
-vi.mock("@/components/ui/popover", () => ({
-  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  PopoverAnchor: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  PopoverContent: () => null,
-}));
-
-// In the test env useIsMd() returns false (no viewport), so the right-click path goes
-// through the Drawer. Render a detectable sentinel so the existing assertions work.
-vi.mock("@/components/ui/drawer", () => ({
-  Drawer: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
-    open ? <div data-testid="live-control-popover">{children}</div> : null,
-  DrawerContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-vi.mock("./PadControlContent", () => ({
-  PadControlContent: ({
-    pad,
-    onEditClick,
-    onClose,
-  }: {
-    pad: { name: string; id: string };
-    onEditClick?: (pad: { name: string; id: string }) => void;
-    onClose: () => void;
-  }) => (
-    <div data-testid="pad-control-content">
-      <button
-        type="button"
-        aria-label="Edit pad"
-        onClick={() => { onEditClick?.(pad); onClose(); }}
-      />
-      <button type="button" aria-label="Duplicate pad" />
-      <button type="button" aria-label="Delete pad" />
-    </div>
+vi.mock("./PadBackFace", () => ({
+  PadBackFace: ({ pad }: { pad: { name: string } }) => (
+    <div data-testid="pad-back-face">{pad.name}</div>
   ),
 }));
 
@@ -104,12 +70,13 @@ describe("PadButton", () => {
       expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
     });
 
-    it("does not show the edit overlay", () => {
+    it("does not show the back face", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.queryByRole("button", { name: /edit pad/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /duplicate pad/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /delete pad/i })).not.toBeInTheDocument();
+      // Front face is visible; back face is aria-hidden in normal mode
+      const backFace = screen.getByTestId("pad-back-face");
+      // eslint-disable-next-line testing-library/no-node-access
+      expect(backFace.closest('[aria-hidden="true"]')).not.toBeNull();
     });
   });
 
@@ -118,29 +85,17 @@ describe("PadButton", () => {
       useUiStore.setState({ ...initialUiState, editMode: true });
     });
 
-    it("shows the edit overlay with action buttons", () => {
+    it("shows the back face when editMode is true", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.getByRole("button", { name: /edit pad/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /duplicate pad/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /delete pad/i })).toBeInTheDocument();
+      expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
     });
 
-    it("renders PadControlContent on the back face in edit mode", () => {
+    it("renders PadBackFace on the back face in edit mode", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      expect(screen.getByTestId("pad-control-content")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
     });
-
-    it("clicking edit button calls onEditClick with the pad", async () => {
-      const pad = loadPadInStore();
-      const onEditClick = vi.fn();
-      render(<PadButton pad={pad} sceneId="scene-1" onEditClick={onEditClick} />);
-      await userEvent.click(screen.getByRole("button", { name: /edit pad/i }));
-      expect(onEditClick).toHaveBeenCalledTimes(1);
-      expect(onEditClick).toHaveBeenCalledWith(pad);
-    });
-
   });
 
   describe("volume drag label", () => {
@@ -316,33 +271,28 @@ describe("right-click / context menu", () => {
     });
   });
 
-  it("right-clicking the pad button opens the live control popover", async () => {
-    // tag layer → hasNonAssignedLayer = true → padSoundState !== "disabled"
+  it("right-click sets editingPadId in uiStore", async () => {
     const pad = loadPadInStore({
       layers: [createMockLayer({ selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })],
     });
     render(<PadButton pad={pad} sceneId="scene-1" />);
-    // The context menu handler is on the outer div wrapper, not the button itself
-    const button = screen.getByRole("button", { name: "Kick" });
-    // eslint-disable-next-line testing-library/no-node-access
-    const wrapper = button.parentElement!.parentElement!.parentElement!.parentElement!;
-    fireEvent.contextMenu(wrapper);
-    expect(screen.getByTestId("live-control-popover")).toBeInTheDocument();
+    const padEl = screen.getByRole("button", { name: "Kick" });
+    fireEvent.contextMenu(padEl);
+    expect(useUiStore.getState().editingPadId).toBe("pad-1");
   });
 
-  it("right-clicking does not open popover in edit mode", async () => {
+  it("right-clicking does not set editingPadId in edit mode", async () => {
     useUiStore.setState({ ...initialUiState, editMode: true });
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
-    // In edit mode the Kick button has aria-hidden; query by test-id on the pad name span
     const padName = screen.getByTestId("pad-name");
     // eslint-disable-next-line testing-library/no-node-access
     const wrapper = padName.closest("div[style]") ?? padName.parentElement!.parentElement!.parentElement!.parentElement!.parentElement!;
     fireEvent.contextMenu(wrapper);
-    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+    expect(useUiStore.getState().editingPadId).toBeNull();
   });
 
-  it("right-clicking does not open popover in multi-fade mode", async () => {
+  it("right-clicking does not set editingPadId in multi-fade mode", async () => {
     useMultiFadeStore.setState({
       active: true,
       originPadId: "some-other-pad",
@@ -352,31 +302,31 @@ describe("right-click / context menu", () => {
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
-    // eslint-disable-next-line testing-library/no-node-access
-    const wrapper = button.parentElement!.parentElement!.parentElement!.parentElement!;
-    fireEvent.contextMenu(wrapper);
-    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+    fireEvent.contextMenu(button);
+    expect(useUiStore.getState().editingPadId).toBeNull();
   });
 
-  it("right-clicking does not open popover when pad is unplayable", async () => {
+  it("right-clicking does not set editingPadId when pad is unplayable", async () => {
     // createMockLayer defaults to empty instances → padSoundState === "disabled"
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
-    // eslint-disable-next-line testing-library/no-node-access
-    const wrapper = button.parentElement!.parentElement!.parentElement!.parentElement!;
-    fireEvent.contextMenu(wrapper);
-    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
+    fireEvent.contextMenu(button);
+    expect(useUiStore.getState().editingPadId).toBeNull();
   });
 
-  it("popover opens when reopenPadId in multiFade store matches pad id", async () => {
+  it("shows PadBackFace when editingPadId matches this pad", () => {
     const pad = loadPadInStore();
+    useUiStore.setState({ ...initialUiState, editingPadId: "pad-1" });
     render(<PadButton pad={pad} sceneId="scene-1" />);
-    expect(screen.queryByTestId("live-control-popover")).not.toBeInTheDocument();
-    act(() => {
-      useMultiFadeStore.setState({ reopenPadId: pad.id });
-    });
-    expect(screen.getByTestId("live-control-popover")).toBeInTheDocument();
+    expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
+  });
+
+  it("shows PadBackFace when editMode is true", () => {
+    const pad = loadPadInStore();
+    useUiStore.setState({ ...initialUiState, editMode: true });
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
   });
 });
 
