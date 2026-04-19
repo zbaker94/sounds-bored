@@ -14,7 +14,7 @@ export const OVERLAY_ID = {
   SAVE_PROJECT_DIALOG: "save-project-dialog",
   CONFIRM_NAVIGATE_DIALOG: "confirm-navigate-dialog",
   CONFIRM_CLOSE_DIALOG: "confirm-close-dialog",
-  PAD_CONFIG_DRAWER: "pad-config-drawer",
+  LAYER_CONFIG_DIALOG: "layer-config-dialog",
   SETTINGS_DIALOG: "settings-dialog",
   EXPORT_PROGRESS_DIALOG: "export-progress-dialog",
   CONFIRM_REMOVE_MISSING_SOUNDS: "confirm-remove-missing-sounds",
@@ -30,8 +30,8 @@ interface UiState {
   activeSceneId: string | null;
   /** The pad currently under the mouse cursor, or null if none. */
   hoveredPadId: string | null;
-  /** The pad whose context popover is currently open, or null if none. */
-  padPopoverOpenId: string | null;
+  /** The pad currently being edited (showing its back face), or null if none. */
+  editingPadId: string | null;
 }
 
 interface UiActions {
@@ -51,8 +51,8 @@ interface UiActions {
   toggleEditMode: () => void;
   /** Set the currently hovered pad id, or null to clear. */
   setHoveredPadId: (id: string | null) => void;
-  /** Set the pad whose context popover is open, or null to clear. */
-  setPadPopoverOpenId: (id: string | null) => void;
+  /** Set the pad currently being edited, or null to clear. */
+  setEditingPadId: (id: string | null) => void;
   /** Set the active scene tab. Pass null to clear (e.g., on project close). */
   setActiveSceneId: (id: string | null) => void;
 }
@@ -64,7 +64,7 @@ export const initialUiState: UiState = {
   editMode: false,
   activeSceneId: null,
   hoveredPadId: null,
-  padPopoverOpenId: null,
+  editingPadId: null,
 };
 
 export const useUiStore = create<UiStore>()((set, get) => ({
@@ -108,7 +108,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setHoveredPadId: (id) => set({ hoveredPadId: id }),
 
-  setPadPopoverOpenId: (id) => set({ padPopoverOpenId: id }),
+  setEditingPadId: (id) => set({ editingPadId: id }),
 
   setActiveSceneId: (id) => set({ activeSceneId: id }),
 }));

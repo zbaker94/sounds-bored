@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Pad editing now uses a backface panel instead of a context popover — clicking a pad to configure it will show its settings on a flipped card face
 - No user-facing changes (internal test refactor only).
 - You can now configure custom **fade volume levels** (low and high endpoints) per pad — set them in the Pad Config drawer or by dragging the fade slider, and they are saved with your project
 - The **Fade In / Fade Out** button label now correctly shows "Fade In" when a pad is mid-fade-out (reversing), instead of always reading from play state

@@ -222,4 +222,21 @@ describe("uiStore", () => {
       expect(useUiStore.getState().activeSceneId).toBeNull();
     });
   });
+
+  describe("editingPadId", () => {
+    it("starts as null", () => {
+      expect(useUiStore.getState().editingPadId).toBeNull();
+    });
+
+    it("setEditingPadId sets the id", () => {
+      useUiStore.getState().setEditingPadId("pad-123");
+      expect(useUiStore.getState().editingPadId).toBe("pad-123");
+    });
+
+    it("setEditingPadId(null) clears it", () => {
+      useUiStore.getState().setEditingPadId("pad-123");
+      useUiStore.getState().setEditingPadId(null);
+      expect(useUiStore.getState().editingPadId).toBeNull();
+    });
+  });
 });
