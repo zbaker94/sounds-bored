@@ -33,7 +33,7 @@ interface ProjectActions {
   addScene: (name?: string) => void;
   renameScene: (sceneId: string, name: string) => void;
   deleteScene: (sceneId: string) => void;
-  addPad: (sceneId: string, config: PadConfig) => void;
+  addPad: (sceneId: string, config: PadConfig, id?: string) => void;
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
   deletePad: (sceneId: string, padId: string) => void;
   duplicatePad: (sceneId: string, padId: string) => void;
@@ -142,13 +142,13 @@ export const useProjectStore = create<ProjectStore>()(
       }
     },
 
-    addPad: (sceneId, config) =>
+    addPad: (sceneId, config, id) =>
       set((draft) => {
         if (!draft.project) return;
         const scene = draft.project.scenes.find((s) => s.id === sceneId);
         if (!scene) return;
         const newPad: Pad = {
-          id: crypto.randomUUID(),
+          id: id ?? crypto.randomUUID(),
           ...config,
         };
         scene.pads.push(newPad);
