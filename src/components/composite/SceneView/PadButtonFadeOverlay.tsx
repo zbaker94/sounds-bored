@@ -71,6 +71,7 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
             min={0}
             max={100}
             step={1}
+            minStepsBetweenThumbs={1}
             className="[&_[data-slot=slider-track]]:bg-white/20"
           />
           <div className="flex justify-between text-[9px] text-white/70 mt-0.5">

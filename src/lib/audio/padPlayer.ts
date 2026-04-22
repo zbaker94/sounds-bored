@@ -42,6 +42,9 @@ import {
   isPadActive,
   isPadFading,
   isPadFadingOut,
+  isPadFadingIn,
+  addFadingInPad,
+  removeFadingInPad,
   nullAllOnEnded,
   setFadePadTimeout,
   setGlobalStopTimeout,
@@ -101,8 +104,12 @@ export {
 } from "./gainManager";
 
 export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): Promise<void> {
-  // 1. Cancel any prior fade for this pad
+  // 1. Cancel any prior fade and mark as fading-in BEFORE the await.
+  //    This closes the race window: if applyFadeToggle fires another fade direction
+  //    during `await triggerPad`, cancelPadFade will clear this flag and we'll bail
+  //    below rather than overwriting the interleaved fade.
   cancelPadFade(pad.id);
+  addFadingInPad(pad.id);
 
   const startVol = fromVolume ?? 0;
   const endVol = toVolume ?? 1.0;
@@ -110,15 +117,21 @@ export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: numbe
   // 2. Start pad at gain startVol
   await triggerPad(pad, startVol);
 
+  // 3. If we were pre-empted during the await (e.g. user pressed F to reverse
+  //    mid fade-in), cancelPadFade will have cleared fadingInPadIds — bail so we
+  //    don't overwrite the interleaved fade-out ramp.
+  if (!isPadFadingIn(pad.id)) return;
+  removeFadingInPad(pad.id);
+
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
 
-  // 3. Schedule Web Audio ramp
+  // 4. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(startVol, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
 
-  // 4. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
+  // 5. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
   // Tick reads gain node values automatically — no RAF or store signal needed.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
@@ -137,11 +150,21 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
 }
 
 /**
- * Shared 3-state fade toggle: reverse an in-progress fade-out, start a fade-out,
- * or fade in — depending on current audio state.
+ * Central fade-toggle state machine — all fade trigger paths (F hotkey, fade button,
+ * synchronized fades) route through here.
  *
- * Reads fadeLowVol/fadeHighVol from the pad (defaulting to 0/1) so every trigger
- * path uses the same configured endpoints without callers needing to supply them.
+ * Four cases, in priority order:
+ *   1. Fading OUT                        → reverse: ramp back up to highVol from current gain.
+ *   2. Active, gain settled near lowVol  → reverse of a completed fade-out: ramp up to highVol.
+ *   3. Active (playing or mid fade-in)   → fade OUT to lowVol.
+ *   4. Not active                        → fade IN from silence to highVol.
+ *
+ * The "settled near low" check (case 2) detects when a non-zero fade-out has completed
+ * and the pad is still playing at lowVol. A 0.02 tolerance accounts for floating-point
+ * drift on the gain node without misclassifying pads playing near the middle of the range.
+ *
+ * isPadFadingIn covers the async gap between cancelPadFade and setFadePadTimeout in
+ * fadePadIn, where isPadFading is momentarily false but a fade-in is still starting.
  */
 function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
   const lowVol = pad.fadeLowVol ?? 0;
@@ -149,18 +172,27 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
 
   if (isPadActive(pad.id)) {
     if (isPadFadingOut(pad.id)) {
+      // Fading out → reverse: ramp back up
       fadePadInFromCurrent(pad, duration, highVol);
-      return Promise.resolve();
+    } else if (isPadFadingIn(pad.id) || isPadFading(pad.id)) {
+      // Fade-in is in progress (async gap or timeout active) → reverse by fading out
+      // fadePadOut will call removeFadingInPad so fadePadIn's post-await guard sees the reversal
+      fadePadOut(pad, duration, undefined, lowVol);
+    } else if (lowVol > 0 && getPadGain(pad.id).gain.value <= lowVol + 0.02) {
+      // Settled near the low endpoint after a completed non-zero fade-out → fade back up
+      fadePadInFromCurrent(pad, duration, highVol);
+    } else {
+      // Playing at high level → fade out to low
+      fadePadOut(pad, duration, undefined, lowVol);
     }
-    // Active (fading-in or not fading): fade out from current gain toward lowVol.
-    // fadePadOut cancels any in-progress fade-in before starting the ramp.
-    fadePadOut(pad, duration, undefined, lowVol);
     return Promise.resolve();
   }
-  // Not playing — leave any in-progress fade alone
-  if (isPadFading(pad.id)) return Promise.resolve();
-  // Always start from silence; lowVol is only the fade-out endpoint
-  return fadePadIn(pad, duration, undefined, highVol);
+
+  // Not active: if a fade-in is already starting (async gap), ignore
+  if (isPadFadingIn(pad.id) || isPadFading(pad.id)) return Promise.resolve();
+
+  // Not playing → fade in from silence
+  return fadePadIn(pad, duration, 0, highVol);
 }
 
 /**
@@ -405,8 +437,10 @@ export function releasePadHoldLayers(pad: Pad): void {
   }
 }
 
-// startVolume: 0-1. Pass 0 for drag-up gestures (silent start), defaults to 1.
-export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
+// startVolume: 0-1. Defaults to pad.fadeHighVol so the pad plays at its configured level.
+// Pass 0 explicitly for silent-start gesture-drag and fade-in operations.
+export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> {
+  const startVol = startVolume ?? pad.fadeHighVol ?? 1.0;
   const { sounds } = useLibraryStore.getState();
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
@@ -414,7 +448,7 @@ export async function triggerPad(pad: Pad, startVolume = 1.0): Promise<void> {
   // that are about to be started below.
   cancelPadFade(pad.id);
   padGain.gain.cancelScheduledValues(ctx.currentTime);
-  padGain.gain.setValueAtTime(startVolume, ctx.currentTime);
+  padGain.gain.setValueAtTime(startVol, ctx.currentTime);
   // Tick reads gain node value automatically — no store call needed.
 
   // Pre-collect eligible layers and set their pending flags synchronously before any await.

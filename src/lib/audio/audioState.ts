@@ -190,6 +190,13 @@ const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const fadingOutPadIds = new Set<string>();
 
 /**
+ * Tracks pads that have started a fade-in but whose async triggerPad has not yet completed.
+ * Set synchronously before `await triggerPad` in fadePadIn; cleared by cancelPadFade.
+ * Lets fadePadIn detect post-await that it was pre-empted by a reverse-fade call during the gap.
+ */
+const fadingInPadIds = new Set<string>();
+
+/**
  * The timeout ID from stopAllPads()'s post-ramp cleanup setTimeout.
  * Tracked so clearAllAudioState() can cancel it and prevent cross-session contamination.
  */
@@ -372,6 +379,7 @@ export function clearAllFadeTracking(): void {
   for (const id of fadePadTimeouts.values()) clearTimeout(id);
   fadePadTimeouts.clear();
   fadingOutPadIds.clear();
+  fadingInPadIds.clear();
   // padFadeRafs removed — global audioTick owns padVolumes now.
   // Store clearing is handled by stopAudioTick() in padPlayer.stopAllPads().
 }
@@ -392,6 +400,9 @@ export function cancelPadFade(padId: string): void {
     fadePadTimeouts.delete(padId);
   }
   fadingOutPadIds.delete(padId);
+  // fadingInPadIds is NOT cleared here — triggerPad calls cancelPadFade internally
+  // and must not accidentally pre-empt a fadePadIn that is still in flight.
+  // Only fadePadOut (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
 }
 
 /** Mark a pad as fading out. */
@@ -402,6 +413,21 @@ export function addFadingOutPad(padId: string): void {
 /** Remove a pad from fading-out tracking. */
 export function removeFadingOutPad(padId: string): void {
   fadingOutPadIds.delete(padId);
+}
+
+/** Mark a pad as starting a fade-in (set before await in fadePadIn to cover the async gap). */
+export function addFadingInPad(padId: string): void {
+  fadingInPadIds.add(padId);
+}
+
+/** Remove a pad from fading-in tracking. */
+export function removeFadingInPad(padId: string): void {
+  fadingInPadIds.delete(padId);
+}
+
+/** True while a fade-in is starting (async gap) or its timeout is registered. */
+export function isPadFadingIn(padId: string): boolean {
+  return fadingInPadIds.has(padId);
 }
 
 /** Store a fade timeout for a pad (so cancelPadFade can cancel it). */

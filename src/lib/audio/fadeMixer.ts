@@ -4,6 +4,7 @@ import {
   cancelPadFade,
   addFadingOutPad,
   removeFadingOutPad,
+  removeFadingInPad,
   isPadFadingOut,
   setFadePadTimeout,
   deleteFadePadTimeout,
@@ -45,8 +46,10 @@ export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): nu
  * If endVol === 0, stops all voices and resets the pad's gain after the fade completes.
  */
 export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): void {
-  // 1. Cancel any prior fade for this pad
+  // 1. Cancel any prior fade and clear fading-in tracking so fadePadIn's post-await
+  //    guard detects the reversal and bails without overwriting this fade-out ramp.
   cancelPadFade(pad.id);
+  removeFadingInPad(pad.id);
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);

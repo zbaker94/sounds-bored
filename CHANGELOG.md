@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where pressing the fade hotkey (F) rapidly could trigger multiple fades in the wrong direction or get stuck
+- Pressing F on a pad that has faded down to its low volume now correctly fades it back up, completing the fade toggle cycle
+- Pads now play at their configured high-fade volume by default when triggered normally, instead of always starting at full volume
+- Fade range sliders no longer allow the two thumbs to overlap each other
+- The "Add Layer" button in the pad editor is now larger and easier to click
 - Removed an outdated test comment referencing a deleted component (`PadControlContent`)
 - Internal code cleanup: `createDefaultLayer` now imports directly from its source module instead of a re-export
 - Right-clicking a pad now flips it in place to reveal an inline editing surface, replacing the separate config drawer.

@@ -98,7 +98,7 @@ export function useGlobalHotkeys() {
   // role="slider"), which is in react-hotkeys-hook's default form-tag block list.
   // Without this flag, pressing F while the slider thumb has focus is swallowed.
   useHotkeys("f", () => {
-    const { editMode, hoveredPadId, editingPadId } = useUiStore.getState();
+    const { editMode, hoveredPadId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
 
     if (editMode) {
@@ -106,8 +106,8 @@ export function useGlobalHotkeys() {
       return;
     }
 
-    // Normal mode: single-fade the hovered pad if no context popover is open
-    if (hoveredPadId && !editingPadId) {
+    // Normal mode: single-fade the hovered pad
+    if (hoveredPadId) {
       const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
       if (!pad) return;

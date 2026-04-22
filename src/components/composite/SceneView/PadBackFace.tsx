@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useHotkeys } from "react-hotkeys-hook";
 import type { Pad, Layer, PadConfig } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -319,8 +318,6 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
     onMultiFade();
   }, [pad, enterMultiFade, onMultiFade]);
 
-  useHotkeys("f", handleFade, { enableOnFormTags: true });
-  useHotkeys("x", handleMultiFadeInternal, { enableOnFormTags: true });
 
   return (
     <TooltipProvider>
@@ -397,7 +394,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
               setPadFadeLevels(sceneId, pad.id, fadeLevels[0] / 100, fadeLevels[1] / 100);
             }}
             onThumbPointerDown={(index) => { if (index === 1) startThumbDraggingRef.current = true; }}
-            min={0} max={100} step={1}
+            min={0} max={100} step={1} minStepsBetweenThumbs={1}
           />
           <div className="flex items-center justify-between text-muted-foreground">
             <span>Duration</span>
@@ -441,7 +438,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
               onClick={handleAddLayer}
               className="p-0.5 rounded hover:bg-muted transition-colors"
             >
-              <HugeiconsIcon icon={Add01Icon} size={12} />
+              <HugeiconsIcon icon={Add01Icon} size={18} />
             </button>
           </div>
           <div className="flex flex-col gap-1">
