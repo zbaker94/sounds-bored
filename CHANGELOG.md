@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Right-clicking an empty (unassigned) pad now opens the back-face editor so you can assign sounds to it.
+- The fade slider now tracks live volume in real time and correctly labels which side is "current" while a pad is playing or fading.
+- The Fade Out / Fade In button label now stays accurate after dragging the fade boundaries mid-playback.
+- Adding a new pad when the scene has filled a full page now automatically navigates to the new page so the pad appears immediately in edit mode.
+- Fading in a stopped pad now ramps from the configured low-volume boundary instead of silence.
 - Fixed a bug where pressing the fade hotkey (F) rapidly could trigger multiple fades in the wrong direction or get stuck
 - Pressing F on a pad that has faded down to its low volume now correctly fades it back up, completing the fade toggle cycle
 - Pads now play at their configured high-fade volume by default when triggered normally, instead of always starting at full volume

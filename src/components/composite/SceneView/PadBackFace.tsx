@@ -235,6 +235,9 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
 
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const isFadingOut = usePlaybackStore((s) => s.fadingOutPadIds.has(pad.id));
+  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
+  const lowVol = pad.fadeLowVol ?? 0;
+  const isSettledAtLow = lowVol > 0 && liveVolume !== undefined && liveVolume <= lowVol + 0.02;
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs ?? 2000);
   const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
@@ -249,27 +252,45 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
     updatePad(sceneId, pad.id, { ...padToConfig(pad), name: trimmed });
   }
 
-  const [fadeLevels, setFadeLevels] = useState<[number, number]>(() => [
-    Math.round((pad.fadeLowVol ?? 0) * 100),
-    Math.round((pad.fadeHighVol ?? 1) * 100),
-  ]);
-  const startThumbDraggingRef = useRef(false);
+  const [localFadeLow, setLocalFadeLow] = useState<number | null>(null);
+  const [localFadeHigh, setLocalFadeHigh] = useState<number | null>(null);
+  const [lockedThumb, setLockedThumb] = useState<number | null>(null);
+  const [sideIsHigh, setSideIsHigh] = useState(true);
+  const wasFadingOutRef = useRef(false);
+  const padRef = useRef(pad);
+  padRef.current = pad;
   const setPadFadeLevels = useProjectStore((s) => s.setPadFadeLevels);
 
-  useEffect(() => {
-    if (!isPlaying && !startThumbDraggingRef.current) {
-      setFadeLevels([
-        Math.round((pad.fadeLowVol ?? 0) * 100),
-        Math.round((pad.fadeHighVol ?? 1) * 100),
-      ]);
-    }
-  }, [isPlaying, pad.fadeLowVol, pad.fadeHighVol]);
+  const fadeLow = Math.round((pad.fadeLowVol ?? 0) * 100);
+  const fadeHigh = Math.round((pad.fadeHighVol ?? 1) * 100);
+  const livePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : fadeHigh;
+  const currentIsHigh = !isPlaying
+    ? true
+    : lockedThumb === 1 ? true
+    : lockedThumb === 0 ? false
+    : sideIsHigh;
 
+  // Track that a fade-out ramp has started.
+  useEffect(() => { if (isFadingOut) wasFadingOutRef.current = true; }, [isFadingOut]);
+  // Reset to high-side whenever the pad starts playing.
   useEffect(() => {
-    const handlePointerUp = () => { startThumbDraggingRef.current = false; };
-    window.addEventListener("pointerup", handlePointerUp);
-    return () => window.removeEventListener("pointerup", handlePointerUp);
-  }, []);
+    if (isPlaying) { setSideIsHigh(true); wasFadingOutRef.current = false; }
+  }, [isPlaying]);
+  // Flip to low-side only when a genuine fade-out (not a fade-in) has completed.
+  useEffect(() => {
+    if (isPlaying && !isFadingOut && isSettledAtLow && lockedThumb === null && wasFadingOutRef.current) {
+      setSideIsHigh(false);
+      wasFadingOutRef.current = false;
+    }
+  }, [isPlaying, isFadingOut, isSettledAtLow, lockedThumb]);
+
+  const boundaryLow = localFadeLow ?? fadeLow;
+  const boundaryHigh = localFadeHigh ?? fadeHigh;
+  const sliderValue: [number, number] = isPlaying
+    ? currentIsHigh
+      ? [boundaryLow, Math.max(livePct, boundaryLow + 1)]
+      : [Math.min(livePct, boundaryHigh - 1), boundaryHigh]
+    : [boundaryLow, boundaryHigh];
 
   const [editingLayerIndex, setEditingLayerIndex] = useState<number | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -308,10 +329,14 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   }, [isPlaying, pad]);
 
   const handleFade = useCallback(() => {
-    fadePadWithLevels(pad, fadeDuration).catch((err: unknown) => {
+    if (!currentIsHigh) {
+      setSideIsHigh(true);
+      wasFadingOutRef.current = false;
+    }
+    fadePadWithLevels(padRef.current, fadeDuration).catch((err: unknown) => {
       toast.error(`Playback error: audio fade failed \u2014 ${err instanceof Error ? err.message : String(err)}`);
     });
-  }, [pad, fadeDuration]);
+  }, [fadeDuration, currentIsHigh]);
 
   const handleMultiFadeInternal = useCallback(() => {
     enterMultiFade(pad.id, pad.fadeLowVol ?? 0, pad.fadeHighVol ?? 1);
@@ -378,22 +403,51 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
 
         <div className="flex flex-col gap-1.5 flex-shrink-0">
           <div className="flex justify-between text-muted-foreground">
-            <span>{isPlaying ? "end" : "start"}</span>
-            <span>{isPlaying ? "start (current)" : "end"}</span>
+            <span>{isPlaying ? (currentIsHigh ? "end" : "start (current)") : "start"}</span>
+            <span>{isPlaying ? (currentIsHigh ? "start (current)" : "end") : "end"}</span>
           </div>
           <Slider
             tooltipLabel={(v) => `${v}%`}
-            value={fadeLevels}
-            onValueChange={(v) => {
-              const [low, high] = v;
-              if (isPlaying && high !== fadeLevels[1]) setPadVolume(pad.id, high / 100);
-              setFadeLevels([low, high]);
+            value={sliderValue}
+            onThumbPointerDown={(index) => {
+              if (!isPlaying) return;
+              const isVolumeThumb = currentIsHigh ? index === 1 : index === 0;
+              if (isVolumeThumb) setLockedThumb(index);
             }}
-            onPointerUp={() => {
-              startThumbDraggingRef.current = false;
-              setPadFadeLevels(sceneId, pad.id, fadeLevels[0] / 100, fadeLevels[1] / 100);
+            onValueChange={([newLow, newHigh]) => {
+              if (isPlaying) {
+                if (currentIsHigh) {
+                  if (newHigh !== sliderValue[1]) {
+                    setPadVolume(pad.id, newHigh / 100);
+                    const boundary = localFadeLow ?? fadeLow;
+                    if (newHigh - boundary < 10) setLocalFadeLow(Math.max(0, newHigh - 10));
+                  } else if (newLow !== sliderValue[0]) {
+                    setLocalFadeLow(newLow);
+                  }
+                } else {
+                  if (newLow !== sliderValue[0]) {
+                    setPadVolume(pad.id, newLow / 100);
+                    const boundary = localFadeHigh ?? fadeHigh;
+                    if (boundary - newLow < 10) setLocalFadeHigh(Math.min(100, newLow + 10));
+                  } else if (newHigh !== sliderValue[1]) {
+                    setLocalFadeHigh(newHigh);
+                  }
+                }
+              } else {
+                setLocalFadeLow(newLow);
+                setLocalFadeHigh(newHigh);
+              }
             }}
-            onThumbPointerDown={(index) => { if (index === 1) startThumbDraggingRef.current = true; }}
+            onValueCommit={() => {
+              setLockedThumb(null);
+              const commitLow = localFadeLow ?? fadeLow;
+              const commitHigh = localFadeHigh ?? fadeHigh;
+              if (localFadeLow !== null || localFadeHigh !== null) {
+                setPadFadeLevels(sceneId, pad.id, commitLow / 100, commitHigh / 100);
+              }
+              setLocalFadeLow(null);
+              setLocalFadeHigh(null);
+            }}
             min={0} max={100} step={1} minStepsBetweenThumbs={1}
           />
           <div className="flex items-center justify-between text-muted-foreground">
@@ -420,12 +474,12 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
           )}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="sm" variant="secondary" onClick={handleFade} className="w-full gap-1.5">
+              <Button size="sm" variant="secondary" onClick={handleFade} className="w-full">
                 <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-                {isPlaying && !isFadingOut ? "Fade Out" : "Fade In"}
+                {isPlaying && !isFadingOut && currentIsHigh ? "Fade Out" : "Fade In"}
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top"><Kbd>F</Kbd></TooltipContent>
+            <TooltipContent><Kbd>F</Kbd></TooltipContent>
           </Tooltip>
         </div>
 

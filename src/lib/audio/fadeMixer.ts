@@ -14,6 +14,7 @@ import {
   deleteLayerPlayOrder,
   nullPadOnEnded,
   stopPadVoices,
+  setPadFadeDirection,
 } from "./audioState";
 import { resetPadGain } from "./gainManager";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -50,6 +51,7 @@ export function fadePadOut(pad: Pad, durationMs: number, fromVolume?: number, to
   //    guard detects the reversal and bails without overwriting this fade-out ramp.
   cancelPadFade(pad.id);
   removeFadingInPad(pad.id);
+  setPadFadeDirection(pad.id, "out");
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
@@ -104,6 +106,7 @@ export function fadePadInFromCurrent(pad: Pad, durationMs: number, toVolume?: nu
   // 1. Cancel the fade-out
   cancelPadFade(pad.id);
   usePlaybackStore.getState().removeFadingOutPad(pad.id);
+  setPadFadeDirection(pad.id, "in");
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);

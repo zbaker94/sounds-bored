@@ -54,6 +54,8 @@ import {
   setLayerPlayOrder,
   stopAllVoices,
   stopPadVoices,
+  getPadFadeDirection,
+  setPadFadeDirection,
 } from "./audioState";
 
 import {
@@ -122,6 +124,7 @@ export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: numbe
   //    don't overwrite the interleaved fade-out ramp.
   if (!isPadFadingIn(pad.id)) return;
   removeFadingInPad(pad.id);
+  setPadFadeDirection(pad.id, "in");
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
@@ -178,12 +181,17 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
       // Fade-in is in progress (async gap or timeout active) → reverse by fading out
       // fadePadOut will call removeFadingInPad so fadePadIn's post-await guard sees the reversal
       fadePadOut(pad, duration, undefined, lowVol);
-    } else if (lowVol > 0 && getPadGain(pad.id).gain.value <= lowVol + 0.02) {
-      // Settled near the low endpoint after a completed non-zero fade-out → fade back up
-      fadePadInFromCurrent(pad, duration, highVol);
     } else {
-      // Playing at high level → fade out to low
-      fadePadOut(pad, duration, undefined, lowVol);
+      const lastDir = getPadFadeDirection(pad.id);
+      if (lastDir === "out" || (!lastDir && lowVol > 0 && getPadGain(pad.id).gain.value <= lowVol + 0.02)) {
+        // Last fade was out (settled at low), or gain is near the low endpoint with no
+        // direction history — fade back up. The stored direction is authoritative when
+        // present: it survives boundary drags that shift fadeLowVol away from gain.value.
+        fadePadInFromCurrent(pad, duration, highVol);
+      } else {
+        // Playing at high level (or no fade history) → fade out to low
+        fadePadOut(pad, duration, undefined, lowVol);
+      }
     }
     return Promise.resolve();
   }
@@ -191,8 +199,8 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
   // Not active: if a fade-in is already starting (async gap), ignore
   if (isPadFadingIn(pad.id) || isPadFading(pad.id)) return Promise.resolve();
 
-  // Not playing → fade in from silence
-  return fadePadIn(pad, duration, 0, highVol);
+  // Not playing → fade in from fadeLowVol (or silence if unset)
+  return fadePadIn(pad, duration, lowVol, highVol);
 }
 
 /**

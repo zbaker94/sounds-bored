@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useForm, FormProvider, type Resolver, type FieldPath } from "react-hook-form";
+import { z } from "zod/v4";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
@@ -71,8 +72,14 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const updatePad = useProjectStore((s) => s.updatePad);
 
+  // LayerConfigDialog edits a single layer; it never reads or writes the pad
+  // name from the form (onSubmit uses pad.name directly via padToConfig).
+  // Override name to z.string() so a new pad with an empty name doesn't block
+  // the Zod resolver from accepting an otherwise valid layer config.
+  const layerDialogSchema = PadConfigSchema.extend({ name: z.string() });
+
   const methods = useForm<PadConfigForm>({
-    resolver: zodResolver(PadConfigSchema) as Resolver<PadConfigForm>,
+    resolver: zodResolver(layerDialogSchema) as Resolver<PadConfigForm>,
     defaultValues: {
       name: pad.name,
       layers: [

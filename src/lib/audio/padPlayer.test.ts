@@ -3718,7 +3718,7 @@ describe("fadePadWithLevels", () => {
     clearAllFadeTracking();
   });
 
-  it("inactive fade-in always starts from silence (0), ignoring fadeLowVol", async () => {
+  it("inactive fade-in starts from fadeLowVol and ramps to fadeHighVol", async () => {
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     const mockGain = makeMockGain();
     mockCtx.createBufferSource.mockReturnValue(makeMockSource());
@@ -3740,8 +3740,8 @@ describe("fadePadWithLevels", () => {
     fadePadWithLevels(pad, 1000);
     await tick();
 
-    // Should start from 0 (silence), not from fadeLowVol=0.3
-    expect(mockGain.gain.setValueAtTime).not.toHaveBeenCalledWith(0.3, expect.any(Number));
+    // Inactive fade-in should start from fadeLowVol=0.3, not from silence
+    expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, expect.any(Number));
     clearAllFadeTracking();
   });

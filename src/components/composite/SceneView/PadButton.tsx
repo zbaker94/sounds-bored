@@ -140,11 +140,14 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
   }), [toggleMultiFadePad, pad.id, pad.fadeLowVol, pad.fadeHighVol]);
 
   // Right-click flips the pad to its back face (individually).
+  // isUnplayable is intentionally excluded — disabled pads should still be right-click-flippable
+  // so the user can assign sounds to them. The HTML disabled attribute is also removed from the
+  // front-face button so Chromium does not swallow the contextmenu event before it bubbles here.
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    if (editMode || multiFadeActive || isUnplayable) return;
+    if (editMode || multiFadeActive) return;
     setEditingPadId(editingPadId === pad.id ? null : pad.id);
-  }, [editMode, multiFadeActive, isUnplayable, editingPadId, pad.id, setEditingPadId]);
+  }, [editMode, multiFadeActive, editingPadId, pad.id, setEditingPadId]);
 
   // Selection ring styling for multi-fade selected pads
   const multiFadeSelectionClass = useMemo(() => {
@@ -216,8 +219,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
           <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
             <button
               aria-label={pad.name}
-              {...(multiFadeActive ? multiFadeHandlers : gestureHandlers)}
-              disabled={isUnplayable && !multiFadeActive}
+              {...(multiFadeActive ? multiFadeHandlers : (isUnplayable ? {} : gestureHandlers))}
               className={cn(
                 "relative w-full h-full rounded-xl overflow-hidden",
                 "flex items-center justify-center p-2",
@@ -225,7 +227,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
                 "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
                 "text-sm font-semibold text-center select-none",
                 isUnplayable && !multiFadeActive
-                  ? "opacity-40 border-2 border-black/20"
+                  ? "opacity-40 border-2 border-black/20 cursor-default"
                   : multiFadeSelectionClass
                     ? cn("border-2 cursor-pointer", multiFadeSelectionClass)
                     : cn(

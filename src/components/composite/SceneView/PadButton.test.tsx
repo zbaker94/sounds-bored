@@ -4,7 +4,7 @@ import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
+import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSoundInstance } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio/padPlayer";
@@ -48,6 +48,13 @@ function loadPadInStore(padOverrides = {}) {
   const entry = createMockHistoryEntry();
   useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
   return pad;
+}
+
+// Creates a pad with one assigned sound instance — padSoundState === "ok", not "disabled"
+function loadPlayablePadInStore(padOverrides = {}) {
+  const inst = createMockSoundInstance();
+  const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [inst] } });
+  return loadPadInStore({ layers: [layer], ...padOverrides });
 }
 
 describe("PadButton", () => {
@@ -104,7 +111,7 @@ describe("PadButton", () => {
     });
 
     it("shows volume percentage instead of pad name while dragging", () => {
-      const pad = loadPadInStore();
+      const pad = loadPlayablePadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
       const button = screen.getByRole("button", { name: "Kick" });
@@ -122,7 +129,7 @@ describe("PadButton", () => {
     });
 
     it("updates percentage as volume changes while dragging", () => {
-      const pad = loadPadInStore();
+      const pad = loadPlayablePadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
       const button = screen.getByRole("button", { name: "Kick" });
@@ -146,7 +153,7 @@ describe("PadButton", () => {
     });
 
     it("shows volume transition bar while dragging", () => {
-      const pad = loadPadInStore();
+      const pad = loadPlayablePadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
       const button = screen.getByRole("button", { name: "Kick" });
 
@@ -164,7 +171,7 @@ describe("PadButton", () => {
     });
 
     it("shows pad name alongside volume percentage while dragging", () => {
-      const pad = loadPadInStore();
+      const pad = loadPlayablePadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
 
       const button = screen.getByRole("button", { name: "Kick" });
@@ -297,13 +304,14 @@ describe("right-click / context menu", () => {
     expect(useUiStore.getState().editingPadId).toBeNull();
   });
 
-  it("right-clicking does not set editingPadId when pad is unplayable", async () => {
+  it("right-clicking sets editingPadId even when pad is unplayable", async () => {
+    // Disabled pads must still be right-click-flippable so users can assign sounds.
     // createMockLayer defaults to empty instances → padSoundState === "disabled"
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(button);
-    expect(useUiStore.getState().editingPadId).toBeNull();
+    expect(useUiStore.getState().editingPadId).toBe("pad-1");
   });
 
   it("shows PadBackFace when editingPadId matches this pad", () => {
