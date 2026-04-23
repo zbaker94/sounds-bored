@@ -47,7 +47,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { useAddFolder } from "@/hooks/useAddFolder";
@@ -188,21 +188,7 @@ export function FoldersPanel({
         await saveSettings(settingsAfterRemove);
       }
       await saveCurrentLibrary();
-      const updatedFolders =
-        useAppSettingsStore.getState().settings?.globalFolders ?? [];
-      const latest = useLibraryStore.getState();
-      const missingResult = await checkMissingStatus(
-        updatedFolders,
-        latest.sounds,
-      );
-      useLibraryStore
-        .getState()
-        .setMissingState(
-          missingResult.missingSoundIds,
-          missingResult.missingFolderIds,
-          missingResult.unknownSoundIds,
-          missingResult.unknownFolderIds,
-        );
+      await refreshMissingState();
       const folderExists = await exists(folderPath);
       if (folderExists) {
         await remove(folderPath, { recursive: true });

@@ -36,6 +36,11 @@ export const SOUNDS_SUBFOLDER = "sounds";
 export const AUDIO_EXTENSIONS = [".wav", ".mp3", ".ogg", ".flac", ".aiff", ".m4a"] as const;
 export type AudioExtension = typeof AUDIO_EXTENSIONS[number];
 
+// File dialog filter for audio file pickers. Shared by every "pick an audio file" call site.
+export const AUDIO_FILE_FILTERS = [
+  { name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) },
+];
+
 // System tag names
 export const SYSTEM_TAG_IMPORTED = "imported";
 

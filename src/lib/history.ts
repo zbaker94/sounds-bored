@@ -1,7 +1,7 @@
 import { ProjectHistory, ProjectHistorySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { readTextFile, mkdir, exists, rename } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
+import { readTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson, backupCorruptFile, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, HISTORY_FILE_NAME } from "./constants";
 import { ZodError } from "zod";
 
@@ -37,15 +37,7 @@ export async function loadProjectHistory(options?: LoadHistoryOptions): Promise<
   } catch (err) {
     if (err instanceof SyntaxError || err instanceof ZodError) {
       // Recovery path: rename corrupt file, write fresh default, notify caller.
-      // Single-backup-slot: if .corrupt.json already exists from a prior crash,
-      // rename throws and we silently proceed — the previous backup is overwritten
-      // by the writeTextFile below. This is intentional for simplicity.
-      try {
-        await rename(filePath, filePath.replace(/\.json$/, ".corrupt.json"));
-      } catch {
-        // Swallow rename errors — file may already exist as .corrupt.json,
-        // filesystem may not support rename, etc. Recovery proceeds regardless.
-      }
+      await backupCorruptFile(filePath);
       // If the write fails (e.g., directory deleted, disk full), the error
       // propagates to the caller as an I/O failure, distinct from the original
       // corruption error — callers should handle rejections accordingly.

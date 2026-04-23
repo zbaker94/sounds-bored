@@ -5,8 +5,8 @@ import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { executeFadeTap } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { createDefaultLayer } from "@/lib/padDefaults";
-import type { Layer, PadConfig } from "@/lib/schemas";
+import { createDefaultStoreLayer } from "@/lib/padDefaults";
+import type { PadConfig } from "@/lib/schemas";
 
 /**
  * All keyboard shortcuts for the main editor in one place.
@@ -152,7 +152,7 @@ export function useGlobalHotkeys() {
     const newId = crypto.randomUUID();
     const config: PadConfig = {
       name: "",
-      layers: [createDefaultLayer() as Layer],
+      layers: [createDefaultStoreLayer()],
       muteTargetPadIds: [],
     };
     addPad(activeSceneId, config, newId);

@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useRef, useEffect } from "react";
+import React, { memo, useCallback, useMemo, useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -145,6 +145,45 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     mouseY.set(0);
   }
 
+  // When tilt is disabled (e.g. entering edit mode mid-hover), snap motion values to 0
+  // so the springs settle immediately and stop running RAF callbacks.
+  useEffect(() => {
+    if (!tiltEnabled) {
+      mouseX.set(0);
+      mouseY.set(0);
+    }
+  }, [tiltEnabled, mouseX, mouseY]);
+
+  // Gate PadBackFace mount behind a delayed-unmount state so the flip-out animation
+  // can finish before the back face's store subscriptions (RAF-driven at 60fps)
+  // are torn down. Avoids paying the subscription cost on front-facing pads.
+  const [showBackFace, setShowBackFace] = useState(isFlipped);
+  const backFaceUnmountRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (backFaceUnmountRef.current) {
+      clearTimeout(backFaceUnmountRef.current);
+      backFaceUnmountRef.current = null;
+    }
+    if (isFlipped) {
+      setShowBackFace(true);
+    } else {
+      backFaceUnmountRef.current = setTimeout(
+        () => {
+          setShowBackFace(false);
+          backFaceUnmountRef.current = null;
+        },
+        PAD_FLIP_DURATION_MS + 50,
+      );
+    }
+    return () => {
+      if (backFaceUnmountRef.current) {
+        clearTimeout(backFaceUnmountRef.current);
+        backFaceUnmountRef.current = null;
+      }
+    };
+  }, [isFlipped]);
+
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const padSoundState = useMemo(
     () => getPadSoundState(pad, missingSoundIds),
@@ -223,12 +262,18 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
           {isPlaying && !isFlipped && !multiFadeActive && (
             <motion.div
               key="pulse"
-              className="absolute -inset-1 rounded-xl pointer-events-none border-4 border-white/60 z-10"
+              className="absolute -inset-1 rounded-xl pointer-events-none z-10"
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0.3, 0.8, 0.3] }}
-              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0, transition: { duration: 0.2, ease: "easeOut" } }}
-            />
+              transition={{ duration: 0.15 }}
+            >
+              {/* CSS animation — zero JS overhead vs. Motion keyframe loop */}
+              <div
+                className="absolute inset-0 rounded-xl border-4 border-white/60"
+                style={{ animation: "pad-pulse 1.2s ease-in-out infinite" }}
+              />
+            </motion.div>
           )}
         </AnimatePresence>
         {/* Flip container — CSS transition instead of JS spring to avoid RAF overload
@@ -353,7 +398,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
             style={{ transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
             aria-hidden={!isFlipped || undefined}
           >
-            <PadBackFace pad={pad} sceneId={sceneId} onMultiFade={toggleEditMode} />
+            {showBackFace && <PadBackFace pad={pad} sceneId={sceneId} onMultiFade={toggleEditMode} />}
           </div>
         </div>
       </motion.div>

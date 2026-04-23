@@ -1,10 +1,11 @@
 import { ZodError } from "zod";
 import { GlobalLibrary, GlobalLibrarySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { readTextFile, exists, rename } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
+import { readTextFile, exists } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson, backupCorruptFile, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, LIBRARY_FILE_NAME, CURRENT_LIBRARY_VERSION } from "./constants";
 import { migrateLibrary, MigrationError } from "./migrations";
+import { useLibraryStore } from "@/state/libraryStore";
 
 export class LibraryValidationError extends Error {
   constructor(message: string) {
@@ -57,15 +58,7 @@ export async function loadGlobalLibrary(
       error instanceof MigrationError
     ) {
       // Recovery path: rename corrupt file, write fresh default, notify caller.
-      // Single-backup-slot: if .corrupt.json already exists from a prior crash,
-      // rename throws and we silently proceed — the previous backup is overwritten
-      // by the writeTextFile below. This is intentional for simplicity.
-      try {
-        await rename(filePath, filePath.replace(/\.json$/, ".corrupt.json"));
-      } catch {
-        // Swallow rename errors — file may already exist as .corrupt.json,
-        // filesystem may not support rename, etc. Recovery proceeds regardless.
-      }
+      await backupCorruptFile(filePath);
       // If the write fails (e.g., directory deleted, disk full), the error
       // propagates to the caller as an I/O failure, distinct from the original
       // corruption error — callers should handle rejections accordingly.
@@ -87,4 +80,27 @@ export async function loadGlobalLibrary(
 export async function saveGlobalLibrary(library: GlobalLibrary): Promise<void> {
   const filePath = await getLibraryFilePath();
   await atomicWriteJson(filePath, library);
+}
+
+/**
+ * Builds a save payload from the current libraryStore state.
+ * Use this instead of manually spreading `sounds`, `tags`, `sets` and hardcoding
+ * `CURRENT_LIBRARY_VERSION` at every call site.
+ */
+export function getCurrentLibraryPayload(): GlobalLibrary {
+  const { sounds, tags, sets } = useLibraryStore.getState();
+  return { version: CURRENT_LIBRARY_VERSION, sounds, tags, sets };
+}
+
+/**
+ * Saves the current libraryStore state to disk and clears the dirty flag.
+ * Encodes the "after a successful save, clear dirty" contract in a single
+ * place so boot-time flows and the mutation hook agree on the sequence.
+ *
+ * @throws propagates any error from the underlying `saveGlobalLibrary` call;
+ *         the dirty flag is NOT cleared on failure.
+ */
+export async function saveCurrentLibraryAndClearDirty(): Promise<void> {
+  await saveGlobalLibrary(getCurrentLibraryPayload());
+  useLibraryStore.getState().clearDirtyFlag();
 }

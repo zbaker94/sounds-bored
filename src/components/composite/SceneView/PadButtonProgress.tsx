@@ -29,6 +29,10 @@ export const PadButtonProgress = memo(function PadButtonProgress({
 
   // Only re-renders THIS pad when ITS layer progress changes. Non-playing pads
   // return {} (stable via shallow equality) and never re-render on audio ticks.
+  //
+  // Perf note: this iterates `layers` (the pad's own layer list, typically 1–3
+  // entries) — not the global layer set. O(pad.layers) per tick per playing pad
+  // is negligible; no need to pre-filter by activeLayerIds before the lookup.
   const layerProgress = usePlaybackStore(
     useShallow((s) => {
       const result: Record<string, number> = {};

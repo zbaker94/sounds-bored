@@ -5,17 +5,33 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { executeFadeTap } from "@/lib/audio/padPlayer";
+import type { Pad, Scene } from "@/lib/schemas";
 
 export type { SelectedPadFade } from "@/state/multiFadeStore";
+
+/**
+ * Build an O(1) lookup map of padId → Pad across all scenes. Avoids the
+ * O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops.
+ */
+function buildPadMap(scenes: Scene[]): Map<string, Pad> {
+  const map = new Map<string, Pad>();
+  for (const scene of scenes) {
+    for (const pad of scene.pads) {
+      map.set(pad.id, pad);
+    }
+  }
+  return map;
+}
 
 export function executeMultiFadeNow(): void {
   const { selectedPads, resetMultiFade } = useMultiFadeStore.getState();
   if (selectedPads.size === 0) return;
-  const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+  const scenes = useProjectStore.getState().project?.scenes ?? [];
+  const padMap = buildPadMap(scenes);
   const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
 
   for (const [padId] of selectedPads) {
-    const pad = pads.find((p) => p.id === padId);
+    const pad = padMap.get(padId);
     if (!pad) continue;
     executeFadeTap(pad, globalFadeDurationMs);
   }
@@ -67,14 +83,16 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
   const canExecute = active && selectedPads.size >= 1;
 
   const enter = useCallback((padId: string) => {
-    const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
-    const pad = pads.find((p) => p.id === padId);
+    const scenes = useProjectStore.getState().project?.scenes ?? [];
+    const padMap = buildPadMap(scenes);
+    const pad = padMap.get(padId);
     enterMultiFade(padId, pad?.volume ?? 1, pad?.fadeTargetVol ?? 0);
   }, [enterMultiFade]);
 
   const togglePad = useCallback((padId: string) => {
-    const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
-    const pad = pads.find((p) => p.id === padId);
+    const scenes = useProjectStore.getState().project?.scenes ?? [];
+    const padMap = buildPadMap(scenes);
+    const pad = padMap.get(padId);
     toggleMultiFadePad(padId, pad?.volume ?? 1, pad?.fadeTargetVol ?? 0);
   }, [toggleMultiFadePad]);
 

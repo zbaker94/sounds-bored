@@ -4,11 +4,10 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useDownloadStore } from "@/state/downloadStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { loadGlobalLibrary, saveGlobalLibrary } from "@/lib/library";
+import { loadGlobalLibrary, saveCurrentLibraryAndClearDirty } from "@/lib/library";
 import { loadAppSettings } from "@/lib/appSettings";
 import { loadDownloadHistory } from "@/lib/downloads";
 import { grantPathAccess } from "@/lib/scope";
-import { getCurrentLibraryPayload } from "@/lib/library.queries";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
 /**
@@ -21,8 +20,12 @@ import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
  * files in globalFolders and backfill folderIds on existing sounds.
  */
 export function useBootLoader(): { ready: boolean } {
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [libraryLoaded, setLibraryLoaded] = useState(false);
+  // `*Attempted` (not `*Loaded`): these flags flip true once the async load
+  // finishes, regardless of success or failure. The reconciliation effect is
+  // gated on both attempts completing — it reads the resulting store state to
+  // decide whether there is anything to reconcile.
+  const [settingsAttempted, setSettingsAttempted] = useState(false);
+  const [libraryAttempted, setLibraryAttempted] = useState(false);
   const hasReconciled = useRef(false);
 
   // One-time load at mount — plain async functions, no query subscription.
@@ -41,32 +44,37 @@ export function useBootLoader(): { ready: boolean } {
         if (failedGrants > 0) {
           toast.warning(`Could not re-grant access to ${failedGrants} folder(s). Some library folders may be inaccessible.`);
         }
-        setSettingsLoaded(true);
+        setSettingsAttempted(true);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error(err);
         toast.error("Failed to load app settings");
-        setSettingsLoaded(true);
+        setSettingsAttempted(true);
       });
     loadGlobalLibrary({ onCorruption: (msg) => toast.warning(msg) })
       .then((library) => {
         useLibraryStore.getState().loadLibrary(library);
-        setLibraryLoaded(true);
+        setLibraryAttempted(true);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error(err);
         toast.error("Failed to load sound library");
-        setLibraryLoaded(true);
+        setLibraryAttempted(true);
       });
     loadDownloadHistory()
       .then((jobs) => { useDownloadStore.getState().loadJobs(jobs); })
-      .catch(() => { /* non-critical — silently ignore */ });
+      .catch((err) => {
+        // Non-critical — no toast. Log for dev visibility only.
+        console.error(err);
+      });
   }, []);
 
   useEffect(() => {
-    if (!settingsLoaded || !libraryLoaded || hasReconciled.current) return;
+    if (!settingsAttempted || !libraryAttempted || hasReconciled.current) return;
     hasReconciled.current = true;
 
     // Read settings from the store — the loadAppSettings().then() above has
-    // already run by the time this effect fires (settingsLoaded is true).
+    // already run by the time this effect fires (settingsAttempted is true).
     const settings = useAppSettingsStore.getState().settings;
     if (!settings) return;
 
@@ -109,23 +117,21 @@ export function useBootLoader(): { ready: boolean } {
 
         // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
         if (useLibraryStore.getState().isDirty) {
-          void saveGlobalLibrary(getCurrentLibraryPayload())
-            .then(() => {
-              useLibraryStore.getState().clearDirtyFlag();
-            })
-            .catch(() => {
-              toast.error("Failed to save sound library");
-            });
+          void saveCurrentLibraryAndClearDirty().catch((err) => {
+            console.error(err);
+            toast.error("Failed to save sound library");
+          });
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error(err);
         toast.error("Failed to scan sound folders");
       })
       .finally(() => {
         // Always refresh missing-file state, even if reconciliation failed.
         void refreshMissingState();
       });
-  }, [settingsLoaded, libraryLoaded]);
+  }, [settingsAttempted, libraryAttempted]);
 
-  return { ready: settingsLoaded && libraryLoaded };
+  return { ready: settingsAttempted && libraryAttempted };
 }

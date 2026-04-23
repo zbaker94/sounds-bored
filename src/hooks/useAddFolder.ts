@@ -6,6 +6,7 @@ import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
 import { pickFolder } from "@/lib/scope";
+import { basename } from "@/lib/utils";
 import type { GlobalFolder } from "@/lib/schemas";
 
 /**
@@ -40,7 +41,7 @@ export function useAddFolder(): {
         toast.error("That folder is already in your library.");
         return;
       }
-      const name = selected.split(/[\\/]/).pop() ?? selected;
+      const name = basename(selected, selected);
       const newFolder: GlobalFolder = {
         id: crypto.randomUUID(),
         path: selected,

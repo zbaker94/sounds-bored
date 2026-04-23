@@ -26,9 +26,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
-import { checkMissingStatus } from "@/lib/library.reconcile";
+import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
@@ -168,21 +167,7 @@ export function SoundList({
         draft.sounds = draft.sounds.filter((s) => !selectedSoundIds.has(s.id));
       });
       await saveCurrentLibrary();
-      const latest = useLibraryStore.getState();
-      const currentFolders =
-        useAppSettingsStore.getState().settings?.globalFolders ?? [];
-      const missingResult = await checkMissingStatus(
-        currentFolders,
-        latest.sounds,
-      );
-      useLibraryStore
-        .getState()
-        .setMissingState(
-          missingResult.missingSoundIds,
-          missingResult.missingFolderIds,
-          missingResult.unknownSoundIds,
-          missingResult.unknownFolderIds,
-        );
+      await refreshMissingState();
       onSelectionChange(new Set());
       if (failedCount > 0) {
         toast.warning(

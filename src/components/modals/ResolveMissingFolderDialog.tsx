@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { basename, dirname, join } from "@tauri-apps/api/path";
+import { basename as tauriBasename, dirname, join } from "@tauri-apps/api/path";
 import { copyFile, rename } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -10,7 +10,8 @@ import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.recon
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { pickFolder, pickFile } from "@/lib/scope";
-import { AUDIO_EXTENSIONS } from "@/lib/constants";
+import { AUDIO_FILE_FILTERS } from "@/lib/constants";
+import { basename } from "@/lib/utils";
 import type { GlobalFolder, Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -115,7 +116,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
     const selected = await pickFolder();
     if (!selected) return;
 
-    const selectedName = await basename(selected);
+    const selectedName = await tauriBasename(selected);
     setNewFolderPath(selected);
     setNewFolderName(selectedName);
 
@@ -171,7 +172,8 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
         setStep("resolving-files");
         setIsWorking(false);
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to re-link folder");
       setIsWorking(false);
     }
@@ -198,7 +200,8 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       toast.success(`Folder "${folder.name}" removed`);
       onResolved?.();
       handleClose();
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to remove folder");
       setIsWorking(false);
     }
@@ -208,12 +211,12 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
 
   async function handlePickFile() {
     const selected = await pickFile({
-      filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
+      filters: AUDIO_FILE_FILTERS,
     });
     if (!selected) return;
 
-    const fileBase = await basename(selected);
-    const oldBase = currentSound?.filePath ? await basename(currentSound.filePath) : "";
+    const fileBase = await tauriBasename(selected);
+    const oldBase = currentSound?.filePath ? await tauriBasename(currentSound.filePath) : "";
 
     setPickedFilePath(selected);
     setPickedFileBasename(fileBase);
@@ -270,7 +273,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
 
       if (selectedPlacement === "add-parent") {
         const parentDir = await dirname(pickedFilePath);
-        const parentName = await basename(parentDir);
+        const parentName = await tauriBasename(parentDir);
         const existingFolder = settings?.globalFolders.find((f) => f.path === parentDir);
 
         if (!existingFolder && settings) {
@@ -330,7 +333,8 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       setPickedFilePath("");
       setDuplicateSound(null);
       advanceToNextSound(newResolved, removedCount, skippedCount);
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to apply file placement");
       setIsWorking(false);
     }
@@ -350,7 +354,8 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       setRemovedCount(newRemoved);
       setIsWorking(false);
       advanceToNextSound(resolvedCount, newRemoved, skippedCount);
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to remove sound");
       setIsWorking(false);
     }
@@ -466,7 +471,7 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
               <DialogTitle>Different File Name</DialogTitle>
               <DialogDescription>
                 The selected file is named <strong>"{pickedFileBasename}"</strong>, but the library entry
-                is <strong>"{currentSound.filePath?.split(/[\\/]/).pop() ?? currentSound.name}"</strong>.
+                is <strong>"{currentSound.filePath ? basename(currentSound.filePath, currentSound.name) : currentSound.name}"</strong>.
                 The library name will be updated to match.
               </DialogDescription>
             </DialogHeader>

@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useDownloadStore, ACTIVE_STATUSES } from "@/state/downloadStore";
+import { useDownloadStore, selectActiveJobs } from "@/state/downloadStore";
 import { DownloadManager } from "./DownloadManager";
 
 interface DownloadButtonProps {
@@ -14,10 +14,9 @@ interface DownloadButtonProps {
 export function DownloadButton({ onOpenDialog }: DownloadButtonProps) {
   const { hasJobs, hasActive, activeCount } = useDownloadStore(
     useShallow((s) => {
-      const all = Object.values(s.jobs);
-      const active = all.filter((j) => ACTIVE_STATUSES.has(j.status));
+      const active = selectActiveJobs(s);
       return {
-        hasJobs: all.length > 0,
+        hasJobs: Object.keys(s.jobs).length > 0,
         hasActive: active.length > 0,
         activeCount: active.length,
       };

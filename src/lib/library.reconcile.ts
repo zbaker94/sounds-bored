@@ -2,6 +2,7 @@ import { readDir, exists, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
 import { Sound, GlobalFolder } from "./schemas";
 import { AUDIO_EXTENSIONS } from "./constants";
+import { basename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 
@@ -111,7 +112,7 @@ export async function reconcileGlobalLibrary(
       pathToFolderId.set(filePath, folder.id);
 
       if (!soundsByPath.has(filePath)) {
-        const filename = filePath.split(/[\\/]/).pop() ?? filePath;
+        const filename = basename(filePath, filePath);
         const sound: Sound = {
           id: crypto.randomUUID(),
           name: nameFromFilename(filename),

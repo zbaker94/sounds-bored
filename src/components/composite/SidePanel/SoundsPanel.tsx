@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useImportSounds } from "@/hooks/useImportSounds";
-import { AUDIO_EXTENSIONS } from "@/lib/constants";
+import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
@@ -62,7 +62,7 @@ export function SoundsPanel() {
     setIsImporting(true);
     try {
       const paths = await pickFiles({
-        filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
+        filters: AUDIO_FILE_FILTERS,
       });
       if (!paths.length) return;
       const count = await importSounds(paths);

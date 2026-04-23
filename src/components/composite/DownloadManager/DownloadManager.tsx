@@ -1,15 +1,14 @@
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useDownloadStore, ACTIVE_STATUSES } from "@/state/downloadStore";
+import { useDownloadStore, selectActiveJobs, ACTIVE_STATUSES } from "@/state/downloadStore";
 import { DownloadItem } from "./DownloadItem";
 
 export function DownloadManager() {
   const jobs = useDownloadStore((s) => s.jobs);
 
   const sortedJobs = useMemo(() => {
-    const all = Object.values(jobs);
-    const active = all.filter((j) => ACTIVE_STATUSES.has(j.status));
-    const inactive = all.filter((j) => !ACTIVE_STATUSES.has(j.status));
+    const active = selectActiveJobs({ jobs });
+    const inactive = Object.values(jobs).filter((j) => !ACTIVE_STATUSES.has(j.status));
     return [...active, ...inactive];
   }, [jobs]);
 

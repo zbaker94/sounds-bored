@@ -6,7 +6,8 @@ import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { PadConfigSchema } from "@/lib/schemas";
-import type { PadConfigForm, PadConfig, LayerConfigForm, Layer, Pad } from "@/lib/schemas";
+import type { PadConfigForm, LayerConfigForm, Layer, Pad } from "@/lib/schemas";
+import { padToConfig } from "@/lib/padDefaults";
 import {
   Dialog,
   DialogContent,
@@ -34,17 +35,15 @@ function toLayer(form: LayerConfigForm): Layer {
   };
 }
 
-function padToConfig(pad: Pad, layers: Layer[]): PadConfig {
+function layerToFormValues(layer: Layer): LayerConfigForm {
   return {
-    name: pad.name,
-    layers,
-    muteTargetPadIds: pad.muteTargetPadIds,
-    muteGroupId: pad.muteGroupId,
-    color: pad.color,
-    icon: pad.icon,
-    fadeDurationMs: pad.fadeDurationMs,
-    volume: pad.volume ?? 1,
-    fadeTargetVol: pad.fadeTargetVol ?? 0,
+    id: layer.id,
+    selection: layer.selection as LayerConfigForm["selection"],
+    arrangement: layer.arrangement,
+    cycleMode: layer.cycleMode,
+    playbackMode: layer.playbackMode,
+    retriggerMode: layer.retriggerMode,
+    volume: layer.volume,
   };
 }
 
@@ -82,17 +81,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
     resolver: zodResolver(layerDialogSchema) as Resolver<PadConfigForm>,
     defaultValues: {
       name: pad.name,
-      layers: [
-        {
-          id: layer.id,
-          selection: layer.selection as LayerConfigForm["selection"],
-          arrangement: layer.arrangement,
-          cycleMode: layer.cycleMode,
-          playbackMode: layer.playbackMode,
-          retriggerMode: layer.retriggerMode,
-          volume: layer.volume,
-        },
-      ],
+      layers: [layerToFormValues(layer)],
       fadeDurationMs: pad.fadeDurationMs,
       volume: pad.volume ?? 1,
       fadeTargetVol: pad.fadeTargetVol ?? 0,
@@ -106,17 +95,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
     if (!isOpen) return;
     reset({
       name: pad.name,
-      layers: [
-        {
-          id: layer.id,
-          selection: layer.selection as LayerConfigForm["selection"],
-          arrangement: layer.arrangement,
-          cycleMode: layer.cycleMode,
-          playbackMode: layer.playbackMode,
-          retriggerMode: layer.retriggerMode,
-          volume: layer.volume,
-        },
-      ],
+      layers: [layerToFormValues(layer)],
       fadeDurationMs: pad.fadeDurationMs,
       volume: pad.volume ?? 1,
       fadeTargetVol: pad.fadeTargetVol ?? 0,

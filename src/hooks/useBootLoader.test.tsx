@@ -22,6 +22,13 @@ vi.mock("@/lib/library", async () => {
     loadGlobalLibrary: (options?: { onCorruption?: (msg: string) => void }) =>
       mockLoadGlobalLibrary(options),
     saveGlobalLibrary: () => mockSaveGlobalLibrary(),
+    // saveCurrentLibraryAndClearDirty calls saveGlobalLibrary via a module-internal
+    // binding that Vitest's export-level mock cannot intercept. Mirror the real
+    // implementation so call-count and dirty-flag assertions continue to work.
+    saveCurrentLibraryAndClearDirty: async () => {
+      await mockSaveGlobalLibrary();
+      useLibraryStore.getState().clearDirtyFlag();
+    },
   };
 });
 

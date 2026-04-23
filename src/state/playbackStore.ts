@@ -199,6 +199,8 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
   layerPlayOrder: {},
   layerChain: {},
 
+  // Spread is O(n layers) but acceptable at current scale (dozens of layers max).
+  // Revisit with Immer produce() if layerVolumes ever tracks hundreds of entries.
   updateLayerVolume: (layerId, volume) =>
     set((s) => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } })),
 

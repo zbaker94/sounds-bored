@@ -7,6 +7,10 @@ import { Pad, PadConfig, Project, ProjectHistoryEntry, Scene } from "@/lib/schem
 // projectStore, so there is no circular dependency. The inverse (having UI callers
 // update both stores) would require duplicating scene-selection logic across all call
 // sites (SceneTabBar, useGlobalHotkeys, drag-to-add, keyboard shortcuts, etc.).
+//
+// These four call sites pass the post-mutation `sceneIds` list to
+// `setActiveSceneId` so it can enforce the activeSceneId invariant (ARCH-4):
+// silently rejecting ids that don't exist in the current project.
 import { useUiStore } from "./uiStore";
 
 interface ProjectState {
@@ -67,7 +71,11 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isTemporary = isTemporary;
         draft.isDirty = false;
       });
-      useUiStore.getState().setActiveSceneId(project.scenes.length > 0 ? project.scenes[0].id : null);
+      // Pass sceneIds so `setActiveSceneId` enforces the activeSceneId invariant.
+      const sceneIds = project.scenes.map((s) => s.id);
+      useUiStore
+        .getState()
+        .setActiveSceneId(sceneIds.length > 0 ? sceneIds[0] : null, sceneIds);
     },
 
     updateProject: (project) =>
@@ -94,7 +102,9 @@ export const useProjectStore = create<ProjectStore>()(
 
     clearProject: () => {
       set(() => ({ ...initialProjectState }));
-      useUiStore.getState().setActiveSceneId(null);
+      // Null is always accepted by `setActiveSceneId`; pass an empty scene list
+      // for consistency with other lifecycle call sites.
+      useUiStore.getState().setActiveSceneId(null, []);
     },
 
     addScene: (name) => {
@@ -110,7 +120,12 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = true;
         newSceneId = newScene.id;
       });
-      if (newSceneId) useUiStore.getState().setActiveSceneId(newSceneId);
+      if (newSceneId) {
+        // Pass updated sceneIds so `setActiveSceneId` can validate the new id
+        // exists (invariant enforcement).
+        const sceneIds = get().project?.scenes.map((s) => s.id) ?? [];
+        useUiStore.getState().setActiveSceneId(newSceneId, sceneIds);
+      }
     },
 
     renameScene: (sceneId, name) =>
@@ -139,7 +154,10 @@ export const useProjectStore = create<ProjectStore>()(
         const next = scenes.length > 0
           ? (scenes[deletedIdx] ?? scenes[deletedIdx - 1])!.id
           : null;
-        useUiStore.getState().setActiveSceneId(next);
+        // Pass updated sceneIds so `setActiveSceneId` enforces the invariant
+        // against the post-delete scene list.
+        const sceneIds = scenes.map((s) => s.id);
+        useUiStore.getState().setActiveSceneId(next, sceneIds);
       }
     },
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { basename } from "@tauri-apps/api/path";
+import { basename as tauriBasename } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
@@ -7,7 +7,8 @@ import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { pickFile } from "@/lib/scope";
-import { AUDIO_EXTENSIONS } from "@/lib/constants";
+import { AUDIO_FILE_FILTERS } from "@/lib/constants";
+import { basename } from "@/lib/utils";
 import type { Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -60,12 +61,12 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
   async function handleLocate() {
     if (!sound) return;
     const selected = await pickFile({
-      filters: [{ name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) }],
+      filters: AUDIO_FILE_FILTERS,
     });
     if (!selected) return;
 
-    const newBasename = await basename(selected);
-    const oldBasename = sound.filePath ? await basename(sound.filePath) : "";
+    const newBasename = await tauriBasename(selected);
+    const oldBasename = sound.filePath ? await tauriBasename(sound.filePath) : "";
 
     setPendingPath(selected);
     setPendingBasename(newBasename);
@@ -133,7 +134,8 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       toast.success("Sound re-linked");
       onResolved?.();
       handleClose();
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to re-link sound");
       setIsWorking(false);
     }
@@ -152,7 +154,8 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       toast.success(`"${sound.name}" removed from library`);
       onResolved?.();
       handleClose();
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to remove sound");
       setIsWorking(false);
     }
@@ -160,7 +163,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
 
   if (!sound) return null;
 
-  const oldBasename = sound.filePath?.split(/[\\/]/).pop() ?? sound.name;
+  const oldBasename = sound.filePath ? basename(sound.filePath, sound.name) : sound.name;
 
   return (
     <Dialog open={!!sound} onOpenChange={(open) => { if (!open) handleClose(); }}>

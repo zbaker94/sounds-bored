@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Fixed a security issue where a malicious yt-dlp config file containing shell commands could execute arbitrary code during downloads; the bundled yt-dlp now runs in isolated mode.
+- Fixed a security vulnerability in project export where a symlink could trick the app into embedding sensitive files from outside the project folder.
+- Improved performance: pad controls and store subscriptions now unmount when a pad is not in edit mode, reducing CPU usage during playback.
+- Improved performance: the playing-pad pulse ring animation now runs entirely in CSS with no JavaScript overhead, and audio tick per-frame memory allocations are eliminated when sound order is unchanged.
+- Fixed a race condition where download events arriving at startup could be silently lost when boot-time history loaded after sidecar events.
 - Internal code review documentation added covering security, performance, and quality findings — no user-facing changes shipped in this diff
 - Planned security fixes identified: yt-dlp config injection risk and symlink path traversal in project export will be hardened in a follow-up release
 - Performance improvements planned: reduced memory allocations during audio playback and faster pad lookup in multi-fade mode

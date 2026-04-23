@@ -3,6 +3,9 @@ import { getAudioContext } from "./audioContext";
 import { getPadGain, getLayerGain, cancelPadFade } from "./audioState";
 import { usePlaybackStore } from "@/state/playbackStore";
 
+/** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
+const CLICK_FREE_RAMP_S = 0.016;
+
 /**
  * Set the live volume for a pad's gain node with a short ramp to avoid clicks.
  * Pass a value in 0–1 range.
@@ -13,7 +16,7 @@ export function setPadVolume(padId: string, volume: number): void {
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
+  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
   // Tick reads the gain node value automatically — no store call needed.
 }
 
@@ -43,7 +46,7 @@ export function syncLayerVolume(layerId: string, volume: number): void {
   const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
+  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
 }
 
 /**
@@ -59,7 +62,7 @@ export function setLayerVolume(layerId: string, volume: number): void {
     const ctx = getAudioContext();
     gain.gain.cancelScheduledValues(ctx.currentTime);
     gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + 0.016);
+    gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
   } else {
     // Layer not playing — tick has no gain node to read. Push directly to store.
     usePlaybackStore.getState().updateLayerVolume(layerId, clamped);

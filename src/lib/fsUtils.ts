@@ -76,3 +76,31 @@ export async function sweepOrphanedTmpFiles(filePath: string): Promise<void> {
     // sweep is opportunistic — never block loading on cleanup failures
   }
 }
+
+/**
+ * Renames a corrupt file to `<basename>.corrupt.json` (or appends `.corrupt.json`
+ * if the path has no `.json` extension) as part of a corrupt-JSON recovery flow.
+ *
+ * Single-backup-slot: if `<basename>.corrupt.json` already exists from a prior
+ * crash, the rename call throws and this helper silently swallows the error —
+ * the previous backup is preserved, and the caller's subsequent default-write
+ * proceeds as normal. This behavior is intentional for simplicity.
+ *
+ * Other rename failures (e.g. filesystem does not support rename, permission
+ * errors) are also swallowed so recovery proceeds regardless. This function
+ * never throws.
+ *
+ * The caller is responsible for writing a fresh default and notifying the user
+ * after this helper returns.
+ */
+export async function backupCorruptFile(filePath: string): Promise<void> {
+  const backupPath = filePath.endsWith(".json")
+    ? filePath.replace(/\.json$/, ".corrupt.json")
+    : `${filePath}.corrupt.json`;
+  try {
+    await rename(filePath, backupPath);
+  } catch {
+    // Swallow rename errors — file may already exist as .corrupt.json,
+    // filesystem may not support rename, etc. Recovery proceeds regardless.
+  }
+}

@@ -39,10 +39,20 @@ export const initialDownloadState: DownloadStoreState = {
   jobs: {},
 };
 
+export const selectActiveJobs = (state: DownloadStoreState): DownloadJob[] =>
+  Object.values(state.jobs).filter((j) => ACTIVE_STATUSES.has(j.status));
+
 export const useDownloadStore = create<DownloadStoreState & DownloadStoreActions>((set) => ({
   ...initialDownloadState,
   loadJobs: (jobs) =>
-    set(() => ({ jobs: Object.fromEntries(jobs.map((j) => [j.id, j])) })),
+    set((state) => ({
+      jobs: {
+        ...Object.fromEntries(jobs.map((j) => [j.id, j])),
+        // Live sidecar state wins over persisted history for the same id —
+        // events arriving before loadJobs must not be silently clobbered.
+        ...state.jobs,
+      },
+    })),
   addJob: (job) =>
     set((state) => ({ jobs: { ...state.jobs, [job.id]: job } })),
   updateJob: (id, update) =>

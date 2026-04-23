@@ -237,6 +237,13 @@ pub fn start_download(
     // Validate download_folder_path: must not contain traversal segments.
     validate_no_traversal(&download_folder_path, "download_folder_path")?;
 
+    // Reject '%' in download_folder_path — yt-dlp interprets '%' as a template
+    // placeholder directive; a path containing '%' would redirect output to an
+    // unexpected location.
+    if download_folder_path.contains('%') {
+        return Err("download_folder_path must not contain '%'".to_string());
+    }
+
     // Emit initial queued event
     let _ = app.emit(DOWNLOAD_EVENT, DownloadProgressEvent::queued(&job_id));
 
@@ -258,6 +265,12 @@ pub fn start_download(
         .sidecar("yt-dlp")
         .map_err(|e| e.to_string())?
         .args([
+            // SEC-2: isolate the sidecar from user/system yt-dlp config files and
+            // plugin directories. Without these flags, a hostile config containing
+            // `--exec "shell command"` would achieve arbitrary command execution.
+            // These MUST appear early, before any URL or output args.
+            "--ignore-config",
+            "--no-plugins",
             "--extract-audio",
             "--audio-format", "mp3",
             "--audio-quality", "0",
@@ -444,6 +457,14 @@ pub fn export_project(
     // zip outside the intended destination or reading arbitrary files into the archive.
     validate_no_traversal(&dest_path, "dest_path")?;
     validate_no_traversal(&source_path, "source_path")?;
+
+    // SEC-1: Close the TOCTOU window between symlink validation and File::open by
+    // pre-opening a File handle immediately after each extra_sound_paths entry
+    // passes validation. The handle references the inode, not the path, so an
+    // attacker cannot swap the file for a symlink after this point. Carries
+    // (basename, File) into the async task below.
+    let mut extra_sound_handles: Vec<(String, std::fs::File)> =
+        Vec::with_capacity(extra_sound_paths.len());
     for (i, extra) in extra_sound_paths.iter().enumerate() {
         validate_no_traversal(extra, &format!("extra_sound_paths[{}]", i))?;
         // Defense-in-depth: restrict entries to known audio extensions to prevent
@@ -461,6 +482,17 @@ pub fn export_project(
         if !meta.file_type().is_file() {
             return Err(format!("extra_sound_paths[{}] must be a regular file", i));
         }
+        // Open the file immediately — within the same validation step — to pin the
+        // inode. Any later path swap (symlink or otherwise) cannot affect this handle.
+        // O_NOFOLLOW is not portable to Windows, so rely on the preceding
+        // symlink_metadata check plus immediate open to minimize the race window.
+        let basename = std::path::Path::new(extra)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .ok_or_else(|| format!("extra_sound_paths[{}] has no file name", i))?;
+        let file = std::fs::File::open(extra)
+            .map_err(|e| format!("extra_sound_paths[{}]: {}", i, e))?;
+        extra_sound_handles.push((basename, file));
     }
 
     // Insert cancellation flag
@@ -503,6 +535,17 @@ pub fn export_project(
 
             // Walk source_path
             let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::zipping(&job_id_clone));
+
+            // SEC-3: WalkDir defaults to follow_links=false for descendants, but
+            // if source_path ITSELF is a symlink, walkdir walks the link target.
+            // The per-entry is_symlink() check only catches descendants — not the root.
+            // Reject symlink roots explicitly to prevent a crafted project folder
+            // symlink from exfiltrating the target's contents.
+            let source_meta = std::fs::symlink_metadata(&source_path)
+                .map_err(|e| e.to_string())?;
+            if source_meta.file_type().is_symlink() {
+                return Err("Project folder is a symlink — export rejected".to_string());
+            }
 
             for entry in walkdir::WalkDir::new(&source_path) {
                 // Check cancellation
@@ -555,8 +598,12 @@ pub fn export_project(
                 std::io::copy(&mut source_file, &mut writer).map_err(|e| e.to_string())?;
             }
 
-            // Add extra sounds
-            for extra_path in &extra_sound_paths {
+            // Add extra sounds.
+            // SEC-1: use the pre-opened File handles from the validation step instead of
+            // re-opening by path. This closes the TOCTOU window where an attacker could
+            // replace a validated file with a symlink after symlink_metadata passed but
+            // before File::open was called inside this async task.
+            for (basename_str, mut f) in extra_sound_handles.into_iter() {
                 // Check cancellation
                 if flag.load(Ordering::SeqCst) {
                     let _ = app_clone.emit(EXPORT_EVENT, ExportProgressEvent::cancelled(&job_id_clone));
@@ -565,18 +612,13 @@ pub fn export_project(
                     return Ok(());
                 }
 
-                let p = std::path::Path::new(extra_path);
-                if let Some(basename) = p.file_name() {
-                    let basename_str = basename.to_string_lossy().to_string();
-                    if !existing_sounds.contains(&basename_str) {
-                        let zip_entry = format!("sounds/{}", basename_str);
-                        writer
-                            .start_file(&zip_entry, options)
-                            .map_err(|e| e.to_string())?;
-                        let mut f = std::fs::File::open(p).map_err(|e| e.to_string())?;
-                        std::io::copy(&mut f, &mut writer).map_err(|e| e.to_string())?;
-                        existing_sounds.insert(basename_str);
-                    }
+                if !existing_sounds.contains(&basename_str) {
+                    let zip_entry = format!("sounds/{}", basename_str);
+                    writer
+                        .start_file(&zip_entry, options)
+                        .map_err(|e| e.to_string())?;
+                    std::io::copy(&mut f, &mut writer).map_err(|e| e.to_string())?;
+                    existing_sounds.insert(basename_str);
                 }
             }
 

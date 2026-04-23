@@ -48,6 +48,13 @@ let prevLayerProgress: Record<string, number> = {};
 let prevLayerPlayOrder: Record<string, string[]> = {};
 let prevLayerChain: Record<string, string[]> = {};
 
+// Track the last observed Sound[] source reference per layer so we can skip
+// the .map(s => s.id) allocation when the source array reference is unchanged.
+// These Sound[] arrays in audioState's layerPlayOrderMap / layerChainQueue only
+// swap to a new reference on explicit writes, so reference equality is sufficient.
+const prevLayerPlayOrderSource = new Map<string, readonly unknown[]>();
+const prevLayerChainSource = new Map<string, readonly unknown[]>();
+
 /** Exposed for test introspection only — do not use in production code. */
 export const _getPrevActiveLayerIds = (): ReadonlySet<string> => prevActiveLayerIds;
 
@@ -61,6 +68,8 @@ function resetTrackers(): void {
   prevLayerProgress = {};
   prevLayerPlayOrder = {};
   prevLayerChain = {};
+  prevLayerPlayOrderSource.clear();
+  prevLayerChainSource.clear();
 }
 
 function tick(): void {
@@ -127,26 +136,67 @@ function tick(): void {
   // whenever any single layer's chain advances).
   const nextLayerPlayOrder: Record<string, string[]> = {};
   const nextLayerChain: Record<string, string[]> = {};
+  const seenPlayOrderLayerIds = new Set<string>();
+  const seenChainLayerIds = new Set<string>();
   for (const layerId of nextActiveLayerIds) {
     const playOrder = getLayerPlayOrder(layerId);
     if (playOrder && playOrder.length > 0) {
-      const ids = playOrder.map((s) => s.id);
-      const prev = prevLayerPlayOrder[layerId];
-      if (prev && prev.length === ids.length && prev.every((v, i) => v === ids[i])) {
-        nextLayerPlayOrder[layerId] = prev;
+      seenPlayOrderLayerIds.add(layerId);
+      // Fast path: if the audioState Sound[] array reference hasn't changed
+      // since last tick, reuse the previous string[] snapshot and skip .map
+      // entirely. The source array only swaps on explicit writes in audioState.
+      const prevSource = prevLayerPlayOrderSource.get(layerId);
+      const prevIds = prevLayerPlayOrder[layerId];
+      if (prevSource === playOrder && prevIds) {
+        nextLayerPlayOrder[layerId] = prevIds;
       } else {
-        nextLayerPlayOrder[layerId] = ids;
+        const ids = playOrder.map((s) => s.id);
+        if (
+          prevIds &&
+          prevIds.length === ids.length &&
+          prevIds.every((v, i) => v === ids[i])
+        ) {
+          // Contents match even though the source reference differs — reuse
+          // the prior array so downstream selector identity stays stable.
+          nextLayerPlayOrder[layerId] = prevIds;
+        } else {
+          nextLayerPlayOrder[layerId] = ids;
+        }
+        prevLayerPlayOrderSource.set(layerId, playOrder);
       }
     }
     const chain = getLayerChain(layerId);
     if (chain && chain.length > 0) {
-      const ids = chain.map((s) => s.id);
-      const prev = prevLayerChain[layerId];
-      if (prev && prev.length === ids.length && prev.every((v, i) => v === ids[i])) {
-        nextLayerChain[layerId] = prev;
+      seenChainLayerIds.add(layerId);
+      const prevSource = prevLayerChainSource.get(layerId);
+      const prevIds = prevLayerChain[layerId];
+      if (prevSource === chain && prevIds) {
+        nextLayerChain[layerId] = prevIds;
       } else {
-        nextLayerChain[layerId] = ids;
+        const ids = chain.map((s) => s.id);
+        if (
+          prevIds &&
+          prevIds.length === ids.length &&
+          prevIds.every((v, i) => v === ids[i])
+        ) {
+          nextLayerChain[layerId] = prevIds;
+        } else {
+          nextLayerChain[layerId] = ids;
+        }
+        prevLayerChainSource.set(layerId, chain);
       }
+    }
+  }
+  // Drop source references for layers that no longer contribute a play order /
+  // chain this tick so the tracker maps don't grow unbounded as layers churn.
+  if (prevLayerPlayOrderSource.size > seenPlayOrderLayerIds.size) {
+    for (const layerId of prevLayerPlayOrderSource.keys()) {
+      if (!seenPlayOrderLayerIds.has(layerId)) prevLayerPlayOrderSource.delete(layerId);
+    }
+  }
+  if (prevLayerChainSource.size > seenChainLayerIds.size) {
+    for (const layerId of prevLayerChainSource.keys()) {
+      if (!seenChainLayerIds.has(layerId)) prevLayerChainSource.delete(layerId);
     }
   }
   const layerPlayOrderChanged = !stringArrayRecordsEqual(nextLayerPlayOrder, prevLayerPlayOrder);
@@ -222,6 +272,7 @@ function _clearAllTickFields(): void {
 function volumesEqual(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
+  if (aKeys.length === 0) return true; // both empty — steady-state fast path
   for (const k of aKeys) {
     if (!(k in b) || Math.abs(a[k] - b[k]) > VOLUME_EPSILON) return false;
   }
@@ -232,6 +283,7 @@ function volumesEqual(a: Record<string, number>, b: Record<string, number>): boo
 function progressEqual(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
+  if (aKeys.length === 0) return true; // both empty — steady-state fast path
   for (const k of aKeys) {
     if (!(k in b) || Math.abs(a[k] - b[k]) > PROGRESS_EPSILON) return false;
   }

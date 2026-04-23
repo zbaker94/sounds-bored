@@ -1,6 +1,7 @@
 import type { Project, Sound } from "@/lib/schemas";
 import { hasFilePath } from "@/lib/schemas";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
+import { basename } from "@/lib/utils";
 
 function getReferencedIds(project: Project, sounds: Sound[]): Set<string> {
   const ids = new Set<string>();
@@ -34,10 +35,6 @@ export function countMissingReferencedSounds(project: Project, sounds: Sound[]):
   return ids.size - sounds.filter((s) => ids.has(s.id) && hasFilePath(s)).length;
 }
 
-function extractBasename(filePath: string): string {
-  return filePath.split(/[\\/]/).pop() ?? filePath;
-}
-
 /**
  * Builds the soundmap JSON string mapping each sound's ID to its export-relative path.
  * Also reports any basename collisions so the caller can warn the user that some audio
@@ -52,7 +49,7 @@ export function buildSoundMapJson(sounds: (Sound & { filePath: string })[]): {
   const collisions: string[] = [];
 
   for (const sound of sounds) {
-    const name = extractBasename(sound.filePath);
+    const name = basename(sound.filePath, sound.filePath);
     if (seen.has(name)) {
       collisions.push(name);
     } else {

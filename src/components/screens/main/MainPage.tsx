@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useProjectStore } from "@/state/projectStore";
 import { clearAllAudioState } from "@/lib/audio/audioState";
+import { clearAllBuffers } from "@/lib/audio/bufferCache";
+import { clearAllStreamingElements, clearAllSizeCache } from "@/lib/audio/streamingCache";
 import { stopAudioTick } from "@/lib/audio/audioTick";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { SceneView } from "@/components/composite/SceneView/SceneView";
@@ -57,6 +59,13 @@ function MainPageInner() {
     return () => {
       stopAudioTick();
       clearAllAudioState();
+      // Release decoded PCM memory from the closed project and discard pre-buffered
+      // HTMLAudioElements so they do not accumulate across project switches.
+      // These caches live outside audioState's pure-state-container boundary, so
+      // the orchestrating caller (this component) owns clearing them.
+      clearAllBuffers();
+      clearAllStreamingElements();
+      clearAllSizeCache();
     };
   }, []);
 

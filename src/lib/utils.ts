@@ -50,3 +50,13 @@ export function truncatePath(path: string, maxLength = 40): string {
   const keep = maxLength - filename.length - 2; // −2 for "…" + sep
   return `${path.slice(0, keep)}…${sep}${filename}`;
 }
+
+/**
+ * Extracts the final segment of a path (the basename), handling both
+ * forward and backward slashes. Returns `fallback` if the path is empty.
+ * e.g. "/foo/bar/baz.wav" → "baz.wav"
+ * e.g. "C:\\foo\\bar.wav" → "bar.wav"
+ */
+export function basename(path: string, fallback = ""): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? fallback;
+}

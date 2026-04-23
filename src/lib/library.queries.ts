@@ -1,8 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { loadGlobalLibrary, saveGlobalLibrary } from "./library";
+import { getCurrentLibraryPayload, loadGlobalLibrary, saveGlobalLibrary } from "./library";
 import { GlobalLibrary } from "./schemas";
-import { CURRENT_LIBRARY_VERSION } from "./constants";
 import { useLibraryStore } from "@/state/libraryStore";
 
 export function useSaveGlobalLibrary() {
@@ -27,15 +26,10 @@ export function useSaveGlobalLibrary() {
   });
 }
 
-/**
- * Builds a save payload from the current libraryStore state.
- * Use this instead of manually spreading `sounds`, `tags`, `sets` and hardcoding
- * `CURRENT_LIBRARY_VERSION` at every call site.
- */
-export function getCurrentLibraryPayload(): GlobalLibrary {
-  const { sounds, tags, sets } = useLibraryStore.getState();
-  return { version: CURRENT_LIBRARY_VERSION, sounds, tags, sets };
-}
+// Re-export the Zustand-reader helper for backward compatibility. It lives in
+// `library.ts` now (pure state helpers belong with the data layer, not the
+// React Query bindings); callers are encouraged to import from there directly.
+export { getCurrentLibraryPayload };
 
 /**
  * Convenience hook: wraps `useSaveGlobalLibrary` so callers don't need to

@@ -27,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, FolderAddIcon, FolderOpenIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { pickFolder } from "@/lib/scope";
+import { basename } from "@/lib/utils";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { exists } from "@tauri-apps/plugin-fs";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -94,7 +95,7 @@ function FoldersTab() {
   async function handleAddFolder() {
     const folderPath = await pickFolder();
     if (!folderPath) return;
-    const name = folderPath.split(/[\\/]/).filter(Boolean).pop() ?? folderPath;
+    const name = basename(folderPath, folderPath);
     addGlobalFolder({ id: crypto.randomUUID(), path: folderPath, name });
     persist();
   }

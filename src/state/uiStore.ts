@@ -26,7 +26,8 @@ interface UiState {
   editMode: boolean;
   /** The currently active scene tab, or null when no project is loaded.
    * Invariant: must be null or a scene id that exists in the current project.
-   * Callers are responsible for validation; `setActiveSceneId` is an unchecked setter. */
+   * `setActiveSceneId` enforces this invariant when callers pass the current
+   * scene id list (see its docstring). */
   activeSceneId: string | null;
   /** The pad currently under the mouse cursor, or null if none. */
   hoveredPadId: string | null;
@@ -57,8 +58,15 @@ interface UiActions {
   setHoveredPadId: (id: string | null) => void;
   /** Set the pad currently being edited, or null to clear. */
   setEditingPadId: (id: string | null) => void;
-  /** Set the active scene tab. Pass null to clear (e.g., on project close). */
-  setActiveSceneId: (id: string | null) => void;
+  /** Set the active scene tab. Pass null to clear (e.g., on project close).
+   *
+   * Optional `sceneIds` argument enforces the activeSceneId invariant: when
+   * provided, a non-null `id` that is NOT in `sceneIds` is silently rejected.
+   * This lets scene lifecycle callers (load/clear/add/delete inside
+   * `projectStore`) guarantee `activeSceneId` never dangles on a non-existent
+   * scene. External callers that are already known-valid (e.g., tab bar clicks
+   * selecting from the rendered scene list) may omit `sceneIds`. */
+  setActiveSceneId: (id: string | null, sceneIds?: string[]) => void;
   /** Set the pad whose fade-config popover is open, or null to close. */
   setFadePopoverPadId: (id: string | null) => void;
   /** Set the in-flight popover fade target (0–1), or null to clear. */
@@ -120,7 +128,15 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setEditingPadId: (id) => set({ editingPadId: id }),
 
-  setActiveSceneId: (id) => set({ activeSceneId: id }),
+  setActiveSceneId: (id, sceneIds) => {
+    // Enforce activeSceneId invariant (ARCH-4): when the caller supplies the
+    // current scene id list, silently reject ids that don't exist. Null is
+    // always accepted (means "no active scene"). Callers that omit `sceneIds`
+    // opt out of the guard — used by UI call sites that already bind selection
+    // to the rendered scene list.
+    if (id !== null && sceneIds !== undefined && !sceneIds.includes(id)) return;
+    set({ activeSceneId: id });
+  },
 
   setFadePopoverPadId: (id) => set(id === null ? { fadePopoverPadId: null, fadePopoverTarget: null } : { fadePopoverPadId: id }),
 

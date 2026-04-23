@@ -12,19 +12,11 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCancelDownload } from "@/lib/ytdlp.queries";
 import { ACTIVE_STATUSES } from "@/state/downloadStore";
-import { cn } from "@/lib/utils";
+import { basename, cn } from "@/lib/utils";
 import type { DownloadJob } from "@/lib/schemas";
 
 interface DownloadItemProps {
   job: DownloadJob;
-}
-
-function getDisplayName(job: DownloadJob): string {
-  if (job.outputPath) {
-    const segments = job.outputPath.split(/[\\/]/);
-    return segments[segments.length - 1] || job.outputName;
-  }
-  return job.outputName;
 }
 
 function useElapsedTime(active: boolean): string {
@@ -60,7 +52,11 @@ export function DownloadItem({ job }: DownloadItemProps) {
 
   const elapsed = useElapsedTime(job.status === "processing");
 
-  const displayName = getDisplayName(job);
+  // A trailing separator means the path has no filename component — fall back to outputName.
+  const displayName =
+    job.outputPath && !/[\\/]$/.test(job.outputPath)
+      ? basename(job.outputPath, job.outputName)
+      : job.outputName;
 
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">

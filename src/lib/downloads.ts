@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DownloadJobSchema } from "./schemas";
 import { atomicWriteJson } from "./fsUtils";
 import { APP_FOLDER, DOWNLOADS_FILE_NAME } from "./constants";
+import { ACTIVE_STATUSES } from "@/state/downloadStore";
 
 const DownloadHistorySchema = z.array(DownloadJobSchema);
 
@@ -21,7 +22,7 @@ export async function loadDownloadHistory() {
     const parsed = DownloadHistorySchema.parse(JSON.parse(text));
     // Any non-terminal job was interrupted by app restart — mark it failed.
     return parsed.map((job) =>
-      job.status === "queued" || job.status === "downloading" || job.status === "processing"
+      ACTIVE_STATUSES.has(job.status)
         ? { ...job, status: "failed" as const, error: "Interrupted by app restart" }
         : job,
     );

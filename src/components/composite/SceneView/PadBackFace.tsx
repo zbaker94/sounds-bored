@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { Pad, Layer, PadConfig } from "@/lib/schemas";
+import type { Pad, Layer } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -32,25 +32,14 @@ import {
 } from "@/lib/audio/padPlayer";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
-import { createDefaultLayer } from "@/lib/padDefaults";
+import { createDefaultStoreLayer, padToConfig } from "@/lib/padDefaults";
+import { summarizeLayerSelection } from "@/lib/layerHelpers";
 import { LayerConfigDialog } from "@/components/composite/PadConfigDrawer/LayerConfigDialog";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
 import { toast } from "sonner";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-
-function padToConfig(pad: Pad, layers?: Layer[]): PadConfig {
-  return {
-    name: pad.name,
-    layers: layers ?? pad.layers,
-    muteTargetPadIds: pad.muteTargetPadIds,
-    muteGroupId: pad.muteGroupId,
-    color: pad.color,
-    icon: pad.icon,
-    fadeDurationMs: pad.fadeDurationMs,
-    volume: pad.volume ?? 1,
-    fadeTargetVol: pad.fadeTargetVol ?? 0,
-  };
-}
+import { PadPercentSlider } from "./PadPercentSlider";
+import { PadDurationSlider } from "./PadDurationSlider";
 
 const BackFaceLayerRow = memo(function BackFaceLayerRow({
   pad,
@@ -83,23 +72,7 @@ const BackFaceLayerRow = memo(function BackFaceLayerRow({
   const [listOpen, setListOpen] = useState(false);
   const listAnchorRef = useRef<HTMLButtonElement>(null);
 
-  const selectionSummary = (() => {
-    const sel = layer.selection;
-    switch (sel.type) {
-      case "assigned":
-        return allSounds.length === 0
-          ? "No sounds assigned"
-          : allSounds.map((s) => s.name).join(", ");
-      case "tag": {
-        const names = sel.tagIds.map((id) => tags.find((t) => t.id === id)?.name ?? id).join(", ");
-        return `Tag: ${names || "\u2014"}`;
-      }
-      case "set": {
-        const name = sets.find((s) => s.id === sel.setId)?.name ?? sel.setId;
-        return `Set: ${name}`;
-      }
-    }
-  })();
+  const selectionSummary = summarizeLayerSelection(layer, allSounds, tags, sets);
 
   return (
     <div className="flex flex-col gap-1 rounded-lg bg-muted/50 p-1.5">
@@ -219,6 +192,192 @@ const BackFaceLayerRow = memo(function BackFaceLayerRow({
   );
 });
 
+interface PadFadeControlsProps {
+  pad: Pad;
+  sceneId: string;
+  isPlaying: boolean;
+  isFading: boolean;
+  isReversing: boolean;
+  globalFadeDurationMs: number;
+  liveVolume: number | undefined;
+  onFade: () => void;
+  onStopFade: () => void;
+  onReverse: () => void;
+}
+
+const PadFadeControls = memo(function PadFadeControls({
+  pad,
+  sceneId,
+  isPlaying,
+  isFading,
+  isReversing,
+  globalFadeDurationMs,
+  liveVolume,
+  onFade,
+  onStopFade,
+  onReverse,
+}: PadFadeControlsProps) {
+  const updatePad = useProjectStore((s) => s.updatePad);
+  const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
+
+  const padVolumePct = Math.round((pad.volume ?? 1) * 100);
+  const liveVolumePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : padVolumePct;
+  const [localVolume, setLocalVolume] = useState<number | null>(null);
+  const volumeSliderValue = localVolume ?? liveVolumePct;
+  const volumeDragStartRef = useRef<number | null>(null);
+
+  const fadeTargetPct = Math.round((pad.fadeTargetVol ?? 0) * 100);
+  const [localFadeTarget, setLocalFadeTarget] = useState<number | null>(null);
+  const fadeTargetSliderValue = localFadeTarget ?? fadeTargetPct;
+
+  const currentVol = liveVolume ?? (pad.volume ?? 1);
+  const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
+  const isFadeOut = !isEqualVolume && isPlaying && (pad.fadeTargetVol ?? 0) < currentVol;
+
+  return (
+    <div className="flex flex-col gap-1.5 flex-shrink-0">
+      <AnimatePresence initial={false}>
+        {isPlaying && (
+          <motion.div
+            key="current-volume"
+            className="flex flex-col gap-1.5 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Current volume</span>
+              <span className="tabular-nums">{volumeSliderValue}%</span>
+            </div>
+            <Slider
+              compact
+              tooltipLabel={(v) => `${v}%`}
+              value={[volumeSliderValue]}
+              onThumbPointerDown={() => { volumeDragStartRef.current = volumeSliderValue; }}
+              onValueChange={([v]) => {
+                setLocalVolume(v);
+                setPadVolume(pad.id, v / 100);
+              }}
+              onValueCommit={([v]) => {
+                const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
+                volumeDragStartRef.current = null;
+                setLocalVolume(null);
+                if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100);
+              }}
+              min={0} max={100} step={1}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <PadPercentSlider
+        label="Fade target"
+        value={fadeTargetSliderValue}
+        onValueChange={(v) => setLocalFadeTarget(v)}
+        onValueCommit={(v) => {
+          setLocalFadeTarget(null);
+          useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100);
+        }}
+      />
+      <PadDurationSlider
+        label="Duration"
+        value={fadeDuration}
+        onValueChange={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
+        onValueCommit={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
+      />
+      {pad.fadeDurationMs !== undefined ? (
+        <button
+          type="button"
+          className="text-muted-foreground underline self-start"
+          onClick={() => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: undefined })}
+        >
+          Reset to default
+        </button>
+      ) : (
+        <p className="text-muted-foreground">Global default ({(globalFadeDurationMs / 1000).toFixed(1)}s)</p>
+      )}
+      <div className="flex items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {isFading ? (
+              <Button size="sm" variant="secondary" onClick={onStopFade} className="flex-1">
+                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+                Stop Fade
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={onFade} disabled={isEqualVolume} className="flex-1">
+                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+                {isEqualVolume ? "Fade" : isFadeOut ? "Fade Out" : "Fade In"}
+              </Button>
+            )}
+          </TooltipTrigger>
+          <TooltipContent><Kbd>F</Kbd></TooltipContent>
+        </Tooltip>
+        <AnimatePresence>
+          {isFading && !isReversing && (
+            <motion.div
+              key="reverse"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: "auto" }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex-shrink-0"
+            >
+              <Button size="sm" variant="secondary" onClick={onReverse} className="whitespace-nowrap">
+                Reverse
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+});
+
+interface PadLayerSectionProps {
+  pad: Pad;
+  sceneId: string;
+  onAddLayer: () => void;
+  onEditLayer: (index: number) => void;
+  onRemoveLayer: (index: number) => void;
+}
+
+const PadLayerSection = memo(function PadLayerSection({
+  pad,
+  onAddLayer,
+  onEditLayer,
+  onRemoveLayer,
+}: PadLayerSectionProps) {
+  return (
+    <div className="flex flex-col gap-1 flex-shrink-0">
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold text-muted-foreground uppercase tracking-wide">Layers</h4>
+        <button
+          type="button"
+          aria-label="Add layer"
+          onClick={onAddLayer}
+          className="p-0.5 rounded hover:bg-muted transition-colors"
+        >
+          <HugeiconsIcon icon={Add01Icon} size={18} />
+        </button>
+      </div>
+      <div className="flex flex-col gap-1">
+        {pad.layers.map((layer, i) => (
+          <BackFaceLayerRow
+            key={layer.id}
+            pad={pad}
+            layer={layer}
+            index={i}
+            canRemove={pad.layers.length > 1}
+            onEditLayer={() => onEditLayer(i)}
+            onRemoveLayer={() => onRemoveLayer(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+});
+
 export interface PadBackFaceProps {
   pad: Pad;
   sceneId: string;
@@ -239,7 +398,6 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs ?? 2000);
-  const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
 
   const [localName, setLocalName] = useState(pad.name);
   useEffect(() => { setLocalName(pad.name); }, [pad.name]);
@@ -254,45 +412,31 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const padRef = useRef(pad);
   padRef.current = pad;
 
-  const padVolumePct = Math.round((pad.volume ?? 1) * 100);
-  const liveVolumePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : padVolumePct;
-  const [localVolume, setLocalVolume] = useState<number | null>(null);
-  const volumeSliderValue = localVolume ?? liveVolumePct;
-  const volumeDragStartRef = useRef<number | null>(null);
-
-  const fadeTargetPct = Math.round((pad.fadeTargetVol ?? 0) * 100);
-  const [localFadeTarget, setLocalFadeTarget] = useState<number | null>(null);
-  const fadeTargetSliderValue = localFadeTarget ?? fadeTargetPct;
-
-  const currentVol = liveVolume ?? (pad.volume ?? 1);
-  const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
-  const isFadeOut = !isEqualVolume && isPlaying && (pad.fadeTargetVol ?? 0) < currentVol;
-
   const [editingLayerIndex, setEditingLayerIndex] = useState<number | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  function handleEditLayer(index: number) {
+  const handleEditLayer = useCallback((index: number) => {
     setEditingLayerIndex(index);
     openOverlay(OVERLAY_ID.LAYER_CONFIG_DIALOG, "dialog");
-  }
+  }, [openOverlay]);
 
   function handleLayerDialogClose() {
     closeOverlay(OVERLAY_ID.LAYER_CONFIG_DIALOG);
     setEditingLayerIndex(null);
   }
 
-  function handleAddLayer() {
-    const newLayer = createDefaultLayer();
-    const newLayers = [...pad.layers, newLayer];
-    updatePad(sceneId, pad.id, padToConfig(pad, newLayers));
+  const handleAddLayer = useCallback(() => {
+    const newLayer = createDefaultStoreLayer();
+    const newLayers = [...padRef.current.layers, newLayer];
+    updatePad(sceneId, padRef.current.id, padToConfig(padRef.current, newLayers));
     handleEditLayer(newLayers.length - 1);
-  }
+  }, [sceneId, updatePad, handleEditLayer]);
 
-  function handleRemoveLayer(index: number) {
-    if (pad.layers.length <= 1) return;
-    const newLayers = pad.layers.filter((_, i) => i !== index);
-    updatePad(sceneId, pad.id, padToConfig(pad, newLayers));
-  }
+  const handleRemoveLayer = useCallback((index: number) => {
+    if (padRef.current.layers.length <= 1) return;
+    const newLayers = padRef.current.layers.filter((_, i) => i !== index);
+    updatePad(sceneId, padRef.current.id, padToConfig(padRef.current, newLayers));
+  }, [sceneId, updatePad]);
 
   const handleStartStop = useCallback(() => {
     if (isPlaying) {
@@ -379,140 +523,26 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
           </AnimatePresence>
         </div>
 
-        <div className="flex flex-col gap-1.5 flex-shrink-0">
-          <AnimatePresence initial={false}>
-            {isPlaying && (
-              <motion.div
-                key="current-volume"
-                className="flex flex-col gap-1.5 overflow-hidden"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Current volume</span>
-                  <span className="tabular-nums">{volumeSliderValue}%</span>
-                </div>
-                <Slider
-                  compact
-                  tooltipLabel={(v) => `${v}%`}
-                  value={[volumeSliderValue]}
-                  onThumbPointerDown={() => { volumeDragStartRef.current = volumeSliderValue; }}
-                  onValueChange={([v]) => {
-                    setLocalVolume(v);
-                    setPadVolume(pad.id, v / 100);
-                  }}
-                  onValueCommit={([v]) => {
-                    const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
-                    volumeDragStartRef.current = null;
-                    setLocalVolume(null);
-                    if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100);
-                  }}
-                  min={0} max={100} step={1}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span>Fade target</span>
-            <span className="tabular-nums">{fadeTargetSliderValue}%</span>
-          </div>
-          <Slider
-            compact
-            tooltipLabel={(v) => `${v}%`}
-            value={[fadeTargetSliderValue]}
-            onValueChange={([v]) => setLocalFadeTarget(v)}
-            onValueCommit={([v]) => {
-              setLocalFadeTarget(null);
-              useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100);
-            }}
-            min={0} max={100} step={1}
-          />
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span>Duration</span>
-            <span className="tabular-nums">{(fadeDuration / 1000).toFixed(1)}s</span>
-          </div>
-          <Slider
-            compact
-            tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
-            value={[fadeDuration]}
-            onValueChange={([v]) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
-            min={100} max={10000} step={100}
-          />
-          {pad.fadeDurationMs !== undefined ? (
-            <button
-              type="button"
-              className="text-muted-foreground underline self-start"
-              onClick={() => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: undefined })}
-            >
-              Reset to default
-            </button>
-          ) : (
-            <p className="text-muted-foreground">Global default ({(globalFadeDurationMs / 1000).toFixed(1)}s)</p>
-          )}
-          <div className="flex items-center gap-1.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {isFading ? (
-                  <Button size="sm" variant="secondary" onClick={handleStopFade} className="flex-1">
-                    <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-                    Stop Fade
-                  </Button>
-                ) : (
-                  <Button size="sm" variant="secondary" onClick={handleFade} disabled={isEqualVolume} className="flex-1">
-                    <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-                    {isEqualVolume ? "Fade" : isFadeOut ? "Fade Out" : "Fade In"}
-                  </Button>
-                )}
-              </TooltipTrigger>
-              <TooltipContent><Kbd>F</Kbd></TooltipContent>
-            </Tooltip>
-            <AnimatePresence>
-              {isFading && !isReversing && (
-                <motion.div
-                  key="reverse"
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="flex-shrink-0"
-                >
-                  <Button size="sm" variant="secondary" onClick={handleReverse} className="whitespace-nowrap">
-                    Reverse
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+        <PadFadeControls
+          pad={pad}
+          sceneId={sceneId}
+          isPlaying={isPlaying}
+          isFading={isFading}
+          isReversing={isReversing}
+          globalFadeDurationMs={globalFadeDurationMs}
+          liveVolume={liveVolume}
+          onFade={handleFade}
+          onStopFade={handleStopFade}
+          onReverse={handleReverse}
+        />
 
-        <div className="flex flex-col gap-1 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-muted-foreground uppercase tracking-wide">Layers</h4>
-            <button
-              type="button"
-              aria-label="Add layer"
-              onClick={handleAddLayer}
-              className="p-0.5 rounded hover:bg-muted transition-colors"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={18} />
-            </button>
-          </div>
-          <div className="flex flex-col gap-1">
-            {pad.layers.map((layer, i) => (
-              <BackFaceLayerRow
-                key={layer.id}
-                pad={pad}
-                layer={layer}
-                index={i}
-                canRemove={pad.layers.length > 1}
-                onEditLayer={() => handleEditLayer(i)}
-                onRemoveLayer={() => handleRemoveLayer(i)}
-              />
-            ))}
-          </div>
-        </div>
+        <PadLayerSection
+          pad={pad}
+          sceneId={sceneId}
+          onAddLayer={handleAddLayer}
+          onEditLayer={handleEditLayer}
+          onRemoveLayer={handleRemoveLayer}
+        />
 
         <div className="flex-shrink-0">
           <Tooltip>

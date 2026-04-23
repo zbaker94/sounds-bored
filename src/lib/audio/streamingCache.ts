@@ -52,6 +52,15 @@ function createStreamingAudioElement(url: string): HTMLAudioElement {
   return audio;
 }
 
+// Perf note: callers (currently SceneView's preload effect) may invoke this
+// N times in a single tick for each large-sound pad in the active scene.
+// N is bounded (one active scene's pad count, typically dozens, never hundreds)
+// and the callsite already dedupes via a prevPreloadIdsRef short-circuit, so
+// we don't stagger element creation here. The per-call work is an Audio
+// constructor + src assignment + load() — the expensive part (network fetch
+// + decode) runs asynchronously in the browser's own threads. If N ever grows
+// unbounded (e.g. preloading across all scenes), introduce a setTimeout /
+// requestIdleCallback stagger or yield to the main thread between entries.
 export function preloadStreamingAudio(sound: Sound): void {
   if (!sound.filePath || streamingElementCache.has(sound.id)) return;
 

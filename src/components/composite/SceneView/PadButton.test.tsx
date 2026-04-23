@@ -80,10 +80,8 @@ describe("PadButton", () => {
     it("does not show the back face", () => {
       const pad = loadPadInStore();
       render(<PadButton pad={pad} sceneId="scene-1" />);
-      // Front face is visible; back face is aria-hidden in normal mode
-      const backFace = screen.getByTestId("pad-back-face");
-      // eslint-disable-next-line testing-library/no-node-access
-      expect(backFace.closest('[aria-hidden="true"]')).not.toBeNull();
+      // Back face is unmounted when not flipped to avoid hidden RAF subscriptions
+      expect(screen.queryByTestId("pad-back-face")).toBeNull();
     });
   });
 
