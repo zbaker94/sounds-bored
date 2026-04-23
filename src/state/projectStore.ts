@@ -41,7 +41,8 @@ interface ProjectActions {
   reorderPads: (sceneId: string, fromIndex: number, toIndex: number) => void;
   updateLayerVolume: (layerId: string, volumePct: number) => void;
   setPadFadeDuration: (sceneId: string, padId: string, durationMs: number | undefined) => void;
-  setPadFadeLevels: (sceneId: string, padId: string, lowVol: number, highVol: number) => void;
+  setPadFadeTarget: (sceneId: string, padId: string, targetVol: number) => void;
+  setPadVolume: (sceneId: string, padId: string, vol: number) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -251,15 +252,25 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = true;
       }),
 
-    setPadFadeLevels: (sceneId, padId, lowVol, highVol) =>
+    setPadFadeTarget: (sceneId, padId, targetVol) =>
       set((draft) => {
         if (!draft.project) return;
         const scene = draft.project.scenes.find((s) => s.id === sceneId);
         if (!scene) return;
         const pad = scene.pads.find((p) => p.id === padId);
         if (!pad) return;
-        pad.fadeLowVol = lowVol;
-        pad.fadeHighVol = highVol;
+        pad.fadeTargetVol = targetVol;
+        draft.isDirty = true;
+      }),
+
+    setPadVolume: (sceneId, padId, vol) =>
+      set((draft) => {
+        if (!draft.project) return;
+        const scene = draft.project.scenes.find((s) => s.id === sceneId);
+        if (!scene) return;
+        const pad = scene.pads.find((p) => p.id === padId);
+        if (!pad) return;
+        pad.volume = vol;
         draft.isDirty = true;
       }),
   }))

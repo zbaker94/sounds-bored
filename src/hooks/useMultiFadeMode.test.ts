@@ -9,8 +9,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 
 // Mock audio functions
 vi.mock("@/lib/audio/padPlayer", () => ({
-  fadePadWithLevels: vi.fn().mockResolvedValue(undefined),
-  resolveFadeDuration: vi.fn().mockReturnValue(1000),
+  executeFadeTap: vi.fn(),
 }));
 
 vi.mock("@/lib/audio/audioState", () => ({
@@ -150,7 +149,7 @@ describe("useMultiFadeMode — f/x hotkey registration", () => {
   });
 
   it("f,x handler executes multi-fade when canExecute is true", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     const pads = loadPadsInStore(1);
 
     // Set up active multi-fade state with a selected pad before rendering
@@ -170,11 +169,11 @@ describe("useMultiFadeMode — f/x hotkey registration", () => {
 
     act(() => { handler!(); });
 
-    expect(fadePadWithLevels).toHaveBeenCalled();
+    expect(executeFadeTap).toHaveBeenCalled();
   });
 
   it("f,x handler is a no-op when canExecute is false", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     loadPadsInStore(1);
 
     // Not active, no selected pads
@@ -187,13 +186,13 @@ describe("useMultiFadeMode — f/x hotkey registration", () => {
 
     act(() => { handler!(); });
 
-    expect(fadePadWithLevels).not.toHaveBeenCalled();
+    expect(executeFadeTap).not.toHaveBeenCalled();
   });
 });
 
 describe("useMultiFadeMode — execute()", () => {
-  it("calls fadePadWithLevels for each selected pad", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+  it("calls executeFadeTap for each selected pad", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     const pads = loadPadsInStore(2);
     const { result } = renderHook(() => useMultiFadeMode());
 
@@ -210,7 +209,7 @@ describe("useMultiFadeMode — execute()", () => {
     });
 
     // One call per selected pad (2 pads selected)
-    expect(fadePadWithLevels).toHaveBeenCalledTimes(2);
+    expect(executeFadeTap).toHaveBeenCalledTimes(2);
   });
 
   it("resets active to false after execute()", () => {
@@ -228,7 +227,7 @@ describe("useMultiFadeMode — execute()", () => {
   });
 
   it("does nothing when canExecute is false", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     const { result } = renderHook(() => useMultiFadeMode());
 
     // Not active, no pads selected
@@ -236,42 +235,41 @@ describe("useMultiFadeMode — execute()", () => {
       result.current.execute();
     });
 
-    expect(fadePadWithLevels).not.toHaveBeenCalled();
+    expect(executeFadeTap).not.toHaveBeenCalled();
   });
 
-  it("execute() uses pad.fadeLowVol and pad.fadeHighVol (not multiFadeStore levels)", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+  it("execute() uses pad.volume and pad.fadeTargetVol (not multiFadeStore levels)", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     const pads = loadPadsInStore(1);
     const pad = pads[0];
 
     act(() => {
-      useMultiFadeStore.getState().enterMultiFade("some-origin", 0, 1);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, 0, 0.75);
+      useMultiFadeStore.getState().enterMultiFade("some-origin", 1, 0);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, 1, 0.75);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => { result.current.execute(); });
 
-    // fadePadWithLevels now reads from pad — no level args passed
-    expect(fadePadWithLevels).toHaveBeenCalledWith(pad, 1000);
+    expect(executeFadeTap).toHaveBeenCalledWith(pad, undefined);
   });
 
-  it("execute() calls fadePadWithLevels for both playing and non-playing pads", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+  it("execute() calls executeFadeTap for both playing and non-playing pads", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     const pads = loadPadsInStore(2);
     const [pad0, pad1] = pads;
 
     act(() => {
-      useMultiFadeStore.getState().enterMultiFade("some-origin", 0, 1);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, 0, 0.8);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, 0, 0.5);
+      useMultiFadeStore.getState().enterMultiFade("some-origin", 1, 0);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, 1, 0.8);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, 1, 0.5);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => { result.current.execute(); });
 
-    expect(fadePadWithLevels).toHaveBeenCalledTimes(2);
-    const calledPadIds = (fadePadWithLevels as ReturnType<typeof vi.fn>).mock.calls.map(
+    expect(executeFadeTap).toHaveBeenCalledTimes(2);
+    const calledPadIds = (executeFadeTap as ReturnType<typeof vi.fn>).mock.calls.map(
       (call) => (call[0] as { id: string }).id
     );
     expect(calledPadIds).toContain(pad0.id);
@@ -318,9 +316,9 @@ describe("useMultiFadeMode — auto-cancel side effects", () => {
 });
 
 describe("executeMultiFadeNow integration", () => {
-  it("dispatches fadePadWithLevels for each selected pad and resets store", async () => {
+  it("dispatches executeFadeTap for each selected pad and resets store", async () => {
     const { executeMultiFadeNow } = await import("./useMultiFadeMode");
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
 
     const pad1 = createMockPad({ id: "pad-exec-1" });
     const pad2 = createMockPad({ id: "pad-exec-2" });
@@ -340,14 +338,14 @@ describe("executeMultiFadeNow integration", () => {
 
     executeMultiFadeNow();
 
-    expect(fadePadWithLevels).toHaveBeenCalledTimes(2);
-    expect(fadePadWithLevels).toHaveBeenCalledWith(
+    expect(executeFadeTap).toHaveBeenCalledTimes(2);
+    expect(executeFadeTap).toHaveBeenCalledWith(
       expect.objectContaining({ id: "pad-exec-1" }),
-      expect.any(Number),
+      undefined,
     );
-    expect(fadePadWithLevels).toHaveBeenCalledWith(
+    expect(executeFadeTap).toHaveBeenCalledWith(
       expect.objectContaining({ id: "pad-exec-2" }),
-      expect.any(Number),
+      undefined,
     );
 
     // Store should be reset after execute

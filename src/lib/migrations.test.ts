@@ -45,7 +45,7 @@ describe("migrateProject — 1.0.0 → 1.1.0", () => {
       sets: [],
     };
     const result = migrateProject(raw);
-    expect(result.version).toBe("1.2.0");
+    expect(result.version).toBe("1.3.0");
     expect(result.favoritedSetIds).toEqual([]);
     expect(result.sounds).toBeUndefined();
     expect(result.tags).toBeUndefined();
@@ -121,7 +121,7 @@ describe("migrateProject — 1.1.0 → 1.2.0", () => {
       }],
     };
     const result = migrateProject(raw);
-    expect(result.version).toBe("1.2.0");
+    expect(result.version).toBe("1.3.0");
     const layer = (result.scenes as Array<Record<string, unknown>>)[0];
     const pad = (layer.pads as Array<Record<string, unknown>>)[0];
     const sel = ((pad.layers as Array<Record<string, unknown>>)[0]).selection as Record<string, unknown>;

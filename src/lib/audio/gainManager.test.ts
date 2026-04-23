@@ -12,7 +12,7 @@ vi.mock("./audioContext", () => ({
 }));
 
 vi.mock("@/state/playbackStore", () => ({
-  usePlaybackStore: { getState: vi.fn(() => ({ updateLayerVolume: vi.fn() })) },
+  usePlaybackStore: { getState: vi.fn(() => ({ updateLayerVolume: vi.fn(), removeFadingPad: vi.fn() })) },
 }));
 
 vi.mock("@/state/projectStore", () => ({

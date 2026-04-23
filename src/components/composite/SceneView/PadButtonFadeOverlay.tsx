@@ -19,6 +19,9 @@ interface PadButtonFadeOverlayProps {
  * Subscribes directly to multiFadeStore, projectStore, appSettingsStore, and
  * playbackStore so that this concern is fully isolated from PadButton. Returns
  * null when this pad is not selected in multi-fade mode.
+ *
+ * levels[0] = current playback volume (0–100)
+ * levels[1] = fade target volume (0–100)
  */
 export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
   pad,
@@ -33,8 +36,6 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
   });
   const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
 
-  const setPadFadeDuration = useProjectStore((s) => s.setPadFadeDuration);
-  const setPadFadeLevels = useProjectStore((s) => s.setPadFadeLevels);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs);
 
   const resolvedFadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
@@ -57,33 +58,44 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
           <Slider
             compact
             tooltipLabel={(v) => `${v}%`}
-            value={[multiFadeLevels[0], multiFadeLevels[1]]}
-            onValueChange={(v) => {
-              if (isPlaying && v[1] !== multiFadeLevels[1]) {
-                setPadVolume(pad.id, v[1] / 100);
-              }
-              setMultiFadeLevels(pad.id, [v[0], v[1]]);
+            value={[multiFadeLevels[0]]}
+            onValueChange={([v]) => {
+              if (isPlaying) setPadVolume(pad.id, v / 100);
+              setMultiFadeLevels(pad.id, [v, multiFadeLevels[1]]);
             }}
-            onPointerUp={() => {
-              const levels = useMultiFadeStore.getState().selectedPads.get(pad.id)?.levels;
-              if (levels) setPadFadeLevels(sceneId, pad.id, levels[0] / 100, levels[1] / 100);
-            }}
+            onValueCommit={([v]) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100)}
             min={0}
             max={100}
             step={1}
-            minStepsBetweenThumbs={1}
             className="[&_[data-slot=slider-track]]:bg-white/20"
           />
           <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
-            <span>{isPlaying ? "end" : "start"}</span>
-            <span>{isPlaying ? "start" : "end"}</span>
+            <span>volume</span>
+            <span>{multiFadeLevels[0]}%</span>
           </div>
+
+          <Slider
+            compact
+            tooltipLabel={(v) => `${v}%`}
+            value={[multiFadeLevels[1]]}
+            onValueChange={([v]) => setMultiFadeLevels(pad.id, [multiFadeLevels[0], v])}
+            onValueCommit={([v]) => useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100)}
+            min={0}
+            max={100}
+            step={1}
+            className="mt-1 [&_[data-slot=slider-track]]:bg-white/20"
+          />
+          <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
+            <span>target</span>
+            <span>{multiFadeLevels[1]}%</span>
+          </div>
+
           <Slider
             compact
             tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
             value={[displayDuration]}
             onValueChange={(v) => setDisplayDuration(v[0])}
-            onPointerUp={() => setPadFadeDuration(sceneId, pad.id, displayDuration)}
+            onPointerUp={() => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, displayDuration)}
             min={100}
             max={10000}
             step={100}

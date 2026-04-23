@@ -7,13 +7,12 @@ import type { SelectedPadFade } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
 import { createMockProject, createMockScene, createMockPad } from "@/test/factories";
 
-// Mock audio module so fadePadWithLevels doesn't run real Web Audio
+// Mock audio module so executeFadeTap doesn't run real Web Audio
 vi.mock("@/lib/audio/padPlayer", () => ({
-  fadePadWithLevels: vi.fn().mockResolvedValue(undefined),
-  resolveFadeDuration: vi.fn().mockReturnValue(1000),
+  executeFadeTap: vi.fn(),
 }));
 
-import { fadePadWithLevels } from "@/lib/audio/padPlayer";
+import { executeFadeTap } from "@/lib/audio/padPlayer";
 
 function setupStore({ active = true, selectedCount = 0, padIds }: { active?: boolean; selectedCount?: number; padIds?: string[] } = {}) {
   const selectedPads = new Map<string, SelectedPadFade>();
@@ -63,7 +62,7 @@ describe("MultiFadePill", () => {
     setupStore({ active: true, padIds: ["pad-0"] });
     render(<MultiFadePill />);
     await user.click(screen.getByRole("button", { name: /execute fade/i }));
-    expect(fadePadWithLevels).toHaveBeenCalledTimes(1);
+    expect(executeFadeTap).toHaveBeenCalledTimes(1);
   });
 
   it("Execute Fade button is disabled when canExecute is false", () => {

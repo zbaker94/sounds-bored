@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export interface SelectedPadFade {
   padId: string;
-  levels: [number, number]; // [fromLevel, toLevel] in 0–100 scale
+  levels: [number, number]; // [volumePct, targetPct] in 0–100 scale
 }
 
 interface MultiFadeState {
@@ -13,9 +13,9 @@ interface MultiFadeState {
 }
 
 interface MultiFadeActions {
-  enterMultiFade: (originPadId: string, fadeLow: number, fadeHigh: number) => void;
+  enterMultiFade: (originPadId: string, volume: number, fadeTarget: number) => void;
   enterMultiFadeEmpty: () => void;
-  toggleMultiFadePad: (padId: string, fadeLow: number, fadeHigh: number) => void;
+  toggleMultiFadePad: (padId: string, volume: number, fadeTarget: number) => void;
   setMultiFadeLevels: (padId: string, levels: [number, number]) => void;
   cancelMultiFade: () => void;
   resetMultiFade: () => void;
@@ -32,9 +32,9 @@ export const initialMultiFadeState: MultiFadeState = {
 export const useMultiFadeStore = create<MultiFadeState & MultiFadeActions>((set) => ({
   ...initialMultiFadeState,
 
-  enterMultiFade: (originPadId, fadeLow, fadeHigh) =>
+  enterMultiFade: (originPadId, volume, fadeTarget) =>
     set(() => {
-      const levels: [number, number] = [Math.round(fadeLow * 100), Math.round(fadeHigh * 100)];
+      const levels: [number, number] = [Math.round(volume * 100), Math.round(fadeTarget * 100)];
       const selectedPads = new Map<string, SelectedPadFade>([
         [originPadId, { padId: originPadId, levels }],
       ]);
@@ -54,13 +54,13 @@ export const useMultiFadeStore = create<MultiFadeState & MultiFadeActions>((set)
       reopenPadId: null,
     }),
 
-  toggleMultiFadePad: (padId, fadeLow, fadeHigh) =>
+  toggleMultiFadePad: (padId, volume, fadeTarget) =>
     set((state) => {
       const next = new Map(state.selectedPads);
       if (next.has(padId)) {
         next.delete(padId);
       } else {
-        const levels: [number, number] = [Math.round(fadeLow * 100), Math.round(fadeHigh * 100)];
+        const levels: [number, number] = [Math.round(volume * 100), Math.round(fadeTarget * 100)];
         next.set(padId, { padId, levels });
       }
       return { selectedPads: next };

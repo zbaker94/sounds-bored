@@ -40,6 +40,18 @@ interface PlaybackState {
   addFadingOutPad: (padId: string) => void;
   removeFadingOutPad: (padId: string) => void;
 
+  // Which pad IDs have any fade ramp in progress (up or down).
+  // Push-based: set when fadePad/triggerAndFade starts a ramp, cleared on completion or cancel.
+  fadingPadIds: Set<string>;
+  addFadingPad: (padId: string) => void;
+  removeFadingPad: (padId: string) => void;
+
+  // Which pad IDs are currently running a reversal ramp (reversed by the user mid-fade).
+  // Set after reverseFade calls fadePad; cleared at the start of any new fadePad call.
+  reversingPadIds: Set<string>;
+  addReversingPad: (padId: string) => void;
+  removeReversingPad: (padId: string) => void;
+
   // Whether a sound preview is currently playing (for Stop All button state)
   isPreviewPlaying: boolean;
   setIsPreviewPlaying: (v: boolean) => void;
@@ -92,6 +104,8 @@ export const initialPlaybackState = {
   masterVolume: 100,
   get playingPadIds() { return new Set<string>(); },
   get fadingOutPadIds() { return new Set<string>(); },
+  get fadingPadIds() { return new Set<string>(); },
+  get reversingPadIds() { return new Set<string>(); },
   get padVolumes() { return {} as Record<string, number>; },
   get layerVolumes() { return {} as Record<string, number>; },
   get padProgress() { return {} as Record<string, number>; },
@@ -140,6 +154,38 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
       const next = new Set(s.fadingOutPadIds);
       next.delete(padId);
       return { fadingOutPadIds: next };
+    }),
+
+  fadingPadIds: new Set<string>(),
+  addFadingPad: (padId) =>
+    set((s) => {
+      if (s.fadingPadIds.has(padId)) return s;
+      const next = new Set(s.fadingPadIds);
+      next.add(padId);
+      return { fadingPadIds: next };
+    }),
+  removeFadingPad: (padId) =>
+    set((s) => {
+      if (!s.fadingPadIds.has(padId)) return s;
+      const next = new Set(s.fadingPadIds);
+      next.delete(padId);
+      return { fadingPadIds: next };
+    }),
+
+  reversingPadIds: new Set<string>(),
+  addReversingPad: (padId) =>
+    set((s) => {
+      if (s.reversingPadIds.has(padId)) return s;
+      const next = new Set(s.reversingPadIds);
+      next.add(padId);
+      return { reversingPadIds: next };
+    }),
+  removeReversingPad: (padId) =>
+    set((s) => {
+      if (!s.reversingPadIds.has(padId)) return s;
+      const next = new Set(s.reversingPadIds);
+      next.delete(padId);
+      return { reversingPadIds: next };
     }),
 
   isPreviewPlaying: false,

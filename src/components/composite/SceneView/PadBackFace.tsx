@@ -26,7 +26,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import {
-  triggerPad, stopPad, fadePadWithLevels,
+  triggerPad, stopPad, executeFadeTap, reverseFade, stopFade,
   triggerLayer, stopLayerWithRamp, setLayerVolume, setPadVolume,
   skipLayerForward, skipLayerBack,
 } from "@/lib/audio/padPlayer";
@@ -47,8 +47,8 @@ function padToConfig(pad: Pad, layers?: Layer[]): PadConfig {
     color: pad.color,
     icon: pad.icon,
     fadeDurationMs: pad.fadeDurationMs,
-    fadeLowVol: pad.fadeLowVol ?? 0,
-    fadeHighVol: pad.fadeHighVol ?? 1,
+    volume: pad.volume ?? 1,
+    fadeTargetVol: pad.fadeTargetVol ?? 0,
   };
 }
 
@@ -234,10 +234,9 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
-  const isFadingOut = usePlaybackStore((s) => s.fadingOutPadIds.has(pad.id));
+  const isFading = usePlaybackStore((s) => s.fadingPadIds.has(pad.id));
+  const isReversing = usePlaybackStore((s) => s.reversingPadIds.has(pad.id));
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
-  const lowVol = pad.fadeLowVol ?? 0;
-  const isSettledAtLow = lowVol > 0 && liveVolume !== undefined && liveVolume <= lowVol + 0.02;
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs ?? 2000);
   const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
@@ -252,45 +251,22 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
     updatePad(sceneId, pad.id, { ...padToConfig(pad), name: trimmed });
   }
 
-  const [localFadeLow, setLocalFadeLow] = useState<number | null>(null);
-  const [localFadeHigh, setLocalFadeHigh] = useState<number | null>(null);
-  const [lockedThumb, setLockedThumb] = useState<number | null>(null);
-  const [sideIsHigh, setSideIsHigh] = useState(true);
-  const wasFadingOutRef = useRef(false);
   const padRef = useRef(pad);
   padRef.current = pad;
-  const setPadFadeLevels = useProjectStore((s) => s.setPadFadeLevels);
 
-  const fadeLow = Math.round((pad.fadeLowVol ?? 0) * 100);
-  const fadeHigh = Math.round((pad.fadeHighVol ?? 1) * 100);
-  const livePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : fadeHigh;
-  const currentIsHigh = !isPlaying
-    ? true
-    : lockedThumb === 1 ? true
-    : lockedThumb === 0 ? false
-    : sideIsHigh;
+  const padVolumePct = Math.round((pad.volume ?? 1) * 100);
+  const liveVolumePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : padVolumePct;
+  const [localVolume, setLocalVolume] = useState<number | null>(null);
+  const volumeSliderValue = localVolume ?? liveVolumePct;
+  const volumeDragStartRef = useRef<number | null>(null);
 
-  // Track that a fade-out ramp has started.
-  useEffect(() => { if (isFadingOut) wasFadingOutRef.current = true; }, [isFadingOut]);
-  // Reset to high-side whenever the pad starts playing.
-  useEffect(() => {
-    if (isPlaying) { setSideIsHigh(true); wasFadingOutRef.current = false; }
-  }, [isPlaying]);
-  // Flip to low-side only when a genuine fade-out (not a fade-in) has completed.
-  useEffect(() => {
-    if (isPlaying && !isFadingOut && isSettledAtLow && lockedThumb === null && wasFadingOutRef.current) {
-      setSideIsHigh(false);
-      wasFadingOutRef.current = false;
-    }
-  }, [isPlaying, isFadingOut, isSettledAtLow, lockedThumb]);
+  const fadeTargetPct = Math.round((pad.fadeTargetVol ?? 0) * 100);
+  const [localFadeTarget, setLocalFadeTarget] = useState<number | null>(null);
+  const fadeTargetSliderValue = localFadeTarget ?? fadeTargetPct;
 
-  const boundaryLow = localFadeLow ?? fadeLow;
-  const boundaryHigh = localFadeHigh ?? fadeHigh;
-  const sliderValue: [number, number] = isPlaying
-    ? currentIsHigh
-      ? [boundaryLow, Math.max(livePct, boundaryLow + 1)]
-      : [Math.min(livePct, boundaryHigh - 1), boundaryHigh]
-    : [boundaryLow, boundaryHigh];
+  const currentVol = liveVolume ?? (pad.volume ?? 1);
+  const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
+  const isFadeOut = !isEqualVolume && isPlaying && (pad.fadeTargetVol ?? 0) < currentVol;
 
   const [editingLayerIndex, setEditingLayerIndex] = useState<number | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -329,17 +305,19 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   }, [isPlaying, pad]);
 
   const handleFade = useCallback(() => {
-    if (!currentIsHigh) {
-      setSideIsHigh(true);
-      wasFadingOutRef.current = false;
-    }
-    fadePadWithLevels(padRef.current, fadeDuration).catch((err: unknown) => {
-      toast.error(`Playback error: audio fade failed \u2014 ${err instanceof Error ? err.message : String(err)}`);
-    });
-  }, [fadeDuration, currentIsHigh]);
+    executeFadeTap(padRef.current, globalFadeDurationMs);
+  }, [globalFadeDurationMs]);
+
+  const handleStopFade = useCallback(() => {
+    stopFade(padRef.current);
+  }, []);
+
+  const handleReverse = useCallback(() => {
+    reverseFade(padRef.current, globalFadeDurationMs);
+  }, [globalFadeDurationMs]);
 
   const handleMultiFadeInternal = useCallback(() => {
-    enterMultiFade(pad.id, pad.fadeLowVol ?? 0, pad.fadeHighVol ?? 1);
+    enterMultiFade(pad.id, pad.volume ?? 1, pad.fadeTargetVol ?? 0);
     onMultiFade();
   }, [pad, enterMultiFade, onMultiFade]);
 
@@ -402,53 +380,54 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
         </div>
 
         <div className="flex flex-col gap-1.5 flex-shrink-0">
-          <div className="flex justify-between text-muted-foreground">
-            <span>{isPlaying ? (currentIsHigh ? "end" : "start (current)") : "start"}</span>
-            <span>{isPlaying ? (currentIsHigh ? "start (current)" : "end") : "end"}</span>
+          <AnimatePresence initial={false}>
+            {isPlaying && (
+              <motion.div
+                key="current-volume"
+                className="flex flex-col gap-1.5 overflow-hidden"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Current volume</span>
+                  <span className="tabular-nums">{volumeSliderValue}%</span>
+                </div>
+                <Slider
+                  compact
+                  tooltipLabel={(v) => `${v}%`}
+                  value={[volumeSliderValue]}
+                  onThumbPointerDown={() => { volumeDragStartRef.current = volumeSliderValue; }}
+                  onValueChange={([v]) => {
+                    setLocalVolume(v);
+                    setPadVolume(pad.id, v / 100);
+                  }}
+                  onValueCommit={([v]) => {
+                    const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
+                    volumeDragStartRef.current = null;
+                    setLocalVolume(null);
+                    if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100);
+                  }}
+                  min={0} max={100} step={1}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>Fade target</span>
+            <span className="tabular-nums">{fadeTargetSliderValue}%</span>
           </div>
           <Slider
+            compact
             tooltipLabel={(v) => `${v}%`}
-            value={sliderValue}
-            onThumbPointerDown={(index) => {
-              if (!isPlaying) return;
-              const isVolumeThumb = currentIsHigh ? index === 1 : index === 0;
-              if (isVolumeThumb) setLockedThumb(index);
+            value={[fadeTargetSliderValue]}
+            onValueChange={([v]) => setLocalFadeTarget(v)}
+            onValueCommit={([v]) => {
+              setLocalFadeTarget(null);
+              useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100);
             }}
-            onValueChange={([newLow, newHigh]) => {
-              if (isPlaying) {
-                if (currentIsHigh) {
-                  if (newHigh !== sliderValue[1]) {
-                    setPadVolume(pad.id, newHigh / 100);
-                    const boundary = localFadeLow ?? fadeLow;
-                    if (newHigh - boundary < 10) setLocalFadeLow(Math.max(0, newHigh - 10));
-                  } else if (newLow !== sliderValue[0]) {
-                    setLocalFadeLow(newLow);
-                  }
-                } else {
-                  if (newLow !== sliderValue[0]) {
-                    setPadVolume(pad.id, newLow / 100);
-                    const boundary = localFadeHigh ?? fadeHigh;
-                    if (boundary - newLow < 10) setLocalFadeHigh(Math.min(100, newLow + 10));
-                  } else if (newHigh !== sliderValue[1]) {
-                    setLocalFadeHigh(newHigh);
-                  }
-                }
-              } else {
-                setLocalFadeLow(newLow);
-                setLocalFadeHigh(newHigh);
-              }
-            }}
-            onValueCommit={() => {
-              setLockedThumb(null);
-              const commitLow = localFadeLow ?? fadeLow;
-              const commitHigh = localFadeHigh ?? fadeHigh;
-              if (localFadeLow !== null || localFadeHigh !== null) {
-                setPadFadeLevels(sceneId, pad.id, commitLow / 100, commitHigh / 100);
-              }
-              setLocalFadeLow(null);
-              setLocalFadeHigh(null);
-            }}
-            min={0} max={100} step={1} minStepsBetweenThumbs={1}
+            min={0} max={100} step={1}
           />
           <div className="flex items-center justify-between text-muted-foreground">
             <span>Duration</span>
@@ -472,15 +451,40 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
           ) : (
             <p className="text-muted-foreground">Global default ({(globalFadeDurationMs / 1000).toFixed(1)}s)</p>
           )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="sm" variant="secondary" onClick={handleFade} className="w-full">
-                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-                {isPlaying && !isFadingOut && currentIsHigh ? "Fade Out" : "Fade In"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><Kbd>F</Kbd></TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {isFading ? (
+                  <Button size="sm" variant="secondary" onClick={handleStopFade} className="flex-1">
+                    <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+                    Stop Fade
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={handleFade} disabled={isEqualVolume} className="flex-1">
+                    <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+                    {isEqualVolume ? "Fade" : isFadeOut ? "Fade Out" : "Fade In"}
+                  </Button>
+                )}
+              </TooltipTrigger>
+              <TooltipContent><Kbd>F</Kbd></TooltipContent>
+            </Tooltip>
+            <AnimatePresence>
+              {isFading && !isReversing && (
+                <motion.div
+                  key="reverse"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex-shrink-0"
+                >
+                  <Button size="sm" variant="secondary" onClick={handleReverse} className="whitespace-nowrap">
+                    Reverse
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1 flex-shrink-0">

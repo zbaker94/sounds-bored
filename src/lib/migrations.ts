@@ -119,6 +119,42 @@ const MIGRATIONS: Migration[] = [
       return next;
     },
   },
+  {
+    // Rename per-pad fade volume fields to their new simplified UX semantics:
+    //   fadeHighVol → volume        (the pad's configured playback volume)
+    //   fadeLowVol  → fadeTargetVol (the volume the pad fades TO on toggle)
+    // Missing fields are left missing; defaults are applied at playback time.
+    fromVersion: "1.2.0",
+    toVersion: "1.3.0",
+    migrate: (raw) => {
+      const next = { ...raw };
+      if (!Array.isArray(next.scenes)) return next;
+
+      next.scenes = (next.scenes as unknown[]).map((scene) => {
+        if (!scene || typeof scene !== "object" || Array.isArray(scene)) return scene;
+        const s = scene as Record<string, unknown>;
+        if (!Array.isArray(s.pads)) return s;
+        return {
+          ...s,
+          pads: (s.pads as unknown[]).map((pad) => {
+            if (!pad || typeof pad !== "object" || Array.isArray(pad)) return pad;
+            const p = { ...(pad as Record<string, unknown>) };
+            if ("fadeHighVol" in p) {
+              p.volume = p.fadeHighVol;
+              delete p.fadeHighVol;
+            }
+            if ("fadeLowVol" in p) {
+              p.fadeTargetVol = p.fadeLowVol;
+              delete p.fadeLowVol;
+            }
+            return p;
+          }),
+        };
+      });
+
+      return next;
+    },
+  },
 ];
 
 export function migrateProject(raw: RawProject): RawProject {

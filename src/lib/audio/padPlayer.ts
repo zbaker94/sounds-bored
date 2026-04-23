@@ -29,7 +29,6 @@ import {
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
-  deleteFadePadTimeout,
   forEachPadGain,
   getLayerChain,
   getLayerCycleIndex,
@@ -46,22 +45,22 @@ import {
   addFadingInPad,
   removeFadingInPad,
   nullAllOnEnded,
-  setFadePadTimeout,
   setGlobalStopTimeout,
+  setFadePadTimeout,
+  deleteFadePadTimeout,
   setLayerChain,
   setLayerCycleIndex,
   setLayerPending,
   setLayerPlayOrder,
   stopAllVoices,
   stopPadVoices,
-  getPadFadeDirection,
-  setPadFadeDirection,
+  setPadFadeFromVolume,
+  getPadFadeFromVolume,
 } from "./audioState";
 
 import {
   resolveFadeDuration,
-  fadePadOut,
-  fadePadInFromCurrent,
+  fadePad,
 } from "./fadeMixer";
 
 import {
@@ -90,12 +89,11 @@ export {
   isPadActive,
 } from "./audioState";
 
-// Re-export functions moved to fadeMixer / gainManager for backward compatibility
+// Re-export functions moved to fadeMixer / gainManager
 export {
   freezePadAtCurrentVolume,
   resolveFadeDuration,
-  fadePadOut,
-  fadePadInFromCurrent,
+  fadePad,
 } from "./fadeMixer";
 
 export {
@@ -105,102 +103,103 @@ export {
   setLayerVolume,
 } from "./gainManager";
 
-export async function fadePadIn(pad: Pad, durationMs: number, fromVolume?: number, toVolume?: number): Promise<void> {
-  // 1. Cancel any prior fade and mark as fading-in BEFORE the await.
-  //    This closes the race window: if applyFadeToggle fires another fade direction
-  //    during `await triggerPad`, cancelPadFade will clear this flag and we'll bail
-  //    below rather than overwriting the interleaved fade.
+/**
+ * Trigger a non-playing pad at silence then ramp its gain up to toVolume.
+ * Marks the pad as fading-in BEFORE the await so a reverse-fade (press F again
+ * while the trigger is pending) can be detected and bail correctly.
+ */
+export async function triggerAndFade(pad: Pad, toVolume: number, durationMs: number): Promise<void> {
   cancelPadFade(pad.id);
   addFadingInPad(pad.id);
 
-  const startVol = fromVolume ?? 0;
-  const endVol = toVolume ?? 1.0;
+  await triggerPad(pad, 0);
 
-  // 2. Start pad at gain startVol
-  await triggerPad(pad, startVol);
-
-  // 3. If we were pre-empted during the await (e.g. user pressed F to reverse
-  //    mid fade-in), cancelPadFade will have cleared fadingInPadIds — bail so we
-  //    don't overwrite the interleaved fade-out ramp.
+  // If pre-empted during the await, bail without overwriting the interleaved ramp.
   if (!isPadFadingIn(pad.id)) return;
   removeFadingInPad(pad.id);
-  setPadFadeDirection(pad.id, "in");
+  usePlaybackStore.getState().addFadingPad(pad.id);
 
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
-
-  // 4. Schedule Web Audio ramp
   gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(startVol, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(endVol, ctx.currentTime + durationMs / 1000);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(toVolume, ctx.currentTime + durationMs / 1000);
+  setPadFadeFromVolume(pad.id, 0);
 
-  // 5. Completion cleanup — stored in fadePadTimeouts so cancelPadFade can cancel it
-  // Tick reads gain node values automatically — no RAF or store signal needed.
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
     cancelPadFade(pad.id);
+    if (toVolume === 0) stopPad(pad);
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);
 }
 
+/**
+ * Reverse a fade that is currently in progress.
+ *
+ * - Fading down (toward fadeTargetVol): ramps back up to pad.volume.
+ * - Fading up (gain still above fadeTargetVol): ramps back down to fadeTargetVol.
+ * - Fading up (gain at or below fadeTargetVol): stops the pad.
+ */
+export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
+  if (!isPadFading(pad.id)) return;
+  const duration = resolveFadeDuration(pad, globalFadeDurationMs);
+  const reverseTarget = getPadFadeFromVolume(pad.id);
+  if (reverseTarget === undefined) return;
+
+  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const currentVol = padVolumes[pad.id] ?? reverseTarget;
+
+  fadePad(pad, currentVol, reverseTarget, duration);
+  usePlaybackStore.getState().addReversingPad(pad.id);
+}
+
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
-  fadingOut.forEach((pad) => fadePadOut(pad, resolveFadeDuration(pad, globalFadeDurationMs)));
+  const padVolumes = usePlaybackStore.getState().padVolumes;
+  fadingOut.forEach((pad) => {
+    const currentVol = padVolumes[pad.id] ?? (pad.volume ?? 1);
+    fadePad(pad, currentVol, pad.fadeTargetVol ?? 0, resolveFadeDuration(pad, globalFadeDurationMs));
+  });
   fadingIn.forEach((pad) =>
-    fadePadIn(pad, resolveFadeDuration(pad, globalFadeDurationMs)).catch((err: unknown) => {
+    triggerAndFade(pad, 1.0, resolveFadeDuration(pad, globalFadeDurationMs)).catch((err: unknown) => {
       emitAudioError(err);
     })
   );
 }
 
 /**
- * Central fade-toggle state machine — all fade trigger paths (F hotkey, fade button,
- * synchronized fades) route through here.
+ * Central fade-toggle state machine — all fade trigger paths route through here.
  *
- * Four cases, in priority order:
- *   1. Fading OUT                        → reverse: ramp back up to highVol from current gain.
- *   2. Active, gain settled near lowVol  → reverse of a completed fade-out: ramp up to highVol.
- *   3. Active (playing or mid fade-in)   → fade OUT to lowVol.
- *   4. Not active                        → fade IN from silence to highVol.
- *
- * The "settled near low" check (case 2) detects when a non-zero fade-out has completed
- * and the pad is still playing at lowVol. A 0.02 tolerance accounts for floating-point
- * drift on the gain node without misclassifying pads playing near the middle of the range.
- *
- * isPadFadingIn covers the async gap between cancelPadFade and setFadePadTimeout in
- * fadePadIn, where isPadFading is momentarily false but a fade-in is still starting.
+ * Four cases in priority order:
+ *   1. Any in-progress fade     → reverse: fading out → ramp to highVol; fading in → ramp to lowVol.
+ *   2. Active, settled at low   → ramp to highVol.
+ *   3. Active, not at low       → ramp to lowVol.
+ *   4. Not active               → trigger at silence then ramp up to lowVol.
  */
 function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
-  const lowVol = pad.fadeLowVol ?? 0;
-  const highVol = pad.fadeHighVol ?? 1;
+  const lowVol = pad.fadeTargetVol ?? 0;
+  const highVol = pad.volume ?? 1;
 
   if (isPadActive(pad.id)) {
-    if (isPadFadingOut(pad.id)) {
-      // Fading out → reverse: ramp back up
-      fadePadInFromCurrent(pad, duration, highVol);
-    } else if (isPadFadingIn(pad.id) || isPadFading(pad.id)) {
-      // Fade-in is in progress (async gap or timeout active) → reverse by fading out
-      // fadePadOut will call removeFadingInPad so fadePadIn's post-await guard sees the reversal
-      fadePadOut(pad, duration, undefined, lowVol);
+    if (isPadFadingOut(pad.id) || isPadFadingIn(pad.id) || isPadFading(pad.id)) {
+      const reverseTarget = getPadFadeFromVolume(pad.id);
+      const padVolumes = usePlaybackStore.getState().padVolumes;
+      const currentVol = padVolumes[pad.id] ?? (reverseTarget ?? highVol);
+      const targetVol = reverseTarget ?? (isPadFadingOut(pad.id) ? highVol : lowVol);
+      fadePad(pad, currentVol, targetVol, duration);
     } else {
-      const lastDir = getPadFadeDirection(pad.id);
-      if (lastDir === "out" || (!lastDir && lowVol > 0 && getPadGain(pad.id).gain.value <= lowVol + 0.02)) {
-        // Last fade was out (settled at low), or gain is near the low endpoint with no
-        // direction history — fade back up. The stored direction is authoritative when
-        // present: it survives boundary drags that shift fadeLowVol away from gain.value.
-        fadePadInFromCurrent(pad, duration, highVol);
-      } else {
-        // Playing at high level (or no fade history) → fade out to low
-        fadePadOut(pad, duration, undefined, lowVol);
-      }
+      // Settled: no ramp running, gain.gain.value is the static current position.
+      const currentVol = getPadGain(pad.id).gain.value;
+      const atLow = Math.abs(currentVol - lowVol) <= 0.02;
+      fadePad(pad, currentVol, atLow ? highVol : lowVol, duration);
     }
     return Promise.resolve();
   }
 
-  // Not active: if a fade-in is already starting (async gap), ignore
+  // Not active: if a trigger-and-fade is already in flight, ignore
   if (isPadFadingIn(pad.id) || isPadFading(pad.id)) return Promise.resolve();
 
-  // Not playing → fade in from fadeLowVol (or silence if unset)
-  return fadePadIn(pad, duration, lowVol, highVol);
+  return triggerAndFade(pad, lowVol, duration);
 }
 
 /**
@@ -209,8 +208,27 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
  * based on current audio state — keeping that decision in the audio layer
  * rather than in the UI hook.
  */
+/**
+ * Cancel an in-progress fade, freezing the gain at the current ramp position.
+ * Uses the last RAF-sampled volume from the store rather than gain.gain.value
+ * to avoid anchoring back to the ramp's start point.
+ */
+export function stopFade(pad: Pad): void {
+  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const currentVol = padVolumes[pad.id] ?? (pad.volume ?? 1);
+  const ctx = getAudioContext();
+  const gain = getPadGain(pad.id);
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(currentVol, ctx.currentTime);
+  cancelPadFade(pad.id);
+  usePlaybackStore.getState().removeFadingOutPad(pad.id);
+}
+
 export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
   if (!isFadeablePad(pad)) return;
+  const lowVol = pad.fadeTargetVol ?? 0;
+  // Fading in a non-playing pad to silence is a no-op
+  if (!isPadActive(pad.id) && lowVol === 0) return;
   const duration = resolveFadeDuration(pad, globalFadeDurationMs);
   applyFadeToggle(pad, duration).catch((err: unknown) => {
     emitAudioError(err);
@@ -445,10 +463,10 @@ export function releasePadHoldLayers(pad: Pad): void {
   }
 }
 
-// startVolume: 0-1. Defaults to pad.fadeHighVol so the pad plays at its configured level.
+// startVolume: 0-1. Defaults to pad.volume so the pad plays at its configured level.
 // Pass 0 explicitly for silent-start gesture-drag and fade-in operations.
 export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> {
-  const startVol = startVolume ?? pad.fadeHighVol ?? 1.0;
+  const startVol = startVolume ?? pad.volume ?? 1.0;
   const { sounds } = useLibraryStore.getState();
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
@@ -654,16 +672,6 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
       usePlaybackStore.getState().addPlayingPad(pad.id);
     }).catch((err: unknown) => { emitAudioError(err); });
   }
-}
-
-/**
- * Fade a pad in or out based on its current playback state.
- *
- * Uses pad.fadeLowVol (lower endpoint) and pad.fadeHighVol (higher endpoint),
- * defaulting to 0 and 1. The toggle direction is determined by current audio state.
- */
-export function fadePadWithLevels(pad: Pad, duration: number): Promise<void> {
-  return applyFadeToggle(pad, duration);
 }
 
 /** Skip back in a sequential/shuffled chain. No-op for simultaneous arrangement. */

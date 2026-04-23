@@ -43,8 +43,8 @@ function padToConfig(pad: Pad, layers: Layer[]): PadConfig {
     color: pad.color,
     icon: pad.icon,
     fadeDurationMs: pad.fadeDurationMs,
-    fadeLowVol: pad.fadeLowVol ?? 0,
-    fadeHighVol: pad.fadeHighVol ?? 1,
+    volume: pad.volume ?? 1,
+    fadeTargetVol: pad.fadeTargetVol ?? 0,
   };
 }
 
@@ -94,8 +94,8 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
         },
       ],
       fadeDurationMs: pad.fadeDurationMs,
-      fadeLowVol: pad.fadeLowVol ?? 0,
-      fadeHighVol: pad.fadeHighVol ?? 1,
+      volume: pad.volume ?? 1,
+      fadeTargetVol: pad.fadeTargetVol ?? 0,
     },
   });
 
@@ -118,8 +118,8 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
         },
       ],
       fadeDurationMs: pad.fadeDurationMs,
-      fadeLowVol: pad.fadeLowVol ?? 0,
-      fadeHighVol: pad.fadeHighVol ?? 1,
+      volume: pad.volume ?? 1,
+      fadeTargetVol: pad.fadeTargetVol ?? 0,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, layer.id]);

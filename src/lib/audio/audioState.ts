@@ -50,7 +50,6 @@
  * layerConsecutiveFailureMap | layer ID | number                             | Consecutive chain load failures (circuit-break) | resetLayerConsecutiveFailures(), clearAllLayerConsecutiveFailures()
  * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
  * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), clearAllFadeTracking()
- * padFadeDirection   | pad ID     | "in" | "out"                              | Last direction faded — drives next toggle dir   | cancelPadFade(), clearAllFadeTracking()
  */
 
 import { getAudioContext, getMasterGain } from "./audioContext";
@@ -184,24 +183,24 @@ const layerConsecutiveFailureMap = new Map<string, number>();
  *  Keyed by layer ID. Set when a chain is started; cleared on stopAllPads / stopPad. */
 const layerPlayOrderMap = new Map<string, Sound[]>();
 
-/** Pending fade cleanup timeouts, keyed by pad ID. Used by both fadePadOut and fadePadIn. */
+/** Pending fade cleanup timeouts, keyed by pad ID. */
 const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** Tracks pads that are actively fading out (gain -> 0). Cleared when fade completes or is cancelled. */
 const fadingOutPadIds = new Set<string>();
 
 /**
- * Records the direction of the most recent fade per pad ("in" or "out").
- * Set by fadePadOut / fadePadInFromCurrent / fadePadIn; cleared by cancelPadFade.
- * Lets applyFadeToggle pick the correct next direction even after boundary changes
- * have shifted fadeLowVol away from the gain node's current value.
+ * Stores the fromVolume of each active gain ramp so reverseFade knows where to return to.
+ * Reversing always goes back to where the fade started — this avoids direction assumptions
+ * that break when fadeTargetVol > pad.volume.
+ * Cleared by cancelPadFade and clearAllFadeTracking.
  */
-const padFadeDirection = new Map<string, "in" | "out">();
+const padFadeFromVolumes = new Map<string, number>();
 
 /**
  * Tracks pads that have started a fade-in but whose async triggerPad has not yet completed.
- * Set synchronously before `await triggerPad` in fadePadIn; cleared by cancelPadFade.
- * Lets fadePadIn detect post-await that it was pre-empted by a reverse-fade call during the gap.
+ * Set synchronously before `await triggerPad` in triggerAndFade; cleared by cancelPadFade.
+ * Lets triggerAndFade detect post-await that it was pre-empted by a reverse-fade call during the gap.
  */
 const fadingInPadIds = new Set<string>();
 
@@ -389,9 +388,7 @@ export function clearAllFadeTracking(): void {
   fadePadTimeouts.clear();
   fadingOutPadIds.clear();
   fadingInPadIds.clear();
-  padFadeDirection.clear();
-  // padFadeRafs removed — global audioTick owns padVolumes now.
-  // Store clearing is handled by stopAudioTick() in padPlayer.stopAllPads().
+  padFadeFromVolumes.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -410,20 +407,11 @@ export function cancelPadFade(padId: string): void {
     fadePadTimeouts.delete(padId);
   }
   fadingOutPadIds.delete(padId);
-  padFadeDirection.delete(padId);
+  padFadeFromVolumes.delete(padId);
+  usePlaybackStore.getState().removeFadingPad(padId);
   // fadingInPadIds is NOT cleared here — triggerPad calls cancelPadFade internally
-  // and must not accidentally pre-empt a fadePadIn that is still in flight.
-  // Only fadePadOut (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
-}
-
-/** Record the direction of the most recent fade for a pad. */
-export function setPadFadeDirection(padId: string, direction: "in" | "out"): void {
-  padFadeDirection.set(padId, direction);
-}
-
-/** Return the direction of the most recent fade, or undefined if no fade has run. */
-export function getPadFadeDirection(padId: string): "in" | "out" | undefined {
-  return padFadeDirection.get(padId);
+  // and must not accidentally pre-empt a triggerAndFade that is still in flight.
+  // Only fadePad (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
 }
 
 /** Mark a pad as fading out. */
@@ -436,7 +424,7 @@ export function removeFadingOutPad(padId: string): void {
   fadingOutPadIds.delete(padId);
 }
 
-/** Mark a pad as starting a fade-in (set before await in fadePadIn to cover the async gap). */
+/** Mark a pad as starting a fade-in (set before await in triggerAndFade to cover the async gap). */
 export function addFadingInPad(padId: string): void {
   fadingInPadIds.add(padId);
 }
@@ -449,6 +437,14 @@ export function removeFadingInPad(padId: string): void {
 /** True while a fade-in is starting (async gap) or its timeout is registered. */
 export function isPadFadingIn(padId: string): boolean {
   return fadingInPadIds.has(padId);
+}
+
+export function setPadFadeFromVolume(padId: string, fromVolume: number): void {
+  padFadeFromVolumes.set(padId, fromVolume);
+}
+
+export function getPadFadeFromVolume(padId: string): number | undefined {
+  return padFadeFromVolumes.get(padId);
 }
 
 /** Store a fade timeout for a pad (so cancelPadFade can cancel it). */

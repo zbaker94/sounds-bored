@@ -71,36 +71,19 @@ describe("PadButtonFadeOverlay", () => {
     expect(screen.getByText("fade")).toBeInTheDocument();
   });
 
-  it("shows 'start'/'end' labels when pad is not playing", () => {
+  it("shows 'volume' and 'target' labels (two separate sliders)", () => {
     const pad = makePad();
     loadPadInProjectStore(pad);
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set() });
     useMultiFadeStore.setState({
       active: true,
       originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 100] }]]),
+      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
       reopenPadId: null,
     });
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    expect(screen.getByText("start")).toBeInTheDocument();
-    expect(screen.getByText("end")).toBeInTheDocument();
-  });
-
-  it("shows 'end'/'start' labels when pad is playing (labels swap)", () => {
-    const pad = makePad();
-    loadPadInProjectStore(pad);
-    usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([PAD_ID]) });
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 100] }]]),
-      reopenPadId: null,
-    });
-    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // When playing, labels are "end" (left) and "start" (right)
-    const labels = screen.getAllByText(/^(start|end)$/);
-    expect(labels[0]).toHaveTextContent("end");
-    expect(labels[1]).toHaveTextContent("start");
+    expect(screen.getByText("volume")).toBeInTheDocument();
+    expect(screen.getByText("target")).toBeInTheDocument();
   });
 
   it("stops pointer events from propagating (prevents pad trigger on slider interaction)", () => {
@@ -133,61 +116,80 @@ describe("PadButtonFadeOverlay", () => {
     useMultiFadeStore.setState({
       active: true,
       originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 100] }]]),
+      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
       reopenPadId: null,
     });
     const mockSetFadeDuration = vi.fn();
     useProjectStore.setState((s) => ({ ...s, setPadFadeDuration: mockSetFadeDuration }));
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // Find the duration slider (second slider in the overlay) and fire pointerUp
+    // Three sliders total: volume, target, duration. Duration is the last one.
     const sliders = screen.getAllByRole("slider");
-    // The duration slider is the last one (level slider comes first)
     const durationSlider = sliders[sliders.length - 1];
     fireEvent.pointerUp(durationSlider);
     expect(mockSetFadeDuration).toHaveBeenCalledWith(SCENE_ID, PAD_ID, 2000);
   });
 
-  it("calls setMultiFadeLevels when level slider changes", () => {
+  it("calls setMultiFadeLevels when the volume slider changes", () => {
     const pad = makePad();
     loadPadInProjectStore(pad);
     const mockSetLevels = vi.fn();
     useMultiFadeStore.setState({
       active: true,
       originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 100] }]]),
+      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
       reopenPadId: null,
       setMultiFadeLevels: mockSetLevels,
     });
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // The first slider is the level slider — change its value via the first thumb
+    // First slider is the volume slider (single thumb)
     const sliders = screen.getAllByRole("slider");
-    const levelThumb = sliders[0];
-    // Simulate value change via keyboard (ArrowRight increments by step=1)
+    const volumeThumb = sliders[0];
     act(() => {
-      fireEvent.keyDown(levelThumb, { key: "ArrowRight" });
+      volumeThumb.focus();
+      fireEvent.keyDown(volumeThumb, { key: "ArrowLeft" });
     });
     expect(mockSetLevels).toHaveBeenCalledWith(PAD_ID, expect.any(Array));
   });
 
-  it("calls setPadVolume when playing and the upper level slider changes", () => {
+  it("calls setMultiFadeLevels when the target slider changes", () => {
+    const pad = makePad();
+    loadPadInProjectStore(pad);
+    const mockSetLevels = vi.fn();
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "other-pad",
+      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
+      reopenPadId: null,
+      setMultiFadeLevels: mockSetLevels,
+    });
+    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    // Second slider is the target slider (single thumb)
+    const sliders = screen.getAllByRole("slider");
+    const targetThumb = sliders[1];
+    act(() => {
+      targetThumb.focus();
+      fireEvent.keyDown(targetThumb, { key: "ArrowRight" });
+    });
+    expect(mockSetLevels).toHaveBeenCalledWith(PAD_ID, expect.any(Array));
+  });
+
+  it("calls setPadVolume when playing and the volume slider changes", () => {
     const pad = makePad();
     loadPadInProjectStore(pad);
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([PAD_ID]) });
     useMultiFadeStore.setState({
       active: true,
       originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 80] }]]),
+      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [80, 0] }]]),
       reopenPadId: null,
     });
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // The second thumb (index 1) of the level slider controls the upper bound.
-    // Focus it first so Radix registers keyboard events for that thumb,
-    // then press ArrowRight to increment v[1] from 80→81, triggering setPadVolume.
+    // Volume slider is the first slider; arrow keys change its value, which should trigger setPadVolume when playing.
     const sliders = screen.getAllByRole("slider");
-    const upperLevelThumb = sliders[1]; // level slider has 2 thumbs; index 1 = upper
+    const volumeThumb = sliders[0];
     act(() => {
-      upperLevelThumb.focus();
-      fireEvent.keyDown(upperLevelThumb, { key: "ArrowRight" });
+      volumeThumb.focus();
+      fireEvent.keyDown(volumeThumb, { key: "ArrowRight" });
     });
     expect(setPadVolume).toHaveBeenCalledWith(PAD_ID, expect.any(Number));
   });

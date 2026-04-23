@@ -32,6 +32,10 @@ interface UiState {
   hoveredPadId: string | null;
   /** The pad currently being edited (showing its back face), or null if none. */
   editingPadId: string | null;
+  /** The pad whose fade-config popover is currently open, or null if none. */
+  fadePopoverPadId: string | null;
+  /** In-flight target volume (0–1) being set by the popover slider before commit. */
+  fadePopoverTarget: number | null;
 }
 
 interface UiActions {
@@ -55,6 +59,10 @@ interface UiActions {
   setEditingPadId: (id: string | null) => void;
   /** Set the active scene tab. Pass null to clear (e.g., on project close). */
   setActiveSceneId: (id: string | null) => void;
+  /** Set the pad whose fade-config popover is open, or null to close. */
+  setFadePopoverPadId: (id: string | null) => void;
+  /** Set the in-flight popover fade target (0–1), or null to clear. */
+  setFadePopoverTarget: (target: number | null) => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -65,6 +73,8 @@ export const initialUiState: UiState = {
   activeSceneId: null,
   hoveredPadId: null,
   editingPadId: null,
+  fadePopoverPadId: null,
+  fadePopoverTarget: null,
 };
 
 export const useUiStore = create<UiStore>()((set, get) => ({
@@ -111,6 +121,10 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   setEditingPadId: (id) => set({ editingPadId: id }),
 
   setActiveSceneId: (id) => set({ activeSceneId: id }),
+
+  setFadePopoverPadId: (id) => set(id === null ? { fadePopoverPadId: null, fadePopoverTarget: null } : { fadePopoverPadId: id }),
+
+  setFadePopoverTarget: (target) => set({ fadePopoverTarget: target }),
 }));
 
 // Standalone selector factories for reactive subscriptions via useUiStore().

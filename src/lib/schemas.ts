@@ -161,8 +161,8 @@ export const PadConfigSchema = z.object({
   layers: z.array(LayerConfigFormSchema).min(1, "At least one layer is required"),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   fadeDurationMs: z.number().min(100).max(10000).optional(),
-  fadeLowVol: z.number().min(0).max(1).optional(),
-  fadeHighVol: z.number().min(0).max(1).optional(),
+  volume: z.number().min(0).max(1).optional(),
+  fadeTargetVol: z.number().min(0).max(1).optional(),
 });
 
 export type LayerConfigForm = z.infer<typeof LayerConfigFormSchema>;
@@ -179,8 +179,8 @@ export const PadSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   icon: z.string().min(1).max(64).regex(/^[A-Za-z][A-Za-z0-9]*$/, { message: "icon must be an alphanumeric identifier starting with a letter" }).optional(),
   fadeDurationMs: z.number().min(100).max(10000).optional(),
-  fadeLowVol: z.number().min(0).max(1).optional(),
-  fadeHighVol: z.number().min(0).max(1).optional(),
+  volume: z.number().min(0).max(1).optional(),
+  fadeTargetVol: z.number().min(0).max(1).optional(),
 });
 
 export type Pad = z.infer<typeof PadSchema>;

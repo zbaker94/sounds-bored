@@ -3,9 +3,8 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { fadePadWithLevels, resolveFadeDuration } from "@/lib/audio/padPlayer";
+import { executeFadeTap } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { toast } from "sonner";
 import { createDefaultLayer } from "@/lib/padDefaults";
 import type { Layer, PadConfig } from "@/lib/schemas";
 
@@ -68,84 +67,80 @@ export function useGlobalHotkeys() {
     useUiStore.getState().toggleEditMode();
   });
 
-  // Shared edit-mode exit handler for F and X hotkeys.
-  // Both Zustand set() calls notify subscribers synchronously, so by the time React's deferred
-  // effects run, editMode=false and active=true are already committed — the useMultiFadeMode
-  // "cancel when editMode && active" effect sees both at once and does not cancel.
-  function exitEditModeWithHover(hoveredPadId: string | null) {
-    useUiStore.getState().toggleEditMode();
-    const { enterMultiFade, enterMultiFadeEmpty } = useMultiFadeStore.getState();
-    if (hoveredPadId) {
-      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
-      const pad = pads.find((p) => p.id === hoveredPadId);
-      enterMultiFade(hoveredPadId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
-    } else {
-      enterMultiFadeEmpty();
-    }
-  }
-
-  // F: immediate single fade on the hovered pad (mirrors F in the context popover).
+  // F: configure/execute a fade on the relevant pad.
   //
   // Behavior matrix:
-  //   multi-fade already active           → handled by useMultiFadeMode's own hotkey; no-op here
-  //   edit mode, hovering a pad           → exit edit mode + enter multi-fade for that pad
-  //   edit mode, not hovering             → exit edit mode + enter multi-fade empty
-  //   normal mode, hovering, no popover   → single-fade the hovered pad immediately
-  //   normal mode, hovering, popover open → no-op (user is interacting with context popover)
-  //   normal mode, not hovering           → no-op
+  //   multi-fade already active                                       → no-op (useMultiFadeMode owns F)
+  //   edit mode with editingPadId set                                 → execute fade for editingPadId immediately
+  //                                                                     (do NOT exit edit mode, do NOT enter multi-fade)
+  //   normal mode, hovering, fadePopoverPadId === hoveredPadId        → execute fade then close popover
+  //   normal mode, hovering, no popover open                          → open popover for hovered pad (no fade yet)
+  //   normal mode, not hovering                                       → no-op
   //
   // enableOnFormTags: the pad backside contains a fade-duration <Slider> (Radix renders
   // role="slider"), which is in react-hotkeys-hook's default form-tag block list.
   // Without this flag, pressing F while the slider thumb has focus is swallowed.
   useHotkeys("f", () => {
-    const { editMode, hoveredPadId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
+    const { editMode, hoveredPadId, editingPadId, fadePopoverPadId, fadePopoverTarget, setFadePopoverPadId } = useUiStore.getState();
+    const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
 
-    if (editMode) {
-      exitEditModeWithHover(hoveredPadId);
+    // Edit mode with a pad being edited: immediately execute that pad's configured fade.
+    if (editMode && editingPadId) {
+      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+      const pad = pads.find((p) => p.id === editingPadId);
+      if (!pad) return;
+      executeFadeTap(pad, globalFadeDurationMs);
       return;
     }
 
-    // Normal mode: single-fade the hovered pad
-    if (hoveredPadId) {
-      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
+    if (editMode) return;
+
+    if (!hoveredPadId) return;
+
+    // Normal mode: popover already open for the hovered pad → execute fade + close popover.
+    // If user dragged the slider without committing, apply in-flight target and persist it.
+    if (fadePopoverPadId === hoveredPadId) {
+      const project = useProjectStore.getState().project;
+      const pads = project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
       if (!pad) return;
-      const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
-      const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-      fadePadWithLevels(pad, duration).catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Playback error: audio fade failed — ${message}`);
-      });
+      if (fadePopoverTarget !== null) {
+        const scene = project?.scenes.find((s) => s.pads.some((p) => p.id === hoveredPadId));
+        if (scene) useProjectStore.getState().setPadFadeTarget(scene.id, hoveredPadId, fadePopoverTarget);
+      }
+      const effectivePad = fadePopoverTarget !== null ? { ...pad, fadeTargetVol: fadePopoverTarget } : pad;
+      executeFadeTap(effectivePad, globalFadeDurationMs);
+      setFadePopoverPadId(null);
+      return;
     }
+
+    // Normal mode: no popover open → open the popover for the hovered pad (do not fade yet).
+    setFadePopoverPadId(hoveredPadId);
   }, { enableOnFormTags: true });
 
   // X: enter multi-fade mode pre-selecting the hovered pad (mirrors X in the context popover).
   //
   // Behavior matrix:
   //   multi-fade already active           → handled by useMultiFadeMode's own hotkey; no-op here
-  //   edit mode, hovering a pad           → exit edit mode + enter multi-fade for that pad
-  //   edit mode, not hovering             → exit edit mode + enter multi-fade empty
+  //   edit mode                           → no-op (edit mode and multi-fade must not co-exist)
   //   normal mode, hovering, no popover   → enter multi-fade pre-selecting the hovered pad
-  //   normal mode, hovering, popover open → no-op (user is interacting with context popover)
+  //   normal mode, hovering, popover open → no-op (user is interacting with fade popover)
   //   normal mode, not hovering           → no-op
   //
   // enableOnFormTags: same reasoning as F above — the fade-level <Slider> in the
   // multi-fade overlay should not swallow this hotkey.
   useHotkeys("x", () => {
-    const { editMode, hoveredPadId, editingPadId } = useUiStore.getState();
+    const { editMode, hoveredPadId, editingPadId, fadePopoverPadId } = useUiStore.getState();
     if (useMultiFadeStore.getState().active) return;
 
-    if (editMode) {
-      exitEditModeWithHover(hoveredPadId);
-      return;
-    }
+    if (editMode) return;
 
     // Normal mode: enter multi-fade if hovering a pad and no context popover is open
-    if (hoveredPadId && !editingPadId) {
+    if (hoveredPadId && !editingPadId && !fadePopoverPadId) {
       const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
-      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.fadeLowVol ?? 0, pad?.fadeHighVol ?? 1);
+      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 1, pad?.fadeTargetVol ?? 0);
     }
   }, { enableOnFormTags: true });
 

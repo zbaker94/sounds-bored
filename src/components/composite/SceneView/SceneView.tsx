@@ -145,8 +145,6 @@ export function SceneView() {
       name: "",
       layers: [createDefaultStoreLayer()],
       muteTargetPadIds: [],
-      fadeLowVol: 0,
-      fadeHighVol: 1,
     };
     addPad(activeSceneId, config, newId);
     // Navigate to the page that contains the new pad before setting editingPadId.

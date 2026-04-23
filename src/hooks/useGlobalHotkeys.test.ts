@@ -35,6 +35,8 @@ const mockUiState = {
   activeSceneId: null as string | null,
   hoveredPadId: null as string | null,
   editingPadId: null as string | null,
+  fadePopoverPadId: null as string | null,
+  fadePopoverTarget: null as number | null,
   overlayStack: [] as object[],
   closeOverlay: vi.fn(),
   toggleOverlay: vi.fn(),
@@ -46,6 +48,8 @@ const mockUiState = {
   setActiveSceneId: vi.fn((id: string | null) => { mockUiState.activeSceneId = id; }),
   setHoveredPadId: vi.fn(),
   setEditingPadId: vi.fn((id: string | null) => { mockUiState.editingPadId = id; }),
+  setFadePopoverPadId: vi.fn((id: string | null) => { mockUiState.fadePopoverPadId = id; }),
+  setFadePopoverTarget: vi.fn((t: number | null) => { mockUiState.fadePopoverTarget = t; }),
 };
 
 vi.mock("@/state/uiStore", () => ({
@@ -74,12 +78,11 @@ vi.mock("@/lib/audio/audioState", () => ({
 }));
 
 vi.mock("@/lib/audio/padPlayer", () => ({
-  fadePadWithLevels: vi.fn(),
-  resolveFadeDuration: vi.fn(() => 300),
+  executeFadeTap: vi.fn(),
 }));
 
 vi.mock("@/state/appSettingsStore", () => ({
-  useAppSettingsStore: { getState: vi.fn(() => ({ settings: { defaultFadeMs: 300 } })) },
+  useAppSettingsStore: { getState: vi.fn(() => ({ settings: { globalFadeDurationMs: 300 } })) },
 }));
 
 vi.mock("sonner", () => ({
@@ -106,6 +109,8 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     mockUiState.activeSceneId = null;
     mockUiState.hoveredPadId = null;
     mockUiState.editingPadId = null;
+    mockUiState.fadePopoverPadId = null;
+    mockUiState.fadePopoverTarget = null;
     mockUiState.overlayStack = [];
   });
 
@@ -136,11 +141,10 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     expect(hotkeyRegistrations["right"]).toBeUndefined();
   });
 
-  it("F callback uses pad.fadeLowVol/fadeHighVol from the pad object (not padVolumes)", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
-    vi.mocked(fadePadWithLevels).mockResolvedValue(undefined);
+  it("F in normal mode over a hovered pad with no popover open calls setFadePopoverPadId (opens the popover, does not fade yet)", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
 
-    const pad = { id: "pad-1", layers: [], isFadeable: true, fadeLowVol: 0.1, fadeHighVol: 0.9 } as unknown as import("@/lib/schemas").Pad;
+    const pad = { id: "pad-1", layers: [], volume: 0.9, fadeTargetVol: 0.1 } as unknown as import("@/lib/schemas").Pad;
     useProjectStore.setState({
       ...initialProjectState,
       project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),
@@ -148,22 +152,63 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     mockUiState.editMode = false;
     mockUiState.hoveredPadId = "pad-1";
     mockUiState.editingPadId = null;
+    mockUiState.fadePopoverPadId = null;
 
     renderHook(() => useGlobalHotkeys());
     triggerKey("f");
 
-    // fadePadWithLevels is called with just pad and duration — levels come from the pad itself
-    expect(fadePadWithLevels).toHaveBeenCalledWith(expect.anything(), expect.any(Number));
-    expect(fadePadWithLevels).toHaveBeenCalledTimes(1);
+    expect(mockUiState.setFadePopoverPadId).toHaveBeenCalledWith("pad-1");
+    expect(executeFadeTap).not.toHaveBeenCalled();
+  });
+
+  it("F in normal mode with popover already open for hovered pad executes the fade and closes the popover", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
+
+    const pad = { id: "pad-1", layers: [], volume: 0.9, fadeTargetVol: 0.1 } as unknown as import("@/lib/schemas").Pad;
+    useProjectStore.setState({
+      ...initialProjectState,
+      project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),
+    });
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = "pad-1";
+    mockUiState.editingPadId = null;
+    mockUiState.fadePopoverPadId = "pad-1";
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("f");
+
+    expect(executeFadeTap).toHaveBeenCalledWith(expect.objectContaining({ id: "pad-1" }), 300);
+    expect(mockUiState.setFadePopoverPadId).toHaveBeenCalledWith(null);
+  });
+
+  it("F in edit mode with editingPadId set executes the fade for the editing pad (does not exit edit mode)", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
+
+    const pad = { id: "pad-1", layers: [], volume: 0.9, fadeTargetVol: 0.1 } as unknown as import("@/lib/schemas").Pad;
+    useProjectStore.setState({
+      ...initialProjectState,
+      project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),
+    });
+    mockUiState.editMode = true;
+    mockUiState.editingPadId = "pad-1";
+    mockUiState.hoveredPadId = null;
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("f");
+
+    expect(executeFadeTap).toHaveBeenCalledWith(expect.objectContaining({ id: "pad-1" }), 300);
+    // Edit mode should not be toggled off by F
+    expect(mockUiState.toggleEditMode).not.toHaveBeenCalled();
   });
 
   it("F callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {
-    const { fadePadWithLevels } = await import("@/lib/audio/padPlayer");
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     mockUiState.editMode = false;
     mockUiState.hoveredPadId = null;
     renderHook(() => useGlobalHotkeys());
     triggerKey("f");
-    expect(fadePadWithLevels).not.toHaveBeenCalled();
+    expect(executeFadeTap).not.toHaveBeenCalled();
+    expect(mockUiState.setFadePopoverPadId).not.toHaveBeenCalled();
   });
 
   it("X callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {

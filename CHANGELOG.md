@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Fade controls are now simpler: each pad has a single **volume** level and a **fade target** level, replacing the old "start/end" range slider
+- Pressing **F** on a pad now opens a target-volume popover first, letting you set where the fade will land before it fires; pressing F again executes the fade
+- An amber indicator line on the pad shows exactly where the fade will stop while a fade is in progress or the popover is open
+- While a fade is running, new **Stop Fade** and **Reverse** buttons appear so you can freeze or reverse the ramp mid-flight
+- Existing projects are automatically migrated to the new volume/fade-target format on load (project format 1.3.0)
 - Right-clicking an empty (unassigned) pad now opens the back-face editor so you can assign sounds to it.
 - The fade slider now tracks live volume in real time and correctly labels which side is "current" while a pad is playing or fading.
 - The Fade Out / Fade In button label now stays accurate after dragging the fade boundaries mid-playback.

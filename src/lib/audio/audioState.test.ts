@@ -19,6 +19,7 @@ const mockPlaybackState = {
   setAudioTick: vi.fn(),
   clearVolumes: vi.fn(),
   padVolumes: {} as Record<string, number>,
+  removeFadingPad: vi.fn(),
 };
 
 vi.mock("@/state/playbackStore", () => ({
