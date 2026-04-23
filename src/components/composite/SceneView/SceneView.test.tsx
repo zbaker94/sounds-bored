@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
@@ -90,6 +90,9 @@ describe("SceneView", () => {
     renderSceneView();
 
     await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
+    // setEditingPadId is deferred via setTimeout(0) so the pad mounts unflipped first
+    // and the CSS flip transition plays. Flush it before asserting.
+    await act(async () => { await new Promise<void>(resolve => setTimeout(resolve, 0)); });
 
     const pads = useProjectStore.getState().project?.scenes[0].pads;
     expect(pads).toHaveLength(1);

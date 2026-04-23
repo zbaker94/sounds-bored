@@ -147,16 +147,18 @@ export function SceneView() {
       muteTargetPadIds: [],
     };
     addPad(activeSceneId, config, newId);
-    // Navigate to the page that contains the new pad before setting editingPadId.
-    // All three updates are batched by React 18, so the new PadButton mounts in a
-    // single render already on the correct page and already flipped (isFlipped=true).
-    // Without setPage, adding a 13th/25th/… pad leaves the view on the previous page
-    // so the new PadButton never mounts and editingPadId points at a ghost.
+    // Navigate to the page containing the new pad so the PadButton mounts
+    // before setEditingPadId fires. Without setPage, adding a 13th/25th/…
+    // pad leaves the view on the previous page and editingPadId points at a ghost.
     const updatedScene = useProjectStore.getState().project?.scenes.find(s => s.id === activeSceneId);
     if (updatedScene) {
       setPage(() => Math.floor((updatedScene.pads.length - 1) / PADS_PER_PAGE));
     }
-    setEditingPadId(newId);
+    // Defer by one tick so the pad mounts at rotateY(0deg) first; the subsequent
+    // render changes it to rotateY(180deg) and the CSS flip transition plays.
+    // Synchronous setEditingPadId would batch with addPad, mounting the pad already
+    // flipped with no previous style for the browser to transition from.
+    setTimeout(() => setEditingPadId(newId), 0);
   }, [activeSceneId, addPad, setEditingPadId, setPage]);
 
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));

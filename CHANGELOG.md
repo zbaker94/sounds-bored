@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Adding a new pad now plays a smooth flip animation when the pad opens to its edit view.
 - Fade controls are now simpler: each pad has a single **volume** level and a **fade target** level, replacing the old "start/end" range slider
 - Pressing **F** on a pad now opens a target-volume popover first, letting you set where the fade will land before it fires; pressing F again executes the fade
 - An amber indicator line on the pad shows exactly where the fade will stop while a fade is in progress or the popover is open

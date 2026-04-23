@@ -78,12 +78,17 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     return () => document.removeEventListener("pointerdown", handlePointerDown, { capture: true });
   }, [editingPadId, pad.id, editMode]);
 
-  // Clear hover/editing state if this pad unmounts while it owns either slot
+  // Clear hover state if this pad unmounts while it owns the hover slot.
+  // editingPadId is intentionally NOT cleared here: React 19 StrictMode runs
+  // this cleanup immediately after mount (before the first paint), which would
+  // erase the editingPadId just set by handleAddPad and prevent the new pad from
+  // flipping to its back face. The click-outside handler (above) covers all
+  // realistic unmount paths (page nav, scene switch, project close) because each
+  // is preceded by a pointerdown that fires before the component unmounts.
   useEffect(() => {
     return () => {
-      const { hoveredPadId, editingPadId: currentEditingId, setHoveredPadId, setEditingPadId: clearId } = useUiStore.getState();
+      const { hoveredPadId, setHoveredPadId } = useUiStore.getState();
       if (hoveredPadId === pad.id) setHoveredPadId(null);
-      if (currentEditingId === pad.id) clearId(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pad.id]);
