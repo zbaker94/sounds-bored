@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Internal code review documentation added covering security, performance, and quality findings — no user-facing changes shipped in this diff
+- Planned security fixes identified: yt-dlp config injection risk and symlink path traversal in project export will be hardened in a follow-up release
+- Performance improvements planned: reduced memory allocations during audio playback and faster pad lookup in multi-fade mode
+- Reliability fixes planned: boot failures will surface clearer error messages, and errors in missing-file resolution dialogs will no longer be silently swallowed
 - Adding a new pad now plays a smooth flip animation when the pad opens to its edit view.
 - Fade controls are now simpler: each pad has a single **volume** level and a **fade target** level, replacing the old "start/end" range slider
 - Pressing **F** on a pad now opens a target-volume popover first, letting you set where the fade will land before it fires; pressing F again executes the fade
