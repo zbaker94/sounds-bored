@@ -84,8 +84,8 @@ None.
 ### [ARCH6] `ProjectActionsContext` bundles three unrelated concerns with no value memoization
 - **File**: `src/contexts/ProjectActionsContext.tsx:34-50, 329-333`
 - **Severity**: Medium
-- **Finding**: Save/save-as, navigate-away, and export concerns share one context with 9 fields. The provider has no `useMemo` on the context value, so every consumer re-renders on any field change — including the export `isPending` toggle. Consumers that need only one concern receive the full bundle.
-- **Recommendation**: Split into `SaveActionsContext`, `NavigateActionsContext`, `ExportActionsContext`, or memoize sub-objects with `useMemo`. Move the export state machine to a dedicated `useExportProject` hook consumed directly by `useGlobalHotkeys` and `MenuDrawer`.
+- **Status**: Fixed
+- **Fix**: Wrapped all five un-memoized handlers (`handleSaveAs`, `handleCancelSave`, `handleNavigateSave`, `handleNavigateDiscard`, `handleNavigateCancel`) in `useCallback`. Memoized `saveDialog`, `navigateDialog`, `exportDialog` sub-objects and the top-level context value with `useMemo`. Used `.mutate`/`.mutateAsync` (stable TanStack references) as deps rather than the whole mutation object to prevent unnecessary cascade invalidation.
 
 ---
 

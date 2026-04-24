@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed unnecessary re-renders across the app — components using project action context now only update when the specific actions they rely on change, not on every state update.
 - Improved reliability of sound library saving — all save operations now share a single code path, reducing the risk of inconsistent behavior after future updates.
 - Error handling for library saves during app startup is now consistent with saves triggered during normal use.
 - Internal code refactoring only — no user-facing features or behavior changed.

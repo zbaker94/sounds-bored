@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, useCallback } from "react";
+import { createContext, useContext, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { invoke } from "@tauri-apps/api/core";
@@ -89,7 +89,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       onSuccess: () => toast.success("Project saved"),
       onError: () => toast.error("Failed to save project. Please try again."),
     });
-  }, [project, isTemporary, isDirty, folderPath, saveProjectMutation, openOverlay]);
+  }, [project, isTemporary, isDirty, folderPath, saveProjectMutation.mutate, openOverlay]);
 
   const requestSaveAndThen = useCallback((onSaved: () => void) => {
     if (!project) return;
@@ -113,7 +113,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
         },
       });
     }
-  }, [project, isTemporary, folderPath, saveProjectMutation, openOverlay]);
+  }, [project, isTemporary, folderPath, saveProjectMutation.mutate, openOverlay]);
 
   const requestNavigateAway = useCallback((path: string) => {
     if (!canSave) {
@@ -247,7 +247,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
 
   // --- Save dialog handlers ---
 
-  const handleSaveAs = async (projectName: string) => {
+  const handleSaveAs = useCallback(async (projectName: string) => {
     if (!project || !folderPath) return;
     try {
       const result = await saveProjectAsMutation.mutateAsync({
@@ -269,25 +269,25 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       toast.error("Failed to save project. Please try again.");
       onAfterSaveRef.current = null;
     }
-  };
+  }, [project, folderPath, saveProjectAsMutation.mutateAsync, markAsPermanent, closeOverlay]);
 
-  const handleCancelSave = () => {
+  const handleCancelSave = useCallback(() => {
     closeOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG);
     onAfterSaveRef.current = null;
-  };
+  }, [closeOverlay]);
 
   // --- Navigate confirm dialog handlers ---
 
-  const handleNavigateSave = () => {
+  const handleNavigateSave = useCallback(() => {
     closeOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG);
     if (pendingNavigatePath) {
       const path = pendingNavigatePath;
       setPendingNavigatePath(null);
       requestSaveAndThen(() => navigate(path));
     }
-  };
+  }, [pendingNavigatePath, closeOverlay, requestSaveAndThen, navigate]);
 
-  const handleNavigateDiscard = async () => {
+  const handleNavigateDiscard = useCallback(async () => {
     closeOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG);
     if (pendingNavigatePath) {
       const path = pendingNavigatePath;
@@ -301,33 +301,45 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
       }
       navigate(path);
     }
-  };
+  }, [pendingNavigatePath, closeOverlay, isTemporary, folderPath, navigate]);
 
-  const handleNavigateCancel = () => {
+  const handleNavigateCancel = useCallback(() => {
     closeOverlay(OVERLAY_ID.CONFIRM_NAVIGATE_DIALOG);
     setPendingNavigatePath(null);
-  };
+  }, [closeOverlay]);
 
-  const saveDialog: SaveDialogValue = {
+  const saveDialog = useMemo<SaveDialogValue>(() => ({
     defaultName: project?.name ?? "",
     isPending: saveProjectAsMutation.isPending,
     onSave: handleSaveAs,
     onCancel: handleCancelSave,
-  };
+  }), [project?.name, saveProjectAsMutation.isPending, handleSaveAs, handleCancelSave]);
 
-  const navigateDialog: NavigateDialogValue = {
+  const navigateDialog = useMemo<NavigateDialogValue>(() => ({
     onSave: handleNavigateSave,
     onDiscard: handleNavigateDiscard,
     onCancel: handleNavigateCancel,
-  };
+  }), [handleNavigateSave, handleNavigateDiscard, handleNavigateCancel]);
 
-  const exportDialog: ExportDialogValue = {
+  const exportDialog = useMemo<ExportDialogValue>(() => ({
     status: exportStatus,
     onCancel: handleCancelExport,
-  };
+  }), [exportStatus, handleCancelExport]);
+
+  const contextValue = useMemo<ProjectActionsContextValue>(() => ({
+    canSave,
+    handleSaveClick,
+    requestNavigateAway,
+    requestSaveAndThen,
+    handleSaveAsMenuClick,
+    handleExportClick,
+    saveDialog,
+    navigateDialog,
+    exportDialog,
+  }), [canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick, saveDialog, navigateDialog, exportDialog]);
 
   return (
-    <ProjectActionsContext.Provider value={{ canSave, handleSaveClick, requestNavigateAway, requestSaveAndThen, handleSaveAsMenuClick, handleExportClick, saveDialog, navigateDialog, exportDialog }}>
+    <ProjectActionsContext.Provider value={contextValue}>
       {children}
     </ProjectActionsContext.Provider>
   );
