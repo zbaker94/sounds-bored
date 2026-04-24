@@ -76,8 +76,8 @@ None.
 ### [ARCH5] Boot-time library save bypasses `useSaveCurrentLibrary` mutation hook
 - **File**: `src/hooks/useBootLoader.ts:119-124`; `src/lib/library.queries.ts:41-56`; `src/lib/library.ts:103-106`
 - **Severity**: Medium
-- **Finding**: `useBootLoader` calls the raw `saveCurrentLibraryAndClearDirty()` on boot while all other callers (`useAutoSave`, `useReconcileLibrary`, `useBulkRemove`, `SoundList`, `FoldersPanel`) use the TanStack mutation. Two save pathways with different error surfaces — a future pipeline change (e.g., adding `lastSavedAt` tracking) must be applied in both places or they silently diverge.
-- **Recommendation**: Rename `saveCurrentLibraryAndClearDirty` to `_saveCurrentLibraryAndClearDirty` and make `useSaveGlobalLibrary.mutationFn` delegate to it. Both pathways then go through one source of truth.
+- **Status**: Fixed
+- **Fix**: `useBootLoader` now calls `useSaveCurrentLibrary().saveCurrentLibrarySync()` instead of the raw `saveCurrentLibraryAndClearDirty()`. `useSaveGlobalLibrary.mutationFn` delegates to `saveCurrentLibraryAndClearDirty` (the shared primitive); `onSuccess: clearDirtyFlag()` removed since it is now handled inside the primitive. Stale comment in `useReconcileLibrary.ts` referencing the removed `onSuccess` updated. All save pathways now go through the same TanStack mutation.
 
 ---
 

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved reliability of sound library saving — all save operations now share a single code path, reducing the risk of inconsistent behavior after future updates.
+- Error handling for library saves during app startup is now consistent with saves triggered during normal use.
 - Internal code refactoring only — no user-facing features or behavior changed.
 - Added ESLint enforcement to prevent circular dependencies between state stores, blocking peripheral stores (e.g. `uiStore`) from importing domain stores (`projectStore`, `libraryStore`, `playbackStore`)
 - Lint check now runs automatically on every commit via the pre-commit hook

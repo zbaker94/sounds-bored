@@ -14,21 +14,12 @@ vi.mock("@/lib/appSettings", () => ({
 }));
 
 const mockLoadGlobalLibrary = vi.fn();
-const mockSaveGlobalLibrary = vi.fn(() => Promise.resolve());
 vi.mock("@/lib/library", async () => {
   const actual = await vi.importActual<typeof import("@/lib/library")>("@/lib/library");
   return {
     ...actual,
     loadGlobalLibrary: (options?: { onCorruption?: (msg: string) => void }) =>
       mockLoadGlobalLibrary(options),
-    saveGlobalLibrary: () => mockSaveGlobalLibrary(),
-    // saveCurrentLibraryAndClearDirty calls saveGlobalLibrary via a module-internal
-    // binding that Vitest's export-level mock cannot intercept. Mirror the real
-    // implementation so call-count and dirty-flag assertions continue to work.
-    saveCurrentLibraryAndClearDirty: async () => {
-      await mockSaveGlobalLibrary();
-      useLibraryStore.getState().clearDirtyFlag();
-    },
   };
 });
 
@@ -39,8 +30,12 @@ vi.mock("@/lib/library.reconcile", () => ({
   refreshMissingState: () => mockRefreshMissingState(),
 }));
 
+const mockSaveCurrentLibrarySync = vi.fn();
 vi.mock("@/lib/library.queries", () => ({
   getCurrentLibraryPayload: vi.fn(() => ({ sounds: [], tags: [], sets: [] })),
+  useSaveCurrentLibrary: () => ({
+    saveCurrentLibrarySync: mockSaveCurrentLibrarySync,
+  }),
 }));
 
 vi.mock("sonner", () => ({
@@ -70,14 +65,18 @@ beforeEach(() => {
   mockLoadGlobalLibrary.mockReset();
   mockReconcile.mockReset();
   mockRefreshMissingState.mockReset();
-  mockSaveGlobalLibrary.mockReset();
+  mockSaveCurrentLibrarySync.mockReset();
   mockGrantPathAccess.mockReset();
 
   mockLoadAppSettings.mockResolvedValue(defaultSettings);
   mockLoadGlobalLibrary.mockResolvedValue(defaultLibrary);
   mockReconcile.mockResolvedValue({ changed: false, sounds: [], inaccessibleFolderIds: [] });
   mockRefreshMissingState.mockResolvedValue(undefined);
-  mockSaveGlobalLibrary.mockResolvedValue(undefined);
+  // Simplified sync mock: real mutate() is async but act() flushes microtasks,
+  // so the timing difference does not affect any current assertion.
+  mockSaveCurrentLibrarySync.mockImplementation(() => {
+    useLibraryStore.getState().clearDirtyFlag();
+  });
   mockGrantPathAccess.mockResolvedValue(undefined);
 });
 
@@ -214,7 +213,7 @@ describe("useBootLoader", () => {
       renderHook(() => useBootLoader());
     });
 
-    expect(mockSaveGlobalLibrary).toHaveBeenCalledTimes(1);
+    expect(mockSaveCurrentLibrarySync).toHaveBeenCalledTimes(1);
 
     // dirty flag cleared after save
     await act(async () => {});
@@ -228,7 +227,7 @@ describe("useBootLoader", () => {
       renderHook(() => useBootLoader());
     });
 
-    expect(mockSaveGlobalLibrary).not.toHaveBeenCalled();
+    expect(mockSaveCurrentLibrarySync).not.toHaveBeenCalled();
   });
 
   it("shows error toast and still proceeds when settings load fails", async () => {
@@ -299,14 +298,18 @@ describe("useBootLoader", () => {
     expect(mockRefreshMissingState).toHaveBeenCalledTimes(1);
   });
 
-  it("shows error toast when saveGlobalLibrary throws after reconcile changes sounds", async () => {
+  it("shows error toast when save fails after reconcile changes sounds", async () => {
     const { toast } = await import("sonner");
     mockReconcile.mockResolvedValue({
       changed: true,
       sounds: [createMockSound({ id: "new-s" })],
       inaccessibleFolderIds: [],
     });
-    mockSaveGlobalLibrary.mockRejectedValue(new Error("disk full"));
+    mockSaveCurrentLibrarySync.mockImplementation(
+      (options?: { onError?: (err: unknown) => void }) => {
+        options?.onError?.(new Error("disk full"));
+      },
+    );
 
     await act(async () => {
       renderHook(() => useBootLoader());

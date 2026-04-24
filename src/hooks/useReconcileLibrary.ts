@@ -78,9 +78,9 @@ export function useReconcileLibrary(): {
 
       if (useLibraryStore.getState().isDirty) {
         saveLibraryRef.current();
-        // useSaveGlobalLibrary.onSuccess clears the dirty flag after a successful
-        // write. Do not clear it here — clearing before save completes means a
-        // failed save would silently drop changes.
+        // `saveCurrentLibraryAndClearDirty` clears the dirty flag only after a
+        // successful write. Do not clear it here — clearing before the save
+        // completes means a failed write would silently drop changes.
       }
     } finally {
       setIsReconciling(false);

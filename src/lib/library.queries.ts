@@ -1,21 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getCurrentLibraryPayload, loadGlobalLibrary, saveGlobalLibrary } from "./library";
-import { GlobalLibrary } from "./schemas";
-import { useLibraryStore } from "@/state/libraryStore";
+import { getCurrentLibraryPayload, loadGlobalLibrary, saveCurrentLibraryAndClearDirty } from "./library";
 
 export function useSaveGlobalLibrary() {
   return useMutation({
-    mutationFn: async (library: GlobalLibrary) => {
-      await saveGlobalLibrary(library);
-      return library;
-    },
-    onSuccess: () => {
-      // Zustand is the single source of truth for library data. Clearing the
-      // dirty flag after a successful save is all that's needed — no query
-      // invalidation or refetch, which previously created a window where stale
-      // query data could overwrite in-flight Zustand mutations.
-      useLibraryStore.getState().clearDirtyFlag();
+    // Delegate to the shared primitive so every caller — boot-time included —
+    // goes through the same save + dirty-clear sequence. Adding pipeline logic
+    // here (e.g. lastSavedAt tracking) automatically applies to all pathways.
+    mutationFn: async () => {
+      await saveCurrentLibraryAndClearDirty();
     },
     // NOTE: No toast at the mutation level — each call site decides how to
     // surface the failure (immediate toast for manual saves, debounced toast
@@ -42,12 +35,12 @@ export function useSaveCurrentLibrary() {
   const { mutate, mutateAsync, isPending } = useSaveGlobalLibrary();
 
   const saveCurrentLibrary = useCallback(async () => {
-    await mutateAsync(getCurrentLibraryPayload());
+    await mutateAsync();
   }, [mutateAsync]);
 
   const saveCurrentLibrarySync = useCallback(
     (options?: Parameters<typeof mutate>[1]) => {
-      mutate(getCurrentLibraryPayload(), options);
+      mutate(undefined, options);
     },
     [mutate],
   );

@@ -94,8 +94,9 @@ export function getCurrentLibraryPayload(): GlobalLibrary {
 
 /**
  * Saves the current libraryStore state to disk and clears the dirty flag.
- * Encodes the "after a successful save, clear dirty" contract in a single
- * place so boot-time flows and the mutation hook agree on the sequence.
+ * Internal primitive used by `useSaveGlobalLibrary.mutationFn`. Direct callers
+ * should prefer `useSaveCurrentLibrary` (the TanStack mutation) so all save
+ * pathways share the same `onSuccess`/`onError` pipeline.
  *
  * @throws propagates any error from the underlying `saveGlobalLibrary` call;
  *         the dirty flag is NOT cleared on failure.

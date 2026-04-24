@@ -4,7 +4,8 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useDownloadStore } from "@/state/downloadStore";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { loadGlobalLibrary, saveCurrentLibraryAndClearDirty } from "@/lib/library";
+import { loadGlobalLibrary } from "@/lib/library";
+import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { loadAppSettings } from "@/lib/appSettings";
 import { loadDownloadHistory } from "@/lib/downloads";
 import { grantPathAccess } from "@/lib/scope";
@@ -27,6 +28,7 @@ export function useBootLoader(): { ready: boolean } {
   const [settingsAttempted, setSettingsAttempted] = useState(false);
   const [libraryAttempted, setLibraryAttempted] = useState(false);
   const hasReconciled = useRef(false);
+  const { saveCurrentLibrarySync } = useSaveCurrentLibrary();
 
   // One-time load at mount — plain async functions, no query subscription.
   // Both loads are independent and fire in parallel.
@@ -117,9 +119,11 @@ export function useBootLoader(): { ready: boolean } {
 
         // Persist if reconciliation changed sounds OR we just tagged import folder sounds.
         if (useLibraryStore.getState().isDirty) {
-          void saveCurrentLibraryAndClearDirty().catch((err) => {
-            console.error(err);
-            toast.error("Failed to save sound library");
+          saveCurrentLibrarySync({
+            onError: (err) => {
+              console.error(err);
+              toast.error("Failed to save sound library");
+            },
           });
         }
       })
