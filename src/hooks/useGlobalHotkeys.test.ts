@@ -45,7 +45,7 @@ const mockUiState = {
   isTopOverlay: vi.fn(() => false),
   isOverlayOpen: vi.fn(() => false),
   toggleEditMode: vi.fn(),
-  setActiveSceneId: vi.fn((id: string | null) => { mockUiState.activeSceneId = id; }),
+  setActiveSceneId: vi.fn((id: string | null, _sceneIds?: string[]) => { mockUiState.activeSceneId = id; }),
   setHoveredPadId: vi.fn(),
   setEditingPadId: vi.fn((id: string | null) => { mockUiState.editingPadId = id; }),
   setFadePopoverPadId: vi.fn((id: string | null) => { mockUiState.fadePopoverPadId = id; }),

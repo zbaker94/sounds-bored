@@ -9,7 +9,7 @@ import { Pad, PadConfig, Project, ProjectHistoryEntry, Scene } from "@/lib/schem
 // sites (SceneTabBar, useGlobalHotkeys, drag-to-add, keyboard shortcuts, etc.).
 //
 // These four call sites pass the post-mutation `sceneIds` list to
-// `setActiveSceneId` so it can enforce the activeSceneId invariant (ARCH-4):
+// `setActiveSceneId` so it can enforce the activeSceneId invariant (ARCH1):
 // silently rejecting ids that don't exist in the current project.
 import { useUiStore } from "./uiStore";
 
@@ -73,9 +73,11 @@ export const useProjectStore = create<ProjectStore>()(
       });
       // Pass sceneIds so `setActiveSceneId` enforces the activeSceneId invariant.
       const sceneIds = project.scenes.map((s) => s.id);
-      useUiStore
-        .getState()
-        .setActiveSceneId(sceneIds.length > 0 ? sceneIds[0] : null, sceneIds);
+      if (sceneIds.length > 0) {
+        useUiStore.getState().setActiveSceneId(sceneIds[0]!, sceneIds);
+      } else {
+        useUiStore.getState().setActiveSceneId(null);
+      }
     },
 
     updateProject: (project) =>
@@ -157,7 +159,11 @@ export const useProjectStore = create<ProjectStore>()(
         // Pass updated sceneIds so `setActiveSceneId` enforces the invariant
         // against the post-delete scene list.
         const sceneIds = scenes.map((s) => s.id);
-        useUiStore.getState().setActiveSceneId(next, sceneIds);
+        if (next !== null) {
+          useUiStore.getState().setActiveSceneId(next, sceneIds);
+        } else {
+          useUiStore.getState().setActiveSceneId(null);
+        }
       }
     },
 

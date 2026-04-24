@@ -163,8 +163,9 @@ export function useGlobalHotkeys() {
   useHotkeys("1,2,3,4,5,6,7,8,9", (e) => {
     const { project } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
+    const sceneIds = scenes.map((s) => s.id);
     const idx = parseInt(e.key) - 1;
-    if (idx < scenes.length) useUiStore.getState().setActiveSceneId(scenes[idx].id);
+    if (idx < scenes.length) useUiStore.getState().setActiveSceneId(scenes[idx].id, sceneIds);
   });
 
   // Alt+Left/Right: navigate between scenes with wrapping.
@@ -184,9 +185,10 @@ export function useGlobalHotkeys() {
     const { activeSceneId, setActiveSceneId } = useUiStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
+    const sceneIds = scenes.map((s) => s.id);
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
-    if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
-    setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id);
+    if (idx === -1) { setActiveSceneId(scenes[0].id, sceneIds); return; }
+    setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id, sceneIds);
   }, { preventDefault: true /* suppress webview Alt+Left = Back */ });
 
   useHotkeys("alt+right", () => {
@@ -194,8 +196,9 @@ export function useGlobalHotkeys() {
     const { activeSceneId, setActiveSceneId } = useUiStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
+    const sceneIds = scenes.map((s) => s.id);
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
-    if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
-    setActiveSceneId(scenes[(idx + 1) % scenes.length].id);
+    if (idx === -1) { setActiveSceneId(scenes[0].id, sceneIds); return; }
+    setActiveSceneId(scenes[(idx + 1) % scenes.length].id, sceneIds);
   }, { preventDefault: true /* suppress webview Alt+Right = Forward */ });
 }

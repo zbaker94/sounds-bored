@@ -56,7 +56,7 @@ const mockUiState = {
   activeSceneId: null as string | null,
   openOverlay: mockOpenOverlay,
   closeOverlay: mockCloseOverlay,
-  setActiveSceneId: vi.fn((id: string | null) => { mockUiState.activeSceneId = id; }),
+  setActiveSceneId: vi.fn((id: string | null, _sceneIds?: string[]) => { mockUiState.activeSceneId = id; }),
 };
 
 vi.mock("@/state/uiStore", () => ({

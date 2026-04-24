@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where switching or deleting scenes could briefly leave the active scene tab pointing to a non-existent scene, causing inconsistent UI state.
 - Fixed a security issue where a malicious yt-dlp config file containing shell commands could execute arbitrary code during downloads; the bundled yt-dlp now runs in isolated mode.
 - Fixed a security vulnerability in project export where a symlink could trick the app into embedding sensitive files from outside the project folder.
 - Improved performance: pad controls and store subscriptions now unmount when a pad is not in edit mode, reducing CPU usage during playback.

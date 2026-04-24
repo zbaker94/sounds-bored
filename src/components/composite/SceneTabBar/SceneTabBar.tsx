@@ -56,7 +56,7 @@ export function SceneTabBar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="min-w-0 max-w-[940px] overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
-              <Tabs value={activeSceneId ?? ""} onValueChange={setActiveSceneId}>
+              <Tabs value={activeSceneId ?? ""} onValueChange={(id) => setActiveSceneId(id, sceneIds)}>
                 <TabsList variant="line">
                   <DndContext
                     sensors={sensors}

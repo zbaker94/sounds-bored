@@ -178,7 +178,7 @@ describe("projectStore", () => {
       getState().loadProject(entry, project, false);
 
       expect(getActiveSceneId()).toBe("s1"); // pre-condition: loadProject auto-selected first scene
-      useUiStore.getState().setActiveSceneId("s2");
+      useUiStore.getState().setActiveSceneId("s2", ["s1", "s2"]);
 
       expect(getActiveSceneId()).toBe("s2");
     });
@@ -201,7 +201,7 @@ describe("projectStore", () => {
         scenes: [createMockScene({ id: "s1" }), createMockScene({ id: "s2" })],
       });
       getState().loadProject(tempEntry, project, true);
-      useUiStore.getState().setActiveSceneId("s2");
+      useUiStore.getState().setActiveSceneId("s2", ["s1", "s2"]);
 
       const permEntry = createMockHistoryEntry({ path: "/projects/My Project" });
       getState().markAsPermanent(permEntry, project);
@@ -360,21 +360,21 @@ describe("projectStore", () => {
 
     it("does not change activeSceneId when a non-active scene is deleted", () => {
       loadWithThreeScenes();
-      useUiStore.getState().setActiveSceneId("s1");
+      useUiStore.getState().setActiveSceneId("s1", ["s1", "s2", "s3"]);
       getState().deleteScene("s3");
       expect(getActiveSceneId()).toBe("s1");
     });
 
     it("advances activeSceneId to the next scene when active middle scene is deleted", () => {
       loadWithThreeScenes();
-      useUiStore.getState().setActiveSceneId("s2");
+      useUiStore.getState().setActiveSceneId("s2", ["s1", "s2", "s3"]);
       getState().deleteScene("s2");
       expect(getActiveSceneId()).toBe("s3");
     });
 
     it("falls back to the previous scene when the active last scene is deleted", () => {
       loadWithThreeScenes();
-      useUiStore.getState().setActiveSceneId("s3");
+      useUiStore.getState().setActiveSceneId("s3", ["s1", "s2", "s3"]);
       getState().deleteScene("s3");
       expect(getActiveSceneId()).toBe("s2");
     });
