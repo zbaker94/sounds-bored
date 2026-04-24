@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When adding a sound folder fails (e.g. disk full, permission error), an error message is now shown instead of the operation silently failing with no feedback.
 - Fixed a potential audio state race condition that could cause inconsistent volume bar display when pads stop playing.
 - Internal audio engine cleanup is now more reliable — stale volume entries are cleared automatically each animation frame rather than through ad-hoc synchronous writes.
 - Fixed a bug where switching or deleting scenes could briefly leave the active scene tab pointing to a non-existent scene, causing inconsistent UI state.

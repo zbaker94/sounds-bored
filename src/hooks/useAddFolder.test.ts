@@ -176,6 +176,35 @@ describe("useAddFolder", () => {
     expect(result.current.isAddingFolder).toBe(false);
   });
 
+  it("shows an error toast and resets isAddingFolder when saveSettings rejects", async () => {
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
+    mockPickFolder.mockResolvedValue("/music/new");
+    mockSaveSettings.mockRejectedValue(new Error("disk full"));
+
+    const { result } = renderHook(() => useAddFolder());
+    await act(async () => {
+      await result.current.handleAddFolder();
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("disk full"));
+    expect(result.current.isAddingFolder).toBe(false);
+  });
+
+  it("shows an error toast and resets isAddingFolder when saveCurrentLibrary rejects", async () => {
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
+    mockPickFolder.mockResolvedValue("/music/new");
+    mockReconcile.mockResolvedValue({ changed: true, sounds: [] });
+    mockSaveLibrary.mockRejectedValue(new Error("write failed"));
+
+    const { result } = renderHook(() => useAddFolder());
+    await act(async () => {
+      await result.current.handleAddFolder();
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("write failed"));
+    expect(result.current.isAddingFolder).toBe(false);
+  });
+
   it("uses live store settings — settings changed after render are reflected in handler", async () => {
     // Prove the handler reads Zustand, not a stale React-render snapshot.
     // Seed with settingsA (empty folders), render, switch store to settingsB (one folder),

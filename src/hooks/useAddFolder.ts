@@ -64,6 +64,8 @@ export function useAddFolder(): {
         await saveCurrentLibrary();
       }
       toast.success(`Folder "${name}" added`);
+    } catch (err) {
+      toast.error(`Failed to add folder: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsAddingFolder(false);
     }

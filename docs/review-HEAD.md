@@ -11,10 +11,10 @@
 | Severity | Count |
 |----------|-------|
 | Critical | 0 |
-| High | 2 (2 fixed) |
+| High | 1 (3 fixed) |
 | Medium | 20 |
 | Low | 47 |
-| **Total** | **69** |
+| **Total** | **68** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC17 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -43,28 +43,10 @@ None.
 
 ---
 
-### [QUAL2] `useAddFolder.handleAddFolder` has `try` with no `catch` — rejections become unhandled
-- **File**: `src/hooks/useAddFolder.ts:34-70`
+### ~~[QUAL2] `useAddFolder.handleAddFolder` has `try` with no `catch` — rejections become unhandled~~ ✅ FIXED
+- **File**: `src/hooks/useAddFolder.ts`
 - **Severity**: High
-- **Finding**: `pickFolder`, `saveSettings`, `reconcileGlobalLibrary`, and `saveCurrentLibrary` can all reject (permissions, disk full, corrupted settings file). The `finally` block resets loading state, but the rejection propagates to the `onClick` handler in `FoldersPanel.tsx:247` as an unhandled promise rejection, silently failing with no user feedback.
-- **Evidence**:
-  ```ts
-  const handleAddFolder = useCallback(async () => {
-    if (!settings) return;
-    setIsAddingFolder(true);
-    try {
-      const selected = await pickFolder();
-      // ...
-      await saveSettings(updatedSettings);
-      const result = await reconcileGlobalLibrary(…);
-      await saveCurrentLibrary();
-      toast.success(`Folder "${name}" added`);
-    } finally {
-      setIsAddingFolder(false);  // no catch — rejection leaks as unhandled
-    }
-  }, …);
-  ```
-- **Recommendation**: Add `catch (err) { toast.error(\`Failed to add folder: ${err instanceof Error ? err.message : String(err)}\`); console.error(err); }` — matching the pattern already established in `useBulkRemove.ts`.
+- **Fix applied**: Added `catch (err) { toast.error(\`Failed to add folder: ${err instanceof Error ? err.message : String(err)}\`); }` between the try block and the existing `finally`. Unhandled rejections from `pickFolder`, `saveSettings`, `reconcileGlobalLibrary`, and `saveCurrentLibrary` are now surfaced to the user. Two tests added covering the catch path (saveSettings rejection and saveCurrentLibrary rejection), each asserting toast.error is called with the error message and `isAddingFolder` resets to false.
 
 ---
 
@@ -676,3 +658,4 @@ None.
 | ARCH-B | `PadButton` decomposed from god component into focused sub-components |
 | ARCH-C | `activeSceneId` moved from `projectStore` to `uiStore` (no circular dep) |
 | ARCH2 | Audio engine no longer writes tick-managed `padVolumes` field directly — `clearPadVolumesEntry()` removed; audioTick drops stale entries naturally |
+| QUAL2 | `useAddFolder.handleAddFolder` — added catch block; async errors shown via toast with error message; 2 tests added |
