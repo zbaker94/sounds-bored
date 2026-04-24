@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code refactoring only — no user-facing features or behavior changed.
 - Added ESLint enforcement to prevent circular dependencies between state stores, blocking peripheral stores (e.g. `uiStore`) from importing domain stores (`projectStore`, `libraryStore`, `playbackStore`)
 - Lint check now runs automatically on every commit via the pre-commit hook
 - Improved internal code quality by consolidating duplicate filename-to-display-name logic into a single shared utility, reducing risk of inconsistent sound naming behavior across the app.

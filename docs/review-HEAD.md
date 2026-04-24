@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 19 (1 fixed) |
+| Medium | 18 (2 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -66,16 +66,10 @@ None.
 
 ---
 
-### [ARCH4] `PadBackFace` is a 582-line god component subscribing to 6 stores
+### ~~[ARCH4] `PadBackFace` is a 582-line god component subscribing to 6 stores~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:1-582`
 - **Severity**: Medium
-- **Finding**: Subscribes to `projectStore`, `libraryStore`, `playbackStore`, `uiStore`, `appSettingsStore`, `multiFadeStore`. Owns name editing, color editing, transport, volume slider, fade target slider, fade duration slider, fade/stop-fade/reverse buttons, layer list with per-layer sliders, multi-fade entry, pad duplication, pad deletion, and the delete-confirm dialog. The memo breakdown into `BackFaceLayerRow`, `PadFadeControls`, `PadLayerSection` is partial — the root component still owns all store subscriptions.
-- **Recommendation**: Split into three focused siblings rendered by a thin orchestrator:
-  - `PadBackFaceHeader` (name/color/duplicate/delete — `projectStore` + `uiStore` only)
-  - `PadBackFaceTransport` (play/stop/fade buttons — `playbackStore` + `padPlayer`)
-  - `PadBackFaceLayers` (layer list — `libraryStore` + `playbackStore` + `projectStore`)
-  
-  Extract `handleStartStop`, `handleFade`, etc. into `src/lib/padActions.ts` for test coverage without React.
+- **Fix applied**: Extracted the three inline memo components (`BackFaceLayerRow`, `PadFadeControls`, `PadLayerSection`) into dedicated sibling files in `SceneView/`. `PadBackFace.tsx` reduced from 582 to ~195 lines; the root component retains 5 store subscriptions (down from the claimed 6 — `libraryStore` was always in `BackFaceLayerRow` only) which are all legitimate orchestration. The sibling-orchestrator split recommended by the review was evaluated and rejected: it would have required the orchestrator to re-subscribe to the same stores to pass `isPlaying`/`globalFadeDurationMs` as props, adding prop-drilling with no reduction in coupling. Zero functional changes; all 20 existing tests pass.
 
 ---
 

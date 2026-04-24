@@ -1,0 +1,156 @@
+import { useState, useRef, memo } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import type { Pad } from "@/lib/schemas";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Kbd } from "@/components/ui/kbd";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { VolumeHighIcon } from "@hugeicons/core-free-icons";
+import { useProjectStore } from "@/state/projectStore";
+import { setPadVolume } from "@/lib/audio/padPlayer";
+import { padToConfig } from "@/lib/padDefaults";
+import { PadPercentSlider } from "./PadPercentSlider";
+import { PadDurationSlider } from "./PadDurationSlider";
+
+export interface PadFadeControlsProps {
+  pad: Pad;
+  sceneId: string;
+  isPlaying: boolean;
+  isFading: boolean;
+  isReversing: boolean;
+  globalFadeDurationMs: number;
+  liveVolume: number | undefined;
+  onFade: () => void;
+  onStopFade: () => void;
+  onReverse: () => void;
+}
+
+export const PadFadeControls = memo(function PadFadeControls({
+  pad,
+  sceneId,
+  isPlaying,
+  isFading,
+  isReversing,
+  globalFadeDurationMs,
+  liveVolume,
+  onFade,
+  onStopFade,
+  onReverse,
+}: PadFadeControlsProps) {
+  const updatePad = useProjectStore((s) => s.updatePad);
+  const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
+
+  const padVolumePct = Math.round((pad.volume ?? 1) * 100);
+  const liveVolumePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : padVolumePct;
+  const [localVolume, setLocalVolume] = useState<number | null>(null);
+  const volumeSliderValue = localVolume ?? liveVolumePct;
+  const volumeDragStartRef = useRef<number | null>(null);
+
+  const fadeTargetPct = Math.round((pad.fadeTargetVol ?? 0) * 100);
+  const [localFadeTarget, setLocalFadeTarget] = useState<number | null>(null);
+  const fadeTargetSliderValue = localFadeTarget ?? fadeTargetPct;
+
+  const currentVol = liveVolume ?? (pad.volume ?? 1);
+  const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
+  const isFadeOut = !isEqualVolume && isPlaying && (pad.fadeTargetVol ?? 0) < currentVol;
+
+  return (
+    <div className="flex flex-col gap-1.5 flex-shrink-0">
+      <AnimatePresence initial={false}>
+        {isPlaying && (
+          <motion.div
+            key="current-volume"
+            className="flex flex-col gap-1.5 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Current volume</span>
+              <span className="tabular-nums">{volumeSliderValue}%</span>
+            </div>
+            <Slider
+              compact
+              tooltipLabel={(v) => `${v}%`}
+              value={[volumeSliderValue]}
+              onThumbPointerDown={() => { volumeDragStartRef.current = volumeSliderValue; }}
+              onValueChange={([v]) => {
+                setLocalVolume(v);
+                setPadVolume(pad.id, v / 100);
+              }}
+              onValueCommit={([v]) => {
+                const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
+                volumeDragStartRef.current = null;
+                setLocalVolume(null);
+                if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100);
+              }}
+              min={0} max={100} step={1}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <PadPercentSlider
+        label="Fade target"
+        value={fadeTargetSliderValue}
+        onValueChange={(v) => setLocalFadeTarget(v)}
+        onValueCommit={(v) => {
+          setLocalFadeTarget(null);
+          useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100);
+        }}
+      />
+      <PadDurationSlider
+        label="Duration"
+        value={fadeDuration}
+        onValueChange={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
+        onValueCommit={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
+      />
+      {pad.fadeDurationMs !== undefined ? (
+        <button
+          type="button"
+          className="text-muted-foreground underline self-start"
+          onClick={() => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: undefined })}
+        >
+          Reset to default
+        </button>
+      ) : (
+        <p className="text-muted-foreground">Global default ({(globalFadeDurationMs / 1000).toFixed(1)}s)</p>
+      )}
+      <div className="flex items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {isFading ? (
+              <Button size="sm" variant="secondary" onClick={onStopFade} className="flex-1">
+                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+                Stop Fade
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={onFade} disabled={isEqualVolume} className="flex-1">
+                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+                {isEqualVolume ? "Fade" : isFadeOut ? "Fade Out" : "Fade In"}
+              </Button>
+            )}
+          </TooltipTrigger>
+          <TooltipContent><Kbd>F</Kbd></TooltipContent>
+        </Tooltip>
+        <AnimatePresence>
+          {isFading && !isReversing && (
+            <motion.div
+              key="reverse"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: "auto" }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex-shrink-0"
+            >
+              <Button size="sm" variant="secondary" onClick={onReverse} className="whitespace-nowrap">
+                Reverse
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+});
