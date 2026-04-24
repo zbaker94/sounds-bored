@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 20 |
+| Medium | 19 (1 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -59,11 +59,10 @@ None.
 
 ## Medium (20)
 
-### [ARCH3] `projectStore → uiStore` coupling direction is unenforced convention
+### ~~[ARCH3] `projectStore → uiStore` coupling direction is unenforced convention~~ ✅ FIXED
 - **File**: `src/state/projectStore.ts:14`
 - **Severity**: Medium
-- **Finding**: The only thing preventing `uiStore → projectStore` circular deps is convention. A future engineer will add `useProjectStore.getState()` inside `uiStore` and create a Vite module evaluation cycle. The long comment at `projectStore.ts:4-13` explains the current coupling but doesn't state the rule as an enforceable constraint.
-- **Recommendation**: Add an ESLint `no-restricted-imports` rule in `uiStore.ts` preventing imports from `projectStore`/`libraryStore`/`playbackStore`.
+- **Fix applied**: Bootstrapped ESLint (`eslint` + `@typescript-eslint/parser` devDependencies; `eslint.config.mjs` flat config). Added a `no-restricted-imports` rule covering all of `src/state/**/*.ts` (with domain stores and test files in `ignores`) — blocking imports from `*/projectStore`, `*/libraryStore`, and `*/playbackStore` with diagnostic messages pointing to the `projectStore.ts` header. The folder-level glob means new peripheral stores are automatically guarded without a config edit. Added `"lint": "eslint src/state/"` script and wired it into `.githooks/pre-commit` so the rule is enforced at every commit.
 
 ---
 

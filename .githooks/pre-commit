@@ -2,6 +2,8 @@
 # Generates a changelog entry for staged changes using Claude and updates CHANGELOG.md.
 set -e
 
+npm run lint
+
 CHANGELOG="CHANGELOG.md"
 
 # Write staged diff to a temp file, excluding files that don't need changelog entries
