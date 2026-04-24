@@ -60,3 +60,18 @@ export function truncatePath(path: string, maxLength = 40): string {
 export function basename(path: string, fallback = ""): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? fallback;
 }
+
+/**
+ * Derive a display name from a filename by stripping the extension,
+ * splitting on hyphens/underscores, and title-casing each word.
+ * e.g. "my-audio_bgm_whatever.wav" → "My Audio Bgm Whatever"
+ */
+export function nameFromFilename(filename: string): string {
+  const lastDot = filename.lastIndexOf(".");
+  const stem = lastDot > 0 ? filename.substring(0, lastDot) : filename;
+  return stem
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}

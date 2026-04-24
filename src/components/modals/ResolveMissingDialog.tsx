@@ -8,7 +8,7 @@ import { evictBuffer } from "@/lib/audio/bufferCache";
 import { evictStreamingElement } from "@/lib/audio/streamingCache";
 import { pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
-import { basename } from "@/lib/utils";
+import { basename, nameFromFilename } from "@/lib/utils";
 import type { Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -28,16 +28,6 @@ interface ResolveMissingDialogProps {
 }
 
 type Step = "main" | "confirm-name" | "confirm-duplicate" | "confirm-remove";
-
-function nameFromFilename(filename: string): string {
-  const lastDot = filename.lastIndexOf(".");
-  const stem = lastDot > 0 ? filename.substring(0, lastDot) : filename;
-  return stem
-    .split(/[-_]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
 
 export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMissingDialogProps) {
   const [step, setStep] = useState<Step>("main");

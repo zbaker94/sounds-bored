@@ -2,7 +2,7 @@ import { readDir, exists, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
 import { Sound, GlobalFolder } from "./schemas";
 import { AUDIO_EXTENSIONS } from "./constants";
-import { basename } from "@/lib/utils";
+import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 
@@ -24,21 +24,6 @@ export interface ReconcileResult {
 function isAudioFile(name: string): boolean {
   const lower = name.toLowerCase();
   return AUDIO_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
-
-/**
- * Derive a display name from a filename by stripping the extension,
- * splitting on hyphens/underscores, and title-casing each word.
- * e.g. "my-audio_bgm_whatever.wav" → "My Audio Bgm Whatever"
- */
-function nameFromFilename(filename: string): string {
-  const lastDot = filename.lastIndexOf(".");
-  const stem = lastDot > 0 ? filename.substring(0, lastDot) : filename;
-  return stem
-    .split(/[-_]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
 }
 
 /**

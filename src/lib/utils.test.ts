@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { truncatePath, detectIsMac } from "./utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { truncatePath, detectIsMac, nameFromFilename } from "./utils";
 
 describe("detectIsMac", () => {
   let originalUADataDescriptor: PropertyDescriptor | undefined;
@@ -145,5 +145,31 @@ describe("truncatePath", () => {
     expect(truncatePath(short)).toBe(short);
     const long = "/very/long/path/that/definitely/exceeds/forty/chars/file.wav";
     expect(truncatePath(long).length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("nameFromFilename", () => {
+  it("strips extension, splits on hyphens and underscores, and title-cases", () => {
+    expect(nameFromFilename("my-audio_bgm_whatever.wav")).toBe("My Audio Bgm Whatever");
+  });
+
+  it("handles a plain name with no extension", () => {
+    expect(nameFromFilename("kick")).toBe("Kick");
+  });
+
+  it("handles a name with only an extension dot", () => {
+    expect(nameFromFilename("snare.mp3")).toBe("Snare");
+  });
+
+  it("collapses multiple consecutive separators", () => {
+    expect(nameFromFilename("hi--hat__open.wav")).toBe("Hi Hat Open");
+  });
+
+  it("lowercases the non-initial characters of each word", () => {
+    expect(nameFromFilename("BIG_ROOM.wav")).toBe("Big Room");
+  });
+
+  it("treats a leading-dot filename as having no extension (dot at index 0 is not a separator)", () => {
+    expect(nameFromFilename(".wav")).toBe(".wav");
   });
 });

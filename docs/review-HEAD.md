@@ -11,10 +11,10 @@
 | Severity | Count |
 |----------|-------|
 | Critical | 0 |
-| High | 1 (3 fixed) |
+| High | 0 (4 fixed) |
 | Medium | 20 |
 | Low | 47 |
-| **Total** | **68** |
+| **Total** | **67** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC17 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -50,24 +50,10 @@ None.
 
 ---
 
-### [REUSE1] `nameFromFilename` implemented identically in three separate files
-- **File**: `src/lib/library.reconcile.ts:34` · `src/components/modals/ResolveMissingDialog.tsx:32` · `src/components/modals/ResolveMissingFolderDialog.tsx:46`
+### ~~[REUSE1] `nameFromFilename` implemented identically in three separate files~~ ✅ FIXED
+- **File**: `src/lib/utils.ts`, `src/lib/library.reconcile.ts`, `src/components/modals/ResolveMissingDialog.tsx`, `src/components/modals/ResolveMissingFolderDialog.tsx`
 - **Severity**: High
-- **Finding**: The exact same 9-line function (strip extension, split on `-`/`_`, title-case, join with spaces) is copy-pasted three times. A bug fix or casing-policy change must be applied in three places.
-- **Evidence**:
-  ```ts
-  // All three files contain this verbatim:
-  function nameFromFilename(filename: string): string {
-    const lastDot = filename.lastIndexOf(".");
-    const stem = lastDot > 0 ? filename.substring(0, lastDot) : filename;
-    return stem
-      .split(/[-_]+/)
-      .filter(Boolean)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ");
-  }
-  ```
-- **Recommendation**: Promote to an exported `nameFromFilename` in `src/lib/utils.ts` alongside the existing `basename` helper.
+- **Fix applied**: Promoted `nameFromFilename` to an exported function in `src/lib/utils.ts`. Removed the local definition from all three files; each now imports from `@/lib/utils`. 6 tests added to `utils.test.ts` covering the happy path, edge cases (no extension, consecutive separators, uppercase input, leading-dot filenames).
 
 ---
 
@@ -659,3 +645,4 @@ None.
 | ARCH-C | `activeSceneId` moved from `projectStore` to `uiStore` (no circular dep) |
 | ARCH2 | Audio engine no longer writes tick-managed `padVolumes` field directly — `clearPadVolumesEntry()` removed; audioTick drops stale entries naturally |
 | QUAL2 | `useAddFolder.handleAddFolder` — added catch block; async errors shown via toast with error message; 2 tests added |
+| REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |
