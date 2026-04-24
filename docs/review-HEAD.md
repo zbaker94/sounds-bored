@@ -11,10 +11,10 @@
 | Severity | Count |
 |----------|-------|
 | Critical | 0 |
-| High | 3 (1 fixed) |
+| High | 2 (2 fixed) |
 | Medium | 20 |
 | Low | 47 |
-| **Total** | **70** |
+| **Total** | **69** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC17 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -36,22 +36,10 @@ None.
 
 ---
 
-### [ARCH2] Audio engine writes directly to `playbackStore`, inverting the layered architecture
-- **File**: `src/lib/audio/audioState.ts:56,409,680-713,748,801,942`; `src/lib/audio/fadeMixer.ts:20,30,39,78,81,95,120`; `src/lib/audio/padPlayer.ts:120,150,154,158,186,217,224,299,360,395,470,532,557`
+### ~~[ARCH2] Audio engine writes directly to `playbackStore`, inverting the layered architecture~~ ✅ FIXED
+- **File**: `src/lib/audio/audioState.ts`
 - **Severity**: High
-- **Finding**: `audioState.ts` claims to be a "pure state container" (line 4) and "single owner of ALL non-serializable audio engine runtime state" (line 13), but writes to `playbackStore` at 10+ sites. `fadeMixer` and `padPlayer` do the same. The tick loop (`audioTick`) is supposed to be the sole reactive bridge between the audio engine and UI stores. Dual ownership creates race conditions — `clearPadVolumesEntry` mutates within a "one-frame window" acknowledged in a comment.
-- **Evidence**:
-  ```ts
-  // audioState.ts:690-696 — "pure state container" writes to Zustand
-  function clearPadVolumesEntry(padId: string): void {
-    const store = usePlaybackStore.getState();
-    if (padId in store.padVolumes) {
-      const { [padId]: _dropped, ...rest } = store.padVolumes;
-      store.setAudioTick({ padVolumes: rest });
-    }
-  }
-  ```
-- **Recommendation**: Route all reactive UI signals through `audioTick` (including `playingPadIds`, `fadingPadIds`, `fadingOutPadIds`, `reversingPadIds`). Audio engine modules expose query functions only; `audioTick` publishes derived sets each frame diffed against the prior snapshot. Or rename `audioState.ts` to acknowledge its mixed role and centralize each paired audioState+playbackStore call in one helper per invariant.
+- **Fix applied**: Removed `clearPadVolumesEntry()` and its 3 call sites; removed the redundant `setAudioTick({ padVolumes: {} })` in `stopAllVoices()` (already handled by `stopAudioTick()` → `_clearAllTickFields()`). The finding's recommendation to route push-based fields (`playingPadIds`, `fadingPadIds`, etc.) through audioTick was evaluated and rejected — these are correctly written as push-based events; routing them through the RAF would add ~16ms UI latency with no correctness benefit. The module header now accurately documents the two-tier write model (push-based vs tick-managed) and the known `gainManager.updateLayerVolume` exception for inactive-layer drag gestures. audioTick naturally drops stale `padVolumes` entries on the next frame when a pad leaves `voiceMap`. 5 tests updated to verify the new invariant.
 
 ---
 
@@ -687,3 +675,4 @@ None.
 | ARCH-A | Dual TanStack Query → Zustand state ownership eliminated |
 | ARCH-B | `PadButton` decomposed from god component into focused sub-components |
 | ARCH-C | `activeSceneId` moved from `projectStore` to `uiStore` (no circular dep) |
+| ARCH2 | Audio engine no longer writes tick-managed `padVolumes` field directly — `clearPadVolumesEntry()` removed; audioTick drops stale entries naturally |

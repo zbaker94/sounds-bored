@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a potential audio state race condition that could cause inconsistent volume bar display when pads stop playing.
+- Internal audio engine cleanup is now more reliable — stale volume entries are cleared automatically each animation frame rather than through ad-hoc synchronous writes.
 - Fixed a bug where switching or deleting scenes could briefly leave the active scene tab pointing to a non-existent scene, causing inconsistent UI state.
 - Fixed a security issue where a malicious yt-dlp config file containing shell commands could execute arbitrary code during downloads; the bundled yt-dlp now runs in isolated mode.
 - Fixed a security vulnerability in project export where a symlink could trick the app into embedding sensitive files from outside the project folder.

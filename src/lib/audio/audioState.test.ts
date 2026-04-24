@@ -378,8 +378,8 @@ describe("clearAllFadeTracking", () => {
     expect(isPadFadingOut("pad-2")).toBe(false);
     expect(isPadFading("pad-1")).toBe(false);
     expect(isPadFading("pad-2")).toBe(false);
-    // Store bulk resets (clearAllVolumeTransitions, resetAllPadVolumes) are no longer called here —
-    // the global audioTick owns padVolumes and stopAudioTick handles clearing.
+    // clearAllFadeTracking does not write tick-managed fields (padVolumes etc.) —
+    // audioTick owns those and stopAudioTick handles clearing.
   });
 });
 
@@ -412,21 +412,11 @@ describe("voice tracking", () => {
     expect(mockPlaybackState.removePlayingPad).toHaveBeenCalledWith("pad-1");
   });
 
-  it("clearVoice clears padVolumes entry synchronously when last voice ends (#217)", () => {
-    // Simulates the fix for the one-frame race: removePlayingPad and padVolumes
-    // must be cleared in the same synchronous transaction so UI subscribers
-    // never see a state where playingPadIds is cleared but padVolumes still has a value.
+  it("clearVoice does not write tick-managed padVolumes — audioTick drops stale entries", () => {
+    // audioState is not allowed to write tick-managed fields (ARCH2). When the last
+    // voice for a pad ends, the pad drops from voiceMap; the audioTick's next frame
+    // will compute padVolumes without the stopped pad and update the store naturally.
     mockPlaybackState.padVolumes = { "pad-1": 0.5, "pad-2": 0.8 };
-    const voice = makeVoice();
-    recordVoice("pad-1", voice);
-    clearVoice("pad-1", voice);
-    expect(mockPlaybackState.setAudioTick).toHaveBeenCalledWith({
-      padVolumes: { "pad-2": 0.8 },
-    });
-  });
-
-  it("clearVoice does not call setAudioTick when padVolumes has no entry for the pad", () => {
-    mockPlaybackState.padVolumes = { "pad-2": 0.8 }; // pad-1 not in padVolumes
     const voice = makeVoice();
     recordVoice("pad-1", voice);
     clearVoice("pad-1", voice);
@@ -446,22 +436,18 @@ describe("voice tracking", () => {
     expect(isLayerActive("layer-2")).toBe(false);
   });
 
-  it("stopPadVoices clears padVolumes entry synchronously (#217)", () => {
+  it("stopPadVoices does not write tick-managed padVolumes — audioTick drops stale entries", () => {
     mockPlaybackState.padVolumes = { "pad-1": 0.3, "pad-2": 0.9 };
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     stopPadVoices("pad-1");
-    expect(mockPlaybackState.setAudioTick).toHaveBeenCalledWith({
-      padVolumes: { "pad-2": 0.9 },
-    });
+    expect(mockPlaybackState.setAudioTick).not.toHaveBeenCalled();
   });
 
-  it("stopLayerVoices clears padVolumes entry synchronously when last layer ends (#217)", () => {
+  it("stopLayerVoices does not write tick-managed padVolumes — audioTick drops stale entries", () => {
     mockPlaybackState.padVolumes = { "pad-1": 0.4 };
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     stopLayerVoices("pad-1", "layer-1");
-    expect(mockPlaybackState.setAudioTick).toHaveBeenCalledWith({
-      padVolumes: {},
-    });
+    expect(mockPlaybackState.setAudioTick).not.toHaveBeenCalled();
   });
 
   it("stopLayerVoices does not clear padVolumes when pad still has other layer voices", () => {
@@ -473,7 +459,7 @@ describe("voice tracking", () => {
     expect(mockPlaybackState.setAudioTick).not.toHaveBeenCalled();
   });
 
-  it("stopAllVoices stops everything and clears padVolumes (#217)", () => {
+  it("stopAllVoices stops all voices and clears playing pads", () => {
     mockPlaybackState.padVolumes = { "pad-1": 0.2, "pad-2": 0.3 };
     const stopped: boolean[] = [];
     recordLayerVoice("pad-1", "layer-1", makeVoice({ onStop: () => stopped.push(true) }));
@@ -483,8 +469,8 @@ describe("voice tracking", () => {
     expect(isPadActive("pad-1")).toBe(false);
     expect(isPadActive("pad-2")).toBe(false);
     expect(mockPlaybackState.clearAllPlayingPads).toHaveBeenCalled();
-    // padVolumes must be cleared in the same transaction (#217 fix)
-    expect(mockPlaybackState.setAudioTick).toHaveBeenCalledWith({ padVolumes: {} });
+    // padVolumes is cleared by stopAudioTick() in padPlayer.stopAllPads(), not here
+    expect(mockPlaybackState.setAudioTick).not.toHaveBeenCalled();
   });
 
   it("recordLayerVoice tracks in both voiceMap and layerVoiceMap", () => {
@@ -811,11 +797,6 @@ describe("clearAllAudioState", () => {
 
     // playbackStore volume maps should be cleared (padVolumes + layerVolumes)
     expect(mockPlaybackState.clearVolumes).toHaveBeenCalledOnce();
-    // clearVolumes must fire AFTER stopAllVoices() (which calls setAudioTick({padVolumes:{}})),
-    // ensuring no subsequent write re-populates the maps within clearAllAudioState.
-    const lastSetTickOrder = mockPlaybackState.setAudioTick.mock.invocationCallOrder.at(-1)!;
-    const clearVolOrder = mockPlaybackState.clearVolumes.mock.invocationCallOrder[0];
-    expect(clearVolOrder).toBeGreaterThan(lastSetTickOrder);
 
     vi.useRealTimers();
   });

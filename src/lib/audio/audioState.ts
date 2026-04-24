@@ -11,10 +11,20 @@
  * ============================================================================
  *
  * This module is the SINGLE owner of ALL non-serializable audio engine runtime state.
- * playbackStore (Zustand) holds only reactive UI signals (playingPadIds, padVolumes,
- * volumeTransitioningPadIds). Voice tracking functions in this module call
- * playbackStore's simple addPlayingPad/removePlayingPad/clearAllPlayingPads actions
- * to keep the reactive UI layer in sync.
+ * playbackStore (Zustand) holds reactive UI signals split into two categories:
+ *
+ *   Push-based (written here on discrete events): playingPadIds, fadingPadIds,
+ *   fadingOutPadIds, reversingPadIds. These are updated synchronously when a pad
+ *   starts or stops — routing them through the RAF tick would add ~16 ms latency
+ *   to UI feedback with no correctness benefit.
+ *
+ *   Tick-managed (written by audioTick.ts each RAF frame): padVolumes,
+ *   layerVolumes, padProgress, layerProgress, activeLayerIds, layerPlayOrder,
+ *   layerChain. This module MUST NOT write these fields — doing so bypasses the
+ *   tick's diff logic and can create race conditions with the RAF loop.
+ *   Exception: gainManager.ts calls updateLayerVolume() for inactive layers
+ *   during drag gestures (no active gain node to read) — this is a documented
+ *   fallback path, not a general pattern to follow.
  *
  * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
  *   fade tracking. Reason: voice.stop() fires onended synchronously, which reads
@@ -680,27 +690,11 @@ export function recordVoice(padId: string, voice: AudioVoice): void {
   usePlaybackStore.getState().addPlayingPad(padId);
 }
 
-/**
- * Clear padVolumes[padId] from the store in the same synchronous transaction as
- * removePlayingPad. The audioTick only clears padVolumes in the next RAF frame;
- * without this, there is a one-frame window where playingPadIds is cleared but
- * padVolumes still has a value, causing the volume bar to flash after a pad ends.
- * Called from every code path that removes the last voice for a pad.
- */
-function clearPadVolumesEntry(padId: string): void {
-  const store = usePlaybackStore.getState();
-  if (padId in store.padVolumes) {
-    const { [padId]: _dropped, ...rest } = store.padVolumes;
-    store.setAudioTick({ padVolumes: rest });
-  }
-}
-
 export function clearVoice(padId: string, voice: AudioVoice): void {
   const updated = (voiceMap.get(padId) ?? []).filter((v) => v !== voice);
   if (updated.length === 0) {
     voiceMap.delete(padId);
     usePlaybackStore.getState().removePlayingPad(padId);
-    clearPadVolumesEntry(padId);
   } else {
     voiceMap.set(padId, updated);
   }
@@ -711,7 +705,6 @@ export function stopPadVoices(padId: string): void {
   const stoppedSet = new Set(voices);
   voiceMap.delete(padId);
   usePlaybackStore.getState().removePlayingPad(padId);
-  clearPadVolumesEntry(padId);
   // Use reverse index to touch only layers belonging to this pad — O(layers_in_pad).
   // Per invariant, every layer voice is also a pad voice, so stoppedSet covers all
   // voices in every tracked layer. The `remaining.length > 0` branch is dead under
@@ -745,10 +738,7 @@ export function stopAllVoices(): void {
   layerVoiceMap.clear();
   _padToLayerIds.clear();
   layerVoiceVersion++;
-  const store = usePlaybackStore.getState();
-  store.clearAllPlayingPads();
-  // Clear padVolumes in the same transaction as clearAllPlayingPads (same race as #217).
-  store.setAudioTick({ padVolumes: {} });
+  usePlaybackStore.getState().clearAllPlayingPads();
   for (const voice of allVoices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -799,7 +789,6 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   if (padVoices.length === 0) {
     voiceMap.delete(padId);
     usePlaybackStore.getState().removePlayingPad(padId);
-    clearPadVolumesEntry(padId);
   } else {
     voiceMap.set(padId, padVoices);
   }
@@ -934,10 +923,8 @@ export function clearAllAudioState(): void {
   // Note: audio buffer / streaming element caches are cleared by the caller
   // (MainPage) — audioState is a pure state container and does not import the
   // cache modules to keep the dependency graph clean.
-  // Defensive clear of tick-managed volume maps. Production callers are expected to call
-  // stopAudioTick() first (which clears these via _clearAllTickFields), but clearAllAudioState()
-  // may also be called independently (e.g. in tests or future callers). stopAllVoices() above
-  // only clears padVolumes — not layerVolumes — so this is the single authoritative reset
-  // for both maps on tear-down, preventing stale values from leaking into the next session.
+  // Defensive clear of tick-managed volume maps. Callers must call stopAudioTick() first
+  // (which clears these via _clearAllTickFields). This is a belt-and-suspenders reset
+  // in case clearAllAudioState() is called without a preceding stopAudioTick() (e.g. tests).
   usePlaybackStore.getState().clearVolumes();
 }
