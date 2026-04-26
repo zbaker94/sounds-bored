@@ -43,6 +43,8 @@ interface UiState {
   fadePopoverPadId: string | null;
   /** In-flight target volume (0–1) being set by the popover slider before commit. */
   fadePopoverTarget: number | null;
+  /** Current page index per scene, keyed by scene id. Missing keys default to 0. */
+  pageByScene: Record<string, number>;
 }
 
 interface UiActions {
@@ -77,6 +79,8 @@ interface UiActions {
   setFadePopoverPadId: (id: string | null) => void;
   /** Set the in-flight popover fade target (0–1), or null to clear. */
   setFadePopoverTarget: (target: number | null) => void;
+  /** Set the current page for a scene's pad grid. */
+  setScenePage: (sceneId: string, page: number) => void;
 }
 
 export type UiStore = UiState & UiActions;
@@ -89,6 +93,7 @@ export const initialUiState: UiState = {
   editingPadId: null,
   fadePopoverPadId: null,
   fadePopoverTarget: null,
+  pageByScene: {},
 };
 
 export const useUiStore = create<UiStore>()((set, get) => ({
@@ -144,6 +149,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   setFadePopoverPadId: (id) => set(id === null ? { fadePopoverPadId: null, fadePopoverTarget: null } : { fadePopoverPadId: id }),
 
   setFadePopoverTarget: (target) => set({ fadePopoverTarget: target }),
+
+  setScenePage: (sceneId, page) =>
+    set((state) => ({ pageByScene: { ...state.pageByScene, [sceneId]: page } })),
 }));
 
 // Standalone selector factories for reactive subscriptions via useUiStore().

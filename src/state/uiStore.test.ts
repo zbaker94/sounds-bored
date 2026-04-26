@@ -245,4 +245,38 @@ describe("uiStore", () => {
       expect(useUiStore.getState().editingPadId).toBeNull();
     });
   });
+
+  describe("pageByScene", () => {
+    it("starts as an empty record", () => {
+      expect(useUiStore.getState().pageByScene).toEqual({});
+    });
+
+    it("setScenePage sets the page for a given scene", () => {
+      useUiStore.getState().setScenePage("scene-1", 2);
+      expect(useUiStore.getState().pageByScene["scene-1"]).toBe(2);
+    });
+
+    it("setScenePage does not affect other scenes", () => {
+      useUiStore.getState().setScenePage("scene-1", 2);
+      useUiStore.getState().setScenePage("scene-2", 5);
+      expect(useUiStore.getState().pageByScene["scene-1"]).toBe(2);
+      expect(useUiStore.getState().pageByScene["scene-2"]).toBe(5);
+    });
+
+    it("setScenePage overwrites an existing page value", () => {
+      useUiStore.getState().setScenePage("scene-1", 2);
+      useUiStore.getState().setScenePage("scene-1", 0);
+      expect(useUiStore.getState().pageByScene["scene-1"]).toBe(0);
+    });
+
+    it("unset scene ids default to 0 via nullish coalescing at read sites", () => {
+      expect(useUiStore.getState().pageByScene["unknown-scene"] ?? 0).toBe(0);
+    });
+
+    it("resets to empty when initialUiState is applied", () => {
+      useUiStore.getState().setScenePage("scene-1", 3);
+      useUiStore.setState({ ...initialUiState });
+      expect(useUiStore.getState().pageByScene).toEqual({});
+    });
+  });
 });
