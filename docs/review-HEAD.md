@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 18 (2 fixed) |
+| Medium | 18 (3 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -73,11 +73,10 @@ None.
 
 ---
 
-### [ARCH5] Boot-time library save bypasses `useSaveCurrentLibrary` mutation hook
+### ~~[ARCH5] Boot-time library save bypasses `useSaveCurrentLibrary` mutation hook~~ ✅ FIXED
 - **File**: `src/hooks/useBootLoader.ts:119-124`; `src/lib/library.queries.ts:41-56`; `src/lib/library.ts:103-106`
 - **Severity**: Medium
-- **Status**: Fixed
-- **Fix**: `useBootLoader` now calls `useSaveCurrentLibrary().saveCurrentLibrarySync()` instead of the raw `saveCurrentLibraryAndClearDirty()`. `useSaveGlobalLibrary.mutationFn` delegates to `saveCurrentLibraryAndClearDirty` (the shared primitive); `onSuccess: clearDirtyFlag()` removed since it is now handled inside the primitive. Stale comment in `useReconcileLibrary.ts` referencing the removed `onSuccess` updated. All save pathways now go through the same TanStack mutation.
+- **Fix applied**: `useBootLoader` now calls `useSaveCurrentLibrary().saveCurrentLibrarySync()` instead of the raw `saveCurrentLibraryAndClearDirty()`. `useSaveGlobalLibrary.mutationFn` delegates to `saveCurrentLibraryAndClearDirty` (the shared primitive); `onSuccess: clearDirtyFlag()` removed since it is now handled inside the primitive. Stale comment in `useReconcileLibrary.ts` referencing the removed `onSuccess` updated. `useReconcileLibrary` now passes an `onError` callback to `saveCurrentLibrarySync` so reconcile-path save failures surface a toast (previously silent). All save pathways now go through the same TanStack mutation.
 
 ---
 
@@ -638,4 +637,5 @@ None.
 | ARCH-C | `activeSceneId` moved from `projectStore` to `uiStore` (no circular dep) |
 | ARCH2 | Audio engine no longer writes tick-managed `padVolumes` field directly — `clearPadVolumesEntry()` removed; audioTick drops stale entries naturally |
 | QUAL2 | `useAddFolder.handleAddFolder` — added catch block; async errors shown via toast with error message; 2 tests added |
+| ARCH5 | Boot-time library save routed through `useSaveCurrentLibrary` mutation; `onSuccess: clearDirtyFlag()` removed (now handled inside primitive); `useReconcileLibrary` save failure now surfaces a toast |
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |

@@ -77,10 +77,15 @@ export function useReconcileLibrary(): {
       applyProjectSoundReconcile();
 
       if (useLibraryStore.getState().isDirty) {
-        saveLibraryRef.current();
-        // `saveCurrentLibraryAndClearDirty` clears the dirty flag only after a
-        // successful write. Do not clear it here — clearing before the save
-        // completes means a failed write would silently drop changes.
+        saveLibraryRef.current({
+          onError: (err) => {
+            console.error(err);
+            toast.error("Failed to save sound library");
+          },
+        });
+        // The mutation clears the dirty flag only after a successful write.
+        // Do not clear it here — clearing before the async save completes
+        // means a failed write would silently drop changes.
       }
     } finally {
       setIsReconciling(false);
