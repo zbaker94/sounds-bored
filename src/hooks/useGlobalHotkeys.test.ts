@@ -464,3 +464,195 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
     });
   });
 });
+
+// ── Shift+Left / Shift+Right — page navigation ────────────────────────────────
+
+describe("useGlobalHotkeys — shift+left / shift+right — page navigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
+    useProjectStore.setState({ ...initialProjectState });
+    mockUiState.activeSceneId = null;
+    mockUiState.pageByScene = {};
+    mockUiState.setScenePage.mockClear();
+  });
+
+  // PADS_PER_PAGE = 12, so:
+  //   0 pads  → totalPages = 1
+  //  12 pads  → totalPages = 1
+  //  13 pads  → totalPages = 2
+  //  25 pads  → totalPages = 3
+
+  function makePads(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `pad-${i}`,
+      name: `Pad ${i}`,
+      layers: [],
+      muteTargetPadIds: [],
+    }));
+  }
+
+  // ── Guard: null activeSceneId ───────────────────────────────────────────────
+
+  it("shift+left is a no-op when activeSceneId is null", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = null;
+    mockUiState.pageByScene = {};
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+left");
+
+    expect(mockUiState.setScenePage).not.toHaveBeenCalled();
+  });
+
+  it("shift+right is a no-op when activeSceneId is null", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = null;
+    mockUiState.pageByScene = {};
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+right");
+
+    expect(mockUiState.setScenePage).not.toHaveBeenCalled();
+  });
+
+  // ── Single-page scene (totalPages = 1) — wraps back to page 0 ──────────────
+
+  it("shift+left on single-page scene stays at page 0 (wrap: 0 → totalPages-1 = 0)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(1) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 0 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+left");
+
+    // totalPages = 1; safePage = 0; 0 > 0 is false → setScenePage(0)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+
+  it("shift+right on single-page scene stays at page 0 (wrap: 0 → 0)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(1) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 0 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+right");
+
+    // totalPages = 1; safePage = 0; 0 < 0 is false → setScenePage(0)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+
+  // ── Multi-page: decrement ───────────────────────────────────────────────────
+
+  it("shift+left decrements page (page 1 → page 0)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 1 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+left");
+
+    // totalPages = 3; safePage = 1; 1 > 0 → setScenePage(0)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+
+  // ── Multi-page: wrap left (page 0 → last page) ─────────────────────────────
+
+  it("shift+left wraps from page 0 to last page (page 0 → page 2)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 0 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+left");
+
+    // totalPages = 3; safePage = 0; 0 > 0 is false → setScenePage(2)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 2);
+  });
+
+  // ── Multi-page: increment ───────────────────────────────────────────────────
+
+  it("shift+right increments page (page 0 → page 1)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 0 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+right");
+
+    // totalPages = 3; safePage = 0; 0 < 2 → setScenePage(1)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 1);
+  });
+
+  // ── Multi-page: wrap right (last page → page 0) ────────────────────────────
+
+  it("shift+right wraps from last page to page 0 (page 2 → page 0)", () => {
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 2 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+right");
+
+    // totalPages = 3; safePage = 2; 2 < 2 is false → setScenePage(0)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+
+  // ── Stale page clamping ─────────────────────────────────────────────────────
+
+  it("shift+left clamps stale page before decrementing (pageByScene=5, totalPages=1 → setScenePage(0))", () => {
+    // 12 pads → totalPages = 1; pageByScene holds stale value of 5
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(12) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 5 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+left");
+
+    // totalPages = 1; safePage = min(5, 0) = 0; 0 > 0 is false → setScenePage(0)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+
+  it("shift+right clamps stale page before incrementing (pageByScene=5, totalPages=1 → setScenePage(0))", () => {
+    // 12 pads → totalPages = 1; pageByScene holds stale value of 5
+    const project = createMockProject({
+      scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(12) }],
+    });
+    useProjectStore.setState({ ...initialProjectState, project });
+    mockUiState.activeSceneId = "scene-1";
+    mockUiState.pageByScene = { "scene-1": 5 };
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("shift+right");
+
+    // totalPages = 1; safePage = min(5, 0) = 0; 0 < 0 is false → setScenePage(0)
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+});

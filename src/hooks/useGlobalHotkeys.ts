@@ -152,7 +152,8 @@ export function useGlobalHotkeys() {
     const pads = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId)?.pads ?? [];
     const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
     const page = pageByScene[activeSceneId] ?? 0;
-    setScenePage(activeSceneId, page > 0 ? page - 1 : totalPages - 1);
+    const safePage = Math.min(page, totalPages - 1);
+    setScenePage(activeSceneId, safePage > 0 ? safePage - 1 : totalPages - 1);
   }, { preventDefault: true });
 
   // Shift+Right: next page of the active scene's pad grid (wraps to first page).
@@ -183,7 +184,7 @@ export function useGlobalHotkeys() {
       setScenePage(activeSceneId, Math.floor((updatedScene.pads.length - 1) / PADS_PER_PAGE));
     }
     setTimeout(() => setEditingPadId(newId), 0);
-  });
+  }, { preventDefault: true });
 
   // 1-9: jump directly to scene by index.
   useHotkeys("1,2,3,4,5,6,7,8,9", (e) => {
