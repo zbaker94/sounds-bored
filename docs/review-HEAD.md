@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (6 fixed) |
+| Medium | 16 (7 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -110,7 +110,7 @@ None.
 
 ---
 
-### [QUAL1] `addPad + flip` logic duplicated between `SceneView.handleAddPad` and `mod+shift+n` hotkey
+### ~~[QUAL1] `addPad + flip` logic duplicated between `SceneView.handleAddPad` and `mod+shift+n` hotkey~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/SceneView.tsx:141-162`; `src/hooks/useGlobalHotkeys.ts:148-160`
 - **Severity**: Medium
 - **Finding**: The hotkey version skips page navigation and the `setTimeout(…, 0)` flip-transition defer. Pressing `mod+shift+n` on page 1 with a full grid creates a pad on page 2 the user cannot see, and the back-face flip animation is skipped.
@@ -131,6 +131,7 @@ None.
   });
   ```
 - **Recommendation**: Extract a shared `addPadAndEdit(sceneId: string): string` helper in `src/lib/padDefaults.ts` or a `usePadActions` hook that both call sites use.
+- **Fix applied**: Lifted `pageByScene: Record<string, number>` and `setScenePage(sceneId, page)` from `SceneView` local `useState` into `uiStore`. Moved `PADS_PER_PAGE` constant to `constants.ts`. Removed `shift+left` / `shift+right` `useHotkeys` registrations from `SceneView` — they now live in `useGlobalHotkeys` alongside all other hotkeys, using `useUiStore.getState()` to read and write page state. Fixed `mod+shift+n`: after `addPad`, re-reads post-mutation store state to compute the new pad's page, calls `setScenePage`, and wraps `setEditingPadId` in `setTimeout(..., 0)` so the pad mounts at `rotateY(0deg)` before flipping. Added `{ preventDefault: true }` to `mod+shift+n` and `safePage` clamping to `shift+left`. 6 tests added to `uiStore.test.ts`; 8 tests added to `useGlobalHotkeys.test.ts`.
 
 ---
 
@@ -640,4 +641,5 @@ None.
 | ARCH6 | All 5 handlers wrapped in `useCallback`; `saveDialog`, `navigateDialog`, `exportDialog` and top-level context value wrapped in `useMemo`; stable `.mutate`/`.mutateAsync` refs used as deps |
 | ARCH7 | `setLayerVolume` now no-ops for inactive layers; `updateLayerVolume` removed from `playbackStore`; `gainManager.ts` no longer imports `playbackStore`; 3 tests updated |
 | PERF1 | `useMultiFadeSideEffects` extracted; SceneView no longer subscribes to multi-fade state; zero-subscription hotkeys + Zustand subscribe for auto-cancel |
+| QUAL1 | `mod+shift+n` hotkey now navigates to new pad's page and plays flip animation; all page hotkeys centralized in `useGlobalHotkeys` |
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |
