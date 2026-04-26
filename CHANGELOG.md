@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Improved performance: the pad grid (SceneView) no longer re-renders when selecting pads during multi-fade mode
+- Fixed a dual-write bug where volume changes could conflict between the drag gesture and the audio tick loop
+- Reduced unnecessary re-renders in the project actions context by properly memoizing handlers and dialog state
 - Performance improvement to multi-fade mode: pad hotkeys and fade auto-cancel now run with reduced React re-renders for a smoother experience.
 - Internal refactor: multi-fade hotkey handling and auto-cancel behavior moved to a dedicated `useMultiFadeSideEffects` hook — no user-visible behavior changes.
 - No user-facing changes in this release; internal code documentation was updated only.

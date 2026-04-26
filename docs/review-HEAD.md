@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 18 (3 fixed) |
+| Medium | 16 (6 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -80,23 +80,21 @@ None.
 
 ---
 
-### [ARCH6] `ProjectActionsContext` bundles three unrelated concerns with no value memoization
+### ~~[ARCH6] `ProjectActionsContext` bundles three unrelated concerns with no value memoization~~ ✅ FIXED
 - **File**: `src/contexts/ProjectActionsContext.tsx:34-50, 329-333`
 - **Severity**: Medium
-- **Status**: Fixed
-- **Fix**: Wrapped all five un-memoized handlers (`handleSaveAs`, `handleCancelSave`, `handleNavigateSave`, `handleNavigateDiscard`, `handleNavigateCancel`) in `useCallback`. Memoized `saveDialog`, `navigateDialog`, `exportDialog` sub-objects and the top-level context value with `useMemo`. Used `.mutate`/`.mutateAsync` (stable TanStack references) as deps rather than the whole mutation object to prevent unnecessary cascade invalidation.
+- **Fix applied**: Wrapped all five un-memoized handlers (`handleSaveAs`, `handleCancelSave`, `handleNavigateSave`, `handleNavigateDiscard`, `handleNavigateCancel`) in `useCallback` with correct dep arrays. Memoized `saveDialog`, `navigateDialog`, `exportDialog` sub-objects and the top-level context value with `useMemo`. Used `.mutate`/`.mutateAsync` stable TanStack references as deps rather than the whole mutation object to prevent unnecessary cascade invalidation. Code review passed; one follow-up noted: `saveProjectAsMutation.mutateAsync` stability relies on a TanStack v5 implementation detail (not part of the public API) — should be replaced with a `.mutate`-dependent stable wrapper before the next TanStack Query upgrade.
 
 ---
 
-### [ARCH7] `gainManager.setLayerVolume` writes to `playbackStore` directly — second write path alongside `audioTick`
+### ~~[ARCH7] `gainManager.setLayerVolume` writes to `playbackStore` directly — second write path alongside `audioTick`~~ ✅ FIXED
 - **File**: `src/lib/audio/gainManager.ts:57-70`; `src/state/playbackStore.ts:68-70`
 - **Severity**: Medium
-- **Finding**: For non-playing layers, `setLayerVolume` pushes directly to `playbackStore.layerVolumes` via `updateLayerVolume`. When a layer starts playing mid-drag, both the direct call and the tick loop write the same field per frame. The comment in `playbackStore.ts:68-70` acknowledges this as a "fallback" but doesn't solve the dual ownership.
-- **Recommendation**: Track non-playing volume in a separate `pendingLayerVolumes` field (distinct from the tick-managed `layerVolumes`), or remove the fallback and have the UI read `layer.volume` from `projectStore` directly when the layer is inactive (the project store already holds this value).
+- **Fix applied**: Removed the `else` branch from `setLayerVolume` — it is now a no-op for inactive layers. `updateLayerVolume` action removed from `playbackStore` entirely. The UI already handled the inactive case correctly: during drag, `localLayerVol` (useState) drives the slider independently of `layerVolumes`; after commit, the `??` fallback to `getLayerNormalizedVolume(layer)` reads `layer.volume` from `projectStore`. The `pendingLayerVolumes` option was considered and rejected — it would add a third write-ownership zone with no benefit since the UI does not need the store for inactive-layer gesture feedback. `gainManager.ts` import of `playbackStore` removed. 3 tests updated; 1 test block removed from `playbackStore.test.ts`.
 
 ---
 
-### [PERF1] `useMultiFadeMode()` called for side-effects only causes full `SceneView` re-renders
+### ~~[PERF1] `useMultiFadeMode()` called for side-effects only causes full `SceneView` re-renders~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/SceneView.tsx:50`
 - **Severity**: Medium
 - **Finding**: `SceneView` calls `useMultiFadeMode()` but discards its return value. The hook subscribes to 9 store fields (`active`, `originPadId`, `selectedPads`, `reopenPadId`, five actions, plus `editMode` and `overlayStack` from `useUiStore`). Every pad toggled in multi-fade selection produces a new `selectedPads` Map, causing SceneView — the top-level grid container — to re-render and reconcile the entire pad grid.
@@ -108,6 +106,7 @@ None.
   const multiFadeActive = useMultiFadeStore((s) => s.active);  // separate subscription
   ```
 - **Recommendation**: Split `useMultiFadeMode` into a side-effect-only variant (uses `getState()` inside callbacks, no subscriptions) and a state-reading variant for components that actually need the state values.
+- **Fix applied**: Extracted `useMultiFadeSideEffects` hook with zero React subscriptions. Hotkeys use `getState()` inside callbacks; auto-cancel on `editMode`/`overlayStack` uses a single `useUiStore.subscribe()` in a mount-only `useEffect`. `useMultiFadeMode` retains all state subscriptions for components that read its return value but no longer registers hotkeys or effects. SceneView no longer re-renders on `selectedPads`, `originPadId`, `reopenPadId`, or `overlayStack` changes. 1 new file, 24 tests (8 new + 16 retained), 5 tests removed from useMultiFadeMode.test.ts.
 
 ---
 
@@ -638,4 +637,7 @@ None.
 | ARCH2 | Audio engine no longer writes tick-managed `padVolumes` field directly — `clearPadVolumesEntry()` removed; audioTick drops stale entries naturally |
 | QUAL2 | `useAddFolder.handleAddFolder` — added catch block; async errors shown via toast with error message; 2 tests added |
 | ARCH5 | Boot-time library save routed through `useSaveCurrentLibrary` mutation; `onSuccess: clearDirtyFlag()` removed (now handled inside primitive); `useReconcileLibrary` save failure now surfaces a toast |
+| ARCH6 | All 5 handlers wrapped in `useCallback`; `saveDialog`, `navigateDialog`, `exportDialog` and top-level context value wrapped in `useMemo`; stable `.mutate`/`.mutateAsync` refs used as deps |
+| ARCH7 | `setLayerVolume` now no-ops for inactive layers; `updateLayerVolume` removed from `playbackStore`; `gainManager.ts` no longer imports `playbackStore`; 3 tests updated |
+| PERF1 | `useMultiFadeSideEffects` extracted; SceneView no longer subscribes to multi-fade state; zero-subscription hotkeys + Zustand subscribe for auto-cancel |
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |
