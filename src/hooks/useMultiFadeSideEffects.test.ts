@@ -44,7 +44,7 @@ describe("useMultiFadeSideEffects — hotkeys", () => {
     renderHook(() => useMultiFadeSideEffects());
 
     const calls = vi.mocked(useHotkeys).mock.calls;
-    const fxCall = calls.find((c) => typeof c[0] === "string" && (c[0] as string).includes("f"));
+    const fxCall = calls.find((c) => c[0] === "enter,f,x");
     expect(fxCall).toBeDefined();
   });
 
@@ -62,7 +62,7 @@ describe("useMultiFadeSideEffects — hotkeys", () => {
     renderHook(() => useMultiFadeSideEffects());
 
     const calls = vi.mocked(useHotkeys).mock.calls;
-    const fxCall = calls.find((c) => typeof c[0] === "string" && (c[0] as string).includes("f"));
+    const fxCall = calls.find((c) => c[0] === "enter,f,x");
     const handler = fxCall?.[1] as (() => void) | undefined;
     expect(handler).toBeDefined();
 
@@ -78,7 +78,7 @@ describe("useMultiFadeSideEffects — hotkeys", () => {
     renderHook(() => useMultiFadeSideEffects());
 
     const calls = vi.mocked(useHotkeys).mock.calls;
-    const fxCall = calls.find((c) => typeof c[0] === "string" && (c[0] as string).includes("f"));
+    const fxCall = calls.find((c) => c[0] === "enter,f,x");
     const handler = fxCall?.[1] as (() => void) | undefined;
     expect(handler).toBeDefined();
 
