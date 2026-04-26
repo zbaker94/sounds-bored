@@ -1,20 +1,20 @@
-/**
- * audioTick.ts — Single global RAF loop for audio engine → UI state synchronization.
+﻿/**
+ * audioTick.ts â€” Single global RAF loop for audio engine â†’ UI state synchronization.
  *
  * Reads from audioState.ts Maps (gain nodes, voice map, progress) each animation frame
  * and emits one batched setAudioTick() call to playbackStore. Replaces:
  *   - Per-pad RAF loops (previously padFadeRafs / startFadeRaf, now removed from audioState.ts)
  *   - Per-PadButton RAF (progress polling)
  *   - Per-PadControlContent RAF (activeLayerIds polling)
- *   - Scattered updatePadVolume / updateLayerVolume calls from fade functions
+ *   - Scattered updatePadVolume calls from fade functions
  *
  * Start/stop contract:
  *   - startAudioTick(): called by padPlayer when a voice is recorded. Idempotent.
  *   - stopAudioTick(): called by padPlayer.stopAllPads() to immediately clear bars.
  *     The tick also self-terminates when getActivePadCount() returns 0.
  *
- * Import graph: audioTick → audioState (reads), audioTick → playbackStore (writes).
- * padPlayer → audioTick (calls start/stop). audioState does NOT import audioTick.
+ * Import graph: audioTick â†’ audioState (reads), audioTick â†’ playbackStore (writes).
+ * padPlayer â†’ audioTick (calls start/stop). audioState does NOT import audioTick.
  */
 
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -38,7 +38,7 @@ const PROGRESS_EPSILON = 0.001;
 
 let rafId: number | null = null;
 
-// Per-frame previous values — diffed each tick to suppress no-op store updates.
+// Per-frame previous values â€” diffed each tick to suppress no-op store updates.
 let prevPadVolumes: Record<string, number> = {};
 let prevLayerVolumes: Record<string, number> = {};
 let prevActiveLayerIds = new Set<string>();
@@ -55,7 +55,7 @@ let prevLayerChain: Record<string, string[]> = {};
 const prevLayerPlayOrderSource = new Map<string, readonly unknown[]>();
 const prevLayerChainSource = new Map<string, readonly unknown[]>();
 
-/** Exposed for test introspection only — do not use in production code. */
+/** Exposed for test introspection only â€” do not use in production code. */
 export const _getPrevActiveLayerIds = (): ReadonlySet<string> => prevActiveLayerIds;
 
 /** Reset all per-frame tracker state. Called on start, self-terminate, and stop. */
@@ -92,24 +92,24 @@ function tick(): void {
   });
 
   // --- Compute layerVolumes ---
-  // Emit all active layer gains (no threshold filter — layers always show their live volume).
+  // Emit all active layer gains (no threshold filter â€” layers always show their live volume).
   // volumesEqual avoids no-op store writes for stable values.
   const nextLayerVolumes: Record<string, number> = {};
   forEachActiveLayerGain((layerId, gain) => {
     nextLayerVolumes[layerId] = gain.gain.value;
   });
 
-  // --- Compute padProgress — diff to skip no-op store updates ---
+  // --- Compute padProgress â€” diff to skip no-op store updates ---
   const nextPadProgress = computeAllPadProgress();
   const padProgressChanged = !progressEqual(nextPadProgress, prevPadProgress);
   if (padProgressChanged) prevPadProgress = nextPadProgress;
 
-  // --- Compute layerProgress — diff to skip no-op store updates ---
+  // --- Compute layerProgress â€” diff to skip no-op store updates ---
   const nextLayerProgress = computeAllLayerProgress();
   const layerProgressChanged = !progressEqual(nextLayerProgress, prevLayerProgress);
   if (layerProgressChanged) prevLayerProgress = nextLayerProgress;
 
-  // --- Compute activeLayerIds — version-gated to avoid allocating a Set every frame ---
+  // --- Compute activeLayerIds â€” version-gated to avoid allocating a Set every frame ---
   // layerVoiceVersion increments only when a voice is added or removed. On frames
   // where the version is unchanged (the common steady-state case during playback),
   // getActiveLayerIdSet() is never called and no Set is allocated.
@@ -118,7 +118,7 @@ function tick(): void {
   let nextActiveLayerIds = prevActiveLayerIds;
   if (activeLayerIdsChanged) {
     nextActiveLayerIds = getActiveLayerIdSet();
-    // Clone before storing as prev — Set has mutating methods (add/delete/clear) that
+    // Clone before storing as prev â€” Set has mutating methods (add/delete/clear) that
     // make accidental consumer mutation more likely than for plain records. No current
     // consumer mutates the Set, but the clone is cheap (allocates only on voice-version
     // changes, not every frame) and enforces the invariant that tick-owned prev state
@@ -156,7 +156,7 @@ function tick(): void {
           prevIds.length === ids.length &&
           prevIds.every((v, i) => v === ids[i])
         ) {
-          // Contents match even though the source reference differs — reuse
+          // Contents match even though the source reference differs â€” reuse
           // the prior array so downstream selector identity stays stable.
           nextLayerPlayOrder[layerId] = prevIds;
         } else {
@@ -212,7 +212,7 @@ function tick(): void {
   if (layerVolumesChanged) prevLayerVolumes = nextLayerVolumes;
 
   // Only call setAudioTick if at least one field actually changed.
-  // When nothing changed, skip the Zustand update entirely — this prevents
+  // When nothing changed, skip the Zustand update entirely â€” this prevents
   // all playbackStore subscribers from running their selector functions every frame.
   if (
     !padVolumesChanged &&
@@ -272,7 +272,7 @@ function _clearAllTickFields(): void {
 function volumesEqual(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
-  if (aKeys.length === 0) return true; // both empty — steady-state fast path
+  if (aKeys.length === 0) return true; // both empty â€” steady-state fast path
   for (const k of aKeys) {
     if (!(k in b) || Math.abs(a[k] - b[k]) > VOLUME_EPSILON) return false;
   }
@@ -283,7 +283,7 @@ function volumesEqual(a: Record<string, number>, b: Record<string, number>): boo
 function progressEqual(a: Record<string, number>, b: Record<string, number>): boolean {
   const aKeys = Object.keys(a);
   if (aKeys.length !== Object.keys(b).length) return false;
-  if (aKeys.length === 0) return true; // both empty — steady-state fast path
+  if (aKeys.length === 0) return true; // both empty â€” steady-state fast path
   for (const k of aKeys) {
     if (!(k in b) || Math.abs(a[k] - b[k]) > PROGRESS_EPSILON) return false;
   }

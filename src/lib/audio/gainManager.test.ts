@@ -11,13 +11,6 @@ vi.mock("./audioContext", () => ({
   getMasterGain: vi.fn(() => ({ connect: vi.fn() })),
 }));
 
-vi.mock("@/state/playbackStore", () => ({
-  usePlaybackStore: { getState: vi.fn(() => ({ updateLayerVolume: vi.fn(), removeFadingPad: vi.fn() })) },
-}));
-
-vi.mock("@/state/projectStore", () => ({
-  useProjectStore: { getState: vi.fn(() => ({ updateLayerVolume: vi.fn() })) },
-}));
 
 function makeMockGain(initialValue = 1.0) {
   return {
@@ -186,28 +179,30 @@ describe("gainManager", () => {
       expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
     });
 
-    it("pushes to playback store when layer is not active", async () => {
-      const { usePlaybackStore } = await import("@/state/playbackStore");
-      const mockUpdate = vi.fn();
-      vi.mocked(usePlaybackStore.getState).mockReturnValue({ updateLayerVolume: mockUpdate } as unknown as ReturnType<typeof usePlaybackStore.getState>);
+    it("is a no-op when the layer is not active", async () => {
+      const mockGain = makeMockGain();
+      mockCtx.createGain.mockReturnValueOnce(mockGain);
       const { setLayerVolume } = await import("./gainManager");
 
       setLayerVolume("inactive-layer", 0.6);
 
-      expect(mockUpdate).toHaveBeenCalledWith("inactive-layer", 0.6);
+      expect(mockGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
     });
 
-    it("clamps out-of-range values (above 1.0 → 1.0, below 0 → 0)", async () => {
-      const { usePlaybackStore } = await import("@/state/playbackStore");
-      const mockUpdate = vi.fn();
-      vi.mocked(usePlaybackStore.getState).mockReturnValue({ updateLayerVolume: mockUpdate } as unknown as ReturnType<typeof usePlaybackStore.getState>);
+    it("clamps out-of-range values when the layer is active (above 1.0 → 1.0, below 0 → 0)", async () => {
+      const mockPadGain = makeMockGain();
+      const mockLayerGain = makeMockGain();
+      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const padGain = getPadGain("pad-clamp");
+      getOrCreateLayerGain("layer-clamp", 0.5, padGain);
       const { setLayerVolume } = await import("./gainManager");
 
-      setLayerVolume("inactive-hi", 1.5);
-      setLayerVolume("inactive-lo", -0.2);
+      setLayerVolume("layer-clamp", 1.5);
+      setLayerVolume("layer-clamp", -0.2);
 
-      expect(mockUpdate).toHaveBeenCalledWith("inactive-hi", 1.0);
-      expect(mockUpdate).toHaveBeenCalledWith("inactive-lo", 0);
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+      expect(mockLayerGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
     });
   });
 

@@ -114,17 +114,6 @@ describe("setAudioTick", () => {
   });
 });
 
-describe("updateLayerVolume (non-playing fallback)", () => {
-  beforeEach(() => {
-    usePlaybackStore.setState({ ...initialPlaybackState });
-  });
-
-  it("stores volume for non-playing layer", () => {
-    usePlaybackStore.getState().updateLayerVolume("layer-1", 0.75);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.75);
-  });
-});
-
 describe("clearVolumes", () => {
   beforeEach(() => {
     usePlaybackStore.setState({ ...initialPlaybackState });

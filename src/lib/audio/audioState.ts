@@ -1,5 +1,5 @@
-/**
- * audioState.ts — Non-serializable audio engine runtime state
+﻿/**
+ * audioState.ts â€” Non-serializable audio engine runtime state
  *
  * This module owns ALL runtime Maps/Sets used by the audio engine (padPlayer.ts).
  * These are kept separate from Zustand (playbackStore) because they contain
@@ -15,16 +15,13 @@
  *
  *   Push-based (written here on discrete events): playingPadIds, fadingPadIds,
  *   fadingOutPadIds, reversingPadIds. These are updated synchronously when a pad
- *   starts or stops — routing them through the RAF tick would add ~16 ms latency
+ *   starts or stops â€” routing them through the RAF tick would add ~16 ms latency
  *   to UI feedback with no correctness benefit.
  *
  *   Tick-managed (written by audioTick.ts each RAF frame): padVolumes,
  *   layerVolumes, padProgress, layerProgress, activeLayerIds, layerPlayOrder,
- *   layerChain. This module MUST NOT write these fields — doing so bypasses the
+ *   layerChain. This module MUST NOT write these fields â€” doing so bypasses the
  *   tick's diff logic and can create race conditions with the RAF loop.
- *   Exception: gainManager.ts calls updateLayerVolume() for inactive layers
- *   during drag gestures (no active gain node to read) — this is a documented
- *   fallback path, not a general pattern to follow.
  *
  * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
  *   fade tracking. Reason: voice.stop() fires onended synchronously, which reads
@@ -35,7 +32,7 @@
  *   It clears fade tracking and chain queues first, nulls onended callbacks,
  *   ramps gain nodes to zero, then calls stopAllVoices().
  *
- * INVARIANT: padGainMap lifecycle mirrors voiceMap lifecycle — a pad entry in one
+ * INVARIANT: padGainMap lifecycle mirrors voiceMap lifecycle â€” a pad entry in one
  *   implies an entry in the other. Both are cleared together in stopAllPads().
  *
  * INVARIANT: stopAllVoices() calls clearAllPlayingPads() on playbackStore to
@@ -68,22 +65,22 @@ import type { AudioVoice } from "./audioVoice";
 import type { Sound } from "@/lib/schemas";
 
 // ---------------------------------------------------------------------------
-// Private state — all 11 Maps/Sets
+// Private state â€” all 11 Maps/Sets
 // ---------------------------------------------------------------------------
 
 /** Per-pad GainNodes: source(s) -> voiceGain -> layerGain -> padGain -> masterGain -> destination */
 const padGainMap = new Map<string, GainNode>();
 
-/** Active voices per pad. Every layer voice is also in voiceMap — see recordLayerVoice invariant. */
+/** Active voices per pad. Every layer voice is also in voiceMap â€” see recordLayerVoice invariant. */
 const voiceMap = new Map<string, AudioVoice[]>();
 
 /** Active voices per layer. */
 const layerVoiceMap = new Map<string, AudioVoice[]>();
 
 /**
- * Reverse index: pad ID → Set of layer IDs with active voices for that pad.
+ * Reverse index: pad ID â†’ Set of layer IDs with active voices for that pad.
  * Maintained alongside layerVoiceMap to allow stopPadVoices to touch only the
- * layers belonging to the stopped pad — O(layers_in_pad) instead of O(all_layers).
+ * layers belonging to the stopped pad â€” O(layers_in_pad) instead of O(all_layers).
  * Exported with underscore prefix for test introspection only.
  */
 export const _padToLayerIds = new Map<string, Set<string>>();
@@ -91,7 +88,7 @@ export const _padToLayerIds = new Map<string, Set<string>>();
 /**
  * Incremented whenever a layer voice is added or removed. The audioTick loop
  * reads this to skip `new Set(layerVoiceMap.keys())` on frames where the active
- * layer set is unchanged — avoids one per-frame Set allocation during stable playback.
+ * layer set is unchanged â€” avoids one per-frame Set allocation during stable playback.
  */
 let layerVoiceVersion = 0;
 
@@ -122,7 +119,7 @@ const padStreamingAudio = new Map<string, Map<string, Set<HTMLAudioElement>>>();
 
 /**
  * Cached "best" (longest-duration) streaming element per pad.
- * Recomputed on register/unregister/clear — never on the RAF hot path.
+ * Recomputed on register/unregister/clear â€” never on the RAF hot path.
  * `getPadProgress` does a single Map lookup instead of a nested linear scan.
  * Exported with underscore prefix for test introspection only.
  */
@@ -179,7 +176,7 @@ const layerChainQueue = new Map<string, Sound[]>();
  *  Deleted when the layer is stopped via stopAllPads or when cycleMode is toggled off. */
 const layerCycleIndex = new Map<string, number>();
 
-/** Layer IDs currently awaiting startLayerSound — guards against async race on rapid retrigger. */
+/** Layer IDs currently awaiting startLayerSound â€” guards against async race on rapid retrigger. */
 const layerPendingMap = new Set<string>();
 
 /** Counts consecutive `loadLayerVoice` failures per layer, used to short-circuit
@@ -199,7 +196,7 @@ const fadingOutPadIds = new Set<string>();
 
 /**
  * Stores the fromVolume of each active gain ramp so reverseFade knows where to return to.
- * Reversing always goes back to where the fade started — this avoids direction assumptions
+ * Reversing always goes back to where the fade started â€” this avoids direction assumptions
  * that break when fadeTargetVol > pad.volume.
  * Cleared by cancelPadFade and clearAllFadeTracking.
  */
@@ -267,7 +264,7 @@ export function getPadProgress(padId: string, currentTime?: number): number | nu
 
 /**
  * Get the GainNode for a pad, creating and connecting it to masterGain if it doesn't exist.
- * This is a get-or-create operation — it always returns a valid GainNode.
+ * This is a get-or-create operation â€” it always returns a valid GainNode.
  * Only call this when the pad is active or about to become active.
  */
 export function getPadGain(padId: string): GainNode {
@@ -288,7 +285,7 @@ export function forEachPadGain(fn: (padId: string, gain: GainNode) => void): voi
   }
 }
 
-/** Iterate active pad gain nodes — only pads currently in voiceMap (with active voices). */
+/** Iterate active pad gain nodes â€” only pads currently in voiceMap (with active voices). */
 export function forEachActivePadGain(fn: (padId: string, gain: GainNode) => void): void {
   for (const padId of voiceMap.keys()) {
     const gain = padGainMap.get(padId);
@@ -301,7 +298,7 @@ export function getActivePadCount(): number {
   return voiceMap.size;
 }
 
-/** Iterate active layer gain nodes — only layers currently in layerVoiceMap. */
+/** Iterate active layer gain nodes â€” only layers currently in layerVoiceMap. */
 export function forEachActiveLayerGain(fn: (layerId: string, gain: GainNode) => void): void {
   for (const layerId of layerVoiceMap.keys()) {
     const gain = layerGainMap.get(layerId);
@@ -316,13 +313,13 @@ export function getActiveLayerIdSet(): Set<string> {
 
 /**
  * Compute padProgress for all active pads in one pass.
- * Returns a Record<padId, progress 0–1>. Pads with no progress info are omitted.
- * Reads AudioContext.currentTime once and passes it to getPadProgress — mirrors computeAllLayerProgress.
+ * Returns a Record<padId, progress 0â€“1>. Pads with no progress info are omitted.
+ * Reads AudioContext.currentTime once and passes it to getPadProgress â€” mirrors computeAllLayerProgress.
  */
 export function computeAllPadProgress(): Record<string, number> {
   const result: Record<string, number> = {};
   if (voiceMap.size === 0) return result;
-  // Hoist a single currentTime read for all active pads — mirrors computeAllLayerProgress.
+  // Hoist a single currentTime read for all active pads â€” mirrors computeAllLayerProgress.
   const currentTime = getAudioContext().currentTime;
   for (const padId of voiceMap.keys()) {
     const progress = getPadProgress(padId, currentTime);
@@ -333,13 +330,13 @@ export function computeAllPadProgress(): Record<string, number> {
 
 /**
  * Compute layerProgress for all active layers in one pass.
- * Returns a Record<layerId, progress 0–1>.
+ * Returns a Record<layerId, progress 0â€“1>.
  * Buffer layers are tracked via layerProgressInfo; streaming layers via padStreamingAudio.
  */
 export function computeAllLayerProgress(): Record<string, number> {
   const result: Record<string, number> = {};
 
-  // Buffer layers — tracked in layerProgressInfo
+  // Buffer layers â€” tracked in layerProgressInfo
   if (layerProgressInfo.size > 0) {
     const ctx = getAudioContext();
     for (const [layerId, info] of layerProgressInfo) {
@@ -352,7 +349,7 @@ export function computeAllLayerProgress(): Record<string, number> {
     }
   }
 
-  // Streaming layers — use cached best element per layer (O(1) lookup per layer)
+  // Streaming layers â€” use cached best element per layer (O(1) lookup per layer)
   for (const [layerId, best] of _layerBestStreamingAudio) {
     if (layerId in result) continue; // already from buffer path
     const d = best.duration;
@@ -405,7 +402,7 @@ export function clearAllFadeTracking(): void {
 
 /**
  * Cancel all fade-related resources for a pad: pending timeout and fadingOut tracking.
- * The global audioTick handles padVolumes — no store call needed here.
+ * The global audioTick handles padVolumes â€” no store call needed here.
  * Safe to call even if no fade is registered -- all operations are idempotent.
  */
 export function cancelPadFade(padId: string): void {
@@ -417,7 +414,7 @@ export function cancelPadFade(padId: string): void {
   fadingOutPadIds.delete(padId);
   padFadeFromVolumes.delete(padId);
   usePlaybackStore.getState().removeFadingPad(padId);
-  // fadingInPadIds is NOT cleared here — triggerPad calls cancelPadFade internally
+  // fadingInPadIds is NOT cleared here â€” triggerPad calls cancelPadFade internally
   // and must not accidentally pre-empt a triggerAndFade that is still in flight.
   // Only fadePad (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
 }
@@ -705,7 +702,7 @@ export function stopPadVoices(padId: string): void {
   const stoppedSet = new Set(voices);
   voiceMap.delete(padId);
   usePlaybackStore.getState().removePlayingPad(padId);
-  // Use reverse index to touch only layers belonging to this pad — O(layers_in_pad).
+  // Use reverse index to touch only layers belonging to this pad â€” O(layers_in_pad).
   // Per invariant, every layer voice is also a pad voice, so stoppedSet covers all
   // voices in every tracked layer. The `remaining.length > 0` branch is dead under
   // normal operation but kept defensively; when triggered, the layer stays in the
@@ -776,7 +773,7 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   const voices = layerVoiceMap.get(layerId) ?? [];
   const stoppedSet = new Set(voices);
 
-  // Clean up maps BEFORE calling stop() — wrapStreamingElement.stop()
+  // Clean up maps BEFORE calling stop() â€” wrapStreamingElement.stop()
   // fires onended synchronously, so clearing first makes clearLayerVoice a safe no-op.
   layerVoiceMap.delete(layerId);
   const padLayers = _padToLayerIds.get(padId);
@@ -876,7 +873,7 @@ export function addStopCleanupTimeout(id: ReturnType<typeof setTimeout>): void {
   pendingStopCleanupTimeouts.add(id);
 }
 
-/** Remove a stop cleanup timeout from tracking — called when the timeout fires naturally. */
+/** Remove a stop cleanup timeout from tracking â€” called when the timeout fires naturally. */
 export function deleteStopCleanupTimeout(id: ReturnType<typeof setTimeout>): void {
   pendingStopCleanupTimeouts.delete(id);
 }
@@ -888,11 +885,11 @@ export function clearAllStopCleanupTimeouts(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Consolidated cleanup — instant, no gain ramp (for project close)
+// Consolidated cleanup â€” instant, no gain ramp (for project close)
 // ---------------------------------------------------------------------------
 
 /**
- * Instantly release all audio engine state — no gain ramp.
+ * Instantly release all audio engine state â€” no gain ramp.
  * Use on project close / component unmount where a click is acceptable.
  * For graceful in-session stopping (with gain ramp), use padPlayer.stopAllPads() instead.
  *
@@ -921,7 +918,7 @@ export function clearAllAudioState(): void {
   clearAllLayerGains();
   clearAllPadGains();
   // Note: audio buffer / streaming element caches are cleared by the caller
-  // (MainPage) — audioState is a pure state container and does not import the
+  // (MainPage) â€” audioState is a pure state container and does not import the
   // cache modules to keep the dependency graph clean.
   // Defensive clear of tick-managed volume maps. Callers must call stopAudioTick() first
   // (which clears these via _clearAllTickFields). This is a belt-and-suspenders reset

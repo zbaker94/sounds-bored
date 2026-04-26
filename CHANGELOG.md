@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved UI performance during multi-fade pad selection — the scene view no longer re-renders on every pad toggle, resulting in smoother interaction.
+- Removed a redundant audio engine write path: inactive layer volumes are no longer written to the playback store during drag gestures; the audio tick loop is now the sole owner of that state.
 - Volume slider adjustments now only affect the live audio gain node when a layer is actively playing; idle layers are unaffected until next playback.
 - Internal audio engine cleanup: removed a redundant playback-store write path from the volume control logic, reducing unnecessary state updates.
 - Improved performance: the pad grid (SceneView) no longer re-renders when selecting pads during multi-fade mode

@@ -65,9 +65,9 @@ interface PlaybackState {
   padVolumes: Record<string, number>;
 
   /** Per-layer runtime volume (0–1). Entry exists for playing layers with an active gain node.
-   *  updateLayerVolume() is kept as a fallback for non-playing layer gesture drags. */
+   *  Written exclusively by audioTick. Absence of an entry means the layer is inactive;
+   *  read `layer.volume` from `projectStore` via `getLayerNormalizedVolume` in that case. */
   layerVolumes: Record<string, number>;
-  updateLayerVolume: (layerId: string, volume: number) => void;
 
   /** Per-pad playback progress (0–1). Entry exists for playing pads with progress info. */
   padProgress: Record<string, number>;
@@ -198,11 +198,6 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
   activeLayerIds: new Set<string>(),
   layerPlayOrder: {},
   layerChain: {},
-
-  // Spread is O(n layers) but acceptable at current scale (dozens of layers max).
-  // Revisit with Immer produce() if layerVolumes ever tracks hundreds of entries.
-  updateLayerVolume: (layerId, volume) =>
-    set((s) => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } })),
 
   setAudioTick: (snapshot) =>
     set(() => ({
