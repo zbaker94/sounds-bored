@@ -41,6 +41,9 @@ export const AUDIO_FILE_FILTERS = [
   { name: "Audio", extensions: AUDIO_EXTENSIONS.map((e) => e.replace(".", "")) },
 ];
 
+// UI Layout
+export const PADS_PER_PAGE = 12;
+
 // System tag names
 export const SYSTEM_TAG_IMPORTED = "imported";
 
