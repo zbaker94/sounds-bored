@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Added **Shift+Left** and **Shift+Right** keyboard shortcuts to navigate between pages of the pad grid in the active scene (wraps around).
+- When adding a new pad with **Mod+Shift+N**, the view now automatically jumps to the page containing the newly created pad before opening it for editing.
 - Each scene now remembers its current pad grid page, so navigating between scenes preserves your place in the pad list.
 - Improved UI performance during multi-fade pad selection — the scene view no longer re-renders on every pad toggle, resulting in smoother interaction.
 - Removed a redundant audio engine write path: inactive layer volumes are no longer written to the playback store during drag gestures; the audio tick loop is now the sole owner of that state.

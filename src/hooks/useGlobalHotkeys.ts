@@ -7,6 +7,7 @@ import { executeFadeTap } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { createDefaultStoreLayer } from "@/lib/padDefaults";
 import type { PadConfig } from "@/lib/schemas";
+import { PADS_PER_PAGE } from "@/lib/constants";
 
 /**
  * All keyboard shortcuts for the main editor in one place.
@@ -144,10 +145,31 @@ export function useGlobalHotkeys() {
     }
   }, { enableOnFormTags: true });
 
-  // Mod+Shift+N: add a new pad to the active scene and flip it into edit mode.
+  // Shift+Left: previous page of the active scene's pad grid (wraps to last page).
+  useHotkeys("shift+left", () => {
+    const { activeSceneId, pageByScene, setScenePage } = useUiStore.getState();
+    if (!activeSceneId) return;
+    const pads = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId)?.pads ?? [];
+    const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
+    const page = pageByScene[activeSceneId] ?? 0;
+    setScenePage(activeSceneId, page > 0 ? page - 1 : totalPages - 1);
+  }, { preventDefault: true });
+
+  // Shift+Right: next page of the active scene's pad grid (wraps to first page).
+  useHotkeys("shift+right", () => {
+    const { activeSceneId, pageByScene, setScenePage } = useUiStore.getState();
+    if (!activeSceneId) return;
+    const pads = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId)?.pads ?? [];
+    const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
+    const page = pageByScene[activeSceneId] ?? 0;
+    const safePage = Math.min(page, totalPages - 1);
+    setScenePage(activeSceneId, safePage < totalPages - 1 ? safePage + 1 : 0);
+  }, { preventDefault: true });
+
+  // Mod+Shift+N: add a new pad to the active scene, navigate to its page, and flip it into edit mode.
   useHotkeys("mod+shift+n", () => {
     const { project, addPad } = useProjectStore.getState();
-    const { activeSceneId, setEditingPadId } = useUiStore.getState();
+    const { activeSceneId, setEditingPadId, setScenePage } = useUiStore.getState();
     if (!activeSceneId || !project?.scenes.some((s) => s.id === activeSceneId)) return;
     const newId = crypto.randomUUID();
     const config: PadConfig = {
@@ -156,7 +178,11 @@ export function useGlobalHotkeys() {
       muteTargetPadIds: [],
     };
     addPad(activeSceneId, config, newId);
-    setEditingPadId(newId);
+    const updatedScene = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId);
+    if (updatedScene) {
+      setScenePage(activeSceneId, Math.floor((updatedScene.pads.length - 1) / PADS_PER_PAGE));
+    }
+    setTimeout(() => setEditingPadId(newId), 0);
   });
 
   // 1-9: jump directly to scene by index.

@@ -1,5 +1,5 @@
-import { renderHook } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { createMockProject } from "@/test/factories";
@@ -50,6 +50,8 @@ const mockUiState = {
   setEditingPadId: vi.fn((id: string | null) => { mockUiState.editingPadId = id; }),
   setFadePopoverPadId: vi.fn((id: string | null) => { mockUiState.fadePopoverPadId = id; }),
   setFadePopoverTarget: vi.fn((t: number | null) => { mockUiState.fadePopoverTarget = t; }),
+  pageByScene: {} as Record<string, number>,
+  setScenePage: vi.fn(),
 };
 
 vi.mock("@/state/uiStore", () => ({
@@ -231,11 +233,17 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
 
 describe("useGlobalHotkeys — mod+shift+n (add pad)", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
     useProjectStore.setState({ ...initialProjectState });
     mockUiState.activeSceneId = null;
     mockUiState.editingPadId = null;
+    mockUiState.pageByScene = {};
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("is a no-op when activeSceneId is null", () => {
@@ -268,6 +276,12 @@ describe("useGlobalHotkeys — mod+shift+n (add pad)", () => {
     const [calledSceneId, , calledId] = addPadSpy.mock.calls[0];
     expect(calledSceneId).toBe("scene-1");
     expect(calledId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+
+    // setScenePage fires synchronously; setEditingPadId is deferred via setTimeout
+    expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+    expect(mockUiState.setEditingPadId).not.toHaveBeenCalled();
+
+    act(() => { vi.runAllTimers(); });
     expect(mockUiState.setEditingPadId).toHaveBeenCalledWith(calledId);
   });
 });
