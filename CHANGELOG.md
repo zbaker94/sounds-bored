@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed `mod+shift+n` hotkey so adding a new pad now correctly navigates to the new pad's page and plays the flip animation
+- Keyboard shortcuts `shift+left` and `shift+right` for paging through pads are now centralized alongside all other global hotkeys
 - Fixed `mod+shift+n` hotkey to automatically navigate to the new pad's page and play the flip animation when adding a pad to a full grid
 - Page navigation hotkeys (`shift+left`, `shift+right`) are now centralized and consistent across the app
 - Fixed a bug where `Shift+Left` / `Shift+Right` pad-grid page navigation could jump to the wrong page if the stored page index was out of range (e.g. after pads were deleted).
