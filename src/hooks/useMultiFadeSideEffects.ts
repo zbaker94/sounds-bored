@@ -15,6 +15,7 @@ import { executeMultiFadeNow } from "./useMultiFadeMode";
  * useMultiFadeStore directly.
  */
 export function useMultiFadeSideEffects(): void {
+  // No `enabled` option: this hook has no reactive state. The getState() guard prevents action when inactive.
   useHotkeys(
     "enter,f,x",
     () => {

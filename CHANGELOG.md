@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release; internal code documentation was updated only.
 - Press **Enter**, **F**, or **X** to execute a multi-fade when pads are selected in multi-fade mode
 - Press **Escape** to cancel an active multi-fade selection
 - Multi-fade mode now automatically cancels when you open a drawer, dialog, or enter edit mode
