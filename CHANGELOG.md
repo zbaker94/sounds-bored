@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad page navigation keyboard shortcuts (Shift+Left / Shift+Right) have been removed from the scene view.
+- Page position per scene is now tracked globally, so the app remembers which page you were on for each scene independently.
 - Each scene now remembers its current pad grid page, so navigating between scenes preserves your place in the pad list.
 - Improved UI performance during multi-fade pad selection — the scene view no longer re-renders on every pad toggle, resulting in smoother interaction.
 - Removed a redundant audio engine write path: inactive layer volumes are no longer written to the playback store during drag gestures; the audio tick loop is now the sole owner of that state.

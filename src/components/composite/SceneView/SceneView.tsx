@@ -28,7 +28,7 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio/streamingCache";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
-import { useHotkeys } from "react-hotkeys-hook";
+import { PADS_PER_PAGE } from "@/lib/constants";
 import { cn, modKey } from "@/lib/utils";
 import {
   DndContext,
@@ -40,8 +40,6 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
-
-const PADS_PER_PAGE = 12;
 
 const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
@@ -113,7 +111,7 @@ export function SceneView() {
     }
   }, [activeScene, librarySounds]);
 
-  const [pageByScene, setPageByScene] = useState<Record<string, number>>({});
+  const pageByScene = useUiStore((s) => s.pageByScene);
 
   const addScene = useProjectStore((s) => s.addScene);
   const reorderPads = useProjectStore((s) => s.reorderPads);
@@ -129,10 +127,8 @@ export function SceneView() {
 
   const setPage = useCallback((updater: (prev: number) => number) => {
     if (!activeScene) return;
-    setPageByScene((prev) => ({
-      ...prev,
-      [activeScene.id]: updater(prev[activeScene.id] ?? 0),
-    }));
+    const currentPage = useUiStore.getState().pageByScene[activeScene.id] ?? 0;
+    useUiStore.getState().setScenePage(activeScene.id, updater(currentPage));
   }, [activeScene]);
 
   const pads = activeScene?.pads ?? [];
@@ -150,16 +146,16 @@ export function SceneView() {
     // Navigate to the page containing the new pad so the PadButton mounts
     // before setEditingPadId fires. Without setPage, adding a 13th/25th/…
     // pad leaves the view on the previous page and editingPadId points at a ghost.
-    const updatedScene = useProjectStore.getState().project?.scenes.find(s => s.id === activeSceneId);
+    const updatedScene = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId);
     if (updatedScene) {
-      setPage(() => Math.floor((updatedScene.pads.length - 1) / PADS_PER_PAGE));
+      useUiStore.getState().setScenePage(activeSceneId, Math.floor((updatedScene.pads.length - 1) / PADS_PER_PAGE));
     }
     // Defer by one tick so the pad mounts at rotateY(0deg) first; the subsequent
     // render changes it to rotateY(180deg) and the CSS flip transition plays.
     // Synchronous setEditingPadId would batch with addPad, mounting the pad already
     // flipped with no previous style for the browser to transition from.
     setTimeout(() => setEditingPadId(newId), 0);
-  }, [activeSceneId, addPad, setEditingPadId, setPage]);
+  }, [activeSceneId, addPad, setEditingPadId]);
 
   const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
   const safePage = Math.min(page, totalPages - 1);
@@ -177,29 +173,11 @@ export function SceneView() {
     const toIndex = pads.findIndex((p) => p.id === over.id);
     if (fromIndex !== -1 && toIndex !== -1 && activeScene) {
       reorderPads(activeScene.id, fromIndex, toIndex);
-      setPage(() => Math.floor(toIndex / PADS_PER_PAGE));
+      useUiStore.getState().setScenePage(activeScene.id, Math.floor(toIndex / PADS_PER_PAGE));
     }
   }
 
   const sortableItems = useMemo(() => pads.map((p) => p.id), [pads]);
-
-  // Hooks must be called unconditionally — before any early returns.
-  useHotkeys(
-    "shift+left",
-    () => {
-      if (safePage > 0) setPage((p) => p - 1);
-      else setPage(() => totalPages - 1);
-    },
-    { preventDefault: true },
-  );
-  useHotkeys(
-    "shift+right",
-    () => {
-      if (!isLastPage) setPage((p) => p + 1);
-      else setPage(() => 0);
-    },
-    { preventDefault: true },
-  );
 
   if (!activeScene) {
     return (
