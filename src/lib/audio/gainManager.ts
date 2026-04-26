@@ -1,7 +1,6 @@
 // src/lib/audio/gainManager.ts
 import { getAudioContext } from "./audioContext";
 import { getPadGain, getLayerGain, cancelPadFade } from "./audioState";
-import { usePlaybackStore } from "@/state/playbackStore";
 
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
 const CLICK_FREE_RAMP_S = 0.016;
@@ -50,26 +49,19 @@ export function syncLayerVolume(layerId: string, volume: number): void {
 }
 
 /**
- * Set the live volume for a layer's gain node and mirror to the playback store.
- * Pass volume in 0–1 range. On drag-end, persist to the project schema via
- * `useProjectStore.getState().updateLayerVolume(layerId, volume)`.
+ * Set the live volume for a layer's gain node.
+ * Pass volume in 0–1 range. No-op if the layer isn't active.
  */
 export function setLayerVolume(layerId: string, volume: number): void {
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
   const gain = getLayerGain(layerId);
-  if (gain) {
-    // Layer is playing — update gain node. Tick reads the new value automatically.
-    const ctx = getAudioContext();
-    gain.gain.cancelScheduledValues(ctx.currentTime);
-    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
-  } else {
-    // Layer not playing — tick has no gain node to read. Push directly to store.
-    usePlaybackStore.getState().updateLayerVolume(layerId, clamped);
-  }
+  if (!gain) return;
+  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
+  const ctx = getAudioContext();
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
 }
 
-// commitLayerVolume was removed: persisting layer volume to the project schema
-// is a UI-layer concern. Callers should use
+// Persisting layer volume on drag-end is a UI-layer concern. Callers use
 //   useProjectStore.getState().updateLayerVolume(layerId, volume)
-// directly on drag-end / value commit.
+// directly via onValueCommit.

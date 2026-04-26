@@ -1,18 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Volume slider adjustments now only affect the live audio gain node when a layer is actively playing; idle layers are unaffected until next playback.
+- Internal audio engine cleanup: removed a redundant playback-store write path from the volume control logic, reducing unnecessary state updates.
 - Improved performance: the pad grid (SceneView) no longer re-renders when selecting pads during multi-fade mode
 - Fixed a dual-write bug where volume changes could conflict between the drag gesture and the audio tick loop
 - Reduced unnecessary re-renders in the project actions context by properly memoizing handlers and dialog state
-- Performance improvement to multi-fade mode: pad hotkeys and fade auto-cancel now run with reduced React re-renders for a smoother experience.
-- Internal refactor: multi-fade hotkey handling and auto-cancel behavior moved to a dedicated `useMultiFadeSideEffects` hook — no user-visible behavior changes.
-- No user-facing changes in this release; internal code documentation was updated only.
-- Press **Enter**, **F**, or **X** to execute a multi-fade when pads are selected in multi-fade mode
-- Press **Escape** to cancel an active multi-fade selection
-- Multi-fade mode now automatically cancels when you open a drawer, dialog, or enter edit mode
-- Added automated test coverage for multi-fade keyboard shortcuts (F/X to execute, Escape to cancel)
-- Multi-fade mode now reliably auto-cancels when edit mode is toggled on
-- Multi-fade mode now reliably auto-cancels when any dialog or overlay is opened
 - Sound library save errors during project load now show a user-facing error toast instead of failing silently.
 - Fixed unnecessary re-renders across the app — components using project action context now only update when the specific actions they rely on change, not on every state update.
 - Improved reliability of sound library saving — all save operations now share a single code path, reducing the risk of inconsistent behavior after future updates.

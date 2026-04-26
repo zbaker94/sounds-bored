@@ -12,9 +12,6 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   executeFadeTap: vi.fn(),
 }));
 
-vi.mock("@/lib/audio/audioState", () => ({
-  isPadActive: vi.fn().mockReturnValue(false),
-}));
 
 vi.mock("react-hotkeys-hook", () => ({
   useHotkeys: vi.fn(),

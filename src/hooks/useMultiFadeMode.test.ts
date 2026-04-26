@@ -11,9 +11,6 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   executeFadeTap: vi.fn(),
 }));
 
-vi.mock("@/lib/audio/audioState", () => ({
-  isPadActive: vi.fn().mockReturnValue(false),
-}));
 
 function loadPadsInStore(numPads = 2) {
   const pads = Array.from({ length: numPads }, (_, i) =>
