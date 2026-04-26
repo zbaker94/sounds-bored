@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes (internal test update only).
 - Fixed a bug where `Shift+Left` / `Shift+Right` pad-grid page navigation could jump to the wrong page if the stored page index was out of range (e.g. after pads were deleted).
 - Fixed the "new pad" keyboard shortcut to no longer trigger unintended browser default behavior.
 - Added **Shift+Left** and **Shift+Right** keyboard shortcuts to navigate between pages of the pad grid in the active scene (wraps around).

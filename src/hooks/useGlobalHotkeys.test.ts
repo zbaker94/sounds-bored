@@ -114,6 +114,7 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     mockUiState.fadePopoverPadId = null;
     mockUiState.fadePopoverTarget = null;
     mockUiState.overlayStack = [];
+    mockUiState.pageByScene = {};
   });
 
   it('registers "f" with enableOnFormTags: true so fade fires even when a slider or input is focused', () => {
