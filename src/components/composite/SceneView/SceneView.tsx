@@ -7,7 +7,7 @@ import { PadButton } from "./PadButton";
 import { PAD_STAGGER_MS, padEnterAnimation } from "./padAnimations";
 import { MultiFadePill } from "./MultiFadePill";
 import { createDefaultStoreLayer } from "@/lib/padDefaults";
-import { useMultiFadeMode } from "@/hooks/useMultiFadeMode";
+import { useMultiFadeSideEffects } from "@/hooks/useMultiFadeSideEffects";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -47,7 +47,7 @@ const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
 
 export function SceneView() {
-  useMultiFadeMode();
+  useMultiFadeSideEffects();
 
   // Split into two selectors + useMemo so the O(n) .find() scan only runs when
   // scenes or activeSceneId actually changes. Notably, isDirty (toggled on every

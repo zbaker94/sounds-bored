@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Performance improvement to multi-fade mode: pad hotkeys and fade auto-cancel now run with reduced React re-renders for a smoother experience.
 - Internal refactor: multi-fade hotkey handling and auto-cancel behavior moved to a dedicated `useMultiFadeSideEffects` hook — no user-visible behavior changes.
 - No user-facing changes in this release; internal code documentation was updated only.
 - Press **Enter**, **F**, or **X** to execute a multi-fade when pads are selected in multi-fade mode
