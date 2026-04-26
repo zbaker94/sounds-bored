@@ -1,7 +1,6 @@
 # Changelog
 
 ## Current Changes
-- Added a default pad layout of 12 pads per page
 - Improved UI performance during multi-fade pad selection — the scene view no longer re-renders on every pad toggle, resulting in smoother interaction.
 - Removed a redundant audio engine write path: inactive layer volumes are no longer written to the playback store during drag gestures; the audio tick loop is now the sole owner of that state.
 - Volume slider adjustments now only affect the live audio gain node when a layer is actively playing; idle layers are unaffected until next playback.
