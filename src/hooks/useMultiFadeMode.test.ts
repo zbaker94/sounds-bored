@@ -5,7 +5,6 @@ import { useMultiFadeStore, initialMultiFadeState } from "@/state/multiFadeStore
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { createMockProject, createMockScene, createMockPad, createMockHistoryEntry } from "@/test/factories";
-import { useHotkeys } from "react-hotkeys-hook";
 
 // Mock audio functions
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -14,10 +13,6 @@ vi.mock("@/lib/audio/padPlayer", () => ({
 
 vi.mock("@/lib/audio/audioState", () => ({
   isPadActive: vi.fn().mockReturnValue(false),
-}));
-
-vi.mock("react-hotkeys-hook", () => ({
-  useHotkeys: vi.fn(),
 }));
 
 function loadPadsInStore(numPads = 2) {
@@ -138,57 +133,6 @@ describe("useMultiFadeMode — cancel()", () => {
   });
 });
 
-describe("useMultiFadeMode — f/x hotkey registration", () => {
-  it("registers f,x hotkeys with useHotkeys", () => {
-    loadPadsInStore(1);
-    renderHook(() => useMultiFadeMode());
-
-    const calls = vi.mocked(useHotkeys).mock.calls;
-    const fxCall = calls.find((c) => c[0] === "f,x");
-    expect(fxCall).toBeDefined();
-  });
-
-  it("f,x handler executes multi-fade when canExecute is true", async () => {
-    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
-    const pads = loadPadsInStore(1);
-
-    // Set up active multi-fade state with a selected pad before rendering
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: pads[0].id,
-      selectedPads: new Map([[pads[0].id, { padId: pads[0].id, levels: [0, 80] as [number, number] }]]),
-      reopenPadId: null,
-    });
-
-    renderHook(() => useMultiFadeMode());
-
-    const calls = vi.mocked(useHotkeys).mock.calls;
-    const fxCall = calls.find((c) => c[0] === "f,x");
-    const handler = fxCall?.[1] as (() => void) | undefined;
-    expect(handler).toBeDefined();
-
-    act(() => { handler!(); });
-
-    expect(executeFadeTap).toHaveBeenCalled();
-  });
-
-  it("f,x handler is a no-op when canExecute is false", async () => {
-    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
-    loadPadsInStore(1);
-
-    // Not active, no selected pads
-    renderHook(() => useMultiFadeMode());
-
-    const calls = vi.mocked(useHotkeys).mock.calls;
-    const fxCall = calls.find((c) => c[0] === "f,x");
-    const handler = fxCall?.[1] as (() => void) | undefined;
-    expect(handler).toBeDefined();
-
-    act(() => { handler!(); });
-
-    expect(executeFadeTap).not.toHaveBeenCalled();
-  });
-});
 
 describe("useMultiFadeMode — execute()", () => {
   it("calls executeFadeTap for each selected pad", async () => {
@@ -277,43 +221,6 @@ describe("useMultiFadeMode — execute()", () => {
   });
 });
 
-describe("useMultiFadeMode — auto-cancel side effects", () => {
-  it("cancels multi-fade when editMode becomes true", () => {
-    const pads = loadPadsInStore(1);
-    const { result } = renderHook(() => useMultiFadeMode());
-
-    // Enter multi-fade so it is active
-    act(() => {
-      result.current.enter(pads[0].id);
-    });
-    expect(result.current.active).toBe(true);
-
-    // Enable editMode
-    act(() => {
-      useUiStore.getState().toggleEditMode();
-    });
-
-    expect(result.current.active).toBe(false);
-  });
-
-  it("cancels multi-fade when an overlay is pushed to overlayStack", () => {
-    const pads = loadPadsInStore(1);
-    const { result } = renderHook(() => useMultiFadeMode());
-
-    // Enter multi-fade so it is active
-    act(() => {
-      result.current.enter(pads[0].id);
-    });
-    expect(result.current.active).toBe(true);
-
-    // Push an overlay onto the stack
-    act(() => {
-      useUiStore.getState().openOverlay("some-dialog", "dialog");
-    });
-
-    expect(result.current.active).toBe(false);
-  });
-});
 
 describe("executeMultiFadeNow integration", () => {
   it("dispatches executeFadeTap for each selected pad and resets store", async () => {

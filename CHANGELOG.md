@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal refactor: multi-fade hotkey handling and auto-cancel behavior moved to a dedicated `useMultiFadeSideEffects` hook — no user-visible behavior changes.
 - No user-facing changes in this release; internal code documentation was updated only.
 - Press **Enter**, **F**, or **X** to execute a multi-fade when pads are selected in multi-fade mode
 - Press **Escape** to cancel an active multi-fade selection

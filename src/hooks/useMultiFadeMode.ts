@@ -1,6 +1,4 @@
-import { useCallback, useEffect } from "react";
-import { useHotkeys } from "react-hotkeys-hook";
-import { useUiStore } from "@/state/uiStore";
+import { useCallback } from "react";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
@@ -52,6 +50,13 @@ export interface UseMultiFadeModeReturn {
   clearReopenPadId: () => void;
 }
 
+/**
+ * Core multi-fade mode state and callbacks. Exposes active/selected pad state,
+ * enter/toggle/cancel/execute actions, and derived canExecute flag.
+ *
+ * Hotkey registration and auto-cancel side effects (editMode, overlayStack) are
+ * handled separately in `useMultiFadeSideEffects`.
+ */
 export function useMultiFadeMode(): UseMultiFadeModeReturn {
   const active = useMultiFadeStore((s) => s.active);
   const originPadId = useMultiFadeStore((s) => s.originPadId);
@@ -62,23 +67,6 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
   const setMultiFadeLevels = useMultiFadeStore((s) => s.setMultiFadeLevels);
   const cancelMultiFade = useMultiFadeStore((s) => s.cancelMultiFade);
   const clearMultiFadeReopenPadId = useMultiFadeStore((s) => s.clearMultiFadeReopenPadId);
-
-  const editMode = useUiStore((s) => s.editMode);
-  const overlayStack = useUiStore((s) => s.overlayStack);
-
-  // Cancel when edit mode activates
-  useEffect(() => {
-    if (editMode && active) {
-      cancelMultiFade();
-    }
-  }, [editMode, active, cancelMultiFade]);
-
-  // Cancel when any overlay opens
-  useEffect(() => {
-    if (overlayStack.length > 0 && active) {
-      cancelMultiFade();
-    }
-  }, [overlayStack.length, active, cancelMultiFade]);
 
   const canExecute = active && selectedPads.size >= 1;
 
@@ -112,13 +100,6 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
   const clearReopenPadId = useCallback(() => {
     clearMultiFadeReopenPadId();
   }, [clearMultiFadeReopenPadId]);
-
-  // enableOnFormTags: PadButtonFadeOverlay renders <Slider> controls (role="slider") over
-  // selected pads. The user may focus a slider thumb to set fade levels, then press
-  // F/X/Enter/Escape — those keys must not be blocked by the default form-tag guard.
-  useHotkeys("enter", execute, { enabled: active && canExecute, enableOnFormTags: true }, [active, canExecute, execute]);
-  useHotkeys("f,x", execute, { enabled: active && canExecute, enableOnFormTags: true }, [active, canExecute, execute]);
-  useHotkeys("escape", cancel, { enabled: active, enableOnFormTags: true }, [active, cancel]);
 
   return {
     active,
