@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 15 (18 fixed) |
+| Medium | 14 (19 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -236,25 +236,10 @@ None.
 
 ---
 
-### [REUSE10] `playbackStore` has 4 copy-pasted `add<X>/remove<X>` action pairs
+### ~~[REUSE10] `playbackStore` has 4 copy-pasted `add<X>/remove<X>` action pairs~~ ✅ FIXED
 - **File**: `src/state/playbackStore.ts:125-189`
 - **Severity**: Medium
-- **Finding**: `playingPadIds`, `fadingOutPadIds`, `fadingPadIds`, `reversingPadIds` each have byte-identical add/remove action bodies — 8 functions differing only in the field name. Any invariant change requires editing 8 places.
-- **Evidence**:
-  ```ts
-  // Repeated 4x with only the field name changing:
-  addPlayingPad: (padId) => set((s) => {
-    if (s.playingPadIds.has(padId)) return s;
-    const next = new Set(s.playingPadIds); next.add(padId);
-    return { playingPadIds: next };
-  }),
-  removePlayingPad: (padId) => set((s) => {
-    if (!s.playingPadIds.has(padId)) return s;
-    const next = new Set(s.playingPadIds); next.delete(padId);
-    return { playingPadIds: next };
-  }),
-  ```
-- **Recommendation**: Use a `createSetActions<K extends keyof State>(key: K)` helper, or switch this store to Zustand+Immer (already used elsewhere) so the body becomes `draft[key].add(padId)`.
+- **Fix applied**: Extracted `addToSet(field: SetField)` and `removeFromSet(field: SetField)` helper closures inside the `create` callback. Each captures `set` via closure and produces the action function for the given field. The early-exit reference-equality optimization (`if (s[field].has(padId)) return s`) is preserved — Zustand suppresses re-renders only when the returned reference is unchanged. Immer was evaluated and rejected: its Set proxy marks the draft as modified even for no-op `.add()`/`.delete()` calls, which would produce spurious new `Set<string>` references and unnecessary subscriber re-renders. A `SetField` union type (with a comment to extend it when adding new `Set<string>` fields) serves as the single maintenance point. 16 tests added to `playbackStore.test.ts`: 4 per new action group (add, idempotency, remove, no-op-on-absent-id) plus 4 cross-field isolation tests verifying that mutating one Set field does not affect the others. 1970/1970 tests pass; TypeScript clean.
 
 ---
 
@@ -623,3 +608,4 @@ None.
 | REUSE5 | `PadPercentSlider` and `PadDurationSlider` collapsed into `PadLabeledSlider`; both old files deleted; `PadFadeControls` updated; `PadButtonFadeOverlay` intentionally left inline (different layout/styling) |
 | REUSE8 | `classifyPickedAudioFile` + `findDuplicateByPath` extracted to `src/lib/fileResolve.ts`; both dialog handlers use shared helpers; `AudioFileClassification` discriminated union eliminates `!` assertions; 8 tests added |
 | REUSE9 | `addGlobalFolderAndReconcile` extracted to `library.reconcile.ts`; `useAddFolder` and `ResolveMissingFolderDialog` (add-parent path) both migrated; `setSounds` callback avoids cross-module `LibraryData` import; 4 tests added |
+| REUSE10 | `addToSet`/`removeFromSet` helper closures replace 8 copy-pasted Set action bodies in `playbackStore`; `SetField` union is single maintenance point; early-exit reference-equality optimization preserved; 16 tests added (per-group + cross-field isolation) |

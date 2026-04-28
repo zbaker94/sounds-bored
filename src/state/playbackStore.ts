@@ -116,77 +116,46 @@ export const initialPlaybackState = {
   isPreviewPlaying: false,
 };
 
-export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((set) => ({
+export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((set) => {
+  // Extend this union whenever a new Set<string> field is added to PlaybackState.
+  type SetField = "playingPadIds" | "fadingOutPadIds" | "fadingPadIds" | "reversingPadIds";
+
+  const addToSet = (field: SetField) => (padId: string) =>
+    set((s) => {
+      if (s[field].has(padId)) return s;
+      const next = new Set(s[field]);
+      next.add(padId);
+      return { [field]: next } as Partial<PlaybackState>;
+    });
+
+  const removeFromSet = (field: SetField) => (padId: string) =>
+    set((s) => {
+      if (!s[field].has(padId)) return s;
+      const next = new Set(s[field]);
+      next.delete(padId);
+      return { [field]: next } as Partial<PlaybackState>;
+    });
+
+  return {
   masterVolume: 100,
   setMasterVolume: (volume) => set({ masterVolume: volume }),
 
   playingPadIds: new Set<string>(),
-
-  addPlayingPad: (padId) =>
-    set((s) => {
-      if (s.playingPadIds.has(padId)) return s;
-      const next = new Set(s.playingPadIds);
-      next.add(padId);
-      return { playingPadIds: next };
-    }),
-
-  removePlayingPad: (padId) =>
-    set((s) => {
-      if (!s.playingPadIds.has(padId)) return s;
-      const next = new Set(s.playingPadIds);
-      next.delete(padId);
-      return { playingPadIds: next };
-    }),
-
+  addPlayingPad: addToSet("playingPadIds"),
+  removePlayingPad: removeFromSet("playingPadIds"),
   clearAllPlayingPads: () => set({ playingPadIds: new Set() }),
 
   fadingOutPadIds: new Set<string>(),
-  addFadingOutPad: (padId) =>
-    set((s) => {
-      if (s.fadingOutPadIds.has(padId)) return s;
-      const next = new Set(s.fadingOutPadIds);
-      next.add(padId);
-      return { fadingOutPadIds: next };
-    }),
-  removeFadingOutPad: (padId) =>
-    set((s) => {
-      if (!s.fadingOutPadIds.has(padId)) return s;
-      const next = new Set(s.fadingOutPadIds);
-      next.delete(padId);
-      return { fadingOutPadIds: next };
-    }),
+  addFadingOutPad: addToSet("fadingOutPadIds"),
+  removeFadingOutPad: removeFromSet("fadingOutPadIds"),
 
   fadingPadIds: new Set<string>(),
-  addFadingPad: (padId) =>
-    set((s) => {
-      if (s.fadingPadIds.has(padId)) return s;
-      const next = new Set(s.fadingPadIds);
-      next.add(padId);
-      return { fadingPadIds: next };
-    }),
-  removeFadingPad: (padId) =>
-    set((s) => {
-      if (!s.fadingPadIds.has(padId)) return s;
-      const next = new Set(s.fadingPadIds);
-      next.delete(padId);
-      return { fadingPadIds: next };
-    }),
+  addFadingPad: addToSet("fadingPadIds"),
+  removeFadingPad: removeFromSet("fadingPadIds"),
 
   reversingPadIds: new Set<string>(),
-  addReversingPad: (padId) =>
-    set((s) => {
-      if (s.reversingPadIds.has(padId)) return s;
-      const next = new Set(s.reversingPadIds);
-      next.add(padId);
-      return { reversingPadIds: next };
-    }),
-  removeReversingPad: (padId) =>
-    set((s) => {
-      if (!s.reversingPadIds.has(padId)) return s;
-      const next = new Set(s.reversingPadIds);
-      next.delete(padId);
-      return { reversingPadIds: next };
-    }),
+  addReversingPad: addToSet("reversingPadIds"),
+  removeReversingPad: removeFromSet("reversingPadIds"),
 
   isPreviewPlaying: false,
   setIsPreviewPlaying: (v) => set({ isPreviewPlaying: v }),
@@ -211,4 +180,5 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
     })),
 
   clearVolumes: () => set({ padVolumes: {}, layerVolumes: {} }),
-})));
+  };
+}));
