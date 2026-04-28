@@ -1,35 +1,43 @@
 import { Slider } from "@/components/ui/slider";
 
-interface PadDurationSliderProps {
+interface PadLabeledSliderProps {
   label: string;
-  value: number; // milliseconds
+  value: number;
   onValueChange: (value: number) => void;
   onValueCommit: (value: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  formatValue: (v: number) => string;
   sliderClassName?: string;
 }
 
-export function PadDurationSlider({
+export function PadLabeledSlider({
   label,
   value,
   onValueChange,
   onValueCommit,
+  min,
+  max,
+  step,
+  formatValue,
   sliderClassName,
-}: PadDurationSliderProps) {
+}: PadLabeledSliderProps) {
   return (
     <>
       <div className="flex items-center justify-between text-muted-foreground">
         <span>{label}</span>
-        <span className="tabular-nums">{(value / 1000).toFixed(1)}s</span>
+        <span className="tabular-nums">{formatValue(value)}</span>
       </div>
       <Slider
         compact
-        tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
+        tooltipLabel={formatValue}
         value={[value]}
         onValueChange={([v]) => onValueChange(v)}
         onValueCommit={([v]) => onValueCommit(v)}
-        min={100}
-        max={10000}
-        step={100}
+        min={min}
+        max={max}
+        step={step}
         className={sliderClassName}
       />
     </>

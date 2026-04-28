@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Refactored audio cache cleanup into shared utility functions, reducing the risk of future memory leaks when removing sounds
+- Consolidated duplicate slider components into a single reusable `PadLabeledSlider`, simplifying internal code without any change to slider behavior
 - Internal audio cache cleanup has been refactored for reliability — removing sounds from your library now clears all cached audio data more consistently.
 - Audio errors that previously failed silently when triggering pads now surface as proper error notifications.
 - Playback errors now show as user-visible toast notifications instead of being silently swallowed — this affects all pad interactions (tap, hold, drag, and back-face controls)

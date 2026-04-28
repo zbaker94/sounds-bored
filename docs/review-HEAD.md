@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (12 fixed) |
+| Medium | 16 (14 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -180,23 +180,20 @@ None.
 
 ---
 
-### [REUSE4] `evictBuffer(id) + evictStreamingElement(id)` pair repeated at 7 call sites
+### ~~[REUSE4] `evictBuffer(id) + evictStreamingElement(id)` pair repeated at 7 call sites~~ ✅ FIXED
 - **File**: `src/hooks/useBulkRemove.ts:59-60,113-114`; `src/components/composite/SidePanel/SoundList.tsx:163-164`; `src/components/composite/SidePanel/FoldersPanel.tsx:179-180`; `src/components/modals/ResolveMissingDialog.tsx:128-129,151-152`; `src/components/modals/ResolveMissingFolderDialog.tsx:310-311,325-326,350-351`
 - **Severity**: Medium
 - **Finding**: The pairing is invariant — any future call site that omits one will leak audio caches into subsequent sessions.
 - **Recommendation**: Add `evictSoundCaches(soundId: string)` that calls both, and `evictSoundCachesMany(ids: Iterable<string>)` for bulk use. Any future cache entry (e.g. waveform metadata) then only requires one change.
+- **Fix applied**: Created `src/lib/audio/cacheUtils.ts` with `evictSoundCaches(soundId)` and `evictSoundCachesMany(ids: Iterable<string>)`. All 9 call sites across 6 files migrated — loop sites use `evictSoundCachesMany`, single-id sites use `evictSoundCaches`. Test mocks in all 5 affected test files updated to mock `@/lib/audio/cacheUtils` instead of the two individual cache modules. 1938/1938 tests pass; TypeScript clean.
 
 ---
 
-### [REUSE5] `PadPercentSlider` and `PadDurationSlider` are the same component with different formatting
+### ~~[REUSE5] `PadPercentSlider` and `PadDurationSlider` are the same component with different formatting~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadPercentSlider.tsx`; `src/components/composite/SceneView/PadDurationSlider.tsx`
 - **Severity**: Medium
 - **Finding**: Lines 18–36 of both components are structurally identical — only the unit format string, min/max/step differ. `PadButtonFadeOverlay.tsx` also inlines the same slider/label pattern three more times without using either component.
-- **Recommendation**: Collapse into `PadLabeledSlider` with `{ min, max, step, formatValue: (v: number) => string }`:
-  ```tsx
-  <PadLabeledSlider label="Fade target" min={0} max={100} step={1} formatValue={(v) => `${v}%`} ... />
-  <PadLabeledSlider label="Duration" min={100} max={10000} step={100} formatValue={(v) => `${(v/1000).toFixed(1)}s`} ... />
-  ```
+- **Fix applied**: Created `PadLabeledSlider` with `{ min, max, step, formatValue: (v: number) => string }` props. Both `PadPercentSlider` and `PadDurationSlider` deleted; `PadFadeControls` updated to use `PadLabeledSlider` at both call sites. `PadButtonFadeOverlay` intentionally left inline — its slider/label pattern is structurally different (labels below slider, `text-[9px] text-white/70`, white-tinted track classes, `onPointerUp` vs `onValueCommit`) and folding it in would require layout/style props that add more complexity than the three inline blocks.
 
 ---
 
@@ -634,3 +631,5 @@ None.
 | QUAL3 | `DownloadDialog.handleSubmit` — `await startDownload` wrapped in `try/catch`; `catch` returns early since `onError` already shows a toast |
 | QUAL4 | 5 empty `catch {}` blocks across 3 files now capture `err`, call `console.error`, and pass `description` to `toast.error`; 5 tests added/updated |
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |
+| REUSE4 | `evictSoundCaches`/`evictSoundCachesMany` extracted to `cacheUtils.ts`; all 9 call sites migrated across 6 files; 5 test mock declarations updated |
+| REUSE5 | `PadPercentSlider` and `PadDurationSlider` collapsed into `PadLabeledSlider`; both old files deleted; `PadFadeControls` updated; `PadButtonFadeOverlay` intentionally left inline (different layout/styling) |

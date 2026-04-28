@@ -10,8 +10,7 @@ import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 import { useProjectStore } from "@/state/projectStore";
 import { setPadVolume } from "@/lib/audio/padPlayer";
 import { padToConfig } from "@/lib/padDefaults";
-import { PadPercentSlider } from "./PadPercentSlider";
-import { PadDurationSlider } from "./PadDurationSlider";
+import { PadLabeledSlider } from "./PadLabeledSlider";
 
 export interface PadFadeControlsProps {
   pad: Pad;
@@ -90,18 +89,22 @@ export const PadFadeControls = memo(function PadFadeControls({
           </motion.div>
         )}
       </AnimatePresence>
-      <PadPercentSlider
+      <PadLabeledSlider
         label="Fade target"
         value={fadeTargetSliderValue}
+        min={0} max={100} step={1}
+        formatValue={(v) => `${v}%`}
         onValueChange={(v) => setLocalFadeTarget(v)}
         onValueCommit={(v) => {
           setLocalFadeTarget(null);
           useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v);
         }}
       />
-      <PadDurationSlider
+      <PadLabeledSlider
         label="Duration"
         value={fadeDuration}
+        min={100} max={10000} step={100}
+        formatValue={(v) => `${(v / 1000).toFixed(1)}s`}
         onValueChange={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
         onValueCommit={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
       />
