@@ -44,7 +44,7 @@ export function useAudioErrorHandler(): void {
         toast.error(
           soundName
             ? `Failed to play "${soundName}": ${message}`
-            : `Playback error: audio fade failed — ${message}`,
+            : `Playback error: ${message}`,
         );
       }
     });

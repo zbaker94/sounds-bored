@@ -161,17 +161,13 @@ None.
 ### [QUAL11] `usePadGesture` swallows `triggerPad` failures; `PadBackFace` toasts — inconsistent UX
 - **File**: `src/hooks/usePadGesture.ts:130,166,178,227,231`; `src/components/composite/SceneView/PadBackFace.tsx:445`
 - **Severity**: Medium
-- **Finding**: Front-face pad taps catch errors with `.catch(console.error)`. Back-face Start button shows `toast.error(...)`. Users get no feedback for failures via the primary interaction path (5 call sites affected).
-- **Evidence**:
-  ```ts
-  // usePadGesture.ts — silent
-  triggerPad(pad, triggerVolume()).catch(console.error);
-  // PadBackFace.tsx — user-visible
-  triggerPad(pad).catch((err: unknown) => {
-    toast.error(`Playback error: ${err instanceof Error ? err.message : String(err)}`);
-  });
-  ```
-- **Recommendation**: Consolidate through a `triggerPadWithToast` helper, or route errors through `emitAudioError` so `useAudioErrorHandler` handles them uniformly across both surfaces.
+- **Fix applied**: All `triggerPad` and `triggerLayer` call sites now route outer rejections through `emitAudioError` instead of logging silently or calling `toast.error` directly. Specifically:
+  - `usePadGesture.ts` — 5× `.catch(console.error)` replaced with `.catch((err: unknown) => { emitAudioError(err); })` (front-face taps now surface errors to the user)
+  - `PadBackFace.tsx` — direct `toast.error(...)` replaced with `emitAudioError(err)`; `import { toast }` removed
+  - `BackFaceLayerRow.tsx` — same direct-toast anti-pattern on `triggerLayer` fixed; `import { toast }` removed
+  - `useAudioErrorHandler.ts` — generic no-`soundName` fallback message changed from `"Playback error: audio fade failed — ${message}"` to `"Playback error: ${message}"` (old wording was misleading for direct trigger errors)
+  - `useAudioErrorHandler.test.ts` — expectation updated to match new message
+  1935/1935 tests pass; TypeScript clean.
 
 ---
 

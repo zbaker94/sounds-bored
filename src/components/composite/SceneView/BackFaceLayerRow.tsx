@@ -19,11 +19,11 @@ import {
   triggerLayer, stopLayerWithRamp, setLayerVolume,
   skipLayerForward, skipLayerBack,
 } from "@/lib/audio/padPlayer";
+import { emitAudioError } from "@/lib/audio/audioEvents";
 import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
 import { summarizeLayerSelection } from "@/lib/layerHelpers";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { toast } from "sonner";
 
 export const BackFaceLayerRow = memo(function BackFaceLayerRow({
   pad,
@@ -82,9 +82,7 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
             <motion.div key="play" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
               <button
                 type="button"
-                onClick={() => triggerLayer(pad, layer).catch((err: unknown) => {
-                  toast.error(`Playback error: ${err instanceof Error ? err.message : String(err)}`);
-                })}
+                onClick={() => triggerLayer(pad, layer).catch((err: unknown) => { emitAudioError(err); })}
                 className="p-0.5 rounded hover:bg-primary/20 transition-colors"
                 aria-label={`Play layer ${index + 1}`}
               >

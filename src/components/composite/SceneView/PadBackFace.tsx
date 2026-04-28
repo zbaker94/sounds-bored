@@ -19,10 +19,10 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import {
   triggerPad, stopPad, executeFadeTap, reverseFade, stopFade,
 } from "@/lib/audio/padPlayer";
+import { emitAudioError } from "@/lib/audio/audioEvents";
 import { createDefaultStoreLayer, padToConfig } from "@/lib/padDefaults";
 import { LayerConfigDialog } from "@/components/composite/PadConfigDrawer/LayerConfigDialog";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
-import { toast } from "sonner";
 import { PadFadeControls } from "./PadFadeControls";
 import { PadLayerSection } from "./PadLayerSection";
 
@@ -90,9 +90,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
     if (isPlaying) {
       stopPad(pad);
     } else {
-      triggerPad(pad).catch((err: unknown) => {
-        toast.error(`Playback error: ${err instanceof Error ? err.message : String(err)}`);
-      });
+      triggerPad(pad).catch((err: unknown) => { emitAudioError(err); });
     }
   }, [isPlaying, pad]);
 

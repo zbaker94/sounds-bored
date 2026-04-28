@@ -3,6 +3,7 @@ import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
 import { isLayerActive } from "@/lib/audio/audioState";
+import { emitAudioError } from "@/lib/audio/audioEvents";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 // Gesture thresholds
@@ -127,7 +128,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
       // Hold-mode pads trigger immediately on press — skip if we just cancelled a fade
       if (hasHoldLayer && !fadeCancelled) {
-        triggerPad(pad, triggerVolume()).catch(console.error);
+        triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
       }
 
       holdTimer.current = setTimeout(() => {
@@ -163,7 +164,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         setIsDragging(true);
 
         if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
-          triggerPad(pad, 0).catch(console.error);
+          triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
           justTriggered = true;
           s.hasTriggeredDuringDrag = true;
         }
@@ -175,7 +176,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         s.currentVolume = newVolume;
 
         if (!justTriggered && !s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
-          triggerPad(pad, 0).catch(console.error);
+          triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
           s.hasTriggeredDuringDrag = true;
         }
 
@@ -224,11 +225,11 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       if (s.phase === "down") {
         // Normal tap — only trigger if not a hold-mode pad and fade wasn't just cancelled
         if (!hasHoldLayer && !s.cancelledFadeAtStart) {
-          triggerPad(pad, triggerVolume()).catch(console.error);
+          triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
         }
       } else if (s.phase === "hold") {
         if (!hasHoldLayer && !s.cancelledFadeAtStart) {
-          triggerPad(pad, triggerVolume()).catch(console.error);
+          triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
         }
       } else if (s.phase === "drag") {
         if (s.currentVolume < 0.01 && !hasHoldLayer) {

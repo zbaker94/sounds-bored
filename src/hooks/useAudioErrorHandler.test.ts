@@ -111,7 +111,7 @@ describe("useAudioErrorHandler", () => {
       renderHook(() => useAudioErrorHandler());
       emitAudioError(new Error("gain node error"));
       expect(mockToastError).toHaveBeenCalledWith(
-        "Playback error: audio fade failed — gain node error"
+        "Playback error: gain node error"
       );
     });
 
