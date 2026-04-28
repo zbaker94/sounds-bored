@@ -9,7 +9,7 @@ import { Project, ProjectHistoryEntry } from "@/lib/schemas";
 import logo from "@/assets/sleeping knight-emblem.gif";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { exists, remove } from "@tauri-apps/plugin-fs";
-import { grantPathAccess } from "@/lib/scope";
+import { restorePathScope } from "@/lib/scope";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderOpenIcon, Settings01Icon, Delete02Icon, FolderRemoveIcon } from "@hugeicons/core-free-icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -60,7 +60,7 @@ export function StartScreen() {
 
   const handleOpenProjectInExplorer = async (entry: ProjectHistoryEntry) => {
     try {
-      await grantPathAccess(entry.path);
+      await restorePathScope(entry.path);
       const pathExists = await exists(entry.path);
       if (!pathExists) {
         toast.error("Project folder no longer exists at this location.");
@@ -92,7 +92,7 @@ export function StartScreen() {
     }
     setIsDeletingFromDisk(true);
     try {
-      await grantPathAccess(entry.path);
+      await restorePathScope(entry.path);
       const pathExists = await exists(entry.path);
       if (pathExists) {
         await remove(entry.path, { recursive: true });

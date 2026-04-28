@@ -673,7 +673,7 @@ pub fn cancel_export(
     Ok(())
 }
 
-/// Validates the `path` argument to `grant_path_access`. Extracted so the
+/// Validates a path before granting runtime scope access. Extracted so the
 /// guard can be unit-tested without constructing a real `AppHandle`.
 fn validate_grant_path(path: &str) -> Result<(), String> {
     if path.is_empty() {
@@ -814,20 +814,141 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Grants runtime fs-scope and asset-protocol-scope access to a user-selected path.
-/// Called after every dialog that returns a user-chosen folder or file, so that
-/// the broad static $DOCUMENT/**, $DOWNLOAD/**, $DESKTOP/** grants can be removed
-/// from capabilities/default.json and assetProtocol.scope in tauri.conf.json.
-#[tauri::command]
-pub fn grant_path_access(app: AppHandle, path: String) -> Result<(), String> {
+/// Applies runtime fs-scope and asset-protocol-scope grants for a validated path.
+/// Callers must run `validate_grant_path` before calling this.
+fn apply_scope_grants(app: &AppHandle, path: &str) -> Result<(), String> {
     use tauri_plugin_fs::FsExt;
-    validate_grant_path(&path)?;
     app.fs_scope()
-        .allow_directory(&path, true)
+        .allow_directory(path, true)
         .map_err(|e| e.to_string())?;
     app.asset_protocol_scope()
-        .allow_directory(&path, true)
+        .allow_directory(path, true)
         .map_err(|e: tauri::Error| e.to_string())
+}
+
+/// Filter specification forwarded from the TypeScript dialog options.
+#[derive(serde::Deserialize)]
+pub struct FilterSpec {
+    pub name: String,
+    pub extensions: Vec<String>,
+}
+
+/// Opens a native folder picker, grants runtime fs-scope and asset-protocol-scope
+/// access to the selected folder, and returns the path. Dialog and scope-grant are
+/// atomic in Rust — a renderer script cannot bypass the dialog to grant an
+/// arbitrary path. Returns null when the user cancels.
+#[tauri::command]
+pub fn pick_folder_and_grant(
+    app: AppHandle,
+    title: Option<String>,
+    default_path: Option<String>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    if let Some(ref t) = title {
+        builder = builder.set_title(t);
+    }
+    if let Some(ref p) = default_path {
+        builder = builder.set_directory(p);
+    }
+    let Some(fp) = builder.blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let path = fp.to_string();
+    validate_grant_path(&path)?;
+    apply_scope_grants(&app, &path)?;
+    Ok(Some(path))
+}
+
+/// Opens a native file picker, grants runtime fs-scope access to the selected
+/// file's parent directory, and returns the file path. Returns null on cancel.
+#[tauri::command]
+pub fn pick_file_and_grant(
+    app: AppHandle,
+    title: Option<String>,
+    default_path: Option<String>,
+    filters: Option<Vec<FilterSpec>>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    if let Some(ref t) = title {
+        builder = builder.set_title(t);
+    }
+    if let Some(ref p) = default_path {
+        builder = builder.set_directory(p);
+    }
+    if let Some(ref fs) = filters {
+        for f in fs {
+            let exts: Vec<&str> = f.extensions.iter().map(|s| s.as_str()).collect();
+            builder = builder.add_filter(&f.name, &exts);
+        }
+    }
+    let Some(fp) = builder.blocking_pick_file() else {
+        return Ok(None);
+    };
+    let path = fp.to_string();
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        let parent_str = parent.to_string_lossy().into_owned();
+        // Silently skip root parents and ignore grant failures — consistent with
+        // pick_files_and_grant which uses allSettled semantics.
+        if validate_grant_path(&parent_str).is_ok() {
+            let _ = apply_scope_grants(&app, &parent_str);
+        }
+    }
+    Ok(Some(path))
+}
+
+/// Opens a native multi-file picker, grants runtime fs-scope access to all
+/// unique parent directories, and returns the selected paths. Returns an empty
+/// array when the user cancels.
+#[tauri::command]
+pub fn pick_files_and_grant(
+    app: AppHandle,
+    title: Option<String>,
+    default_path: Option<String>,
+    filters: Option<Vec<FilterSpec>>,
+) -> Result<Vec<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    if let Some(ref t) = title {
+        builder = builder.set_title(t);
+    }
+    if let Some(ref p) = default_path {
+        builder = builder.set_directory(p);
+    }
+    if let Some(ref fs) = filters {
+        for f in fs {
+            let exts: Vec<&str> = f.extensions.iter().map(|s| s.as_str()).collect();
+            builder = builder.add_filter(&f.name, &exts);
+        }
+    }
+    let paths: Vec<String> = builder
+        .blocking_pick_files()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|fp| fp.to_string())
+        .collect();
+    // Grant unique parent directories; skip any that fail validation.
+    let mut seen = std::collections::HashSet::new();
+    for path in &paths {
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            let parent_str = parent.to_string_lossy().into_owned();
+            if seen.insert(parent_str.clone()) && validate_grant_path(&parent_str).is_ok() {
+                let _ = apply_scope_grants(&app, &parent_str);
+            }
+        }
+    }
+    Ok(paths)
+}
+
+/// Restores runtime fs-scope and asset-protocol-scope access for a path that
+/// was previously selected by the user and persisted to disk (e.g. a project
+/// folder from history, or a global library folder from app settings).
+/// Tauri's allow_directory grants are session-only and are lost on restart.
+#[tauri::command]
+pub fn restore_path_scope(app: AppHandle, path: String) -> Result<(), String> {
+    validate_grant_path(&path)?;
+    apply_scope_grants(&app, &path)
 }
 
 #[cfg(test)]
@@ -1204,11 +1325,10 @@ mod tests {
         assert!(result.is_none());
     }
 
-    // ---- grant_path_access tests ----
-    // Note: the happy path of grant_path_access requires a real AppHandle with the
-    // fs plugin initialized, which cannot be constructed in a unit-test context.
-    // Those scenarios are covered by integration tests / manual testing. Only the
-    // empty-path guard (extracted into validate_grant_path) is unit-tested here.
+    // ---- validate_grant_path tests ----
+    // The happy-path scope grants (pick_*_and_grant, restore_path_scope) require a
+    // real AppHandle with the fs plugin initialized and cannot be unit-tested here.
+    // Only the path-validation logic is covered below.
 
     #[test]
     fn test_validate_grant_path_rejects_empty() {

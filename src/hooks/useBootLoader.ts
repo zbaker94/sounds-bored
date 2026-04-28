@@ -8,7 +8,7 @@ import { loadGlobalLibrary } from "@/lib/library";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { loadAppSettings } from "@/lib/appSettings";
 import { loadDownloadHistory } from "@/lib/downloads";
-import { grantPathAccess } from "@/lib/scope";
+import { restorePathScope } from "@/lib/scope";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
 
 /**
@@ -40,7 +40,7 @@ export function useBootLoader(): { ready: boolean } {
         // Tauri's allow_directory grants are session-only and are lost on restart,
         // so they must be replayed before reconciliation reads those directories.
         const grantResults = await Promise.allSettled(
-          settings.globalFolders.map((f) => grantPathAccess(f.path))
+          settings.globalFolders.map((f) => restorePathScope(f.path))
         );
         const failedGrants = grantResults.filter((r) => r.status === "rejected").length;
         if (failedGrants > 0) {

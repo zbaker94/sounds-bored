@@ -38,8 +38,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/lib/scope", () => ({
   pickFolder: vi.fn(),
   pickFile: vi.fn(),
-  grantPathAccess: vi.fn().mockResolvedValue(undefined),
-  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+  restorePathScope: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { pickFile } from "@/lib/scope";

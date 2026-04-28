@@ -19,7 +19,10 @@ pub fn run() {
             commands::cancel_download,
             commands::export_project,
             commands::cancel_export,
-            commands::grant_path_access,
+            commands::pick_folder_and_grant,
+            commands::pick_file_and_grant,
+            commands::pick_files_and_grant,
+            commands::restore_path_scope,
         ]);
 
     #[cfg(debug_assertions)]

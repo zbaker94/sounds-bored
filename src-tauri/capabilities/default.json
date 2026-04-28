@@ -38,8 +38,7 @@
       "identifier": "fs:scope",
       "allow": [
         { "path": "$APPDATA/SoundsBored/**" },
-        { "path": "$APPLOCALDATA/SoundsBored/**" },
-        { "path": "$AUDIO/**" }
+        { "path": "$APPLOCALDATA/SoundsBored/**" }
       ]
     },
     "updater:default",

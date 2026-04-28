@@ -1,55 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { dirname } from "@tauri-apps/api/path";
-import { open, type OpenDialogOptions } from "@tauri-apps/plugin-dialog";
+import { type OpenDialogOptions } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
-
-export async function grantPathAccess(folderPath: string): Promise<void> {
-  await invoke("grant_path_access", { path: folderPath });
-}
-
-function isRootPath(path: string): boolean {
-  if (path === "" || path === "/") return true;
-  // Null bytes, ASCII control characters (0x00–0x1F), DEL (0x7F), BIDI marks
-  // (U+200E, U+200F), BIDI formatting/override controls (U+202A–U+202E), Unicode
-  // line/paragraph separators (U+2028, U+2029), BIDI isolates (U+2066–U+2069),
-  // and BOM (U+FEFF) — never present in legitimate dialog-returned paths.
-  // Mirrors validate_grant_path in src-tauri/src/commands.rs.
-  if (/[\x00-\x1f\x7f\u200e\u200f\u202a-\u202e\u2028\u2029\u2066-\u2069\ufeff]/.test(path)) return true;
-  // Windows drive root: "C:", "C:\", "C:/"
-  if (/^[A-Za-z]:[/\\]?$/.test(path)) return true;
-  // DOS device namespace \\. or //. — block all forms (never produced by native dialogs)
-  if (/^[/\\]{2}\.[/\\]/.test(path)) return true;
-  // Windows extended-length prefix \\?\ or \\?/ or //?/ variants
-  if (/^[/\\]{2}\?[/\\]/.test(path)) {
-    const inner = path.slice(4).replace(/[/\\]+$/, "");
-    if (inner === "") return true;
-    // Extended-length drive root: \\?\C: or \\?\C:\
-    if (/^[A-Za-z]:[/\\]?$/.test(inner)) return true;
-    // Extended-length UNC share root: \\?\UNC\server\share (one or more separators at each interior position)
-    if (/^UNC[/\\]+[^/\\]+[/\\]+[^/\\]+[/\\]?$/i.test(inner)) return true;
-    // Device namespace: \\?\GLOBALROOT\... — can bypass normal ACL checks
-    if (/^GLOBALROOT([/\\]|$)/i.test(inner)) return true;
-    // Device volume root: \\?\Volume{GUID} — equivalent to a drive root on Windows
-    if (/^Volume\{[^}]+\}$/i.test(inner)) return true;
-    // Allowlist catch-all: only permit drive-letter subfolders, UNC subfolders, or
-    // Volume GUID subfolders under \\?\. Everything else (HarddiskVolumeN, PhysicalDriveN,
-    // PIPE, MAILSLOT, BootPartition, etc.) is an unrecognized device-namespace path.
-    const isDriveSubfolder = /^[A-Za-z]:[/\\]/.test(inner);
-    const isUncSubfolder = /^UNC[/\\]+[^/\\]+[/\\]+[^/\\]+[/\\]/i.test(inner);
-    const isVolumeSubfolder = /^Volume\{[^}]+\}[/\\]/i.test(inner);
-    if (!isDriveSubfolder && !isUncSubfolder && !isVolumeSubfolder) return true;
-  }
-  // UNC share root: \\server\share or //server/share (no further path segments)
-  // Paths starting with \\.\ or \\?\ are already handled above
-  if (/^[/\\]{2,}[^/\\]+[/\\]+[^/\\]+[/\\]*$/.test(path)) return true;
-  return false;
-}
-
-export async function grantParentAccess(filePath: string): Promise<void> {
-  const parent = await dirname(filePath);
-  if (isRootPath(parent)) return;
-  await grantPathAccess(parent);
-}
 
 /** Options forwarded to the native folder picker dialog. */
 export interface FolderPickerOptions {
@@ -67,19 +19,19 @@ export interface FilePickerOptions {
 /**
  * Opens a native folder picker and, if the user selects a folder, grants
  * runtime fs-scope access to it before returning the path.
+ * Dialog and scope-grant are handled atomically in Rust.
  * Returns null when the user cancels.
  */
 export async function pickFolder(options?: FolderPickerOptions): Promise<string | null> {
-  const selected = await open({ ...options, directory: true, multiple: false });
-  const path = Array.isArray(selected) ? (selected[0] ?? null) : selected;
-  if (!path) return null;
   try {
-    await grantPathAccess(path);
+    return await invoke<string | null>("pick_folder_and_grant", {
+      title: options?.title ?? null,
+      defaultPath: options?.defaultPath ?? null,
+    });
   } catch (err) {
     toast.error(`Cannot use that folder: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
-  return path;
 }
 
 /**
@@ -88,24 +40,11 @@ export async function pickFolder(options?: FolderPickerOptions): Promise<string 
  * Returns null when the user cancels.
  */
 export async function pickFile(options?: FilePickerOptions): Promise<string | null> {
-  const selected = await open({ ...options, multiple: false });
-  const path = Array.isArray(selected) ? (selected[0] ?? null) : selected;
-  if (path) await grantParentAccess(path);
-  return path;
-}
-
-/**
- * Grants runtime fs-scope access to the unique parent directories of the
- * given file paths. Skips root paths. Uses allSettled so a single bad path
- * does not prevent the remaining grants from running.
- */
-export async function grantParentDirectories(filePaths: string[]): Promise<void> {
-  const uniqueParents = new Set<string>();
-  for (const p of filePaths) {
-    const parent = await dirname(p);
-    if (!isRootPath(parent)) uniqueParents.add(parent);
-  }
-  await Promise.allSettled([...uniqueParents].map((p) => grantPathAccess(p)));
+  return invoke<string | null>("pick_file_and_grant", {
+    title: options?.title ?? null,
+    defaultPath: options?.defaultPath ?? null,
+    filters: options?.filters ?? null,
+  });
 }
 
 /**
@@ -114,9 +53,37 @@ export async function grantParentDirectories(filePaths: string[]): Promise<void>
  * the paths. Returns an empty array when the user cancels.
  */
 export async function pickFiles(options?: FilePickerOptions): Promise<string[]> {
-  const selected = await open({ ...options, multiple: true });
-  if (!selected) return [];
-  const paths = Array.isArray(selected) ? selected : [selected];
-  await grantParentDirectories(paths);
-  return paths;
+  return invoke<string[]>("pick_files_and_grant", {
+    title: options?.title ?? null,
+    defaultPath: options?.defaultPath ?? null,
+    filters: options?.filters ?? null,
+  });
+}
+
+/**
+ * Restores runtime fs-scope access for a path previously selected by the user
+ * and persisted to disk (e.g. a project folder from history or a global
+ * library folder from app settings). Tauri's allow_directory grants are
+ * session-only and lost on restart.
+ */
+export async function restorePathScope(path: string): Promise<void> {
+  await invoke("restore_path_scope", { path });
+}
+
+/**
+ * Grants runtime fs-scope access to the unique parent directories of the
+ * given file paths. Intended for OS drag-and-drop events where the user
+ * provides paths directly (not via a picker dialog). Uses allSettled so a
+ * single bad path does not prevent remaining grants from running.
+ *
+ * Path safety relies on `restore_path_scope`/`validate_grant_path` enforcement
+ * in Rust — not on a dialog. Callers must supply only OS-originating paths
+ * (e.g. from Tauri's drag-drop event), never user-constructed strings.
+ */
+export async function grantDroppedPaths(filePaths: string[]): Promise<void> {
+  const uniqueParents = new Set<string>();
+  for (const p of filePaths) {
+    uniqueParents.add(await dirname(p));
+  }
+  await Promise.allSettled([...uniqueParents].map((p) => restorePathScope(p)));
 }

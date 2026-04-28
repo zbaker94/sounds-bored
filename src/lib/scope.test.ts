@@ -1,18 +1,22 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { grantPathAccess, grantParentAccess, grantParentDirectories, pickFolder, pickFile, pickFiles } from "./scope";
-import { mockCore, mockPath, mockDialog, resetTauriMocks } from "@/test/tauri-mocks";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { restorePathScope, pickFolder, pickFile, pickFiles, grantDroppedPaths } from "./scope";
+import { mockCore, mockPath, resetTauriMocks } from "@/test/tauri-mocks";
 
-describe("grantPathAccess", () => {
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
+
+describe("restorePathScope", () => {
   beforeEach(() => {
     resetTauriMocks();
     mockCore.invoke.mockResolvedValue(undefined);
   });
 
-  it("calls invoke with 'grant_path_access' and the provided folder path", async () => {
-    await grantPathAccess("/some/folder");
+  it("invokes restore_path_scope with the provided path", async () => {
+    await restorePathScope("/some/folder");
 
     expect(mockCore.invoke).toHaveBeenCalledTimes(1);
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
+    expect(mockCore.invoke).toHaveBeenCalledWith("restore_path_scope", {
       path: "/some/folder",
     });
   });
@@ -20,819 +24,140 @@ describe("grantPathAccess", () => {
   it("propagates errors from invoke", async () => {
     mockCore.invoke.mockRejectedValue(new Error("scope denied"));
 
-    await expect(grantPathAccess("/some/folder")).rejects.toThrow("scope denied");
-  });
-});
-
-describe("grantParentAccess", () => {
-  beforeEach(() => {
-    resetTauriMocks();
-    mockCore.invoke.mockResolvedValue(undefined);
-    // Restore the default synchronous dirname implementation from tauri-mocks.
-    // The real Tauri dirname returns Promise<string>, but `await` works on both
-    // sync strings and promises, so the runtime behavior is identical.
-    mockPath.dirname.mockImplementation((path: string) => {
-      const normalized = path.replace(/\\/g, "/");
-      const idx = normalized.lastIndexOf("/");
-      return idx > 0 ? normalized.substring(0, idx) : "/";
-    });
-  });
-
-  it("calls dirname to get the parent, then invoke with 'grant_path_access' and the parent path", async () => {
-    await grantParentAccess("/some/folder/file.json");
-
-    expect(mockPath.dirname).toHaveBeenCalledWith("/some/folder/file.json");
-    expect(mockCore.invoke).toHaveBeenCalledTimes(1);
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "/some/folder",
-    });
-  });
-
-  it("grants access to the parent for a file at a nested path", async () => {
-    await grantParentAccess("/a/b/c/d/song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "/a/b/c/d",
-    });
-  });
-
-  it("propagates errors from dirname", async () => {
-    mockPath.dirname.mockImplementation(() => {
-      throw new Error("invalid path");
-    });
-
-    await expect(grantParentAccess("/some/folder/file.json")).rejects.toThrow(
-      "invalid path"
-    );
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("propagates errors from invoke", async () => {
-    mockCore.invoke.mockRejectedValue(new Error("scope denied"));
-
-    await expect(grantParentAccess("/some/folder/file.json")).rejects.toThrow(
-      "scope denied"
-    );
-  });
-
-  it("does not grant access when the parent is the Unix root", async () => {
-    mockPath.dirname.mockImplementation(() => "/");
-
-    await grantParentAccess("/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows drive root", async () => {
-    mockPath.dirname.mockImplementation(() => "C:\\");
-
-    await grantParentAccess("C:\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns an empty string", async () => {
-    mockPath.dirname.mockImplementation(() => "");
-
-    await grantParentAccess("song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows drive root without trailing slash (C:)", async () => {
-    mockPath.dirname.mockImplementation(() => "C:");
-
-    await grantParentAccess("C:song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows drive root with a forward slash (C:/)", async () => {
-    mockPath.dirname.mockImplementation(() => "C:/");
-
-    await grantParentAccess("C:/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a UNC share root (\\\\server\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\share");
-
-    await grantParentAccess("\\\\server\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a UNC share root with a trailing backslash", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\share\\");
-
-    await grantParentAccess("\\\\server\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows extended-length drive root (\\\\?\\\\C:\\\\)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\C:\\");
-
-    await grantParentAccess("\\\\?\\C:\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows extended-length drive root without trailing slash (\\\\?\\\\C:)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\C:");
-
-    await grantParentAccess("\\\\?\\C:song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows extended-length UNC root (\\\\?\\\\UNC\\\\server\\\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\share");
-
-    await grantParentAccess("\\\\?\\UNC\\server\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when the parent is a UNC subfolder (\\\\server\\share\\music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\share\\music");
-
-    await grantParentAccess("\\\\server\\share\\music\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\server\\share\\music",
-    });
-  });
-
-  it("grants access when the parent is a Windows extended-length subfolder (\\\\?\\\\C:\\\\music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\C:\\music");
-
-    await grantParentAccess("\\\\?\\C:\\music\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\C:\\music",
-    });
-  });
-
-  it("does not grant access when the parent contains a null byte (\\x00)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\x00/evil");
-
-    await grantParentAccess("/music\x00/evil/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains SOH (\\x01)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\x01folder");
-
-    await grantParentAccess("/music\x01folder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a tab character (\\x09)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\x09folder");
-
-    await grantParentAccess("/music\x09folder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a newline character (\\x0A)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\nfolder");
-
-    await grantParentAccess("/music\nfolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a carriage return character (\\x0D)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\rfolder");
-
-    await grantParentAccess("/music\rfolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains an ESC character (\\x1B)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\x1bfolder");
-
-    await grantParentAccess("/music\x1bfolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains US (\\x1F)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\x1ffolder");
-
-    await grantParentAccess("/music\x1ffolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains DEL (\\x7F)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\x7ffolder");
-
-    await grantParentAccess("/music\x7ffolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent is a Windows path containing a null byte (\\x00)", async () => {
-    mockPath.dirname.mockImplementation(() => "C:\\music\x00folder");
-
-    await grantParentAccess("C:\\music\x00folder\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a LINE SEPARATOR (U+2028)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u2028folder");
-
-    await grantParentAccess("/music\u2028folder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a PARAGRAPH SEPARATOR (U+2029)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u2029folder");
-
-    await grantParentAccess("/music\u2029folder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains LTR MARK (U+200E)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u200efolder");
-
-    await grantParentAccess("/music\u200efolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains RTL MARK (U+200F)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u200ffolder");
-
-    await grantParentAccess("/music\u200ffolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a BIDI override (U+202E)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u202efolder");
-
-    await grantParentAccess("/music\u202efolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a BIDI isolate (U+2066)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u2066folder");
-
-    await grantParentAccess("/music\u2066folder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a BOM (U+FEFF)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\ufefffolder");
-
-    await grantParentAccess("/music\ufefffolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains a BIDI override embedded in a Windows path (U+202E)", async () => {
-    mockPath.dirname.mockImplementation(() => "C:\\music\u202efolder");
-
-    await grantParentAccess("C:\\music\u202efolder\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains U+202A (LRE — lower bound of BIDI formatting range)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u202afolder");
-
-    await grantParentAccess("/music\u202afolder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when the parent contains U+2069 (PDI — upper bound of BIDI isolate range)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u2069folder");
-
-    await grantParentAccess("/music\u2069folder/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when the parent contains accented Latin characters (é)", async () => {
-    mockPath.dirname.mockImplementation(() => "/music/caf\u00e9");
-
-    await grantParentAccess("/music/caf\u00e9/song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", { path: "/music/caf\u00e9" });
-  });
-
-  it("grants access when the parent contains CJK characters", async () => {
-    mockPath.dirname.mockImplementation(() => "/\u4e2d\u6587/\u97f3\u4e50");
-
-    await grantParentAccess("/\u4e2d\u6587/\u97f3\u4e50/song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", { path: "/\u4e2d\u6587/\u97f3\u4e50" });
-  });
-
-  it("does not grant access when dirname returns a forward-slash UNC share root (//server/share)", async () => {
-    mockPath.dirname.mockImplementation(() => "//server/share");
-
-    await grantParentAccess("//server/share/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a mixed-separator UNC share root (\\\\server/share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server/share");
-
-    await grantParentAccess("\\\\server/share/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns doubled-prefix UNC share root (\\\\\\\\server\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\\\\\server\\share");
-
-    await grantParentAccess("\\\\\\\\server\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns doubled-prefix forward-slash UNC share root (////server/share)", async () => {
-    mockPath.dirname.mockImplementation(() => "////server/share");
-
-    await grantParentAccess("////server/share/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns doubled-prefix UNC subfolder (\\\\\\\\server\\share\\music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\\\\\server\\share\\music");
-
-    await grantParentAccess("\\\\\\\\server\\share\\music\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\\\\\server\\share\\music",
-    });
-  });
-
-  it("does not grant access when dirname returns doubled-interior-separator UNC share root (\\\\server\\\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share");
-
-    await grantParentAccess("\\\\server\\\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns doubled-interior-separator UNC share root with trailing sep (\\\\server\\\\share\\)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share\\");
-
-    await grantParentAccess("\\\\server\\\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns doubled-interior-separator forward-slash UNC share root (//server//share)", async () => {
-    mockPath.dirname.mockImplementation(() => "//server//share");
-
-    await grantParentAccess("//server//share/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns doubled-interior-separator UNC subfolder (\\\\server\\\\share\\folder)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share\\folder");
-
-    await grantParentAccess("\\\\server\\\\share\\folder\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\server\\\\share\\folder",
-    });
-  });
-
-  it("grants access when dirname returns doubled-interior-separator UNC subfolder with doubled sep (\\\\server\\\\share\\\\folder)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server\\\\share\\\\folder");
-
-    await grantParentAccess("\\\\server\\\\share\\\\folder\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\server\\\\share\\\\folder",
-    });
-  });
-
-  it("does not grant access when dirname returns mixed-separator doubled-interior UNC share root (\\\\server/\\\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\server/\\\\share");
-
-    await grantParentAccess("\\\\server/\\\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a Windows extended-length prefix with forward-slash (\\\\?/C:\\\\)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?/C:\\");
-
-    await grantParentAccess("\\\\?/C:\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a bare extended-length prefix with no inner path (\\\\?\\\\)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\");
-
-    await grantParentAccess("\\\\?\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a GLOBALROOT device path (\\\\?\\\\GLOBALROOT\\\\Device)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\GLOBALROOT\\Device");
-
-    await grantParentAccess("\\\\?\\GLOBALROOT\\Device\\Volume1\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a DOS device namespace path (\\\\\\\\.\\\\C:\\\\)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\.\\C:\\");
-
-    await grantParentAccess("\\\\.\\C:\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a Volume GUID root (\\\\?\\\\Volume{GUID})", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}");
-
-    await grantParentAccess("\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a Volume GUID root with trailing backslash", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\");
-
-    await grantParentAccess("\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a lowercase Volume GUID root (case-insensitive)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\volume{12345678-1234-1234-1234-1234567890AB}");
-
-    await grantParentAccess("\\\\?\\volume{12345678-1234-1234-1234-1234567890AB}\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a forward-slash Volume GUID root (//?/Volume{GUID})", async () => {
-    mockPath.dirname.mockImplementation(() => "//?/Volume{12345678-1234-1234-1234-1234567890AB}");
-
-    await grantParentAccess("//?/Volume{12345678-1234-1234-1234-1234567890AB}/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns a subfolder under a Volume GUID path", async () => {
-    mockPath.dirname.mockImplementation(
-      () => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music"
-    );
-
-    await grantParentAccess(
-      "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music\\song.wav"
-    );
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}\\music",
-    });
-  });
-
-  it("does not grant access when dirname returns an empty-GUID Volume root (\\\\?\\\\Volume{})", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\Volume{}");
-
-    await grantParentAccess("\\\\?\\Volume{}\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a Volume GUID path with no separator after '}' (\\\\?\\\\Volume{GUID}suffix)", async () => {
-    mockPath.dirname.mockImplementation(
-      () => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}suffix"
-    );
-
-    await grantParentAccess(
-      "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}suffix\\song.wav"
-    );
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a raw volume device path (\\\\?\\\\HarddiskVolume3)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\HarddiskVolume3");
-
-    await grantParentAccess("\\\\?\\HarddiskVolume3\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a raw physical drive path (\\\\?\\\\PhysicalDrive0)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\PhysicalDrive0");
-
-    await grantParentAccess("\\\\?\\PhysicalDrive0\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a BootPartition device path (\\\\?\\\\BootPartition)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\BootPartition");
-
-    await grantParentAccess("\\\\?\\BootPartition\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a SystemPartition device path (\\\\?\\\\SystemPartition)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\SystemPartition");
-
-    await grantParentAccess("\\\\?\\SystemPartition\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a named pipe device path (\\\\?\\\\PIPE\\\\foo)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\PIPE\\foo");
-
-    await grantParentAccess("\\\\?\\PIPE\\foo\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access when dirname returns a mailslot device path (\\\\?\\\\MAILSLOT\\\\foo)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\MAILSLOT\\foo");
-
-    await grantParentAccess("\\\\?\\MAILSLOT\\foo\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns an extended-length UNC subfolder (\\\\?\\\\UNC\\\\server\\\\share\\\\music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\share\\music");
-
-    await grantParentAccess("\\\\?\\UNC\\server\\share\\music\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\UNC\\server\\share\\music",
-    });
-  });
-
-  it("does not grant access for forward-slash extended-length PIPE path (//?/PIPE/foo)", async () => {
-    mockPath.dirname.mockImplementation(() => "//?/PIPE/foo");
-
-    await grantParentAccess("//?/PIPE/foo/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access for forward-slash extended-length raw volume (//?/HarddiskVolume3)", async () => {
-    mockPath.dirname.mockImplementation(() => "//?/HarddiskVolume3");
-
-    await grantParentAccess("//?/HarddiskVolume3/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access for mixed-separator extended-length MAILSLOT (\\\\?/MAILSLOT/foo)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?/MAILSLOT/foo");
-
-    await grantParentAccess("\\\\?/MAILSLOT/foo/song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access for multi-level device-namespace path (\\\\?\\\\PIPE\\\\a\\\\b\\\\c)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\PIPE\\a\\b\\c");
-
-    await grantParentAccess("\\\\?\\PIPE\\a\\b\\c\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("does not grant access for an unknown arbitrary device-namespace path (proves allowlist)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UnknownDevice\\sub");
-
-    await grantParentAccess("\\\\?\\UnknownDevice\\sub\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns an extended-length drive subfolder with forward-slash inner sep (\\\\?\\\\C:/music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\C:/music");
-
-    await grantParentAccess("\\\\?\\C:/music/song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\C:/music",
-    });
-  });
-
-  it("grants access when dirname returns an extended-length UNC subfolder with forward slashes (//server/share/music)", async () => {
-    mockPath.dirname.mockImplementation(() => "//?/UNC/server/share/music");
-
-    await grantParentAccess("//?/UNC/server/share/music/song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "//?/UNC/server/share/music",
-    });
-  });
-
-  it("grants access when dirname returns an extended-length Volume GUID subfolder with forward-slash separator (\\\\?\\\\Volume{GUID}/music)", async () => {
-    mockPath.dirname.mockImplementation(
-      () => "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music"
-    );
-
-    await grantParentAccess(
-      "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music/song.wav"
-    );
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\Volume{12345678-1234-1234-1234-1234567890AB}/music",
-    });
-  });
-
-  it("does not grant access when dirname returns doubled-interior-separator extended-length UNC root (\\\\?\\\\UNC\\\\\\\\server\\\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\\\server\\share");
-
-    await grantParentAccess("\\\\?\\UNC\\\\server\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns doubled-interior-separator extended-length UNC subfolder (\\\\?\\\\UNC\\\\\\\\server\\\\share\\\\music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\\\server\\share\\music");
-
-    await grantParentAccess("\\\\?\\UNC\\\\server\\share\\music\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\UNC\\\\server\\share\\music",
-    });
-  });
-
-  it("does not grant access when dirname returns doubled-separator-after-server extended-length UNC root (\\\\?\\\\UNC\\\\server\\\\\\\\share)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\\\share");
-
-    await grantParentAccess("\\\\?\\UNC\\server\\\\share\\song.wav");
-
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("grants access when dirname returns doubled-separator-after-server extended-length UNC subfolder (\\\\?\\\\UNC\\\\server\\\\\\\\share\\\\music)", async () => {
-    mockPath.dirname.mockImplementation(() => "\\\\?\\UNC\\server\\\\share\\music");
-
-    await grantParentAccess("\\\\?\\UNC\\server\\\\share\\music\\song.wav");
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "\\\\?\\UNC\\server\\\\share\\music",
-    });
+    await expect(restorePathScope("/some/folder")).rejects.toThrow("scope denied");
   });
 });
 
 describe("pickFolder", () => {
   beforeEach(() => {
     resetTauriMocks();
-    mockCore.invoke.mockResolvedValue(undefined);
   });
 
-  it("opens a directory picker and returns the selected folder path", async () => {
-    mockDialog.open.mockResolvedValue("/user/music");
+  it("invokes pick_folder_and_grant with null options when none provided", async () => {
+    mockCore.invoke.mockResolvedValue("/user/music");
 
     const result = await pickFolder();
 
-    expect(mockDialog.open).toHaveBeenCalledWith({ directory: true, multiple: false });
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
+      title: null,
+      defaultPath: null,
+    });
     expect(result).toBe("/user/music");
   });
 
-  it("passes title and defaultPath options to the dialog", async () => {
-    mockDialog.open.mockResolvedValue("/user/music");
+  it("passes title and defaultPath to the Rust command", async () => {
+    mockCore.invoke.mockResolvedValue("/user/music");
 
     await pickFolder({ title: "Choose Folder", defaultPath: "/user" });
 
-    expect(mockDialog.open).toHaveBeenCalledWith({
-      directory: true,
-      multiple: false,
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
       title: "Choose Folder",
       defaultPath: "/user",
     });
   });
 
-  it("grants path access after the user selects a folder", async () => {
-    mockDialog.open.mockResolvedValue("/user/music");
-
-    await pickFolder();
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "/user/music",
-    });
-  });
-
-  it("handles an array response and grants access to the first element", async () => {
-    mockDialog.open.mockResolvedValue(["/user/music", "/other"]);
-
-    const result = await pickFolder();
-
-    expect(result).toBe("/user/music");
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", { path: "/user/music" });
-  });
-
-  it("returns null and does not grant access when the dialog is cancelled", async () => {
-    mockDialog.open.mockResolvedValue(null);
+  it("returns null when the Rust command returns null (user cancelled)", async () => {
+    mockCore.invoke.mockResolvedValue(null);
 
     const result = await pickFolder();
 
     expect(result).toBeNull();
-    expect(mockCore.invoke).not.toHaveBeenCalled();
   });
 
-  it("returns null and does not grant access when the dialog returns an empty array", async () => {
-    mockDialog.open.mockResolvedValue([]);
+  it("returns null and shows an error toast when the command rejects", async () => {
+    const { toast } = await import("sonner");
+    mockCore.invoke.mockRejectedValue(new Error("scope denied"));
 
     const result = await pickFolder();
 
     expect(result).toBeNull();
-    expect(mockCore.invoke).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining("scope denied")
+    );
   });
 });
 
 describe("pickFile", () => {
   beforeEach(() => {
     resetTauriMocks();
-    mockCore.invoke.mockResolvedValue(undefined);
-    mockPath.dirname.mockImplementation((path: string) => {
-      const normalized = path.replace(/\\/g, "/");
-      const idx = normalized.lastIndexOf("/");
-      return idx > 0 ? normalized.substring(0, idx) : "/";
-    });
   });
 
-  it("opens a file picker and returns the selected file path", async () => {
-    mockDialog.open.mockResolvedValue("/user/music/kick.wav");
+  it("invokes pick_file_and_grant with null options when none provided", async () => {
+    mockCore.invoke.mockResolvedValue("/user/music/kick.wav");
 
     const result = await pickFile();
 
-    expect(mockDialog.open).toHaveBeenCalledWith({ multiple: false });
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_file_and_grant", {
+      title: null,
+      defaultPath: null,
+      filters: null,
+    });
     expect(result).toBe("/user/music/kick.wav");
   });
 
-  it("passes filters and defaultPath options to the dialog", async () => {
-    mockDialog.open.mockResolvedValue("/user/music/kick.wav");
+  it("passes title, defaultPath, and filters to the Rust command", async () => {
+    mockCore.invoke.mockResolvedValue("/user/music/kick.wav");
     const filters = [{ name: "Audio", extensions: ["wav", "mp3"] }];
 
-    await pickFile({ filters, defaultPath: "/user/music" });
+    await pickFile({ title: "Choose File", defaultPath: "/user/music", filters });
 
-    expect(mockDialog.open).toHaveBeenCalledWith({
-      multiple: false,
-      filters,
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_file_and_grant", {
+      title: "Choose File",
       defaultPath: "/user/music",
+      filters,
     });
   });
 
-  it("grants access to the parent directory after the user selects a file", async () => {
-    mockDialog.open.mockResolvedValue("/user/music/kick.wav");
-
-    await pickFile();
-
-    expect(mockCore.invoke).toHaveBeenCalledWith("grant_path_access", {
-      path: "/user/music",
-    });
-  });
-
-  it("returns null and does not grant access when the dialog is cancelled", async () => {
-    mockDialog.open.mockResolvedValue(null);
+  it("returns null when the command returns null (user cancelled)", async () => {
+    mockCore.invoke.mockResolvedValue(null);
 
     const result = await pickFile();
 
     expect(result).toBeNull();
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("returns null and does not grant access when the dialog returns an empty array", async () => {
-    mockDialog.open.mockResolvedValue([]);
-
-    const result = await pickFile();
-
-    expect(result).toBeNull();
-    expect(mockCore.invoke).not.toHaveBeenCalled();
   });
 });
 
-describe("grantParentDirectories", () => {
+describe("pickFiles", () => {
+  beforeEach(() => {
+    resetTauriMocks();
+  });
+
+  it("invokes pick_files_and_grant and returns the selected paths", async () => {
+    mockCore.invoke.mockResolvedValue(["/music/kick.wav", "/music/snare.wav"]);
+
+    const result = await pickFiles();
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_files_and_grant", {
+      title: null,
+      defaultPath: null,
+      filters: null,
+    });
+    expect(result).toEqual(["/music/kick.wav", "/music/snare.wav"]);
+  });
+
+  it("passes filters and options to the Rust command", async () => {
+    mockCore.invoke.mockResolvedValue(["/music/kick.wav"]);
+    const filters = [{ name: "Audio", extensions: ["wav", "mp3"] }];
+
+    await pickFiles({ filters });
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_files_and_grant", {
+      title: null,
+      defaultPath: null,
+      filters,
+    });
+  });
+
+  it("returns an empty array when the command returns an empty array (user cancelled)", async () => {
+    mockCore.invoke.mockResolvedValue([]);
+
+    const result = await pickFiles();
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe("grantDroppedPaths", () => {
   beforeEach(() => {
     resetTauriMocks();
     mockCore.invoke.mockResolvedValue(undefined);
@@ -843,8 +168,8 @@ describe("grantParentDirectories", () => {
     });
   });
 
-  it("grants unique parent directories for multiple file paths", async () => {
-    await grantParentDirectories(["/music/kick.wav", "/music/snare.wav", "/sfx/boom.wav"]);
+  it("calls restorePathScope for each unique parent directory", async () => {
+    await grantDroppedPaths(["/music/kick.wav", "/music/snare.wav", "/sfx/boom.wav"]);
 
     const paths = mockCore.invoke.mock.calls.map((c) => (c[1] as { path: string }).path);
     expect(paths).toHaveLength(2);
@@ -852,84 +177,22 @@ describe("grantParentDirectories", () => {
     expect(paths).toContain("/sfx");
   });
 
-  it("does not grant access when the parent is the Unix root", async () => {
-    mockPath.dirname.mockImplementation(() => "/");
-    await grantParentDirectories(["/song.wav"]);
+  it("deduplicates parent directories so each is granted only once", async () => {
+    await grantDroppedPaths(["/music/kick.wav", "/music/snare.wav"]);
+
+    expect(mockCore.invoke).toHaveBeenCalledTimes(1);
+    expect(mockCore.invoke).toHaveBeenCalledWith("restore_path_scope", { path: "/music" });
+  });
+
+  it("does nothing for an empty array", async () => {
+    await grantDroppedPaths([]);
+
     expect(mockCore.invoke).not.toHaveBeenCalled();
   });
 
   it("resolves without throwing when a grant fails (allSettled)", async () => {
     mockCore.invoke.mockRejectedValue(new Error("scope denied"));
-    await expect(grantParentDirectories(["/music/kick.wav"])).resolves.toBeUndefined();
-  });
 
-  it("does nothing for an empty array", async () => {
-    await grantParentDirectories([]);
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("skips parents containing BIDI control characters", async () => {
-    mockPath.dirname.mockImplementation(() => "/music\u202efolder");
-    await grantParentDirectories(["/music\u202efolder/song.wav"]);
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-});
-
-describe("pickFiles", () => {
-  beforeEach(() => {
-    resetTauriMocks();
-    mockCore.invoke.mockResolvedValue(undefined);
-    mockPath.dirname.mockImplementation((path: string) => {
-      const normalized = path.replace(/\\/g, "/");
-      const idx = normalized.lastIndexOf("/");
-      return idx > 0 ? normalized.substring(0, idx) : "/";
-    });
-  });
-
-  it("opens a multi-file picker and returns all selected paths", async () => {
-    mockDialog.open.mockResolvedValue(["/music/kick.wav", "/music/snare.wav"]);
-
-    const result = await pickFiles();
-
-    expect(mockDialog.open).toHaveBeenCalledWith({ multiple: true });
-    expect(result).toEqual(["/music/kick.wav", "/music/snare.wav"]);
-  });
-
-  it("grants access to unique parent directories", async () => {
-    mockDialog.open.mockResolvedValue(["/music/kick.wav", "/music/snare.wav", "/sfx/boom.wav"]);
-
-    await pickFiles();
-
-    const invokeCalls = mockCore.invoke.mock.calls.map((c) => (c[1] as { path: string }).path);
-    expect(invokeCalls).toHaveLength(2);
-    expect(invokeCalls).toContain("/music");
-    expect(invokeCalls).toContain("/sfx");
-  });
-
-  it("returns an empty array and does not grant access when the dialog is cancelled", async () => {
-    mockDialog.open.mockResolvedValue(null);
-
-    const result = await pickFiles();
-
-    expect(result).toEqual([]);
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("returns an empty array and does not grant access when the dialog returns an empty array", async () => {
-    mockDialog.open.mockResolvedValue([]);
-
-    const result = await pickFiles();
-
-    expect(result).toEqual([]);
-    expect(mockCore.invoke).not.toHaveBeenCalled();
-  });
-
-  it("passes filters and other options to the dialog", async () => {
-    mockDialog.open.mockResolvedValue(["/music/kick.wav"]);
-    const filters = [{ name: "Audio", extensions: ["wav", "mp3"] }];
-
-    await pickFiles({ filters });
-
-    expect(mockDialog.open).toHaveBeenCalledWith({ filters, multiple: true });
+    await expect(grantDroppedPaths(["/music/kick.wav"])).resolves.toBeUndefined();
   });
 });

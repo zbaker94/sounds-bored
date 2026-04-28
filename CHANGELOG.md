@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- **Tightened file system access**: The app no longer requests broad read access to your home directory, Music, Documents, Downloads, or Desktop folders at startup — access is now granted only for folders you explicitly select.
+- **Hardened folder/file pickers**: Dialog selection and folder access are now handled atomically in the backend, so the app cannot be tricked into accessing paths you didn't choose through the native picker.
+- **Reduced static permissions**: Removed the standing `$AUDIO/**` file system scope grant; audio file access is now granted dynamically when you add a folder or import sounds.
 - Tightened app file access permissions: the app no longer has broad read access to your home directory, music library, documents, downloads, and desktop at startup — access is now granted only to folders you explicitly choose.
 - Fixed a security issue where a compromised renderer could have read arbitrary files (SSH keys, browser data, shell history) via the asset protocol; access is now scoped to app data directories and user-selected folders only.
 - Internal audio playback state management refactored to eliminate code duplication, with 16 new tests added to verify correctness and stability.

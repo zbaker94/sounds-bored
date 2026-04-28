@@ -5,7 +5,7 @@ import { ZodError } from "zod";
 import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
 import { migrateProject, MigrationError } from "./migrations";
-import { pickFolder, grantPathAccess } from "@/lib/scope";
+import { pickFolder, restorePathScope } from "@/lib/scope";
 
 /** Fallback folder/zip-base name used when sanitization yields an unusable result. */
 const FALLBACK_PROJECT_NAME = "project";
@@ -114,7 +114,7 @@ export async function loadProjectFromPath(folderPath: string): Promise<{
 }> {
   // Grant runtime fs-scope access before any reads. Projects loaded from history
   // may live under paths whose static scope grants were removed in this PR.
-  await grantPathAccess(folderPath);
+  await restorePathScope(folderPath);
   const projectFilePath = await validateProjectFolder(folderPath);
   const project = await loadProjectFile(projectFilePath);
 

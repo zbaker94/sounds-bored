@@ -42,14 +42,12 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
-const mockGrantPathAccess = vi.fn();
+const mockRestorePathScope = vi.fn();
 vi.mock("@/lib/scope", () => ({
-  grantPathAccess: (...args: unknown[]) => mockGrantPathAccess(...args),
-  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+  restorePathScope: (...args: unknown[]) => mockRestorePathScope(...args),
   pickFolder: vi.fn(),
   pickFile: vi.fn(),
   pickFiles: vi.fn(),
-  grantParentDirectories: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -66,7 +64,7 @@ beforeEach(() => {
   mockReconcile.mockReset();
   mockRefreshMissingState.mockReset();
   mockSaveCurrentLibrarySync.mockReset();
-  mockGrantPathAccess.mockReset();
+  mockRestorePathScope.mockReset();
 
   mockLoadAppSettings.mockResolvedValue(defaultSettings);
   mockLoadGlobalLibrary.mockResolvedValue(defaultLibrary);
@@ -77,7 +75,7 @@ beforeEach(() => {
   mockSaveCurrentLibrarySync.mockImplementation(() => {
     useLibraryStore.getState().clearDirtyFlag();
   });
-  mockGrantPathAccess.mockResolvedValue(undefined);
+  mockRestorePathScope.mockResolvedValue(undefined);
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -325,7 +323,7 @@ describe("useBootLoader", () => {
     mockLoadAppSettings.mockResolvedValue(settings);
 
     const grantCallOrder: string[] = [];
-    mockGrantPathAccess.mockImplementation((p: string) => {
+    mockRestorePathScope.mockImplementation((p: string) => {
       grantCallOrder.push(`grant:${p}`);
       return Promise.resolve();
     });
@@ -338,8 +336,8 @@ describe("useBootLoader", () => {
       renderHook(() => useBootLoader());
     });
 
-    expect(mockGrantPathAccess).toHaveBeenCalledWith(folderA.path);
-    expect(mockGrantPathAccess).toHaveBeenCalledWith(folderB.path);
+    expect(mockRestorePathScope).toHaveBeenCalledWith(folderA.path);
+    expect(mockRestorePathScope).toHaveBeenCalledWith(folderB.path);
     // Both grants must appear before reconcile in the call order
     const reconcileIdx = grantCallOrder.indexOf("reconcile");
     expect(grantCallOrder.indexOf(`grant:${folderA.path}`)).toBeLessThan(reconcileIdx);
@@ -351,7 +349,7 @@ describe("useBootLoader", () => {
     const folder = createMockGlobalFolder({ path: "/music/a" });
     const settings = createMockAppSettings({ globalFolders: [folder] });
     mockLoadAppSettings.mockResolvedValue(settings);
-    mockGrantPathAccess.mockRejectedValue(new Error("scope denied"));
+    mockRestorePathScope.mockRejectedValue(new Error("scope denied"));
 
     const { result } = renderHook(() => useBootLoader());
     await act(async () => {});
@@ -363,13 +361,13 @@ describe("useBootLoader", () => {
     );
   });
 
-  it("does not call grantPathAccess when globalFolders is empty", async () => {
+  it("does not call restorePathScope when globalFolders is empty", async () => {
     mockLoadAppSettings.mockResolvedValue(createMockAppSettings({ globalFolders: [] }));
 
     await act(async () => {
       renderHook(() => useBootLoader());
     });
 
-    expect(mockGrantPathAccess).not.toHaveBeenCalled();
+    expect(mockRestorePathScope).not.toHaveBeenCalled();
   });
 });

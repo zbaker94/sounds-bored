@@ -31,8 +31,7 @@ import { PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION
 vi.mock("@/lib/scope", () => ({
   pickFolder: vi.fn(),
   pickFile: vi.fn(),
-  grantPathAccess: vi.fn().mockResolvedValue(undefined),
-  grantParentAccess: vi.fn().mockResolvedValue(undefined),
+  restorePathScope: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { pickFolder } from "@/lib/scope";

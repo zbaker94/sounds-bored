@@ -260,19 +260,11 @@ None.
 - **Finding**: `assetProtocol.scope` contained `$HOME/**` (plus `$MUSIC/**`, `$DOCUMENT/**`, `$DOWNLOAD/**`, `$DESKTOP/**`). The audio engine reads sound files via `convertFileSrc(path)` + `fetch(url)` through the `asset:` protocol (see `bufferCache.ts:16-22`, `preview.ts:34`, `streamingCache.ts:67/96/163`). This means a renderer XSS can `fetch('asset://localhost/' + anyPath)` to read any file under the user's home directory — including `~/.ssh/`, browser profiles, and shell history — and exfiltrate the bytes. This is a broader version of what the `fs:scope` cleanup was intended to address: the asset protocol provides an equivalent (and wider) read primitive that was left untouched.
 - **Fix applied**: Removed `$HOME/**`, `$MUSIC/**`, `$DOCUMENT/**`, `$DOWNLOAD/**`, and `$DESKTOP/**` from `tauri.conf.json`'s `assetProtocol.scope`; retained `$RESOURCE/**`, `$APP/**/*`, `$APPDATA/**`, `$APPLOCALDATA/**`. Extended `grant_path_access` in `commands.rs` to call `app.asset_protocol_scope().allow_directory(&path, true)` alongside the existing `app.fs_scope()` call (`tauri::Manager` imported for trait access). The boot-time `grantPathAccess` replay in `useBootLoader.ts:42-44` now covers both scopes simultaneously on every app start.
 
-#### [SEC2] `grant_path_access` IPC is reachable from any renderer script
+#### [SEC2] `grant_path_access` IPC is reachable from any renderer script ✅ Fixed
 - **File**: `src-tauri/src/commands.rs:821-828`
 - **Severity**: Low
 - **Finding**: `validate_grant_path` enforces many constraints but does not tie the path to a recent user-initiated native dialog selection. A malicious script inside the renderer can call this command to grant itself fs scope over any legitimate-looking absolute path (e.g., `C:/Users/victim/Documents`) and then read/write via the standard fs plugin.
-- **Evidence**:
-  ```rust
-  #[tauri::command]
-  pub fn grant_path_access(app: AppHandle, path: String) -> Result<(), String> {
-      validate_grant_path(&path)?;
-      app.fs_scope().allow_directory(&path, true).map_err(|e| e.to_string())
-  }
-  ```
-- **Recommendation**: Track user-dialog-issued paths in a short-TTL server-side allowlist and reject `grant_path_access` calls for paths not in that allowlist. Alternatively, move dialog invocation into Rust so grants are gated on "this path was just returned by `dialog::open`".
+- **Fix applied**: Removed `grant_path_access` from the IPC invoke handler entirely. Replaced with three atomic Rust commands (`pick_folder_and_grant`, `pick_file_and_grant`, `pick_files_and_grant`) that run the native OS dialog inside Rust and grant scope before returning the path — a renderer script can no longer supply an arbitrary path to the grant path. For session-restore cases (replaying persisted folder grants on app startup), a narrower `restore_path_scope` command is exposed that still runs `validate_grant_path`. The drag-and-drop path uses `grantDroppedPaths` → `restore_path_scope`, which relies on OS-event path provenance and server-side `validate_grant_path` enforcement. All 1885 TypeScript tests and 62 Rust tests pass.
 
 #### [SEC3] `start_download` accepts relative `download_folder_path`
 - **File**: `src-tauri/src/commands.rs:237-251`

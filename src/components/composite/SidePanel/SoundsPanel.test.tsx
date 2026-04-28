@@ -18,10 +18,15 @@ import {
   createMockSoundInstance,
 } from "@/test/factories";
 
-// Mock Tauri dialog (tauri-mocks.ts already mocks plugin-dialog globally,
-// but we need a named vi.mock here to control return values per test)
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  open: vi.fn(),
+// Mock scope to intercept picker calls without going through invoke
+const mockPickFiles = vi.fn();
+const mockPickFolder = vi.fn();
+const mockGrantDroppedPaths = vi.fn();
+vi.mock("@/lib/scope", () => ({
+  pickFiles: (...args: unknown[]) => mockPickFiles(...args),
+  pickFolder: (...args: unknown[]) => mockPickFolder(...args),
+  grantDroppedPaths: (...args: unknown[]) => mockGrantDroppedPaths(...args),
+  restorePathScope: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock Tauri window drag-drop events
@@ -76,8 +81,6 @@ vi.mock("./AddToSetDialog", () => ({
     open ? <div data-testid="add-to-set-dialog">AddToSetDialog open ({soundIds.length} sounds)</div> : null,
 }));
 
-// Pull in the mocked modules so tests can configure return values
-import { open } from "@tauri-apps/plugin-dialog";
 // plugin-fs is globally mocked by src/test/tauri-mocks.ts; pull the
 // auto-mocked `remove` so we can assert/clear it per-test.
 import { remove as fsRemove, exists as fsExists } from "@tauri-apps/plugin-fs";
@@ -109,7 +112,12 @@ beforeEach(() => {
   useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
   mockOnFileDropEvent.mockClear();
   mockOnFileDropEvent.mockReturnValue(Promise.resolve(() => {}));
-  vi.mocked(open).mockReset();
+  mockPickFiles.mockReset();
+  mockPickFiles.mockResolvedValue([]);
+  mockPickFolder.mockReset();
+  mockPickFolder.mockResolvedValue(null);
+  mockGrantDroppedPaths.mockReset();
+  mockGrantDroppedPaths.mockResolvedValue(undefined);
   mockMutateAsync.mockClear();
   vi.mocked(fsRemove).mockReset();
   vi.mocked(fsRemove).mockResolvedValue(undefined);
@@ -147,19 +155,16 @@ describe("SoundsPanel", () => {
     expect(screen.getByText("Add Folder")).toBeInTheDocument();
   });
 
-  // 4. Clicking "Add Sounds" calls open() with multiple: true and audio filter
-  it("calls open() with multiple: true and audio filter when Add Sounds is clicked", async () => {
-    vi.mocked(open).mockResolvedValueOnce(null);
-
+  // 4. Clicking "Add Sounds" calls pickFiles with audio filter
+  it("calls pickFiles with audio filter when Add Sounds is clicked", async () => {
     renderPanel();
     const btn = screen.getByRole("button", { name: /add sounds/i });
     await act(async () => {
       fireEvent.click(btn);
     });
 
-    expect(open).toHaveBeenCalledWith(
+    expect(mockPickFiles).toHaveBeenCalledWith(
       expect.objectContaining({
-        multiple: true,
         filters: expect.arrayContaining([
           expect.objectContaining({ name: "Audio" }),
         ]),
@@ -167,10 +172,9 @@ describe("SoundsPanel", () => {
     );
   });
 
-  // 5. Clicking "Add Folder" button calls open() with directory: true
-  it("calls open() with directory: true when Add Folder button (empty state) is clicked", async () => {
+  // 5. Clicking "Add Folder" button calls pickFolder
+  it("calls pickFolder when Add Folder button (empty state) is clicked", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" } });
-    vi.mocked(open).mockResolvedValueOnce(null);
 
     renderPanel();
     const btn = screen.getAllByRole("button", { name: /add folder/i })[0];
@@ -178,16 +182,14 @@ describe("SoundsPanel", () => {
       fireEvent.click(btn);
     });
 
-    expect(open).toHaveBeenCalledWith(
-      expect.objectContaining({ directory: true })
-    );
+    expect(mockPickFolder).toHaveBeenCalled();
   });
 
   // 5b. Duplicate folder path shows error toast and does not save
   it("shows an error toast and does not save when adding a folder that already exists", async () => {
     const existingFolder = createMockGlobalFolder({ path: "/music/sounds" });
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [existingFolder] } });
-    vi.mocked(open).mockResolvedValueOnce("/music/sounds");
+    mockPickFolder.mockResolvedValueOnce("/music/sounds");
 
     renderPanel();
     const btn = screen.getByRole("button", { name: /add folder/i });
