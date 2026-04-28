@@ -38,7 +38,12 @@ vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
   return { ...actual, useNavigate: vi.fn(() => vi.fn()) };
 });
-vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn() }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn(() => Promise.resolve()) }));
+vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn(() => Promise.resolve(true)) }));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
 
 const mockSaveSettings = vi.fn();
 vi.mock("@/lib/appSettings.queries", () => ({
@@ -47,6 +52,12 @@ vi.mock("@/lib/appSettings.queries", () => ({
 
 import { pickFolder } from "@/lib/scope";
 const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
+
+import { openPath } from "@tauri-apps/plugin-opener";
+const mockOpenPath = openPath as ReturnType<typeof vi.fn>;
+
+import { toast } from "sonner";
+const mockToastError = toast.error as ReturnType<typeof vi.fn>;
 
 function renderDialog() {
   return render(
@@ -67,6 +78,9 @@ beforeEach(() => {
   useAppSettingsStore.setState({ ...initialAppSettingsState });
   mockSaveSettings.mockClear();
   mockPickFolder.mockReset();
+  mockOpenPath.mockReset();
+  mockOpenPath.mockResolvedValue(undefined);
+  mockToastError.mockClear();
 });
 
 describe("SettingsDialog — shell", () => {
@@ -412,5 +426,24 @@ describe("SettingsDialog — Rename Folder", () => {
     await user.click(screen.getByRole("button", { name: "Other" }));
     await user.tab(); // blur without changing
     expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe("SettingsDialog — Open In Explorer error path", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows toast with error description when openPath throws", async () => {
+    const user = userEvent.setup();
+    setupFolderState();
+    mockOpenPath.mockRejectedValueOnce(new Error("permission denied"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("button", { name: /open other in file explorer/i }));
+    expect(mockToastError).toHaveBeenCalledWith("Could not open folder in file explorer.", {
+      description: "permission denied",
+    });
   });
 });

@@ -67,8 +67,11 @@ export function useBulkRemove(): {
       toast.success(
         `${idsToRemove.size} missing sound${idsToRemove.size > 1 ? "s" : ""} removed`,
       );
-    } catch {
-      toast.error("Failed to remove missing sounds");
+    } catch (err) {
+      console.error("[useBulkRemove] removeAllMissingSounds:", err);
+      toast.error("Failed to remove missing sounds", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setIsBulkRemoving(false);
       useUiStore.getState().closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS);
@@ -126,8 +129,11 @@ export function useBulkRemove(): {
           `${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`,
         );
       }
-    } catch {
-      toast.error("Failed to remove missing folders");
+    } catch (err) {
+      console.error("[useBulkRemove] removeAllMissingFolders:", err);
+      toast.error("Failed to remove missing folders", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setIsBulkRemoving(false);
       useUiStore.getState().closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS);

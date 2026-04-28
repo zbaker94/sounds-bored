@@ -108,8 +108,11 @@ function FoldersTab() {
         return;
       }
       await openPath(folder.path);
-    } catch {
-      toast.error("Could not open folder in file explorer.");
+    } catch (err) {
+      console.error("[SettingsDialog] openInExplorer:", err);
+      toast.error("Could not open folder in file explorer.", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   }
 

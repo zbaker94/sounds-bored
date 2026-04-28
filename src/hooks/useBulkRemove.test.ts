@@ -277,7 +277,9 @@ describe("useBulkRemove", () => {
         await result.current.handleRemoveAllMissingSounds();
       });
 
-      expect(mockToastError).toHaveBeenCalledWith("Failed to remove missing sounds");
+      expect(mockToastError).toHaveBeenCalledWith("Failed to remove missing sounds", {
+        description: "disk full",
+      });
       expect(result.current.isBulkRemoving).toBe(false);
       expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(false);
     });
@@ -302,7 +304,9 @@ describe("useBulkRemove", () => {
         await result.current.handleRemoveAllMissingFolders();
       });
 
-      expect(mockToastError).toHaveBeenCalledWith("Failed to remove missing folders");
+      expect(mockToastError).toHaveBeenCalledWith("Failed to remove missing folders", {
+        description: "disk full",
+      });
       expect(result.current.isBulkRemoving).toBe(false);
       expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(false);
     });

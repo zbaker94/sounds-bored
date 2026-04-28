@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -63,6 +63,10 @@ vi.mock("@/lib/audio/streamingCache", () => ({
   evictStreamingElement: vi.fn(),
 }));
 
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 const mockMutateAsync = vi.fn(() => Promise.resolve());
 
 vi.mock("@/lib/library.queries", () => ({
@@ -88,6 +92,12 @@ vi.mock("@/components/modals/ResolveMissingFolderDialog", () => ({
       </div>
     ) : null,
 }));
+
+import { openPath } from "@tauri-apps/plugin-opener";
+const mockOpenPath = openPath as ReturnType<typeof vi.fn>;
+
+import { toast } from "sonner";
+const mockToastError = toast.error as ReturnType<typeof vi.fn>;
 
 // ---------- helpers ----------
 
@@ -123,6 +133,10 @@ beforeEach(() => {
   useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
   useUiStore.setState({ ...initialUiState });
   mockMutateAsync.mockClear();
+  mockMutateAsync.mockResolvedValue(undefined);
+  mockOpenPath.mockReset();
+  mockOpenPath.mockResolvedValue(undefined);
+  mockToastError.mockClear();
 });
 
 // ---------- tests ----------
@@ -225,5 +239,57 @@ describe("FolderBrowser", () => {
     const addFolderBtn = screen.getByRole("button", { name: /add folder/i });
     expect(addFolderBtn).toBeInTheDocument();
     expect(addFolderBtn).not.toBeDisabled();
+  });
+});
+
+describe("FoldersPanel — error paths", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows toast with error description when openPath throws in handleOpenFolderInExplorer", async () => {
+    const folder = createMockGlobalFolder({ id: "f1", name: "Sounds", path: "/music/sounds" });
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ globalFolders: [folder] }),
+    });
+    mockOpenPath.mockRejectedValueOnce(new Error("permission denied"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderBrowser({ selectedId: "f1" });
+
+    const openBtn = screen.getByRole("button", { name: /^open$/i });
+    await act(async () => {
+      fireEvent.click(openBtn);
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith("Failed to open folder", {
+      description: "permission denied",
+    });
+  });
+
+  it("shows toast with error description when saveSettings throws in handleDeleteFolderFromDisk", async () => {
+    const folder = createMockGlobalFolder({ id: "f1", name: "Sounds", path: "/music/sounds" });
+    const settings = createMockAppSettings({
+      globalFolders: [folder],
+      downloadFolderId: undefined,
+      importFolderId: undefined,
+    });
+    useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
+    mockMutateAsync.mockRejectedValueOnce(new Error("disk full"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    renderBrowser({ selectedId: "f1" });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /delete from disk/i }));
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith("Failed to delete folder from disk", {
+      description: "disk full",
+    });
   });
 });

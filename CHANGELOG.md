@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Error notifications now include specific error details (e.g., "permission denied", "disk full") instead of generic messages when folder operations fail — affects opening folders in file explorer, deleting folders, and removing missing sounds/folders.
 - Fixed an internal volume scale inconsistency where pad volume and fade target were stored differently from all other volume fields; existing projects are automatically migrated to the new format (v1.4.0) on load with no change to playback behavior.
 - Fixed a bug where a failed download could leave the Download Dialog in a broken state — it now stays open with your input preserved so you can retry
 - Fixed `mod+shift+n` hotkey so adding a new pad now correctly navigates to the new pad's page and plays the flip animation

@@ -148,8 +148,11 @@ export function FoldersPanel({
         return;
       }
       await openPath(selectedFolder.path);
-    } catch {
-      toast.error("Failed to open folder");
+    } catch (err) {
+      console.error("[FoldersPanel] openFolderInExplorer:", err);
+      toast.error("Failed to open folder", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   }
 
@@ -195,8 +198,11 @@ export function FoldersPanel({
       }
       onSelect(null);
       toast.success(`Folder "${folderName}" deleted from disk`);
-    } catch {
-      toast.error("Failed to delete folder from disk");
+    } catch (err) {
+      console.error("[FoldersPanel] deleteFolderFromDisk:", err);
+      toast.error("Failed to delete folder from disk", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setIsDeletingFolder(false);
       setConfirmDeleteFolderOpen(false);

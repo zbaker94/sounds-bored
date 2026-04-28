@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (9 fixed) |
+| Medium | 16 (10 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -144,11 +144,10 @@ None.
 
 ---
 
-### [QUAL4] Empty `catch {}` blocks drop all diagnostic context in multiple handlers
+### ~~[QUAL4] Empty `catch {}` blocks drop all diagnostic context in multiple handlers~~ ✅ FIXED
 - **File**: `src/hooks/useBulkRemove.ts:70-72,129-131`; `src/components/composite/SidePanel/FoldersPanel.tsx:151,198`; `src/components/modals/SettingsDialog.tsx:111`
 - **Severity**: Medium
-- **Finding**: Multiple production catch blocks drop the error entirely: `} catch { toast.error("Failed to …"); }`. Users see a generic message; developers have no diagnostic trail.
-- **Recommendation**: Capture and log: `} catch (err) { console.error("[context]", err); toast.error("…", { description: err instanceof Error ? err.message : undefined }); }`
+- **Fix applied**: All 5 bare `catch {}` blocks now capture the error as `err`, call `console.error("[context]", err)` for the developer diagnostic trail, and pass `{ description: err instanceof Error ? err.message : undefined }` to `toast.error` so users see the error detail when available. 2 existing error-path tests in `useBulkRemove.test.ts` updated to assert the new toast signature. 2 new tests added to `FolderBrowser.test.tsx` covering the `handleOpenFolderInExplorer` and `handleDeleteFolderFromDisk` rejection paths. 1 new test added to `SettingsDialog.test.tsx` covering the `handleOpenInExplorer` rejection path.
 
 ---
 
@@ -636,4 +635,5 @@ None.
 | PERF1 | `useMultiFadeSideEffects` extracted; SceneView no longer subscribes to multi-fade state; zero-subscription hotkeys + Zustand subscribe for auto-cancel |
 | QUAL1 | `mod+shift+n` hotkey now navigates to new pad's page and plays flip animation; all page hotkeys centralized in `useGlobalHotkeys` |
 | QUAL3 | `DownloadDialog.handleSubmit` — `await startDownload` wrapped in `try/catch`; `catch` returns early since `onError` already shows a toast |
+| QUAL4 | 5 empty `catch {}` blocks across 3 files now capture `err`, call `console.error`, and pass `description` to `toast.error`; 5 tests added/updated |
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |
