@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio cache cleanup has been refactored for reliability — removing sounds from your library now clears all cached audio data more consistently.
 - Audio errors that previously failed silently when triggering pads now surface as proper error notifications.
 - Playback errors now show as user-visible toast notifications instead of being silently swallowed — this affects all pad interactions (tap, hold, drag, and back-face controls)
 - Error notifications now include specific error details (e.g., "permission denied", "disk full") instead of generic messages when folder operations fail — affects opening folders in file explorer, deleting folders, and removing missing sounds/folders.

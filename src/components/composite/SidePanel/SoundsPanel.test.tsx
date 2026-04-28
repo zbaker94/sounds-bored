@@ -50,12 +50,9 @@ vi.mock("@/lib/library.reconcile", () => ({
   refreshMissingState: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("@/lib/audio/bufferCache", () => ({
-  evictBuffer: vi.fn(),
-}));
-
-vi.mock("@/lib/audio/streamingCache", () => ({
-  evictStreamingElement: vi.fn(),
+vi.mock("@/lib/audio/cacheUtils", () => ({
+  evictSoundCaches: vi.fn(),
+  evictSoundCachesMany: vi.fn(),
 }));
 
 const mockMutateAsync = vi.fn(() => Promise.resolve());

@@ -28,8 +28,7 @@ import {
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictBuffer } from "@/lib/audio/bufferCache";
-import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { evictSoundCaches } from "@/lib/audio/cacheUtils";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
 import { useResolveSoundQueue } from "@/hooks/useResolveSoundQueue";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
@@ -160,8 +159,7 @@ export function SoundList({
             failedCount++;
           }
         }
-        evictBuffer(sound.id);
-        evictStreamingElement(sound.id);
+        evictSoundCaches(sound.id);
       }
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !selectedSoundIds.has(s.id));

@@ -16,12 +16,9 @@ vi.mock("@/lib/library.reconcile", () => ({
   refreshMissingState: vi.fn(),
 }));
 
-vi.mock("@/lib/audio/bufferCache", () => ({
-  evictBuffer: vi.fn(),
-}));
-
-vi.mock("@/lib/audio/streamingCache", () => ({
-  evictStreamingElement: vi.fn(),
+vi.mock("@/lib/audio/cacheUtils", () => ({
+  evictSoundCaches: vi.fn(),
+  evictSoundCachesMany: vi.fn(),
 }));
 
 const mockSaveLibrary = vi.fn();
@@ -45,13 +42,11 @@ vi.mock("sonner", () => ({
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictBuffer } from "@/lib/audio/bufferCache";
-import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
 import { toast } from "sonner";
 
 const mockRefreshMissingState = refreshMissingState as ReturnType<typeof vi.fn>;
-const mockEvictBuffer = evictBuffer as ReturnType<typeof vi.fn>;
-const mockEvictStreaming = evictStreamingElement as ReturnType<typeof vi.fn>;
+const mockEvictSoundCachesMany = evictSoundCachesMany as ReturnType<typeof vi.fn>;
 const mockToastSuccess = toast.success as ReturnType<typeof vi.fn>;
 const mockToastWarning = toast.warning as ReturnType<typeof vi.fn>;
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
@@ -63,8 +58,7 @@ beforeEach(() => {
   mockSaveLibrary.mockReset();
   mockSaveSettings.mockReset();
   mockRefreshMissingState.mockReset();
-  mockEvictBuffer.mockReset();
-  mockEvictStreaming.mockReset();
+  mockEvictSoundCachesMany.mockReset();
   mockToastSuccess.mockReset();
   mockToastWarning.mockReset();
   mockToastError.mockReset();
@@ -94,9 +88,9 @@ describe("useBulkRemove", () => {
       const latest = useLibraryStore.getState().sounds;
       expect(latest.map((s) => s.id)).toEqual(["s-present"]);
 
-      expect(mockEvictBuffer).toHaveBeenCalledWith("s-missing-1");
-      expect(mockEvictBuffer).toHaveBeenCalledWith("s-missing-2");
-      expect(mockEvictStreaming).toHaveBeenCalledTimes(2);
+      expect(mockEvictSoundCachesMany).toHaveBeenCalledTimes(1);
+      const evictedIds = [...(mockEvictSoundCachesMany.mock.calls[0][0] as Set<string>)].sort();
+      expect(evictedIds).toEqual(["s-missing-1", "s-missing-2"]);
 
       expect(mockSaveLibrary).toHaveBeenCalledTimes(1);
       // Must pass explicit globalFolders so the check uses current settings, not Zustand store

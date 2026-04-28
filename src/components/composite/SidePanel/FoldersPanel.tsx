@@ -48,8 +48,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictBuffer } from "@/lib/audio/bufferCache";
-import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
 import { useAddFolder } from "@/hooks/useAddFolder";
 import { useResolveFolderQueue } from "@/hooks/useResolveFolderQueue";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
@@ -178,10 +177,7 @@ export function FoldersPanel({
       const folderSoundIds = sounds
         .filter((s) => s.folderId === folderId)
         .map((s) => s.id);
-      for (const id of folderSoundIds) {
-        evictBuffer(id);
-        evictStreamingElement(id);
-      }
+      evictSoundCachesMany(folderSoundIds);
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => s.folderId !== folderId);
       });

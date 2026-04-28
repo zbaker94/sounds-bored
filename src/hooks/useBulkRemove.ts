@@ -6,8 +6,7 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictBuffer } from "@/lib/audio/bufferCache";
-import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 
 /**
@@ -55,10 +54,7 @@ export function useBulkRemove(): {
     setIsBulkRemoving(true);
     try {
       const idsToRemove = new Set(allMissingSounds.map((s) => s.id));
-      for (const id of idsToRemove) {
-        evictBuffer(id);
-        evictStreamingElement(id);
-      }
+      evictSoundCachesMany(idsToRemove);
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !idsToRemove.has(s.id));
       });
@@ -112,10 +108,7 @@ export function useBulkRemove(): {
           .filter((s) => s.folderId && folderIdsToRemove.has(s.folderId))
           .map((s) => s.id),
       );
-      for (const id of soundIdsToRemove) {
-        evictBuffer(id);
-        evictStreamingElement(id);
-      }
+      evictSoundCachesMany(soundIdsToRemove);
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => !soundIdsToRemove.has(s.id));
       });

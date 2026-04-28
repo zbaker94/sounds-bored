@@ -4,8 +4,7 @@ import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictBuffer } from "@/lib/audio/bufferCache";
-import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { evictSoundCaches } from "@/lib/audio/cacheUtils";
 import { pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { basename, nameFromFilename } from "@/lib/utils";
@@ -115,8 +114,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
         }
       });
 
-      evictBuffer(sound.id);
-      evictStreamingElement(sound.id);
+      evictSoundCaches(sound.id);
 
       await refreshMissingState();
 
@@ -138,8 +136,7 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => s.id !== sound.id);
       });
-      evictBuffer(sound.id);
-      evictStreamingElement(sound.id);
+      evictSoundCaches(sound.id);
       await saveCurrentLibrary();
       toast.success(`"${sound.name}" removed from library`);
       onResolved?.();
