@@ -6,9 +6,10 @@ interface TagPickerProps {
   value: string[];
   onChange: (ids: string[]) => void;
   renderItemSuffix?: (item: { id: string; name: string }) => ReactNode;
+  renderExtraChips?: () => ReactNode;
 }
 
-export function TagPicker({ value, onChange, renderItemSuffix }: TagPickerProps) {
+export function TagPicker({ value, onChange, renderItemSuffix, renderExtraChips }: TagPickerProps) {
   const tags = useLibraryStore((s) => s.tags);
   const ensureTagExists = useLibraryStore((s) => s.ensureTagExists);
   const userTags = useMemo(() => tags.filter((t) => !t.isSystem), [tags]);
@@ -22,6 +23,7 @@ export function TagPicker({ value, onChange, renderItemSuffix }: TagPickerProps)
       placeholder="Search or create tags..."
       emptyText="No tags found."
       renderItemSuffix={renderItemSuffix}
+      renderExtraChips={renderExtraChips}
     />
   );
 }

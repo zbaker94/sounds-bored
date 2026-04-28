@@ -20,6 +20,7 @@ interface LibraryItemPickerProps {
   placeholder?: string;
   emptyText?: string;
   renderItemSuffix?: (item: { id: string; name: string }) => ReactNode;
+  renderExtraChips?: () => ReactNode;
 }
 
 export function LibraryItemPicker({
@@ -30,6 +31,7 @@ export function LibraryItemPicker({
   placeholder = "Search...",
   emptyText = "No items found.",
   renderItemSuffix,
+  renderExtraChips,
 }: LibraryItemPickerProps) {
   const [inputValue, setInputValue] = useState("");
   const anchorRef = useComboboxAnchor();
@@ -66,6 +68,7 @@ export function LibraryItemPicker({
           const item = items.find((i) => i.id === id);
           return item ? <ComboboxChip key={id}>{item.name}</ComboboxChip> : null;
         })}
+        {renderExtraChips?.()}
         <ComboboxChipsInput placeholder={placeholder} />
       </ComboboxChips>
       <ComboboxContent anchor={anchorRef}>

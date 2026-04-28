@@ -48,6 +48,17 @@ describe("TagPicker", () => {
     expect(suffix).toHaveTextContent("t1-3");
   });
 
+  it("renders renderExtraChips content when provided", () => {
+    render(
+      <TagPicker
+        value={[]}
+        onChange={vi.fn()}
+        renderExtraChips={() => <span data-testid="extra-chip">partial</span>}
+      />
+    );
+    expect(screen.getByTestId("extra-chip")).toBeInTheDocument();
+  });
+
   it("excludes system tags from the dropdown", async () => {
     const systemTag = createMockTag({ name: "system-tag", isSystem: true });
     const userTag = createMockTag({ name: "user-tag" });

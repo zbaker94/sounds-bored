@@ -5,24 +5,13 @@ import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { DrawerDialog } from "@/components/ui/drawer-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Combobox,
-  ComboboxChips,
-  ComboboxChip,
-  ComboboxChipsInput,
-  ComboboxContent,
-  ComboboxList,
-  ComboboxItem,
-  ComboboxCollection,
-  ComboboxEmpty,
-  useComboboxAnchor,
-} from "@/components/ui/combobox";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, MinusSignIcon } from "@hugeicons/core-free-icons";
+import { TagPicker } from "@/components/composite/LibraryPickers/TagPicker";
 
 interface AddTagsDialogProps {
   open: boolean;
@@ -39,18 +28,15 @@ export function AddTagsDialog({
   const sounds = useLibraryStore((s) => s.sounds);
   const assignTagsToSounds = useLibraryStore((s) => s.assignTagsToSounds);
   const removeTagFromSounds = useLibraryStore((s) => s.removeTagFromSounds);
-  const ensureTagExists = useLibraryStore((s) => s.ensureTagExists);
   const { saveCurrentLibrary } = useSaveCurrentLibrary();
-  const anchorRef = useComboboxAnchor();
 
-  // Full tags: on ALL selected sounds — managed by the Combobox value array
+  // Full tags: on ALL selected sounds — managed by TagPicker value array
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   // Partial tags: on SOME but not all selected sounds — managed manually
   const [partialTagIds, setPartialTagIds] = useState<string[]>([]);
   // Snapshots taken at open time, used for diffing on confirm
   const [originalFullTagIds, setOriginalFullTagIds] = useState<string[]>([]);
   const [originalPartialTagIds, setOriginalPartialTagIds] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState("");
 
   // Only non-system tags are available for manual add/remove
   const userTags = useMemo(() => tags.filter((t) => !t.isSystem), [tags]);
@@ -96,29 +82,15 @@ export function AddTagsDialog({
     setPartialTagIds(partialIds);
     setOriginalFullTagIds(fullIds);
     setOriginalPartialTagIds(partialIds);
-    setInputValue("");
   }, [open]);
 
-  const trimmedInput = inputValue.trim();
-  const inputMatchesExisting = userTags.some(
-    (t) => t.name.toLowerCase() === trimmedInput.toLowerCase(),
-  );
-  const canCreate = trimmedInput.length > 0 && !inputMatchesExisting;
-
   function handleValueChange(newIds: string[]) {
-    if (newIds.includes("__create__")) {
-      const newTag = ensureTagExists(trimmedInput);
-      setSelectedTagIds([...newIds.filter((id) => id !== "__create__"), newTag.id]);
-      return;
-    }
-
     // Detect if a partial tag was promoted via the dropdown (added to full selection)
     const addedIds = newIds.filter((id) => !selectedTagIds.includes(id));
     const promotedIds = addedIds.filter((id) => partialTagIds.includes(id));
     if (promotedIds.length > 0) {
       setPartialTagIds((prev) => prev.filter((id) => !promotedIds.includes(id)));
     }
-
     setSelectedTagIds(newIds);
   }
 
@@ -181,21 +153,11 @@ export function AddTagsDialog({
       description={`Manage tags for ${selectedSoundIds.length} sound(s).`}
       content={
         <div className="p-4">
-          <Combobox
+          <TagPicker
             value={selectedTagIds}
-            onValueChange={handleValueChange}
-            onInputValueChange={(val) => setInputValue(val)}
-            items={userTags}
-            multiple
-          >
-            <ComboboxChips ref={anchorRef}>
-              {/* Full tags — managed by the Combobox value */}
-              {selectedTagIds.map((id) => {
-                const tag = userTags.find((t) => t.id === id);
-                return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
-              })}
-              {/* Partial tags — custom chips, not part of Combobox value */}
-              {partialTagIds.map((id) => {
+            onChange={handleValueChange}
+            renderExtraChips={() =>
+              partialTagIds.map((id) => {
                 const tag = userTags.find((t) => t.id === id);
                 if (!tag) return null;
                 const info = tagPartialSoundsMap.get(id);
@@ -237,34 +199,20 @@ export function AddTagsDialog({
                     </TooltipContent>
                   </Tooltip>
                 );
-              })}
-              <ComboboxChipsInput placeholder="Search or create tags..." />
-            </ComboboxChips>
-            <ComboboxContent anchor={anchorRef}>
-              <ComboboxList>
-                <ComboboxEmpty>No tags found.</ComboboxEmpty>
-                <ComboboxCollection>
-                  {(t) => (
-                    <ComboboxItem key={t.id} value={t.id}>
-                      {t.name}
-                      {partialTagIds.includes(t.id) && (
-                        <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-                          <HugeiconsIcon
-                            icon={MinusSignIcon}
-                            strokeWidth={2}
-                            className="pointer-events-none size-4 text-muted-foreground"
-                          />
-                        </span>
-                      )}
-                    </ComboboxItem>
-                  )}
-                </ComboboxCollection>
-                {canCreate && (
-                  <ComboboxItem value="__create__">Create "{trimmedInput}"</ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
+              })
+            }
+            renderItemSuffix={(item) =>
+              partialTagIds.includes(item.id) ? (
+                <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
+                  <HugeiconsIcon
+                    icon={MinusSignIcon}
+                    strokeWidth={2}
+                    className="pointer-events-none size-4 text-muted-foreground"
+                  />
+                </span>
+              ) : null
+            }
+          />
         </div>
       }
       footer={

@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (15 fixed) |
+| Medium | 16 (16 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -204,11 +204,10 @@ None.
 
 ---
 
-### [REUSE7] `AddTagsDialog` reimplements `LibraryItemPicker`'s create-flow inline
+### ~~[REUSE7] `AddTagsDialog` reimplements `LibraryItemPicker`'s create-flow inline~~ ✅ FIXED
 - **File**: `src/components/composite/SidePanel/AddTagsDialog.tsx:102-123,184-267`; `src/components/composite/LibraryPickers/LibraryItemPicker.tsx:34-52`
 - **Severity**: Medium
-- **Finding**: The `canCreate` derivation, `"__create__"` sentinel branch, and surrounding Combobox JSX scaffolding are duplicated from what `LibraryItemPicker` was built to encapsulate.
-- **Recommendation**: Add optional `renderExtraChips` and `renderItemBadge` slots to `LibraryItemPicker`; `AddTagsDialog` drops ~80 lines of duplicated scaffolding.
+- **Fix applied**: Added `renderExtraChips?: () => ReactNode` to `LibraryItemPicker` (rendered between full-value chips and the input) and threaded it through `TagPicker`. `AddTagsDialog` now routes through `TagPicker` — `canCreate`/`__create__`/`inputValue` state and the entire Combobox JSX scaffold removed (73 lines). Partial chips are passed via `renderExtraChips`; MinusSignIcon per-item badge uses the existing `renderItemSuffix` slot. All existing behavior preserved; 2 new tests added. 1942/1942 tests pass; TypeScript clean.
 
 ---
 

@@ -89,6 +89,16 @@ describe("LibraryItemPicker", () => {
     expect(suffixes[1]).toHaveTextContent("b-count");
   });
 
+  it("renders renderExtraChips content between value chips and the input", () => {
+    renderPicker({
+      value: ["a"],
+      renderExtraChips: () => <span data-testid="extra-chip">extra</span>,
+    });
+    expect(screen.getByTestId("extra-chip")).toBeInTheDocument();
+    // Value chip should also be present
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+  });
+
   it("calls onCreate with the typed name when Create is clicked and includes returned id in onChange", async () => {
     const { onChange, onCreate } = renderPicker();
     const input = screen.getByPlaceholderText("Pick something...");
