@@ -146,7 +146,7 @@ describe("PadBackFace", () => {
   });
 
   it("displays explicit pad volume (when playing) and fadeTargetVol values", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     expect(screen.getByText("80%")).toBeInTheDocument();
@@ -154,14 +154,14 @@ describe("PadBackFace", () => {
   });
 
   it("shows Fade In when pad is not playing and target > 0", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /fade out/i })).not.toBeInTheDocument();
   });
 
   it("shows disabled Fade when pad is not playing and target is 0", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 0 });
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     const btn = screen.getByRole("button", { name: /^fade$/i });
     expect(btn).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe("PadBackFace", () => {
   });
 
   it("shows Fade Out when pad is playing and target < current volume", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     expect(screen.getByRole("button", { name: /fade out/i })).toBeInTheDocument();
@@ -177,7 +177,7 @@ describe("PadBackFace", () => {
   });
 
   it("shows Fade In when pad is playing and target >= current volume", () => {
-    const { pad } = loadPad({ volume: 0.5, fadeTargetVol: 0.8 });
+    const { pad } = loadPad({ volume: 50, fadeTargetVol: 80 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe("PadBackFace", () => {
   });
 
   it("shows disabled Fade when pad is playing and live volume equals target", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.5 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 50 });
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.5 } });
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     const btn = screen.getByRole("button", { name: /^fade$/i });
@@ -194,14 +194,14 @@ describe("PadBackFace", () => {
   });
 
   it("does not show Reverse button when pad is not fading", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
     render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /reverse/i })).not.toBeInTheDocument();
   });
 
   it("shows Stop Fade button and Reverse button when pad is fading", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([pad.id]),
@@ -214,7 +214,7 @@ describe("PadBackFace", () => {
   });
 
   it("hides Reverse button while reversal is in progress", () => {
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([pad.id]),
@@ -228,7 +228,7 @@ describe("PadBackFace", () => {
 
   it("calls reverseFade when Reverse button is clicked", async () => {
     const { reverseFade } = await import("@/lib/audio/padPlayer");
-    const { pad } = loadPad({ volume: 0.8, fadeTargetVol: 0.2 });
+    const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([pad.id]),

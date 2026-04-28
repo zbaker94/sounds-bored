@@ -197,7 +197,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      toggleMultiFadePad(pad.id, pad.volume ?? 1, pad.fadeTargetVol ?? 0);
+      toggleMultiFadePad(pad.id, pad.volume ?? 100, pad.fadeTargetVol ?? 0);
     },
   }), [toggleMultiFadePad, pad.id, pad.volume, pad.fadeTargetVol]);
 
@@ -352,7 +352,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
               {(isFadingOut || isPopoverOpen) && (
                 <div
                   className="absolute left-0 right-0 h-px bg-amber-400/80 pointer-events-none z-10"
-                  style={{ bottom: `${(fadePopoverTarget ?? (pad.fadeTargetVol ?? 0)) * 100}%` }}
+                  style={{ bottom: `${fadePopoverTarget ?? (pad.fadeTargetVol ?? 0)}%` }}
                 />
               )}
               {isPopoverOpen && (
@@ -363,9 +363,9 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
                   <Slider
                     compact
                     tooltipLabel={(v) => `${v}%`}
-                    value={[Math.round((fadePopoverTarget ?? (pad.fadeTargetVol ?? 0)) * 100)]}
-                    onValueChange={([v]) => setFadePopoverTarget(v / 100)}
-                    onValueCommit={([v]) => handlePopoverCommit(v / 100)}
+                    value={[Math.round(fadePopoverTarget ?? (pad.fadeTargetVol ?? 0))]}
+                    onValueChange={([v]) => setFadePopoverTarget(v)}
+                    onValueCommit={([v]) => handlePopoverCommit(v)}
                     min={0}
                     max={100}
                     step={1}

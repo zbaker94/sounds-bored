@@ -83,7 +83,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
       name: pad.name,
       layers: [layerToFormValues(layer)],
       fadeDurationMs: pad.fadeDurationMs,
-      volume: pad.volume ?? 1,
+      volume: pad.volume ?? 100,
       fadeTargetVol: pad.fadeTargetVol ?? 0,
     },
   });
@@ -97,7 +97,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
       name: pad.name,
       layers: [layerToFormValues(layer)],
       fadeDurationMs: pad.fadeDurationMs,
-      volume: pad.volume ?? 1,
+      volume: pad.volume ?? 100,
       fadeTargetVol: pad.fadeTargetVol ?? 0,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

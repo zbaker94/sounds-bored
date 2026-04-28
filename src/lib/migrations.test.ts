@@ -45,7 +45,7 @@ describe("migrateProject — 1.0.0 → 1.1.0", () => {
       sets: [],
     };
     const result = migrateProject(raw);
-    expect(result.version).toBe("1.3.0");
+    expect(result.version).toBe("1.4.0");
     expect(result.favoritedSetIds).toEqual([]);
     expect(result.sounds).toBeUndefined();
     expect(result.tags).toBeUndefined();
@@ -121,7 +121,7 @@ describe("migrateProject — 1.1.0 → 1.2.0", () => {
       }],
     };
     const result = migrateProject(raw);
-    expect(result.version).toBe("1.3.0");
+    expect(result.version).toBe("1.4.0");
     const layer = (result.scenes as Array<Record<string, unknown>>)[0];
     const pad = (layer.pads as Array<Record<string, unknown>>)[0];
     const sel = ((pad.layers as Array<Record<string, unknown>>)[0]).selection as Record<string, unknown>;
@@ -290,6 +290,57 @@ describe("migrateProject — 1.1.0 → 1.2.0 malformed-input guards", () => {
     // Should not have been converted (tagId non-string, tagIds absent → no-op)
     expect(sel.tagId).toBe(42);
     expect(sel.tagIds).toBeUndefined();
+  });
+});
+
+describe("migrateProject — 1.3.0 → 1.4.0 (pad volume scale 0–1 → 0–100)", () => {
+  function makePadProject(pad: Record<string, unknown>): Record<string, unknown> {
+    return {
+      name: "P",
+      version: "1.3.0",
+      scenes: [{ id: "s1", name: "Scene", pads: [{ id: "p1", name: "Pad", layers: [], muteTargetPadIds: [], ...pad }] }],
+    };
+  }
+
+  function getPad(result: Record<string, unknown>): Record<string, unknown> {
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const pads = scenes[0].pads as Array<Record<string, unknown>>;
+    return pads[0];
+  }
+
+  it("rescales pad.volume 0.5 → 50", () => {
+    const result = migrateProject(makePadProject({ volume: 0.5 }));
+    expect(getPad(result).volume).toBe(50);
+  });
+
+  it("rescales pad.volume 1 → 100", () => {
+    const result = migrateProject(makePadProject({ volume: 1 }));
+    expect(getPad(result).volume).toBe(100);
+  });
+
+  it("rescales pad.volume 0 → 0", () => {
+    const result = migrateProject(makePadProject({ volume: 0 }));
+    expect(getPad(result).volume).toBe(0);
+  });
+
+  it("leaves pad.volume undefined when absent", () => {
+    const result = migrateProject(makePadProject({}));
+    expect(getPad(result).volume).toBeUndefined();
+  });
+
+  it("rescales pad.fadeTargetVol 0.2 → 20", () => {
+    const result = migrateProject(makePadProject({ fadeTargetVol: 0.2 }));
+    expect(getPad(result).fadeTargetVol).toBe(20);
+  });
+
+  it("leaves pad.fadeTargetVol undefined when absent", () => {
+    const result = migrateProject(makePadProject({}));
+    expect(getPad(result).fadeTargetVol).toBeUndefined();
+  });
+
+  it("bumps version to 1.4.0", () => {
+    const result = migrateProject(makePadProject({ volume: 0.5 }));
+    expect(result.version).toBe("1.4.0");
   });
 });
 

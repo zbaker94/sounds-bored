@@ -74,14 +74,14 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
     const scenes = useProjectStore.getState().project?.scenes ?? [];
     const padMap = buildPadMap(scenes);
     const pad = padMap.get(padId);
-    enterMultiFade(padId, pad?.volume ?? 1, pad?.fadeTargetVol ?? 0);
+    enterMultiFade(padId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
   }, [enterMultiFade]);
 
   const togglePad = useCallback((padId: string) => {
     const scenes = useProjectStore.getState().project?.scenes ?? [];
     const padMap = buildPadMap(scenes);
     const pad = padMap.get(padId);
-    toggleMultiFadePad(padId, pad?.volume ?? 1, pad?.fadeTargetVol ?? 0);
+    toggleMultiFadePad(padId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
   }, [toggleMultiFadePad]);
 
   const setFadeLevels = useCallback((padId: string, levels: [number, number]) => {

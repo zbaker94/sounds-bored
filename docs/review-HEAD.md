@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (8 fixed) |
+| Medium | 16 (9 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -152,18 +152,10 @@ None.
 
 ---
 
-### [QUAL7] `multiFadeStore` mixes 0–1 and 0–100 unit scales across adjacent APIs
+### ~~[QUAL7] `multiFadeStore` mixes 0–1 and 0–100 unit scales across adjacent APIs~~ ✅ FIXED
 - **File**: `src/state/multiFadeStore.ts:35-67`; `src/hooks/useMultiFadeMode.ts:85-101`
 - **Severity**: Medium
-- **Finding**: `enterMultiFade`/`toggleMultiFadePad` accept `volume`/`fadeTarget` in 0–1 scale and multiply by 100 to store. `setMultiFadeLevels` accepts 0–100 directly. `SelectedPadFade.levels` is documented as `[volumePct, targetPct]` in 0–100 scale. No type distinction prevents mixing.
-- **Evidence**:
-  ```ts
-  // enterMultiFade — accepts 0-1, stores as 0-100
-  const levels: [number, number] = [Math.round(volume * 100), Math.round(fadeTarget * 100)];
-  // setMultiFadeLevels — accepts already-0-100
-  setMultiFadeLevels: (padId, levels) => { next.set(padId, { ...existing, levels }); }
-  ```
-- **Recommendation**: Pick one convention across the store API. Consider branded types (`Percent` vs `Normalized`) to make the compiler reject mixing.
+- **Fix applied**: Root cause traced to `PadSchema.volume` and `PadSchema.fadeTargetVol` being stored as 0–1 while all other volume fields (`Layer.volume`, `SoundInstance.volume`) used 0–100. Fixed at the schema level: both pad fields changed to `z.number().min(0).max(100)`. Migration `1.3.0 → 1.4.0` rescales existing persisted values by ×100. `padPlayer.ts` now divides by 100 at the 7 read sites where pad volume becomes a Web Audio gain value. `multiFadeStore.enterMultiFade`/`toggleMultiFadePad` params renamed to `volumePct`/`fadeTargetPct` and the internal `Math.round(x * 100)` removed — values are stored directly. All callers updated; `PadFadeControls`, `PadButton`, `PadButtonFadeOverlay`, `PadBackFace`, `useMultiFadeMode`, `useGlobalHotkeys`, `LayerConfigDialog`, and `padDefaults` adjusted to match. 1932/1932 tests pass; TypeScript clean.
 
 ---
 

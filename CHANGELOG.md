@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an internal volume scale inconsistency where pad volume and fade target were stored differently from all other volume fields; existing projects are automatically migrated to the new format (v1.4.0) on load with no change to playback behavior.
 - Fixed a bug where a failed download could leave the Download Dialog in a broken state — it now stays open with your input preserved so you can retry
 - Fixed `mod+shift+n` hotkey so adding a new pad now correctly navigates to the new pad's page and plays the flip animation
 - Keyboard shortcuts `shift+left` and `shift+right` for paging through pads are now centralized alongside all other global hotkeys

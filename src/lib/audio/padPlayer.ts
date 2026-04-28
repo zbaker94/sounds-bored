@@ -157,8 +157,8 @@ export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
   const padVolumes = usePlaybackStore.getState().padVolumes;
   fadingOut.forEach((pad) => {
-    const currentVol = padVolumes[pad.id] ?? (pad.volume ?? 1);
-    fadePad(pad, currentVol, pad.fadeTargetVol ?? 0, resolveFadeDuration(pad, globalFadeDurationMs));
+    const currentVol = padVolumes[pad.id] ?? ((pad.volume ?? 100) / 100);
+    fadePad(pad, currentVol, (pad.fadeTargetVol ?? 0) / 100, resolveFadeDuration(pad, globalFadeDurationMs));
   });
   fadingIn.forEach((pad) =>
     triggerAndFade(pad, 1.0, resolveFadeDuration(pad, globalFadeDurationMs)).catch((err: unknown) => {
@@ -177,8 +177,8 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
  *   4. Not active               → trigger at silence then ramp up to lowVol.
  */
 function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
-  const lowVol = pad.fadeTargetVol ?? 0;
-  const highVol = pad.volume ?? 1;
+  const lowVol = (pad.fadeTargetVol ?? 0) / 100;
+  const highVol = (pad.volume ?? 100) / 100;
 
   if (isPadActive(pad.id)) {
     if (isPadFadingOut(pad.id) || isPadFadingIn(pad.id) || isPadFading(pad.id)) {
@@ -215,7 +215,7 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
  */
 export function stopFade(pad: Pad): void {
   const padVolumes = usePlaybackStore.getState().padVolumes;
-  const currentVol = padVolumes[pad.id] ?? (pad.volume ?? 1);
+  const currentVol = padVolumes[pad.id] ?? ((pad.volume ?? 100) / 100);
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
   gain.gain.cancelScheduledValues(ctx.currentTime);
@@ -226,7 +226,7 @@ export function stopFade(pad: Pad): void {
 
 export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
   if (!isFadeablePad(pad)) return;
-  const lowVol = pad.fadeTargetVol ?? 0;
+  const lowVol = (pad.fadeTargetVol ?? 0) / 100;
   // Fading in a non-playing pad to silence is a no-op
   if (!isPadActive(pad.id) && lowVol === 0) return;
   const duration = resolveFadeDuration(pad, globalFadeDurationMs);
@@ -463,10 +463,10 @@ export function releasePadHoldLayers(pad: Pad): void {
   }
 }
 
-// startVolume: 0-1. Defaults to pad.volume so the pad plays at its configured level.
+// startVolume: 0-1. Defaults to pad.volume (0-100) divided by 100 so the pad plays at its configured level.
 // Pass 0 explicitly for silent-start gesture-drag and fade-in operations.
 export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> {
-  const startVol = startVolume ?? pad.volume ?? 1.0;
+  const startVol = startVolume ?? ((pad.volume ?? 100) / 100);
   const { sounds } = useLibraryStore.getState();
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);

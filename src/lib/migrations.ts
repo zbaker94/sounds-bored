@@ -155,6 +155,39 @@ const MIGRATIONS: Migration[] = [
       return next;
     },
   },
+  {
+    // Rescale per-pad volume and fadeTargetVol from 0–1 to 0–100 to match
+    // Layer.volume and SoundInstance.volume conventions. Undefined fields are
+    // left undefined (defaults applied at playback time).
+    fromVersion: "1.3.0",
+    toVersion: "1.4.0",
+    migrate: (raw) => {
+      const next = { ...raw };
+      if (!Array.isArray(next.scenes)) return next;
+
+      next.scenes = (next.scenes as unknown[]).map((scene) => {
+        if (!scene || typeof scene !== "object" || Array.isArray(scene)) return scene;
+        const s = scene as Record<string, unknown>;
+        if (!Array.isArray(s.pads)) return s;
+        return {
+          ...s,
+          pads: (s.pads as unknown[]).map((pad) => {
+            if (!pad || typeof pad !== "object" || Array.isArray(pad)) return pad;
+            const p = { ...(pad as Record<string, unknown>) };
+            if (typeof p.volume === "number" && Number.isFinite(p.volume)) {
+              p.volume = Math.round(p.volume * 100);
+            }
+            if (typeof p.fadeTargetVol === "number" && Number.isFinite(p.fadeTargetVol)) {
+              p.fadeTargetVol = Math.round(p.fadeTargetVol * 100);
+            }
+            return p;
+          }),
+        };
+      });
+
+      return next;
+    },
+  },
 ];
 
 export function migrateProject(raw: RawProject): RawProject {

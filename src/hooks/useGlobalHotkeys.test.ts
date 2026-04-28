@@ -147,7 +147,7 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
   it("F in normal mode over a hovered pad with no popover open calls setFadePopoverPadId (opens the popover, does not fade yet)", async () => {
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");
 
-    const pad = { id: "pad-1", layers: [], volume: 0.9, fadeTargetVol: 0.1 } as unknown as import("@/lib/schemas").Pad;
+    const pad = { id: "pad-1", layers: [], volume: 90, fadeTargetVol: 10 } as unknown as import("@/lib/schemas").Pad;
     useProjectStore.setState({
       ...initialProjectState,
       project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),
@@ -167,7 +167,7 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
   it("F in normal mode with popover already open for hovered pad executes the fade and closes the popover", async () => {
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");
 
-    const pad = { id: "pad-1", layers: [], volume: 0.9, fadeTargetVol: 0.1 } as unknown as import("@/lib/schemas").Pad;
+    const pad = { id: "pad-1", layers: [], volume: 90, fadeTargetVol: 10 } as unknown as import("@/lib/schemas").Pad;
     useProjectStore.setState({
       ...initialProjectState,
       project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),
@@ -187,7 +187,7 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
   it("F in edit mode with editingPadId set executes the fade for the editing pad (does not exit edit mode)", async () => {
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");
 
-    const pad = { id: "pad-1", layers: [], volume: 0.9, fadeTargetVol: 0.1 } as unknown as import("@/lib/schemas").Pad;
+    const pad = { id: "pad-1", layers: [], volume: 90, fadeTargetVol: 10 } as unknown as import("@/lib/schemas").Pad;
     useProjectStore.setState({
       ...initialProjectState,
       project: createMockProject({ scenes: [{ id: "s1", name: "Scene 1", pads: [pad] }] }),

@@ -63,7 +63,7 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
               if (isPlaying) setPadVolume(pad.id, v / 100);
               setMultiFadeLevels(pad.id, [v, multiFadeLevels[1]]);
             }}
-            onValueCommit={([v]) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100)}
+            onValueCommit={([v]) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v)}
             min={0}
             max={100}
             step={1}
@@ -79,7 +79,7 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
             tooltipLabel={(v) => `${v}%`}
             value={[multiFadeLevels[1]]}
             onValueChange={([v]) => setMultiFadeLevels(pad.id, [multiFadeLevels[0], v])}
-            onValueCommit={([v]) => useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100)}
+            onValueCommit={([v]) => useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v)}
             min={0}
             max={100}
             step={1}

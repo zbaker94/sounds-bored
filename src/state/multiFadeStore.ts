@@ -13,9 +13,9 @@ interface MultiFadeState {
 }
 
 interface MultiFadeActions {
-  enterMultiFade: (originPadId: string, volume: number, fadeTarget: number) => void;
+  enterMultiFade: (originPadId: string, volumePct: number, fadeTargetPct: number) => void;
   enterMultiFadeEmpty: () => void;
-  toggleMultiFadePad: (padId: string, volume: number, fadeTarget: number) => void;
+  toggleMultiFadePad: (padId: string, volumePct: number, fadeTargetPct: number) => void;
   setMultiFadeLevels: (padId: string, levels: [number, number]) => void;
   cancelMultiFade: () => void;
   resetMultiFade: () => void;
@@ -32,9 +32,9 @@ export const initialMultiFadeState: MultiFadeState = {
 export const useMultiFadeStore = create<MultiFadeState & MultiFadeActions>((set) => ({
   ...initialMultiFadeState,
 
-  enterMultiFade: (originPadId, volume, fadeTarget) =>
+  enterMultiFade: (originPadId, volumePct, fadeTargetPct) =>
     set(() => {
-      const levels: [number, number] = [Math.round(volume * 100), Math.round(fadeTarget * 100)];
+      const levels: [number, number] = [volumePct, fadeTargetPct];
       const selectedPads = new Map<string, SelectedPadFade>([
         [originPadId, { padId: originPadId, levels }],
       ]);
@@ -54,13 +54,13 @@ export const useMultiFadeStore = create<MultiFadeState & MultiFadeActions>((set)
       reopenPadId: null,
     }),
 
-  toggleMultiFadePad: (padId, volume, fadeTarget) =>
+  toggleMultiFadePad: (padId, volumePct, fadeTargetPct) =>
     set((state) => {
       const next = new Map(state.selectedPads);
       if (next.has(padId)) {
         next.delete(padId);
       } else {
-        const levels: [number, number] = [Math.round(volume * 100), Math.round(fadeTarget * 100)];
+        const levels: [number, number] = [volumePct, fadeTargetPct];
         next.set(padId, { padId, levels });
       }
       return { selectedPads: next };

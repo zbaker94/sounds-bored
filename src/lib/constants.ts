@@ -23,7 +23,7 @@ export const QUERY_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 // Project defaults
 // Single source of truth for the current project format version.
 // DEFAULT_PROJECT_VERSION is kept as an alias so project.ts reads naturally ("this is the default version for new projects").
-export const CURRENT_PROJECT_VERSION = "1.3.0";
+export const CURRENT_PROJECT_VERSION = "1.4.0";
 export const DEFAULT_PROJECT_VERSION = CURRENT_PROJECT_VERSION;
 export const DEFAULT_PROJECT_DESCRIPTION = "";
 

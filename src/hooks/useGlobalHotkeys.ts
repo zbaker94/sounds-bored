@@ -141,7 +141,7 @@ export function useGlobalHotkeys() {
     if (hoveredPadId && !editingPadId && !fadePopoverPadId) {
       const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
       const pad = pads.find((p) => p.id === hoveredPadId);
-      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 1, pad?.fadeTargetVol ?? 0);
+      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
     }
   }, { enableOnFormTags: true });
 

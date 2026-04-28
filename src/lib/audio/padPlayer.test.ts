@@ -1379,7 +1379,7 @@ describe("executeFadeTap", () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-in-pad",
-      fadeTargetVol: 0.5,
+      fadeTargetVol: 50,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -2755,7 +2755,7 @@ describe("executeFadeTap error handling", () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-err-pad",
-      fadeTargetVol: 0.5,
+      fadeTargetVol: 50,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     setSounds([createMockSound({ id: "s1", filePath: "sounds/test.wav" })]);
@@ -2876,8 +2876,8 @@ describe("executeFadeTap — pad.fadeTargetVol and pad.volume", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-custom-out-pad",
-      fadeTargetVol: 0.2,
-      volume: 1.0,
+      fadeTargetVol: 20,
+      volume: 100,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -2900,8 +2900,8 @@ describe("executeFadeTap — pad.fadeTargetVol and pad.volume", () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tap-custom-in-pad",
-      fadeTargetVol: 0.3,
-      volume: 0.7,
+      fadeTargetVol: 30,
+      volume: 70,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3563,7 +3563,7 @@ describe("triggerPad default startVolume", () => {
     const { triggerPad, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tp-default-vol-pad",
-      volume: 0.75,
+      volume: 75,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3610,7 +3610,7 @@ describe("triggerPad default startVolume", () => {
     const { triggerPad, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "tp-explicit-vol-pad",
-      volume: 0.75,
+      volume: 75,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3637,8 +3637,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-playing-pad",
-      fadeTargetVol: 0.2,
-      volume: 0.8,
+      fadeTargetVol: 20,
+      volume: 80,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3664,8 +3664,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-current-gain-pad",
-      fadeTargetVol: 0.2,
-      volume: 0.8,
+      fadeTargetVol: 20,
+      volume: 80,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3675,7 +3675,7 @@ describe("executeFadeTap — toggle state machine", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-    // Simulate pad playing at 0.6 (distinct from volume=0.8)
+    // Simulate pad playing at 0.6 (distinct from volume=80 → gain 0.8)
     mockGain.gain.value = 0.6;
     mockGain.gain.setValueAtTime.mockClear();
 
@@ -3696,8 +3696,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-silence-start-pad",
-      fadeTargetVol: 0.3,
-      volume: 0.8,
+      fadeTargetVol: 30,
+      volume: 80,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3748,7 +3748,7 @@ describe("executeFadeTap — toggle state machine", () => {
     const pad = createMockPad({
       id: "fpl-not-playing-pad",
       fadeTargetVol: 0,
-      volume: 0.8,
+      volume: 80,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3775,8 +3775,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-ramp-level-pad",
-      fadeTargetVol: 0.6,
-      volume: 1.0,
+      fadeTargetVol: 60,
+      volume: 100,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3804,7 +3804,7 @@ describe("executeFadeTap — toggle state machine", () => {
     const pad = createMockPad({
       id: "fpl-reverse-fadeout-pad",
       fadeTargetVol: 0,
-      volume: 1.0,
+      volume: 100,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3820,7 +3820,7 @@ describe("executeFadeTap — toggle state machine", () => {
     mockGain.gain.linearRampToValueAtTime.mockClear();
     executeFadeTap(pad, 1000);
 
-    // Should ramp UP to volume=1.0, not DOWN to fadeTargetVol=0
+    // Should ramp UP to volume=100 (gain 1.0), not DOWN to fadeTargetVol=0
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
     expect(isPadFadingOut(pad.id)).toBe(false);
     clearAllFadeTracking();
@@ -3836,7 +3836,7 @@ describe("executeFadeTap — toggle state machine", () => {
     const pad = createMockPad({
       id: "fpl-reverse-fadein-pad",
       fadeTargetVol: 0,
-      volume: 0.8,
+      volume: 80,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3874,8 +3874,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-settled-lowvol-pad",
-      fadeTargetVol: 0.2,
-      volume: 0.8,
+      fadeTargetVol: 20,
+      volume: 80,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3885,7 +3885,7 @@ describe("executeFadeTap — toggle state machine", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-    // Simulate pad having completed a fade-out to fadeTargetVol=0.2 (voices still playing)
+    // Simulate pad having completed a fade-out to fadeTargetVol=20 → gain 0.2 (voices still playing)
     mockGain.gain.value = 0.2;
     mockGain.gain.setValueAtTime.mockClear();
     mockGain.gain.linearRampToValueAtTime.mockClear();
@@ -3907,8 +3907,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-midrange-fadeout-pad",
-      fadeTargetVol: 0.3,
-      volume: 0.9,
+      fadeTargetVol: 30,
+      volume: 90,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3938,8 +3938,8 @@ describe("executeFadeTap — toggle state machine", () => {
     const { triggerPad, executeFadeTap, clearAllFadeTracking } = await import("./padPlayer");
     const pad = createMockPad({
       id: "fpl-settled-low-fadein-pad",
-      fadeTargetVol: 0.3,
-      volume: 0.9,
+      fadeTargetVol: 30,
+      volume: 90,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({
@@ -3971,7 +3971,7 @@ describe("executeFadeTap — toggle state machine", () => {
     const { setFadePadTimeout } = await import("./audioState");
     const pad = createMockPad({
       id: "fpl-noop-fading-pad",
-      fadeTargetVol: 0.5,
+      fadeTargetVol: 50,
       layers: [createMockLayer({ selection: { type: "assigned", instances: [{ id: "si-1", soundId: "s1", volume: 100 }] } })],
     });
     useLibraryStore.setState({

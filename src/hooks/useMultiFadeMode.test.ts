@@ -185,8 +185,8 @@ describe("useMultiFadeMode — execute()", () => {
     const pad = pads[0];
 
     act(() => {
-      useMultiFadeStore.getState().enterMultiFade("some-origin", 1, 0);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, 1, 0.75);
+      useMultiFadeStore.getState().enterMultiFade("some-origin", 100, 0);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad.id, 100, 75);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());
@@ -201,9 +201,9 @@ describe("useMultiFadeMode — execute()", () => {
     const [pad0, pad1] = pads;
 
     act(() => {
-      useMultiFadeStore.getState().enterMultiFade("some-origin", 1, 0);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, 1, 0.8);
-      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, 1, 0.5);
+      useMultiFadeStore.getState().enterMultiFade("some-origin", 100, 0);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad0.id, 100, 80);
+      useMultiFadeStore.getState().toggleMultiFadePad(pad1.id, 100, 50);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());

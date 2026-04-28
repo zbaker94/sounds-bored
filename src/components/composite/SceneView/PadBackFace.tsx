@@ -109,7 +109,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   }, [globalFadeDurationMs]);
 
   const handleMultiFadeInternal = useCallback(() => {
-    enterMultiFade(pad.id, pad.volume ?? 1, pad.fadeTargetVol ?? 0);
+    enterMultiFade(pad.id, pad.volume ?? 100, pad.fadeTargetVol ?? 0);
     onMultiFade();
   }, [pad, enterMultiFade, onMultiFade]);
 

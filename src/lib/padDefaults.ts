@@ -25,7 +25,7 @@ export function padToConfig(pad: Pad, layers?: Layer[]): PadConfig {
     color: pad.color,
     icon: pad.icon,
     fadeDurationMs: pad.fadeDurationMs,
-    volume: pad.volume ?? 1,
+    volume: pad.volume ?? 100,
     fadeTargetVol: pad.fadeTargetVol ?? 0,
   };
 }

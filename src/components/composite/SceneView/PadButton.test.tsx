@@ -244,8 +244,8 @@ describe("multi-fade mode", () => {
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.pointerDown(button, { button: 0, pointerId: 1 });
-    // New semantics: toggleMultiFadePad(padId, volume, fadeTarget) — defaults volume=1, fadeTarget=0
-    expect(mockToggle).toHaveBeenCalledWith("pad-1", 1, 0);
+    // New semantics: toggleMultiFadePad(padId, volumePct, fadeTargetPct) — defaults volume=100, fadeTarget=0
+    expect(mockToggle).toHaveBeenCalledWith("pad-1", 100, 0);
   });
 
   it("does not show pulse ring when multi-fade mode is active even while playing", () => {

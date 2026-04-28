@@ -124,7 +124,7 @@ describe("useMultiFadeSideEffects — auto-cancel on editMode", () => {
     const pads = loadPadsInStore(1);
     renderHook(() => useMultiFadeSideEffects());
 
-    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 1, 0); });
+    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
     expect(useMultiFadeStore.getState().active).toBe(true);
 
     act(() => { useUiStore.getState().toggleEditMode(); });
@@ -136,7 +136,7 @@ describe("useMultiFadeSideEffects — auto-cancel on editMode", () => {
     const pads = loadPadsInStore(1);
     renderHook(() => useMultiFadeSideEffects());
 
-    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 1, 0); });
+    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
     // Some other uiStore change that leaves editMode false
     act(() => { useUiStore.getState().setActiveSceneId(null); });
 
@@ -149,7 +149,7 @@ describe("useMultiFadeSideEffects — auto-cancel on overlay", () => {
     const pads = loadPadsInStore(1);
     renderHook(() => useMultiFadeSideEffects());
 
-    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 1, 0); });
+    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
     expect(useMultiFadeStore.getState().active).toBe(true);
 
     act(() => { useUiStore.getState().openOverlay("some-dialog", "dialog"); });

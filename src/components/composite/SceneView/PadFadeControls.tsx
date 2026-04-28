@@ -41,19 +41,18 @@ export const PadFadeControls = memo(function PadFadeControls({
   const updatePad = useProjectStore((s) => s.updatePad);
   const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
 
-  const padVolumePct = Math.round((pad.volume ?? 1) * 100);
+  const padVolumePct = pad.volume ?? 100;
   const liveVolumePct = liveVolume !== undefined ? Math.round(liveVolume * 100) : padVolumePct;
   const [localVolume, setLocalVolume] = useState<number | null>(null);
   const volumeSliderValue = localVolume ?? liveVolumePct;
   const volumeDragStartRef = useRef<number | null>(null);
 
-  const fadeTargetPct = Math.round((pad.fadeTargetVol ?? 0) * 100);
+  const fadeTargetPct = pad.fadeTargetVol ?? 0;
   const [localFadeTarget, setLocalFadeTarget] = useState<number | null>(null);
   const fadeTargetSliderValue = localFadeTarget ?? fadeTargetPct;
 
-  const currentVol = liveVolume ?? (pad.volume ?? 1);
   const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
-  const isFadeOut = !isEqualVolume && isPlaying && (pad.fadeTargetVol ?? 0) < currentVol;
+  const isFadeOut = !isEqualVolume && isPlaying && fadeTargetPct < liveVolumePct;
 
   return (
     <div className="flex flex-col gap-1.5 flex-shrink-0">
@@ -84,7 +83,7 @@ export const PadFadeControls = memo(function PadFadeControls({
                 const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
                 volumeDragStartRef.current = null;
                 setLocalVolume(null);
-                if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v / 100);
+                if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v);
               }}
               min={0} max={100} step={1}
             />
@@ -97,7 +96,7 @@ export const PadFadeControls = memo(function PadFadeControls({
         onValueChange={(v) => setLocalFadeTarget(v)}
         onValueCommit={(v) => {
           setLocalFadeTarget(null);
-          useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v / 100);
+          useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v);
         }}
       />
       <PadDurationSlider
