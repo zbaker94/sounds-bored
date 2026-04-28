@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (7 fixed) |
+| Medium | 16 (8 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -135,11 +135,12 @@ None.
 
 ---
 
-### [QUAL3] `DownloadDialog.handleSubmit` awaits `startDownload` with no error handling
+### ~~[QUAL3] `DownloadDialog.handleSubmit` awaits `startDownload` with no error handling~~ ✅ FIXED
 - **File**: `src/components/modals/DownloadDialog.tsx:104-125`
 - **Severity**: Medium
 - **Finding**: A rejected `startDownload` bubbles out of the form submit handler as an unhandled rejection. Form fields are not cleared and the dialog remains open in an indeterminate state.
 - **Recommendation**: Wrap in `try/catch`, or switch from `mutateAsync` to `mutate` (fire-and-forget) since `useStartDownload.onError` already shows a toast.
+- **Fix applied**: Wrapped `await startDownload(...)` in `try/catch`; `catch` block returns early since `useStartDownload.onError` already shows a toast and marks the job as failed. On success, fields are cleared and the dialog closes as before. 1 test added covering the rejection path (dialog stays open, fields preserved, `onOpenChange` not called).
 
 ---
 
@@ -642,4 +643,5 @@ None.
 | ARCH7 | `setLayerVolume` now no-ops for inactive layers; `updateLayerVolume` removed from `playbackStore`; `gainManager.ts` no longer imports `playbackStore`; 3 tests updated |
 | PERF1 | `useMultiFadeSideEffects` extracted; SceneView no longer subscribes to multi-fade state; zero-subscription hotkeys + Zustand subscribe for auto-cancel |
 | QUAL1 | `mod+shift+n` hotkey now navigates to new pad's page and plays flip animation; all page hotkeys centralized in `useGlobalHotkeys` |
+| QUAL3 | `DownloadDialog.handleSubmit` — `await startDownload` wrapped in `try/catch`; `catch` returns early since `onError` already shows a toast |
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |

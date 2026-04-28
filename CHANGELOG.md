@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where a failed download could leave the Download Dialog in a broken state — it now stays open with your input preserved so you can retry
 - Fixed `mod+shift+n` hotkey so adding a new pad now correctly navigates to the new pad's page and plays the flip animation
 - Keyboard shortcuts `shift+left` and `shift+right` for paging through pads are now centralized alongside all other global hotkeys
 - Fixed `mod+shift+n` hotkey to automatically navigate to the new pad's page and play the flip animation when adding a pad to a full grid

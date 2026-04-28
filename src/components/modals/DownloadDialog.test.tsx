@@ -466,6 +466,25 @@ describe("DownloadDialog — tags and sets pre-selection", () => {
     expect(screen.queryByText("drums")).not.toBeInTheDocument();
   });
 
+  it("keeps the dialog open and fields populated when startDownload rejects", async () => {
+    mockStartDownload.mockRejectedValue(new Error("sidecar failed"));
+    const onOpenChange = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <DownloadDialog open onOpenChange={onOpenChange} />
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByPlaceholderText("https://..."), "https://example.com/audio");
+    await userEvent.type(screen.getByPlaceholderText("my-sound"), "my-sound");
+    await userEvent.click(screen.getByRole("button", { name: /download/i }));
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText("https://...")).toHaveValue("https://example.com/audio");
+    expect(screen.getByPlaceholderText("my-sound")).toHaveValue("my-sound");
+  });
+
   it("clears selected tags and sets after successful submit", async () => {
     const tag = createMockTag({ name: "drums" });
     const set = createMockSet({ name: "intro" });

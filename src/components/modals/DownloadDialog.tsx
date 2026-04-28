@@ -106,14 +106,18 @@ export function DownloadDialog({ open, onOpenChange }: DownloadDialogProps) {
     if (!validate()) return;
     if (!downloadFolder) return;
 
-    await startDownload({
-      url: url.trim(),
-      outputName: outputName,
-      downloadFolderPath: downloadFolder,
-      jobId: crypto.randomUUID(),
-      tags: selectedTagIds,
-      sets: selectedSetIds,
-    });
+    try {
+      await startDownload({
+        url: url.trim(),
+        outputName: outputName,
+        downloadFolderPath: downloadFolder,
+        jobId: crypto.randomUUID(),
+        tags: selectedTagIds,
+        sets: selectedSetIds,
+      });
+    } catch {
+      return;
+    }
 
     setUrl("");
     setOutputName("");
