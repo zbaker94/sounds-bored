@@ -76,6 +76,19 @@ describe("LibraryItemPicker", () => {
     expect(screen.queryByRole("option", { name: /create/i })).not.toBeInTheDocument();
   });
 
+  it("renders renderItemSuffix next to each item in the dropdown", async () => {
+    renderPicker({
+      renderItemSuffix: (item) => (
+        <span data-testid="suffix">{item.id}-count</span>
+      ),
+    });
+    await userEvent.click(screen.getByPlaceholderText("Pick something..."));
+    const suffixes = await screen.findAllByTestId("suffix");
+    expect(suffixes).toHaveLength(2);
+    expect(suffixes[0]).toHaveTextContent("a-count");
+    expect(suffixes[1]).toHaveTextContent("b-count");
+  });
+
   it("calls onCreate with the typed name when Create is clicked and includes returned id in onChange", async () => {
     const { onChange, onCreate } = renderPicker();
     const input = screen.getByPlaceholderText("Pick something...");

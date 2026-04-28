@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (14 fixed) |
+| Medium | 16 (15 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -197,11 +197,10 @@ None.
 
 ---
 
-### [REUSE6] `SoundSelector` rebuilds the `LibraryItemPicker` tag-combobox pattern from scratch
+### ~~[REUSE6] `SoundSelector` rebuilds the `LibraryItemPicker` tag-combobox pattern from scratch~~ ✅ FIXED
 - **File**: `src/components/composite/PadConfigDrawer/SoundSelector.tsx:302-334`; `src/components/composite/LibraryPickers/LibraryItemPicker.tsx:54-87`
 - **Severity**: Medium
-- **Finding**: `SoundSelector`'s tag mode duplicates the `LibraryItemPicker` JSX tree line-for-line (Combobox + ComboboxChips + ChipsInput + Content + List + Empty + Collection). The `LibraryPickers` directory was added this cycle specifically to own this pattern, but `SoundSelector` was not updated to consume it.
-- **Recommendation**: Replace `SoundSelector`'s tag combobox with `<TagPicker>` from the new `LibraryPickers` barrel. Same for the set-mode combobox — use a single-select variant of `LibraryItemPicker`.
+- **Fix applied**: Added optional `renderItemSuffix?: (item: { id: string; name: string }) => ReactNode` to `LibraryItemPicker`; passed through in `TagPicker`. `TagModeSection`'s 30-line inline combobox replaced with `<TagPicker renderItemSuffix={…} />` — suffix renders the per-tag sound count badge. The caller-managed `tagAnchorRef` / `useComboboxAnchor()` hook call removed from `SoundSelector` since `LibraryItemPicker` manages its own anchor internally. Set mode intentionally left as-is: it uses `ComboboxInput` (single-select, full Set object value) vs `LibraryItemPicker`'s `ComboboxChips` (multi-select, string[] IDs) — a "single-select variant" would be a new component with no other call sites, adding net code. 2 tests added to `LibraryItemPicker.test.tsx` and `TagPicker.test.tsx`; 3 `SoundSelector.test.tsx` placeholder matches updated.
 
 ---
 

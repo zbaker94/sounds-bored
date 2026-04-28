@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- The tag picker in the pad configuration drawer now uses the same shared component as the rest of the app, ensuring consistent behavior and appearance across all tag selection UI.
+- Tag dropdown items continue to display per-tag sound counts alongside each tag name.
 - Refactored audio cache cleanup into shared utility functions, reducing the risk of future memory leaks when removing sounds
 - Consolidated duplicate slider components into a single reusable `PadLabeledSlider`, simplifying internal code without any change to slider behavior
 - Internal audio cache cleanup has been refactored for reliability — removing sounds from your library now clears all cached audio data more consistently.

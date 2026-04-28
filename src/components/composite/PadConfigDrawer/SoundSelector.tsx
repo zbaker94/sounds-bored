@@ -14,17 +14,14 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import {
   Combobox,
-  ComboboxChips,
-  ComboboxChip,
-  ComboboxChipsInput,
   ComboboxContent,
   ComboboxList,
   ComboboxItem,
   ComboboxCollection,
   ComboboxEmpty,
   ComboboxInput,
-  useComboboxAnchor,
 } from "@/components/ui/combobox";
+import { TagPicker } from "@/components/composite/LibraryPickers";
 import { SoundFolderTree } from "./SoundFolderTree";
 import { buildTree, findFolderNode, getSoundsInSubtree } from "./soundTreeUtils";
 
@@ -37,8 +34,6 @@ interface SoundSelectorProps {
 
 export function SoundSelector({ value, onChange }: SoundSelectorProps) {
   const [query, setQuery] = useState("");
-  // Anchor ref for Combobox chips dropdown positioning — always called (hook rule)
-  const tagAnchorRef = useComboboxAnchor();
 
   useEffect(() => {
     setQuery("");
@@ -189,10 +184,8 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
       <TagModeSection
         value={value}
         onChange={onChange}
-        tags={tags}
         sounds={sounds}
         tagCountMap={tagCountMap}
-        tagAnchorRef={tagAnchorRef}
       />
     );
   }
@@ -242,13 +235,11 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
 interface TagModeSectionProps {
   value: Extract<LayerSelection, { type: "tag" }>;
   onChange: (value: LayerSelection) => void;
-  tags: { id: string; name: string }[];
   sounds: Sound[];
   tagCountMap: Record<string, number>;
-  tagAnchorRef: React.RefObject<HTMLDivElement | null>;
 }
 
-function TagModeSection({ value, onChange, tags, sounds, tagCountMap, tagAnchorRef }: TagModeSectionProps) {
+function TagModeSection({ value, onChange, sounds, tagCountMap }: TagModeSectionProps) {
   const matchCount = useMemo(() => {
     if (value.tagIds.length === 0) return null;
     return filterSoundsByTags(sounds, value.tagIds, value.matchMode).length;
@@ -299,39 +290,17 @@ function TagModeSection({ value, onChange, tags, sounds, tagCountMap, tagAnchorR
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Combobox
+      <TagPicker
         value={value.tagIds}
-        onValueChange={(tagIds) =>
+        onChange={(tagIds) =>
           onChange({ type: "tag", tagIds, matchMode: value.matchMode, defaultVolume: value.defaultVolume })
         }
-        items={tags}
-        multiple
-      >
-        <ComboboxChips ref={tagAnchorRef}>
-          {value.tagIds.map((id) => {
-            const tag = tags.find((t) => t.id === id);
-            return tag ? <ComboboxChip key={id}>{tag.name}</ComboboxChip> : null;
-          })}
-          <ComboboxChipsInput placeholder="Search tags..." />
-        </ComboboxChips>
-        <ComboboxContent anchor={tagAnchorRef}>
-          <ComboboxList>
-            <ComboboxEmpty>
-              {tags.length === 0 ? "No tags in library yet." : "No tags found."}
-            </ComboboxEmpty>
-            <ComboboxCollection>
-              {(t) => (
-                <ComboboxItem key={t.id} value={t.id}>
-                  <span className="flex-1">{t.name}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {tagCountMap[t.id] ?? 0} sounds
-                  </span>
-                </ComboboxItem>
-              )}
-            </ComboboxCollection>
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
+        renderItemSuffix={(t) => (
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {tagCountMap[t.id] ?? 0} sounds
+          </span>
+        )}
+      />
       <p className="text-xs text-muted-foreground">{helperText}</p>
     </div>
   );

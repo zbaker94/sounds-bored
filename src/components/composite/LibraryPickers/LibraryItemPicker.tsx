@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Combobox,
   ComboboxChips,
@@ -19,6 +19,7 @@ interface LibraryItemPickerProps {
   onCreate: (name: string) => { id: string };
   placeholder?: string;
   emptyText?: string;
+  renderItemSuffix?: (item: { id: string; name: string }) => ReactNode;
 }
 
 export function LibraryItemPicker({
@@ -28,6 +29,7 @@ export function LibraryItemPicker({
   onCreate,
   placeholder = "Search...",
   emptyText = "No items found.",
+  renderItemSuffix,
 }: LibraryItemPickerProps) {
   const [inputValue, setInputValue] = useState("");
   const anchorRef = useComboboxAnchor();
@@ -72,7 +74,8 @@ export function LibraryItemPicker({
           <ComboboxCollection>
             {(item) => (
               <ComboboxItem key={item.id} value={item.id}>
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {renderItemSuffix?.(item)}
               </ComboboxItem>
             )}
           </ComboboxCollection>

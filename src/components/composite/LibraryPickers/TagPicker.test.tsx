@@ -29,6 +29,25 @@ describe("TagPicker", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders renderItemSuffix in each dropdown item when provided", async () => {
+    const tag = createMockTag({ id: "t1", name: "Drums" });
+    useLibraryStore.setState({ ...initialLibraryState, tags: [tag] });
+
+    render(
+      <TagPicker
+        value={[]}
+        onChange={vi.fn()}
+        renderItemSuffix={(item) => (
+          <span data-testid="tag-count">{item.id}-3</span>
+        )}
+      />
+    );
+    await userEvent.click(screen.getByPlaceholderText("Search or create tags..."));
+
+    const suffix = await screen.findByTestId("tag-count");
+    expect(suffix).toHaveTextContent("t1-3");
+  });
+
   it("excludes system tags from the dropdown", async () => {
     const systemTag = createMockTag({ name: "system-tag", isSystem: true });
     const userTag = createMockTag({ name: "user-tag" });

@@ -47,7 +47,7 @@ describe("SoundSelector", () => {
       onChange: noopChange,
     });
 
-    expect(screen.getByPlaceholderText(/search tags/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
   it("shows selected tags as chips when tag ids are provided", () => {
@@ -208,7 +208,7 @@ describe("SoundSelector — tag mode", () => {
       value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
       onChange: vi.fn(),
     });
-    expect(screen.getByPlaceholderText(/search tags/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
   it("shows 'No tags in library yet.' when tag list is empty", () => {
@@ -219,7 +219,7 @@ describe("SoundSelector — tag mode", () => {
     });
     // Combobox empty state is rendered inside a portal — only visible after opening
     // We verify the chips input renders (the combobox is present)
-    expect(screen.getByPlaceholderText(/search tags/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
   it("renders AND/OR toggle in tag mode", () => {
@@ -312,7 +312,7 @@ describe("SoundSelector — tag mode", () => {
     });
 
     // Open the combobox and select a tag
-    await userEvent.click(screen.getByPlaceholderText(/search tags/i));
+    await userEvent.click(screen.getByPlaceholderText(/search.*tags/i));
     const option = await screen.findByRole("option", { name: /percussion/i });
     await userEvent.click(option);
 

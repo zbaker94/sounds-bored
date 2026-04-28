@@ -92,7 +92,7 @@ describe("LayerConfigSection", () => {
     useLibraryStore.setState({ sounds: [], tags: [{ id: "t1", name: "Percussion", color: "#ffffff" }], sets: [], isDirty: false });
     render(<Wrapper />);
     await userEvent.click(screen.getByRole("tab", { name: /tag/i }));
-    expect(screen.getByPlaceholderText(/search tags/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
   it("switching to set type shows set selector combobox", async () => {
