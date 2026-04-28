@@ -1,6 +1,6 @@
 import { readDir, exists, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
-import { Sound, GlobalFolder } from "./schemas";
+import { Sound, GlobalFolder, AppSettings } from "./schemas";
 import { AUDIO_EXTENSIONS } from "./constants";
 import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
@@ -193,6 +193,26 @@ export async function reconcileGlobalLibrary(
     changed,
     inaccessibleFolderIds,
   };
+}
+
+// Settings are committed before reconcile; a reconcile failure leaves settings updated but the in-memory library stale until the next boot reconcile.
+export async function addGlobalFolderAndReconcile(
+  newFolder: GlobalFolder,
+  settings: AppSettings,
+  sounds: Sound[],
+  saveSettings: (s: AppSettings) => Promise<unknown>,
+  setSounds: (newSounds: Sound[]) => void,
+): Promise<{ updatedSettings: AppSettings; changed: boolean }> {
+  const updatedSettings: AppSettings = {
+    ...settings,
+    globalFolders: [...settings.globalFolders, newFolder],
+  };
+  await saveSettings(updatedSettings);
+  const result = await reconcileGlobalLibrary(updatedSettings.globalFolders, sounds);
+  if (result.changed) {
+    setSounds(result.sounds);
+  }
+  return { updatedSettings, changed: result.changed };
 }
 
 // ─── Missing File / Folder Detection ─────────────────────────────────────────

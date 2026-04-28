@@ -30,6 +30,9 @@ vi.mock("@/lib/library.reconcile", () => ({
     Promise.resolve({ sounds: [], changed: false, inaccessibleFolderIds: [] }),
   ),
   refreshMissingState: vi.fn(() => Promise.resolve()),
+  addGlobalFolderAndReconcile: vi.fn(() =>
+    Promise.resolve({ updatedSettings: {}, changed: false }),
+  ),
 }));
 
 vi.mock("@/lib/audio/cacheUtils", () => ({

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Duplicate logic for adding a global sound folder and syncing the library has been consolidated — the app now uses a single shared implementation, reducing the chance of inconsistencies between the two places this action could be triggered.
 - Fixed a bug where the "Resolve Missing File" dialog could crash or behave unexpectedly when no sound was selected before picking a replacement file
 - Improved reliability of duplicate-file detection when locating missing sounds — the app now correctly identifies when a picked file is already used by another sound in your library
 - Partial tags (applied to some but not all selected sounds) now display correctly alongside full tags in the Add Tags dialog

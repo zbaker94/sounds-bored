@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (17 fixed) |
+| Medium | 15 (18 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -218,7 +218,7 @@ None.
 
 ---
 
-### [REUSE9] `addFolder + reconcile + save` orchestration duplicated in hook and modal
+### ~~[REUSE9] `addFolder + reconcile + save` orchestration duplicated in hook and modal~~ ✅ FIXED
 - **File**: `src/hooks/useAddFolder.ts:44-66`; `src/components/modals/ResolveMissingFolderDialog.tsx:280-299`
 - **Severity**: Medium
 - **Finding**: The `GlobalFolder` create → `saveSettings` → `reconcileGlobalLibrary` → `updateLibrary` sequence is copy-pasted. The only difference is `useAddFolder` also runs the `pickFolder` UI step.
@@ -232,6 +232,7 @@ None.
   if (result.changed) { updateLibrary((draft) => { draft.sounds = result.sounds; }); }
   ```
 - **Recommendation**: Extract `addGlobalFolderAndReconcile(folder: GlobalFolder, { settings, sounds, saveSettings, updateLibrary }): Promise<void>` as a shared module helper.
+- **Fix applied**: Extracted `addGlobalFolderAndReconcile(newFolder, settings, sounds, saveSettings, setSounds)` to `src/lib/library.reconcile.ts`. Signature uses `setSounds: (newSounds: Sound[]) => void` to avoid importing the unexported `LibraryData` type across module boundaries. Returns `{ updatedSettings, changed }` so callers decide when to call `saveCurrentLibrary`. 4 unit tests added. Both callers migrated.
 
 ---
 
@@ -621,3 +622,4 @@ None.
 | REUSE4 | `evictSoundCaches`/`evictSoundCachesMany` extracted to `cacheUtils.ts`; all 9 call sites migrated across 6 files; 5 test mock declarations updated |
 | REUSE5 | `PadPercentSlider` and `PadDurationSlider` collapsed into `PadLabeledSlider`; both old files deleted; `PadFadeControls` updated; `PadButtonFadeOverlay` intentionally left inline (different layout/styling) |
 | REUSE8 | `classifyPickedAudioFile` + `findDuplicateByPath` extracted to `src/lib/fileResolve.ts`; both dialog handlers use shared helpers; `AudioFileClassification` discriminated union eliminates `!` assertions; 8 tests added |
+| REUSE9 | `addGlobalFolderAndReconcile` extracted to `library.reconcile.ts`; `useAddFolder` and `ResolveMissingFolderDialog` (add-parent path) both migrated; `setSounds` callback avoids cross-module `LibraryData` import; 4 tests added |

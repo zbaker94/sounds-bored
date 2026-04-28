@@ -6,7 +6,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
-import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
+import { reconcileGlobalLibrary, refreshMissingState, addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
 import { evictSoundCaches } from "@/lib/audio/cacheUtils";
 import { pickFolder, pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
@@ -267,21 +267,14 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
             path: parentDir,
             name: parentName,
           };
-          const updatedSettings = {
-            ...settings,
-            globalFolders: [...settings.globalFolders, newFolder],
-          };
-          await saveSettings(updatedSettings);
+          await addGlobalFolderAndReconcile(
+            newFolder,
+            settings,
+            useLibraryStore.getState().sounds,
+            saveSettings,
+            (newSounds) => updateLibrary((draft) => { draft.sounds = newSounds; }),
+          );
           newFolderIdForSound = newFolder.id;
-
-          // Reconcile the new folder
-          const currentSounds = useLibraryStore.getState().sounds;
-          const reconciled = await reconcileGlobalLibrary(updatedSettings.globalFolders, currentSounds);
-          if (reconciled.changed) {
-            updateLibrary((draft) => {
-              draft.sounds = reconciled.sounds;
-            });
-          }
         } else if (existingFolder) {
           newFolderIdForSound = existingFolder.id;
         }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile } from "./library.reconcile";
 import { mockFs, mockPath } from "@/test/tauri-mocks";
 import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
@@ -658,6 +658,85 @@ describe("reconcileGlobalLibrary", () => {
 
       expect(result.sounds[0].name).toBe("My.cool.sound");
     });
+  });
+});
+
+describe("addGlobalFolderAndReconcile", () => {
+  beforeEach(() => {
+    mockPath.join.mockImplementation((...paths: string[]) => Promise.resolve(paths.join("/")) as unknown as string);
+    mockFs.exists.mockResolvedValue(true);
+    mockStat.mockResolvedValue({ size: 1024 });
+  });
+
+  it("appends the folder to settings and calls saveSettings before reconciling", async () => {
+    const settings = createMockAppSettings({ globalFolders: [] });
+    const newFolder = createMockGlobalFolder({ id: "f-new", path: "/music/new", name: "new" });
+    const saveSettings = vi.fn().mockResolvedValue(undefined);
+    const setSounds = vi.fn();
+
+    mockReadDir({ "/music/new": [] });
+
+    const { updatedSettings } = await addGlobalFolderAndReconcile(
+      newFolder, settings, [], saveSettings, setSounds,
+    );
+
+    expect(saveSettings).toHaveBeenCalledTimes(1);
+    expect(saveSettings).toHaveBeenCalledWith(updatedSettings);
+    expect(updatedSettings.globalFolders).toHaveLength(1);
+    expect(updatedSettings.globalFolders[0]).toBe(newFolder);
+  });
+
+  it("calls setSounds with discovered files when reconcile reports changed", async () => {
+    const settings = createMockAppSettings({ globalFolders: [] });
+    const newFolder = createMockGlobalFolder({ id: "f-new", path: "/music/new", name: "new" });
+    const saveSettings = vi.fn().mockResolvedValue(undefined);
+    const setSounds = vi.fn();
+
+    mockReadDir({ "/music/new": [fileEntry("kick.wav")] });
+
+    const { changed } = await addGlobalFolderAndReconcile(
+      newFolder, settings, [], saveSettings, setSounds,
+    );
+
+    expect(changed).toBe(true);
+    expect(setSounds).toHaveBeenCalledTimes(1);
+    const [newSounds] = setSounds.mock.calls[0] as [Sound[]];
+    expect(newSounds).toHaveLength(1);
+    expect(newSounds[0].folderId).toBe("f-new");
+  });
+
+  it("does not call setSounds when the folder contains no new audio files", async () => {
+    const settings = createMockAppSettings({ globalFolders: [] });
+    const newFolder = createMockGlobalFolder({ id: "f-new", path: "/music/new", name: "new" });
+    const saveSettings = vi.fn().mockResolvedValue(undefined);
+    const setSounds = vi.fn();
+
+    mockReadDir({ "/music/new": [] });
+
+    const { changed } = await addGlobalFolderAndReconcile(
+      newFolder, settings, [], saveSettings, setSounds,
+    );
+
+    expect(changed).toBe(false);
+    expect(setSounds).not.toHaveBeenCalled();
+  });
+
+  it("preserves existing folders in updatedSettings", async () => {
+    const existingFolder = createMockGlobalFolder({ path: "/music/existing" });
+    const settings = createMockAppSettings({ globalFolders: [existingFolder] });
+    const newFolder = createMockGlobalFolder({ id: "f-new", path: "/music/new", name: "new" });
+    const saveSettings = vi.fn().mockResolvedValue(undefined);
+    const setSounds = vi.fn();
+
+    mockReadDir({ "/music/existing": [], "/music/new": [] });
+
+    const { updatedSettings } = await addGlobalFolderAndReconcile(
+      newFolder, settings, [], saveSettings, setSounds,
+    );
+
+    expect(updatedSettings.globalFolders).toHaveLength(2);
+    expect(updatedSettings.globalFolders[0]).toBe(existingFolder);
+    expect(updatedSettings.globalFolders[1]).toBe(newFolder);
   });
 });
 

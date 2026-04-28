@@ -8,7 +8,7 @@ import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories"
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 vi.mock("@/lib/library.reconcile", () => ({
-  reconcileGlobalLibrary: vi.fn(),
+  addGlobalFolderAndReconcile: vi.fn(),
 }));
 
 const mockSaveLibrary = vi.fn();
@@ -38,11 +38,11 @@ vi.mock("@/lib/scope", () => ({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
 import { toast } from "sonner";
 import { pickFolder } from "@/lib/scope";
 
-const mockReconcile = reconcileGlobalLibrary as ReturnType<typeof vi.fn>;
+const mockAddGlobalFolder = addGlobalFolderAndReconcile as ReturnType<typeof vi.fn>;
 const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
 const mockToastSuccess = toast.success as ReturnType<typeof vi.fn>;
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
@@ -52,7 +52,8 @@ beforeEach(() => {
   useAppSettingsStore.setState({ ...initialAppSettingsState });
   mockSaveLibrary.mockReset();
   mockSaveSettings.mockReset();
-  mockReconcile.mockReset();
+  mockAddGlobalFolder.mockReset();
+  mockAddGlobalFolder.mockResolvedValue({ updatedSettings: createMockAppSettings(), changed: false });
   mockPickFolder.mockReset();
   mockToastSuccess.mockReset();
   mockToastError.mockReset();
@@ -80,8 +81,7 @@ describe("useAddFolder", () => {
       await result.current.handleAddFolder();
     });
 
-    expect(mockSaveSettings).not.toHaveBeenCalled();
-    expect(mockReconcile).not.toHaveBeenCalled();
+    expect(mockAddGlobalFolder).not.toHaveBeenCalled();
   });
 
   it("shows an error toast and aborts when the folder path is already present", async () => {
@@ -98,10 +98,10 @@ describe("useAddFolder", () => {
     expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 
-  it("calls pickFolder, saves settings, reconciles, and saves the library when changed", async () => {
+  it("calls addGlobalFolderAndReconcile with the new folder and saves the library when changed", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockPickFolder.mockResolvedValue("/music/new");
-    mockReconcile.mockResolvedValue({ changed: true, sounds: [] });
+    mockAddGlobalFolder.mockResolvedValue({ updatedSettings: createMockAppSettings(), changed: true });
 
     const { result } = renderHook(() => useAddFolder());
     await act(async () => {
@@ -109,13 +109,10 @@ describe("useAddFolder", () => {
     });
 
     expect(mockPickFolder).toHaveBeenCalledTimes(1);
-    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
-    const savedSettings = mockSaveSettings.mock.calls[0][0];
-    expect(savedSettings.globalFolders).toHaveLength(1);
-    expect(savedSettings.globalFolders[0].path).toBe("/music/new");
-    expect(savedSettings.globalFolders[0].name).toBe("new");
-
-    expect(mockReconcile).toHaveBeenCalledTimes(1);
+    expect(mockAddGlobalFolder).toHaveBeenCalledTimes(1);
+    const [folder] = mockAddGlobalFolder.mock.calls[0] as Parameters<typeof addGlobalFolderAndReconcile>;
+    expect(folder.path).toBe("/music/new");
+    expect(folder.name).toBe("new");
     expect(mockSaveLibrary).toHaveBeenCalledTimes(1);
     expect(mockToastSuccess).toHaveBeenCalledWith(`Folder "new" added`);
   });
@@ -123,15 +120,14 @@ describe("useAddFolder", () => {
   it("does not save the library when reconcile reports no changes", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockPickFolder.mockResolvedValue("/music/new");
-    mockReconcile.mockResolvedValue({ changed: false, sounds: [] });
+    // default mock returns changed: false
 
     const { result } = renderHook(() => useAddFolder());
     await act(async () => {
       await result.current.handleAddFolder();
     });
 
-    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
-    expect(mockReconcile).toHaveBeenCalledTimes(1);
+    expect(mockAddGlobalFolder).toHaveBeenCalledTimes(1);
     expect(mockSaveLibrary).not.toHaveBeenCalled();
     expect(mockToastSuccess).toHaveBeenCalled();
   });
@@ -176,10 +172,10 @@ describe("useAddFolder", () => {
     expect(result.current.isAddingFolder).toBe(false);
   });
 
-  it("shows an error toast and resets isAddingFolder when saveSettings rejects", async () => {
+  it("shows an error toast and resets isAddingFolder when addGlobalFolderAndReconcile rejects", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockPickFolder.mockResolvedValue("/music/new");
-    mockSaveSettings.mockRejectedValue(new Error("disk full"));
+    mockAddGlobalFolder.mockRejectedValue(new Error("disk full"));
 
     const { result } = renderHook(() => useAddFolder());
     await act(async () => {
@@ -193,7 +189,7 @@ describe("useAddFolder", () => {
   it("shows an error toast and resets isAddingFolder when saveCurrentLibrary rejects", async () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings({ globalFolders: [] }) });
     mockPickFolder.mockResolvedValue("/music/new");
-    mockReconcile.mockResolvedValue({ changed: true, sounds: [] });
+    mockAddGlobalFolder.mockResolvedValue({ updatedSettings: createMockAppSettings(), changed: true });
     mockSaveLibrary.mockRejectedValue(new Error("write failed"));
 
     const { result } = renderHook(() => useAddFolder());
@@ -228,9 +224,9 @@ describe("useAddFolder", () => {
       await result.current.handleAddFolder();
     });
 
-    // With stale settingsA, no duplicate would be detected and saveSettings would be called.
-    // With live settingsB, the duplicate check fires and saveSettings must NOT be called.
+    // With stale settingsA, no duplicate would be detected and addGlobalFolderAndReconcile would be called.
+    // With live settingsB, the duplicate check fires and it must NOT be called.
     expect(mockToastError).toHaveBeenCalledWith("That folder is already in your library.");
-    expect(mockSaveSettings).not.toHaveBeenCalled();
+    expect(mockAddGlobalFolder).not.toHaveBeenCalled();
   });
 });

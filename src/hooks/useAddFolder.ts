@@ -4,7 +4,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
-import { reconcileGlobalLibrary } from "@/lib/library.reconcile";
+import { addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
 import { pickFolder } from "@/lib/scope";
 import { basename } from "@/lib/utils";
 import type { GlobalFolder } from "@/lib/schemas";
@@ -47,20 +47,14 @@ export function useAddFolder(): {
         path: selected,
         name,
       };
-      const updatedSettings = {
-        ...settings,
-        globalFolders: [...settings.globalFolders, newFolder],
-      };
-      await saveSettings(updatedSettings);
-
-      const result = await reconcileGlobalLibrary(
-        updatedSettings.globalFolders,
+      const { changed } = await addGlobalFolderAndReconcile(
+        newFolder,
+        settings,
         sounds,
+        saveSettings,
+        (newSounds) => updateLibrary((draft) => { draft.sounds = newSounds; }),
       );
-      if (result.changed) {
-        updateLibrary((draft) => {
-          draft.sounds = result.sounds;
-        });
+      if (changed) {
         await saveCurrentLibrary();
       }
       toast.success(`Folder "${name}" added`);
