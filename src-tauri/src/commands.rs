@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
@@ -814,17 +814,20 @@ fn validate_grant_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Grants runtime fs-scope access to a user-selected path.
+/// Grants runtime fs-scope and asset-protocol-scope access to a user-selected path.
 /// Called after every dialog that returns a user-chosen folder or file, so that
 /// the broad static $DOCUMENT/**, $DOWNLOAD/**, $DESKTOP/** grants can be removed
-/// from capabilities/default.json.
+/// from capabilities/default.json and assetProtocol.scope in tauri.conf.json.
 #[tauri::command]
 pub fn grant_path_access(app: AppHandle, path: String) -> Result<(), String> {
     use tauri_plugin_fs::FsExt;
     validate_grant_path(&path)?;
     app.fs_scope()
         .allow_directory(&path, true)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    app.asset_protocol_scope()
+        .allow_directory(&path, true)
+        .map_err(|e: tauri::Error| e.to_string())
 }
 
 #[cfg(test)]

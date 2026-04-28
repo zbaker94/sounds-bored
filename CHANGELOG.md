@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Tightened app file access permissions: the app no longer has broad read access to your home directory, music library, documents, downloads, and desktop at startup — access is now granted only to folders you explicitly choose.
+- Fixed a security issue where a compromised renderer could have read arbitrary files (SSH keys, browser data, shell history) via the asset protocol; access is now scoped to app data directories and user-selected folders only.
 - Internal audio playback state management refactored to eliminate code duplication, with 16 new tests added to verify correctness and stability.
 - Duplicate logic for adding a global sound folder and syncing the library has been consolidated — the app now uses a single shared implementation, reducing the chance of inconsistencies between the two places this action could be triggered.
 - Fixed a bug where the "Resolve Missing File" dialog could crash or behave unexpectedly when no sound was selected before picking a replacement file

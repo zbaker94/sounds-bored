@@ -11,12 +11,12 @@
 | Severity | Count |
 |----------|-------|
 | Critical | 0 |
-| High | 0 (4 fixed) |
+| High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 47 |
+| Low | 46 (1 fixed) |
 | **Total** | **67** |
 
-**Confirmed FIXED in this diff:** SEC12–SEC17 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
+**Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
 ---
 
@@ -245,13 +245,20 @@ None.
 
 ## Low (47)
 
-### Security (11)
+### Security (12)
 
-#### [SEC1] `$AUDIO/**` remains a static fs-scope grant
+#### ~~[SEC1] `$AUDIO/**` remains a static fs-scope grant~~ ✅ FIXED
 - **File**: `src-tauri/capabilities/default.json:42`
 - **Severity**: Low
 - **Finding**: The large static grants (`$DOCUMENT/**`, `$DOWNLOAD/**`, `$DESKTOP/**`) were correctly replaced with runtime `grant_path_access` calls this cycle, but `$AUDIO/**` remains. A renderer XSS would have full read/write over the user's entire music library without any further IPC call.
 - **Recommendation**: Move behind the runtime grant model — scan `$AUDIO` only if the user opts in, then grant via `grant_path_access`. Otherwise document explicitly that renderer compromise implies music library access.
+- **Fix applied**: Removed `{ "path": "$AUDIO/**" }` from the `fs:scope` allow block. The `opener:allow-open-path` entry is intentionally retained — the opener plugin has no runtime scope expansion mechanism, and it only permits OS-default-app launches (not arbitrary file reads/writes). Runtime fs access to user-chosen folders in `~/Music` is already covered by `grant_path_access` calls in `pickFolder`/`useBootLoader`.
+
+#### ~~[SEC18] `assetProtocol.scope` grants renderer read access to entire user home directory~~ ✅ FIXED
+- **File**: `src-tauri/tauri.conf.json:43-56`
+- **Severity**: High
+- **Finding**: `assetProtocol.scope` contained `$HOME/**` (plus `$MUSIC/**`, `$DOCUMENT/**`, `$DOWNLOAD/**`, `$DESKTOP/**`). The audio engine reads sound files via `convertFileSrc(path)` + `fetch(url)` through the `asset:` protocol (see `bufferCache.ts:16-22`, `preview.ts:34`, `streamingCache.ts:67/96/163`). This means a renderer XSS can `fetch('asset://localhost/' + anyPath)` to read any file under the user's home directory — including `~/.ssh/`, browser profiles, and shell history — and exfiltrate the bytes. This is a broader version of what the `fs:scope` cleanup was intended to address: the asset protocol provides an equivalent (and wider) read primitive that was left untouched.
+- **Fix applied**: Removed `$HOME/**`, `$MUSIC/**`, `$DOCUMENT/**`, `$DOWNLOAD/**`, and `$DESKTOP/**` from `tauri.conf.json`'s `assetProtocol.scope`; retained `$RESOURCE/**`, `$APP/**/*`, `$APPDATA/**`, `$APPLOCALDATA/**`. Extended `grant_path_access` in `commands.rs` to call `app.asset_protocol_scope().allow_directory(&path, true)` alongside the existing `app.fs_scope()` call (`tauri::Manager` imported for trait access). The boot-time `grantPathAccess` replay in `useBootLoader.ts:42-44` now covers both scopes simultaneously on every app start.
 
 #### [SEC2] `grant_path_access` IPC is reachable from any renderer script
 - **File**: `src-tauri/src/commands.rs:821-828`
@@ -579,6 +586,7 @@ None.
 
 | ID | Description |
 |----|-------------|
+| SEC1 | `$AUDIO/**` removed from `fs:scope`; boot-time `grant_path_access` replay already covers user-chosen `~/Music` paths; `opener:allow-open-path` entry retained (no runtime scope API, launch-only risk) |
 | SEC12 | Shell `allow-spawn` / `allow-kill` removed from frontend capabilities |
 | SEC13 | Static broad fs-scope grants replaced with runtime `grant_path_access` |
 | SEC14 | Extensive Unicode/BIDI/control-char/UNC-root/device-namespace validation added |
