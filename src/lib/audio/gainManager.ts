@@ -5,17 +5,34 @@ import { getPadGain, getLayerGain, cancelPadFade } from "./audioState";
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
 const CLICK_FREE_RAMP_S = 0.016;
 
+function clampGain(x: number): number {
+  return Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0;
+}
+
+/**
+ * Schedule a click-free linear ramp on an `AudioParam` (typically a gain node's
+ * `.gain`). Cancels any pending automation, anchors the curve at `from` (defaults
+ * to the param's current live value), and ramps to `target` over `rampS` seconds.
+ */
+export function rampGainTo(
+  param: AudioParam,
+  target: number,
+  rampS = CLICK_FREE_RAMP_S,
+  from: number = param.value
+): void {
+  const ctx = getAudioContext();
+  param.cancelScheduledValues(ctx.currentTime);
+  param.setValueAtTime(from, ctx.currentTime);
+  param.linearRampToValueAtTime(target, ctx.currentTime + rampS);
+}
+
 /**
  * Set the live volume for a pad's gain node with a short ramp to avoid clicks.
  * Pass a value in 0–1 range.
  */
 export function setPadVolume(padId: string, volume: number): void {
-  const ctx = getAudioContext();
   const gain = getPadGain(padId);
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
+  rampGainTo(gain.gain, clampGain(volume));
   // Tick reads the gain node value automatically — no store call needed.
 }
 
@@ -41,11 +58,7 @@ export function resetPadGain(padId: string): void {
 export function syncLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
-  const ctx = getAudioContext();
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
+  rampGainTo(gain.gain, clampGain(volume));
 }
 
 /**
@@ -55,11 +68,7 @@ export function syncLayerVolume(layerId: string, volume: number): void {
 export function setLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
-  const clamped = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0;
-  const ctx = getAudioContext();
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(clamped, ctx.currentTime + CLICK_FREE_RAMP_S);
+  rampGainTo(gain.gain, clampGain(volume));
 }
 
 // Persisting layer volume on drag-end is a UI-layer concern. Callers use

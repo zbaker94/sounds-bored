@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (10 fixed) |
+| Medium | 16 (12 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -158,7 +158,7 @@ None.
 
 ---
 
-### [QUAL11] `usePadGesture` swallows `triggerPad` failures; `PadBackFace` toasts — inconsistent UX
+### ~~[QUAL11] `usePadGesture` swallows `triggerPad` failures; `PadBackFace` toasts — inconsistent UX~~ ✅ FIXED
 - **File**: `src/hooks/usePadGesture.ts:130,166,178,227,231`; `src/components/composite/SceneView/PadBackFace.tsx:445`
 - **Severity**: Medium
 - **Fix applied**: All `triggerPad` and `triggerLayer` call sites now route outer rejections through `emitAudioError` instead of logging silently or calling `toast.error` directly. Specifically:
@@ -171,11 +171,12 @@ None.
 
 ---
 
-### [REUSE2] Web Audio gain ramp pattern open-coded 5 times across 3 files
+### ~~[REUSE2] Web Audio gain ramp pattern open-coded 5 times across 3 files~~ ✅ FIXED
 - **File**: `src/lib/audio/gainManager.ts:17-19,47-49,63-65`; `src/lib/audio/padPlayer.ts:430-432`; `src/lib/audio/fadeMixer.ts:98-100`
 - **Severity**: Medium
 - **Finding**: `cancelScheduledValues → setValueAtTime(gain.value) → linearRampToValueAtTime` is copy-pasted with only the AudioParam and ramp constant differing. Volume clamping (`Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0`) is also repeated at 3 sites in `gainManager.ts`.
 - **Recommendation**: Extract `rampGainTo(param: AudioParam, target: number, rampS = CLICK_FREE_RAMP_S)` in `gainManager.ts`. All ramp sites become one-liners.
+- **Fix applied**: Extracted `rampGainTo(param: AudioParam, target: number, rampS = CLICK_FREE_RAMP_S, from: number = param.value)` in `gainManager.ts`. The optional `from` parameter (defaulting to the live `param.value` at call time) accommodates `fadePad`'s explicit pre-computed `fromVolume`. Private `clampGain` helper extracted for the repeated clamping expression. `setPadVolume`, `syncLayerVolume`, and `setLayerVolume` each reduce to a single `rampGainTo(gain.gain, clampGain(volume))` call. `padPlayer.ts` stop-all ramp and `fadeMixer.ts` `fadePad` converted to `rampGainTo` calls. 3 tests added to `gainManager.test.ts` for `rampGainTo`; `fadeMixer.test.ts` mock updated to include `rampGainTo`. 185 tests pass; TypeScript clean.
 
 ---
 

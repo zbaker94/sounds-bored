@@ -63,6 +63,8 @@ import {
   fadePad,
 } from "./fadeMixer";
 
+import { rampGainTo } from "./gainManager";
+
 import {
   applyRetriggerMode,
   startLayerPlayback,
@@ -425,11 +427,8 @@ export function stopAllPads(): void {
   nullAllOnEnded();
   stopAudioTick(); // immediately clear bars before the STOP_RAMP_S window
 
-  const ctx = getAudioContext();
   forEachPadGain((_padId, gain) => {
-    gain.gain.cancelScheduledValues(ctx.currentTime);
-    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + STOP_RAMP_S);
+    rampGainTo(gain.gain, 0, STOP_RAMP_S);
   });
   // Track this timeout so clearAllAudioState() can cancel it if project close
   // fires before the ramp completes — prevents stale cleanup from touching a

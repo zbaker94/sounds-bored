@@ -16,7 +16,7 @@ import {
   stopPadVoices,
   setPadFadeFromVolume,
 } from "./audioState";
-import { resetPadGain } from "./gainManager";
+import { rampGainTo, resetPadGain } from "./gainManager";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
 
@@ -80,7 +80,6 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
   removeFadingInPad(pad.id);
   usePlaybackStore.getState().addFadingPad(pad.id);
 
-  const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
   const fadingDown = toVolume < fromVolume;
 
@@ -95,9 +94,7 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
     usePlaybackStore.getState().removeFadingOutPad(pad.id);
   }
 
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(fromVolume, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(toVolume, ctx.currentTime + durationMs / 1000);
+  rampGainTo(gain.gain, toVolume, durationMs / 1000, fromVolume);
   setPadFadeFromVolume(pad.id, fromVolume);
 
   const timeoutId = setTimeout(() => {

@@ -14,6 +14,11 @@ vi.mock("./audioContext", () => ({
 
 vi.mock("./gainManager", () => ({
   resetPadGain: vi.fn(),
+  rampGainTo: vi.fn((param: AudioParam, target: number, rampS: number = 0.016, from: number = param.value) => {
+    param.cancelScheduledValues(mockCtx.currentTime);
+    param.setValueAtTime(from, mockCtx.currentTime);
+    param.linearRampToValueAtTime(target, mockCtx.currentTime + rampS);
+  }),
 }));
 
 function makeMockGain(initialValue = 1.0) {

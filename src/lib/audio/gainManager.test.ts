@@ -208,4 +208,38 @@ describe("gainManager", () => {
 
   // commitLayerVolume was removed from gainManager — persisting layer volume to
   // the project schema is a UI-layer concern.
+
+  describe("rampGainTo", () => {
+    it("schedules a ramp using the default rampS (0.016) and anchors from param.value", async () => {
+      const mockGain = makeMockGain(0.4);
+      const { rampGainTo } = await import("./gainManager");
+
+      rampGainTo(mockGain.gain as unknown as AudioParam, 0.9);
+
+      expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalledWith(0);
+      expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.4, 0);
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.9, 0.016);
+    });
+
+    it("uses a custom rampS when provided", async () => {
+      const mockGain = makeMockGain(0.2);
+      const { rampGainTo } = await import("./gainManager");
+
+      rampGainTo(mockGain.gain as unknown as AudioParam, 0.7, 0.5);
+
+      expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.2, 0);
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, 0.5);
+    });
+
+    it("uses an explicit from value when provided (does not read param.value)", async () => {
+      const mockGain = makeMockGain(0.4);
+      const { rampGainTo } = await import("./gainManager");
+
+      rampGainTo(mockGain.gain as unknown as AudioParam, 0.9, 0.25, 0.0);
+
+      expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.0, 0);
+      expect(mockGain.gain.setValueAtTime).not.toHaveBeenCalledWith(0.4, 0);
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.9, 0.25);
+    });
+  });
 });
