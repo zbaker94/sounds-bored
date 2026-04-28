@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Hardened path validation for download and export operations: file paths must now be absolute and are rejected if they contain traversal segments, UNC device-namespace paths, or control characters — reducing the risk of malicious or misconfigured paths redirecting files outside intended folders.
 - **Tightened file system access**: The app no longer requests broad read access to your home directory, Music, Documents, Downloads, or Desktop folders at startup — access is now granted only for folders you explicitly select.
 - **Hardened folder/file pickers**: Dialog selection and folder access are now handled atomically in the backend, so the app cannot be tricked into accessing paths you didn't choose through the native picker.
 - **Reduced static permissions**: Removed the standing `$AUDIO/**` file system scope grant; audio file access is now granted dynamically when you add a folder or import sounds.

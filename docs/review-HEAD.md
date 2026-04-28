@@ -13,8 +13,8 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 46 (1 fixed) |
-| **Total** | **67** |
+| Low | 44 (3 fixed) |
+| **Total** | **65** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -266,17 +266,19 @@ None.
 - **Finding**: `validate_grant_path` enforces many constraints but does not tie the path to a recent user-initiated native dialog selection. A malicious script inside the renderer can call this command to grant itself fs scope over any legitimate-looking absolute path (e.g., `C:/Users/victim/Documents`) and then read/write via the standard fs plugin.
 - **Fix applied**: Removed `grant_path_access` from the IPC invoke handler entirely. Replaced with three atomic Rust commands (`pick_folder_and_grant`, `pick_file_and_grant`, `pick_files_and_grant`) that run the native OS dialog inside Rust and grant scope before returning the path — a renderer script can no longer supply an arbitrary path to the grant path. For session-restore cases (replaying persisted folder grants on app startup), a narrower `restore_path_scope` command is exposed that still runs `validate_grant_path`. The drag-and-drop path uses `grantDroppedPaths` → `restore_path_scope`, which relies on OS-event path provenance and server-side `validate_grant_path` enforcement. All 1885 TypeScript tests and 62 Rust tests pass.
 
-#### [SEC3] `start_download` accepts relative `download_folder_path`
+#### ~~[SEC3] `start_download` accepts relative `download_folder_path`~~ ✅ FIXED
 - **File**: `src-tauri/src/commands.rs:237-251`
 - **Severity**: Low
 - **Finding**: `validate_no_traversal` rejects `..` and `%` but does not require an absolute path. A tampered `appSettings.json` or compromised renderer could redirect yt-dlp output to the Tauri process CWD.
 - **Recommendation**: Add `if !std::path::Path::new(&download_folder_path).is_absolute() { return Err("download_folder_path must be absolute") }`. Apply the same to `export_project`.
+- **Fix applied**: Replaced the bare `validate_no_traversal` call in `start_download` with `validate_grant_path` (labeled), which enforces absolute path, traversal-free, no UNC device-namespace/share-root, and no control characters. All 62 Rust tests pass.
 
-#### [SEC4] `export_project` paths not constrained to absolute
+#### ~~[SEC4] `export_project` paths not constrained to absolute~~ ✅ FIXED
 - **File**: `src-tauri/src/commands.rs:455-496,515`
 - **Severity**: Low
 - **Finding**: `dest_path`, `source_path`, and `extra_sound_paths` are validated for traversal but not required to be absolute. A locally-tampered `library.json` with a relative `filePath` (e.g., `secret/confidential.mp3` — passes `SoundSchema`'s `..` refine) would be resolved against the Tauri process CWD during `File::open`.
 - **Recommendation**: Require all three inputs to be absolute paths in the Rust command handler.
+- **Fix applied**: Replaced `validate_no_traversal` calls in `export_project` with `validate_grant_path` (labeled) for `dest_path`, `source_path`, and each `extra_sound_paths` entry. All three inputs now reject relative paths, UNC device-namespace paths, UNC share roots, and control characters. All 62 Rust tests pass.
 
 #### [SEC5] `job_id` accepted without validation
 - **File**: `src-tauri/src/commands.rs:215-223`
@@ -579,6 +581,8 @@ None.
 | ID | Description |
 |----|-------------|
 | SEC1 | `$AUDIO/**` removed from `fs:scope`; boot-time `grant_path_access` replay already covers user-chosen `~/Music` paths; `opener:allow-open-path` entry retained (no runtime scope API, launch-only risk) |
+| SEC3 | `start_download` `download_folder_path` now validated via `validate_grant_path`; rejects relative, UNC device-namespace, and UNC share-root paths |
+| SEC4 | `export_project` `dest_path`, `source_path`, and each `extra_sound_paths` entry now validated via `validate_grant_path`; rejects relative, UNC device-namespace, and UNC share-root paths |
 | SEC12 | Shell `allow-spawn` / `allow-kill` removed from frontend capabilities |
 | SEC13 | Static broad fs-scope grants replaced with runtime `grant_path_access` |
 | SEC14 | Extensive Unicode/BIDI/control-char/UNC-root/device-namespace validation added |

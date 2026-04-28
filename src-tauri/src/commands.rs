@@ -137,27 +137,6 @@ fn parse_progress(line: &str) -> Option<(f64, Option<String>, Option<String>)> {
     Some((percent, speed, eta))
 }
 
-/// Returns an error if the path string contains any parent-directory (`..`) traversal
-/// segments. Normalizes backslash separators to forward slashes before parsing so the
-/// check is consistent regardless of which OS compiles the binary (the app ships on
-/// Windows but CI may run on Linux/macOS where `\` is not a separator).
-///
-/// NOTE: This check rejects literal `..` traversal but does NOT enforce the Tauri
-/// `fs:scope` allowlist — absolute paths outside the expected scope are a separate
-/// concern tracked in issue #110. The frontend dialog already constrains dest_path to
-/// user-chosen directories; Rust-side scope enforcement is deferred until #110
-/// introduces a proper scope-expansion mechanism for arbitrary user folders.
-fn validate_no_traversal(path: &str, label: &str) -> Result<(), String> {
-    // Normalize to forward slashes so Path::components() treats both separators
-    // uniformly when compiled on a non-Windows host (e.g., CI).
-    let normalized = path.replace('\\', "/");
-    for component in std::path::Path::new(&normalized).components() {
-        if component == std::path::Component::ParentDir {
-            return Err(format!("{} must not contain '..' path segments", label));
-        }
-    }
-    Ok(())
-}
 
 /// Returns an error if a bare filename (no directory component) contains path separators,
 /// is exactly `.` or `..`, or contains `%` (which yt-dlp interprets as a template
@@ -234,8 +213,9 @@ pub fn start_download(
     // Validate output_name: must not contain path separators or be a traversal token.
     validate_filename(&output_name, "output_name")?;
 
-    // Validate download_folder_path: must not contain traversal segments.
-    validate_no_traversal(&download_folder_path, "download_folder_path")?;
+    // Validate download_folder_path: must be absolute, traversal-free, and not a UNC device path.
+    validate_grant_path(&download_folder_path)
+        .map_err(|e| format!("download_folder_path: {}", e))?;
 
     // Reject '%' in download_folder_path — yt-dlp interprets '%' as a template
     // placeholder directive; a path containing '%' would redirect output to an
@@ -452,11 +432,10 @@ pub fn export_project(
     // Validate zip_name: must not contain path separators or be a traversal token.
     validate_filename(&zip_name, "zip_name")?;
 
-    // Validate paths for traversal: dest_path, source_path, and each extra_sound_paths
-    // entry must not contain '..' components. This prevents a caller from writing the
-    // zip outside the intended destination or reading arbitrary files into the archive.
-    validate_no_traversal(&dest_path, "dest_path")?;
-    validate_no_traversal(&source_path, "source_path")?;
+    // Validate paths: must be absolute, traversal-free, and not UNC device/share roots.
+    // validate_grant_path covers is_absolute, '..', UNC device-namespace, and control chars.
+    validate_grant_path(&dest_path).map_err(|e| format!("dest_path: {}", e))?;
+    validate_grant_path(&source_path).map_err(|e| format!("source_path: {}", e))?;
 
     // SEC-1: Close the TOCTOU window between symlink validation and File::open by
     // pre-opening a File handle immediately after each extra_sound_paths entry
@@ -466,7 +445,8 @@ pub fn export_project(
     let mut extra_sound_handles: Vec<(String, std::fs::File)> =
         Vec::with_capacity(extra_sound_paths.len());
     for (i, extra) in extra_sound_paths.iter().enumerate() {
-        validate_no_traversal(extra, &format!("extra_sound_paths[{}]", i))?;
+        validate_grant_path(extra)
+            .map_err(|e| format!("extra_sound_paths[{}]: {}", i, e))?;
         // Defense-in-depth: restrict entries to known audio extensions to prevent
         // arbitrary file exfiltration (e.g., credentials, SSH keys) into the archive.
         if !is_allowed_audio_extension(extra) {
@@ -1149,72 +1129,6 @@ mod tests {
         assert!(!is_allowed_audio_extension("evil.exe"));
     }
 
-    // --- validate_no_traversal tests ---
-
-    #[test]
-    fn test_validate_no_traversal_clean_absolute_path() {
-        assert!(validate_no_traversal("C:/Users/user/Documents/project", "path").is_ok());
-    }
-
-    #[test]
-    fn test_validate_no_traversal_clean_relative_path() {
-        assert!(validate_no_traversal("sounds/kick.wav", "path").is_ok());
-    }
-
-    #[test]
-    fn test_validate_no_traversal_dotdot_start() {
-        let result = validate_no_traversal("../etc/passwd", "path");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("must not contain '..'"));
-    }
-
-    #[test]
-    fn test_validate_no_traversal_dotdot_middle() {
-        let result = validate_no_traversal("/home/user/../../etc/passwd", "dest_path");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_validate_no_traversal_dotdot_only() {
-        let result = validate_no_traversal("..", "source_path");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_validate_no_traversal_dotdot_in_name_not_flagged() {
-        // "foo..bar" is a valid filename component and must NOT be rejected
-        assert!(validate_no_traversal("sounds/foo..bar.wav", "path").is_ok());
-    }
-
-    #[test]
-    fn test_validate_no_traversal_label_in_error() {
-        let result = validate_no_traversal("../evil", "extra_sound_paths[0]");
-        assert!(result.unwrap_err().contains("extra_sound_paths[0]"));
-    }
-
-    #[test]
-    fn test_validate_no_traversal_windows_style_path() {
-        assert!(validate_no_traversal("C:\\Users\\user\\Documents", "path").is_ok());
-    }
-
-    #[test]
-    fn test_validate_no_traversal_windows_dotdot() {
-        // Backslash separators are normalized to forward slashes before parsing,
-        // so ".." traversal is caught on any host OS including Linux/macOS CI.
-        let result = validate_no_traversal("C:\\Users\\user\\..\\..\\Windows\\System32", "path");
-        assert!(result.is_err(), "backslash-separated '..' must be rejected on all platforms");
-    }
-
-    #[test]
-    fn test_validate_no_traversal_accepts_absolute_path_by_design() {
-        // Absolute-path scope enforcement is deferred to issue #110.
-        // validate_no_traversal intentionally only rejects '..' traversal —
-        // absolute paths that happen to point outside the expected scope are a
-        // separate concern. This test documents that behavior so a future
-        // tightening doesn't happen silently.
-        assert!(validate_no_traversal("/etc/passwd", "path").is_ok());
-        assert!(validate_no_traversal("C:/Windows/System32/config/SAM", "path").is_ok());
-    }
 
     #[test]
     fn test_parse_output_path_no_match() {
