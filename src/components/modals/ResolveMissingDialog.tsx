@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { basename as tauriBasename } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
@@ -8,6 +7,7 @@ import { evictSoundCaches } from "@/lib/audio/cacheUtils";
 import { pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { basename, nameFromFilename } from "@/lib/utils";
+import { classifyPickedAudioFile, findDuplicateByPath } from "@/lib/fileResolve";
 import type { Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -49,45 +49,33 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
 
   async function handleLocate() {
     if (!sound) return;
-    const selected = await pickFile({
-      filters: AUDIO_FILE_FILTERS,
-    });
+    const selected = await pickFile({ filters: AUDIO_FILE_FILTERS });
     if (!selected) return;
 
-    const newBasename = await tauriBasename(selected);
-    const oldBasename = sound.filePath ? await tauriBasename(sound.filePath) : "";
-
+    const result = await classifyPickedAudioFile({ pickedPath: selected, existingSound: sound, allSounds: sounds });
     setPendingPath(selected);
-    setPendingBasename(newBasename);
+    setPendingBasename(result.newBasename);
 
-    // Check name mismatch first
-    if (newBasename !== oldBasename) {
+    if (result.kind === "name-mismatch") {
       setStep("confirm-name");
       return;
     }
-
-    // Check duplicate path
-    const dup = sounds.find((s) => s.id !== sound.id && s.filePath === selected);
-    if (dup) {
-      setDuplicateSound(dup);
+    if (result.kind === "duplicate") {
+      setDuplicateSound(result.duplicate);
       setStep("confirm-duplicate");
       return;
     }
-
-    await applyLocate(selected, newBasename, null);
+    await applyLocate(selected, result.newBasename, null);
   }
 
   async function handleConfirmName() {
     if (!pendingPath || !sound) return;
-
-    // Now check for duplicates
-    const dup = sounds.find((s) => s.id !== sound.id && s.filePath === pendingPath);
+    const dup = findDuplicateByPath(pendingPath, sound.id, sounds);
     if (dup) {
       setDuplicateSound(dup);
       setStep("confirm-duplicate");
       return;
     }
-
     await applyLocate(pendingPath, pendingBasename, null);
   }
 

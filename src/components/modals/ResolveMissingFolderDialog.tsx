@@ -11,6 +11,7 @@ import { evictSoundCaches } from "@/lib/audio/cacheUtils";
 import { pickFolder, pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { basename, nameFromFilename } from "@/lib/utils";
+import { classifyPickedAudioFile, findDuplicateByPath } from "@/lib/fileResolve";
 import type { GlobalFolder, Sound } from "@/lib/schemas";
 import {
   Dialog,
@@ -199,34 +200,29 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
   // ─── Step 2: Per-file resolution ──────────────────────────────────────────
 
   async function handlePickFile() {
-    const selected = await pickFile({
-      filters: AUDIO_FILE_FILTERS,
-    });
+    if (!currentSound) return;
+    const selected = await pickFile({ filters: AUDIO_FILE_FILTERS });
     if (!selected) return;
 
-    const fileBase = await tauriBasename(selected);
-    const oldBase = currentSound?.filePath ? await tauriBasename(currentSound.filePath) : "";
-
+    const result = await classifyPickedAudioFile({ pickedPath: selected, existingSound: currentSound, allSounds: sounds });
     setPickedFilePath(selected);
-    setPickedFileBasename(fileBase);
+    setPickedFileBasename(result.newBasename);
 
-    if (fileBase !== oldBase) {
+    if (result.kind === "name-mismatch") {
       setStep("file-confirm-name");
       return;
     }
-
-    const dup = sounds.find((s) => s.id !== currentSound?.id && s.filePath === selected);
-    if (dup) {
-      setDuplicateSound(dup);
+    if (result.kind === "duplicate") {
+      setDuplicateSound(result.duplicate);
       setStep("file-confirm-duplicate");
       return;
     }
-
     setStep("file-placement");
   }
 
   async function handleFileConfirmName() {
-    const dup = sounds.find((s) => s.id !== currentSound?.id && s.filePath === pickedFilePath);
+    if (!currentSound) return;
+    const dup = findDuplicateByPath(pickedFilePath, currentSound.id, sounds);
     if (dup) {
       setDuplicateSound(dup);
       setStep("file-confirm-duplicate");

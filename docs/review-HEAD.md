@@ -12,7 +12,7 @@
 |----------|-------|
 | Critical | 0 |
 | High | 0 (4 fixed) |
-| Medium | 16 (16 fixed) |
+| Medium | 16 (17 fixed) |
 | Low | 47 |
 | **Total** | **67** |
 
@@ -211,21 +211,10 @@ None.
 
 ---
 
-### [REUSE8] `ResolveMissingDialog.handleLocate` duplicates `ResolveMissingFolderDialog.handlePickFile`
+### ~~[REUSE8] `ResolveMissingDialog.handleLocate` duplicates `ResolveMissingFolderDialog.handlePickFile`~~ ✅ FIXED
 - **File**: `src/components/modals/ResolveMissingDialog.tsx:61-108`; `src/components/modals/ResolveMissingFolderDialog.tsx:212-251`
 - **Severity**: Medium
-- **Finding**: Both implement the same "pick audio file → basename check vs. library entry name → duplicate-path check → proceed" decision tree with the same three step-name patterns.
-- **Evidence**:
-  ```ts
-  // Both files contain structurally identical logic:
-  const selected = await pickFile({ filters: AUDIO_FILE_FILTERS });
-  if (!selected) return;
-  const newBasename = await tauriBasename(selected);
-  // basename mismatch check → "confirm-name" step
-  // duplicate path check → "confirm-duplicate" step
-  await applyLocate(...);
-  ```
-- **Recommendation**: Extract `classifyPickedAudioFile({ pickedPath, existingSound, allSounds }): Promise<{ kind: "name-mismatch" | "duplicate" | "ok"; newBasename: string; duplicate?: Sound }>` to `src/lib/fileResolve.ts`.
+- **Fix applied**: Created `src/lib/fileResolve.ts` with `classifyPickedAudioFile({ pickedPath, existingSound, allSounds }): Promise<AudioFileClassification>` (async — handles tauriBasename calls and the name-mismatch → duplicate → ok decision tree) and `findDuplicateByPath(pickedPath, excludeId, allSounds): Sound | undefined` (synchronous — used in both confirm-name handlers). `AudioFileClassification` is a discriminated union so `duplicate` is typed as `Sound` (not `Sound | undefined`) in the `kind="duplicate"` branch, eliminating non-null assertions at both call sites. `handlePickFile` in `ResolveMissingFolderDialog` gained a `!currentSound` early-return guard that was absent in the original. 8 tests added to `src/lib/fileResolve.test.ts`; 1950/1950 tests pass; TypeScript clean.
 
 ---
 
@@ -631,3 +620,4 @@ None.
 | REUSE1 | `nameFromFilename` consolidated into `utils.ts`; removed from 3 files; 6 tests added |
 | REUSE4 | `evictSoundCaches`/`evictSoundCachesMany` extracted to `cacheUtils.ts`; all 9 call sites migrated across 6 files; 5 test mock declarations updated |
 | REUSE5 | `PadPercentSlider` and `PadDurationSlider` collapsed into `PadLabeledSlider`; both old files deleted; `PadFadeControls` updated; `PadButtonFadeOverlay` intentionally left inline (different layout/styling) |
+| REUSE8 | `classifyPickedAudioFile` + `findDuplicateByPath` extracted to `src/lib/fileResolve.ts`; both dialog handlers use shared helpers; `AudioFileClassification` discriminated union eliminates `!` assertions; 8 tests added |

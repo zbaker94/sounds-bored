@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where the "Resolve Missing File" dialog could crash or behave unexpectedly when no sound was selected before picking a replacement file
+- Improved reliability of duplicate-file detection when locating missing sounds — the app now correctly identifies when a picked file is already used by another sound in your library
 - Partial tags (applied to some but not all selected sounds) now display correctly alongside full tags in the Add Tags dialog
 - Tags with partial selection now show a minus-sign indicator in the dropdown, making mixed-state selections easier to identify
 - The tag picker in the pad configuration drawer now uses the same shared component as the rest of the app, ensuring consistent behavior and appearance across all tag selection UI.
