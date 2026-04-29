@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 37 (12 fixed) |
+| Low | 36 (13 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -337,19 +337,11 @@ None.
 - **Finding**: `nextPadVolumes` and `nextLayerVolumes` are rebuilt as fresh objects every frame. During stable playback with no fade or gain change, every frame allocates two records, walks the active maps, and runs `volumesEqual` — O(N) per frame per category when nothing changes.
 - **Fix applied**: Added `gainRampDeadline` module var, `markGainRamp(durationS)`, and `isAnyGainChanging()` to `audioState.ts`. `isAnyGainChanging()` returns true when `fadePadTimeouts`/`fadingOutPadIds`/`fadingInPadIds` are non-empty (ongoing fade) OR `AudioContext.currentTime < gainRampDeadline` (short ramp still animating); reclaims the `-Infinity` fast path once the deadline naturally expires. `rampGainTo()` in `gainManager.ts` calls `markGainRamp(rampS)` — covers all call sites including `triggerAndFade` (previously called `linearRampToValueAtTime` directly; replaced with `rampGainTo`). `audioTick` short-circuits both volume rebuilds when `isAnyGainChanging()` returns false, skipping the two object allocations and O(N) Map iterations. 6 tests added (2 in `audioTick.test.ts`; 4 in `audioState.test.ts`). `audioVoice.stopWithRamp` intentionally does not call `markGainRamp` — it ramps a per-voice gain node not tracked by the tick; circular dependency concern documented in a comment.
 
-#### [PERF4] `PadButtonProgress` `layerProgress` selector runs on every non-playing pad at 60fps
+#### ~~[PERF4] `PadButtonProgress` `layerProgress` selector runs on every non-playing pad at 60fps~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadButtonProgress.tsx:36-45`
 - **Severity**: Low
-- **Finding**: The selector allocates `{}` and iterates `pad.layers` on every `PadButtonProgress` instance — including pads not currently playing — every RAF tick. With 12 visible pads, that's 12 × (allocate + iterate + shallow compare) × 60fps ≈ 720 wasted selector invocations/sec while any single pad plays.
-- **Recommendation**: Guard with `s.playingPadIds.has(padId)` before building the result object:
-  ```ts
-  useShallow((s) => {
-    if (!s.playingPadIds.has(padId)) return EMPTY_RECORD;
-    const result: Record<string, number> = {};
-    for (const l of layers) { ... }
-    return result;
-  })
-  ```
+- **Finding**: The `layerProgress` selector (and likewise `activeLayers`) allocated a fresh object/array and iterated `pad.layers` on every RAF tick for every pad instance, including non-playing ones. With 12 visible pads that's 720+ wasted allocations/sec while any pad plays.
+- **Fix applied**: Added module-level `EMPTY_RECORD` and `EMPTY_LAYERS` stable constants. Both selectors now guard with `if (!s.playingPadIds.has(padId)) return EMPTY_*` — short-circuiting all allocation and iteration for idle pads. Shallow equality sees the same reference each tick, so no re-render is triggered. The fix is broader than recommended: `activeLayers` had the same pattern and was fixed in the same commit.
 
 #### [PERF5] `loadedmetadata` listener accumulates without removal on early stop
 - **File**: `src/lib/audio/audioState.ts:522-529`

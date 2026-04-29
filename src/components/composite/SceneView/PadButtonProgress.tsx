@@ -8,6 +8,9 @@ interface PadButtonProgressProps {
   layers: Layer[];
 }
 
+const EMPTY_LAYERS: Layer[] = [];
+const EMPTY_RECORD: Record<string, number> = {};
+
 /**
  * Renders per-layer playback progress bars inside a pad button.
  *
@@ -21,20 +24,20 @@ export const PadButtonProgress = memo(function PadButtonProgress({
 }: PadButtonProgressProps) {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(padId));
 
-  // Stable array reference while the same layers are active — only changes on
-  // layer start/stop, not every RAF frame.
+  // Short-circuits to a stable reference for non-playing pads, avoiding a
+  // filter allocation on every RAF tick when this pad is idle.
   const activeLayers = usePlaybackStore(
-    useShallow((s) => layers.filter((l) => s.activeLayerIds.has(l.id))),
+    useShallow((s) => {
+      if (!s.playingPadIds.has(padId)) return EMPTY_LAYERS;
+      return layers.filter((l) => s.activeLayerIds.has(l.id));
+    }),
   );
 
-  // Only re-renders THIS pad when ITS layer progress changes. Non-playing pads
-  // return {} (stable via shallow equality) and never re-render on audio ticks.
-  //
-  // Perf note: this iterates `layers` (the pad's own layer list, typically 1–3
-  // entries) — not the global layer set. O(pad.layers) per tick per playing pad
-  // is negligible; no need to pre-filter by activeLayerIds before the lookup.
+  // Short-circuits to a stable reference for non-playing pads, avoiding a {}
+  // allocation and layer iteration on every RAF tick when this pad is idle.
   const layerProgress = usePlaybackStore(
     useShallow((s) => {
+      if (!s.playingPadIds.has(padId)) return EMPTY_RECORD;
       const result: Record<string, number> = {};
       for (const l of layers) {
         const p = s.layerProgress[l.id];
