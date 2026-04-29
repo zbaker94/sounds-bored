@@ -138,6 +138,23 @@ fn parse_progress(line: &str) -> Option<(f64, Option<String>, Option<String>)> {
 }
 
 
+/// Validates a job ID supplied by the renderer. Rejects empty strings, strings
+/// longer than 64 characters, and any character outside `[A-Za-z0-9_-]`.
+/// This prevents memory exhaustion via oversized keys, control-character injection
+/// into event payloads, and key-collision attacks against the jobs HashMap.
+fn validate_job_id(job_id: &str) -> Result<(), String> {
+    if job_id.is_empty() {
+        return Err("job_id must not be empty".to_string());
+    }
+    if job_id.len() > 64 {
+        return Err("job_id must not exceed 64 characters".to_string());
+    }
+    if !job_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err("job_id must contain only [A-Za-z0-9_-]".to_string());
+    }
+    Ok(())
+}
+
 /// Returns an error if a bare filename (no directory component) contains path separators,
 /// is exactly `.` or `..`, or contains `%` (which yt-dlp interprets as a template
 /// placeholder and could redirect output to an unexpected filename).
@@ -201,6 +218,8 @@ pub fn start_download(
     job_id: String,
 ) -> Result<(), String> {
 
+    validate_job_id(&job_id)?;
+
     // Defense-in-depth: reject non-http/https schemes before passing to yt-dlp.
     // Trim whitespace and lowercase the scheme portion for case-insensitive matching,
     // then use the trimmed form for all downstream work.
@@ -222,6 +241,15 @@ pub fn start_download(
     // unexpected location.
     if download_folder_path.contains('%') {
         return Err("download_folder_path must not contain '%'".to_string());
+    }
+
+    // Reject duplicate job IDs before spawning anything — HashMap::insert would silently
+    // overwrite the existing CommandChild, orphaning the first job's cancel handle.
+    {
+        let map = jobs.0.lock().map_err(|e| e.to_string())?;
+        if map.contains_key(&job_id) {
+            return Err(format!("job_id '{}' is already in use", job_id));
+        }
     }
 
     // Emit initial queued event
@@ -347,6 +375,8 @@ pub fn cancel_download(
     jobs: State<'_, DownloadJobs>,
     job_id: String,
 ) -> Result<(), String> {
+    validate_job_id(&job_id)?;
+
     // Remove and kill the child process
     if let Some(child) = jobs.0.lock().map_err(|e| e.to_string())?.remove(&job_id) {
         child.kill().map_err(|e| e.to_string())?;
@@ -429,6 +459,8 @@ pub fn export_project(
     sound_map_json: String,
     job_id: String,
 ) -> Result<(), String> {
+    validate_job_id(&job_id)?;
+
     // Validate zip_name: must not contain path separators or be a traversal token.
     validate_filename(&zip_name, "zip_name")?;
 
@@ -475,10 +507,13 @@ pub fn export_project(
         extra_sound_handles.push((basename, file));
     }
 
-    // Insert cancellation flag
+    // Insert cancellation flag — reject duplicate IDs before the async task is spawned.
     let cancel_flag = Arc::new(AtomicBool::new(false));
     {
         let mut map = export_jobs.0.lock().map_err(|e| e.to_string())?;
+        if map.contains_key(&job_id) {
+            return Err(format!("job_id '{}' is already in use", job_id));
+        }
         map.insert(job_id.clone(), cancel_flag.clone());
     }
 
@@ -644,6 +679,8 @@ pub fn cancel_export(
     export_jobs: State<'_, ExportJobs>,
     job_id: String,
 ) -> Result<(), String> {
+    validate_job_id(&job_id)?;
+
     if let Some(flag) = export_jobs.0.lock().map_err(|e| e.to_string())?.remove(&job_id) {
         flag.store(true, Ordering::SeqCst);
     }
@@ -1202,6 +1239,64 @@ mod tests {
         let map = jobs.0.lock().unwrap();
         assert!(!map.contains_key("job-1"), "job-1 must be removed");
         assert!(map.contains_key("job-2"), "job-2 must remain");
+    }
+
+    // ---- validate_job_id tests ----
+
+    #[test]
+    fn test_validate_job_id_accepts_uuid() {
+        assert!(validate_job_id("550e8400-e29b-41d4-a716-446655440000").is_ok());
+    }
+
+    #[test]
+    fn test_validate_job_id_accepts_simple_slug() {
+        assert!(validate_job_id("job-1").is_ok());
+        assert!(validate_job_id("download_abc123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_job_id_rejects_empty() {
+        let err = validate_job_id("").unwrap_err();
+        assert!(err.contains("must not be empty"));
+    }
+
+    #[test]
+    fn test_validate_job_id_rejects_too_long() {
+        let long = "a".repeat(65);
+        let err = validate_job_id(&long).unwrap_err();
+        assert!(err.contains("must not exceed 64"));
+    }
+
+    #[test]
+    fn test_validate_job_id_accepts_exactly_64_chars() {
+        let boundary = "a".repeat(64);
+        assert!(validate_job_id(&boundary).is_ok());
+    }
+
+    #[test]
+    fn test_validate_job_id_rejects_control_chars() {
+        assert!(validate_job_id("job\x00id").is_err());
+        assert!(validate_job_id("job\nid").is_err());
+        assert!(validate_job_id("job\tid").is_err());
+    }
+
+    #[test]
+    fn test_validate_job_id_rejects_spaces() {
+        assert!(validate_job_id("job id").is_err());
+    }
+
+    #[test]
+    fn test_validate_job_id_rejects_unicode() {
+        assert!(validate_job_id("job\u{2028}id").is_err());
+        assert!(validate_job_id("jöb-1").is_err());
+    }
+
+    #[test]
+    fn test_validate_job_id_rejects_special_chars() {
+        assert!(validate_job_id("job/id").is_err());
+        assert!(validate_job_id("job\\id").is_err());
+        assert!(validate_job_id("job@id").is_err());
+        assert!(validate_job_id("job%id").is_err());
     }
 
     // ---- DownloadJobs lifecycle tests ----

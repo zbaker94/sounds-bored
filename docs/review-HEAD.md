@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 44 (3 fixed) |
+| Low | 43 (4 fixed) |
 | **Total** | **65** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -280,11 +280,10 @@ None.
 - **Recommendation**: Require all three inputs to be absolute paths in the Rust command handler.
 - **Fix applied**: Replaced `validate_no_traversal` calls in `export_project` with `validate_grant_path` (labeled) for `dest_path`, `source_path`, and each `extra_sound_paths` entry. All three inputs now reject relative paths, UNC device-namespace paths, UNC share roots, and control characters. All 62 Rust tests pass.
 
-#### [SEC5] `job_id` accepted without validation
+#### ~~[SEC5] `job_id` accepted without validation~~ ✅ FIXED
 - **File**: `src-tauri/src/commands.rs:215-223`
 - **Severity**: Low
-- **Finding**: `job_id: String` is inserted into the jobs `HashMap` key and emitted in event payloads without validation. A compromised renderer could send a very large string to exhaust memory, or include control characters that corrupt log output.
-- **Recommendation**: Validate as a UUID string (`uuid::Uuid::parse_str(&job_id).map_err(...)?`) or enforce a strict length/charset (`[A-Za-z0-9_-]{1,64}`). Apply the same to `export_project` and `cancel_*` variants.
+- **Fix applied**: Added `validate_job_id(job_id: &str) -> Result<(), String>` helper that rejects empty strings, strings longer than 64 characters, and any character outside `[A-Za-z0-9_-]`. Called as the first statement in all four affected commands: `start_download`, `cancel_download`, `export_project`, and `cancel_export`. Additionally added duplicate-ID guards in `start_download` (before sidecar spawn and the initial `queued` event emission) and `export_project` (before async task spawn and HashMap insert) — `HashMap::insert` silently overwrites existing entries, which would orphan the first job's cancel handle and break cancellation. 10 unit tests added covering empty, too-long, invalid-charset (control chars, spaces, Unicode, special chars), UUID format, and slug format inputs.
 
 #### [SEC6] `stderr.contains("ERROR")` allows hostile video metadata to inject misleading events
 - **File**: `src-tauri/src/commands.rs:326-334`

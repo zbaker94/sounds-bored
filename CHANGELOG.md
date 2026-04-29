@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a security vulnerability where malformed job IDs could exhaust memory or inject control characters into event payloads — job IDs are now strictly validated (alphanumeric, hyphens, underscores only; max 64 characters)
+- Fixed a bug where submitting a duplicate job ID could silently orphan an in-progress download or export, breaking its cancel button
 - Hardened path validation for download and export operations: file paths must now be absolute and are rejected if they contain traversal segments, UNC device-namespace paths, or control characters — reducing the risk of malicious or misconfigured paths redirecting files outside intended folders.
 - **Tightened file system access**: The app no longer requests broad read access to your home directory, Music, Documents, Downloads, or Desktop folders at startup — access is now granted only for folders you explicitly select.
 - **Hardened folder/file pickers**: Dialog selection and folder access are now handled atomically in the backend, so the app cannot be tricked into accessing paths you didn't choose through the native picker.
