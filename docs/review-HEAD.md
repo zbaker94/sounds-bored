@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 36 (13 fixed) |
+| Low | 35 (14 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -349,11 +349,11 @@ None.
 - **Finding**: `registerStreamingAudio` uses `{once: true}` so the listener auto-removes after firing. But when `clearLayerStreamingAudio` is called before metadata loads (common for rapid trigger-then-stop), the listener remains attached. Since `streamingCache` reuses the same `HTMLAudioElement` across triggers, dead closures accumulate over a long session.
 - **Fix applied**: Added `pendingMetadataAborts: WeakMap<HTMLAudioElement, Map<"${padId}|${layerId}", AbortController>>`. `registerStreamingAudio` creates an `AbortController` per `(element, padId, layerId)` triple and passes `signal: ac.signal` alongside `{ once: true }` to `addEventListener`. `unregisterStreamingAudio`, `clearLayerStreamingAudio`, and `clearAllStreamingAudio` all abort and evict the controller, proactively removing the listener before it can accumulate. Empty inner maps are evicted from the `WeakMap` immediately. The existing membership guard is preserved as defense-in-depth. 4 new tests added covering: abort on unregister, abort on clear, per-key isolation (aborting one layer doesn't affect another), and re-register pre-abort.
 
-#### [PERF6] `BackFaceLayerRow` subscribes to `layerVolumes` at 60fps during fades
-- **File**: `src/components/composite/SceneView/PadBackFace.tsx:60-62`
+#### ~~[PERF6] `BackFaceLayerRow` subscribes to `layerVolumes` at 60fps during fades~~ ✅ FIXED
+- **File**: `src/components/composite/SceneView/BackFaceLayerRow.tsx:44-46` (note: reviewer cited `PadBackFace.tsx:60-62`, which was stale after the ARCH4 extraction)
 - **Severity**: Low
 - **Finding**: The slider re-renders at up to 60fps during an audio fade while the back face is visible. Slider DOM reflows at audio-rate are measurable for multiple layers.
-- **Recommendation**: Throttle the RAF-driven updates to the slider while not dragging — update at ~10Hz for visual feedback, or only re-read live volume on pointer enter/focus.
+- **Fix applied**: Replaced `usePlaybackStore(selector)` (which caused 60fps re-renders) with a `usePlaybackStore.subscribe(selector, listener)` in a `useEffect` that throttles `setState` to ~10Hz (100ms). `liveLayerVol` state is initialized from a store snapshot on mount; the effect also re-syncs immediately on `layer.id` change before subscribing so there is no stale intermediate value. When `layerVolumes[layer.id]` is `undefined` (fade ended / layer stopped), `setLiveLayerVol(null)` fires immediately without throttle so the slider snaps to the static project value without delay. `localLayerVol` (drag gesture) continues to take priority via `sliderVol = localLayerVol ?? layerVol`. During steady-state playback with no fade in flight, `layerVolumes[layer.id]` is absent and the subscription listener never fires — zero re-renders beyond the initial mount. The throttle is leading-edge-only; the last sub-100ms intermediate value of a short fade will be missed, which is imperceptible in practice. 1928/1928 tests pass; TypeScript clean.
 
 #### [PERF7] `resolveLayerSounds` re-runs for every `sounds` array replacement
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:66-67`
@@ -580,6 +580,7 @@ None.
 | SEC15 | yt-dlp sidecar hardened: `--ignore-config`, `--no-plugins`, HTTP(S)-only scheme enforcement |
 | SEC16 | Export TOCTOU on `extra_sound_paths` closed via pre-opened file handles |
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
+| PERF6 | `BackFaceLayerRow` `layerVolumes` subscription throttled to ~10Hz via `usePlaybackStore.subscribe` + `useEffect`; leading-edge 100ms throttle; immediate clear on `undefined`; sync-read on `layer.id` change; zero re-renders during steady-state playback |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |
 | PERF3 | `isAnyGainChanging()` + `markGainRamp()` added to `audioState.ts`; `audioTick` short-circuits volume rebuild when no fade/ramp is in flight; `triggerAndFade` ramp routed through `rampGainTo`; 6 tests added |
 | PERF-A | `audioTick` batches all tick updates into one `set()` call, skips when nothing changed |

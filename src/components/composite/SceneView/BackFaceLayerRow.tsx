@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, memo } from "react";
+import { useState, useRef, useMemo, memo, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Pad, Layer } from "@/lib/schemas";
 import { Slider } from "@/components/ui/slider";
@@ -41,10 +41,33 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
   onRemoveLayer: () => void;
 }) {
   const layerActive = usePlaybackStore((s) => s.activeLayerIds.has(layer.id));
-  const layerVol = usePlaybackStore(
-    (s) => Math.round((s.layerVolumes[layer.id] ?? getLayerNormalizedVolume(layer)) * 100)
-  );
+  const [liveLayerVol, setLiveLayerVol] = useState<number | null>(() => {
+    const stored = usePlaybackStore.getState().layerVolumes[layer.id];
+    return stored !== undefined ? Math.round(stored * 100) : null;
+  });
   const [localLayerVol, setLocalLayerVol] = useState<number | null>(null);
+
+  useEffect(() => {
+    const THROTTLE_MS = 100;
+    let lastUpdate = 0;
+    // Sync to current state when layer.id changes so there's no stale value between
+    // unsubscribing the old selector and receiving the first notification on the new one.
+    const snap = usePlaybackStore.getState().layerVolumes[layer.id];
+    setLiveLayerVol(snap !== undefined ? Math.round(snap * 100) : null);
+    return usePlaybackStore.subscribe(
+      (state) => state.layerVolumes[layer.id],
+      (vol) => {
+        if (vol === undefined) { setLiveLayerVol(null); return; }
+        const now = Date.now();
+        if (now - lastUpdate >= THROTTLE_MS) {
+          lastUpdate = now;
+          setLiveLayerVol(Math.round(vol * 100));
+        }
+      }
+    );
+  }, [layer.id]);
+
+  const layerVol = liveLayerVol ?? Math.round(getLayerNormalizedVolume(layer) * 100);
   const sliderVol = localLayerVol ?? layerVol;
 
   const sounds = useLibraryStore((s) => s.sounds);
