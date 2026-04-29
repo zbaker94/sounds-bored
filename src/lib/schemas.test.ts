@@ -19,6 +19,7 @@ import {
   TagSchema,
   SetSchema,
   DownloadProgressEventSchema,
+  DownloadJobSchema,
   type ProjectHistoryEntry,
   type ProjectHistory,
   type Project,
@@ -1134,6 +1135,42 @@ describe("DownloadProgressEventSchema — percent validation", () => {
 
   it("rejects percent = NaN", () => {
     expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, percent: NaN }).success).toBe(false);
+  });
+});
+
+describe("DownloadJobSchema — url validation", () => {
+  const baseJob = {
+    id: "job-1",
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    outputName: "never-gonna-give-you-up",
+    status: "queued",
+    percent: 0,
+    tags: [],
+    sets: [],
+  };
+
+  it("accepts an https URL", () => {
+    expect(DownloadJobSchema.safeParse(baseJob).success).toBe(true);
+  });
+
+  it("accepts an http URL", () => {
+    expect(DownloadJobSchema.safeParse({ ...baseJob, url: "http://example.com/audio.mp3" }).success).toBe(true);
+  });
+
+  it("rejects an ftp URL", () => {
+    const result = DownloadJobSchema.safeParse({ ...baseJob, url: "ftp://files.example.com/audio.wav" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("URL must use http or https protocol");
+    }
+  });
+
+  it("rejects a data URL", () => {
+    expect(DownloadJobSchema.safeParse({ ...baseJob, url: "data:text/html,hello" }).success).toBe(false);
+  });
+
+  it("rejects a bare non-URL string", () => {
+    expect(DownloadJobSchema.safeParse({ ...baseJob, url: "not-a-url" }).success).toBe(false);
   });
 });
 

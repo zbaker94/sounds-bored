@@ -13,8 +13,8 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 39 (8 fixed) |
-| **Total** | **63** |
+| Low | 38 (9 fixed) |
+| **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -310,11 +310,10 @@ None.
 - **Finding**: Swallows every error category (corrupt JSON, Zod validation, I/O errors) and returns `[]` silently. Inconsistent with `loadProjectHistory` and `loadGlobalLibrary` which distinguish error types, call `backupCorruptFile`, and notify the user.
 - **Fix applied**: Added `LoadDownloadHistoryOptions` with `onCorruption?: (message: string) => void` (matching `loadProjectHistory` / `loadGlobalLibrary` pattern). `catch {}` replaced with typed recovery: `SyntaxError`/`ZodError` → `backupCorruptFile`, write fresh `[]`, call `onCorruption`; all other errors rethrow. `useBootLoader` updated to pass `onCorruption: (msg) => toast.warning(msg)` so users see a warning when their download history is cleared. 9 tests added in `src/lib/downloads.test.ts`.
 
-#### [SEC10] `DownloadJobSchema.url` accepts any string — no protocol constraint
-- **File**: `src/lib/schemas.ts:281-294`
+#### ~~[SEC10] `DownloadJobSchema.url` accepts any string — no protocol constraint~~ ✅ FIXED
+- **File**: `src/lib/schemas.ts:291-295`
 - **Severity**: Low
-- **Finding**: `url: z.string()` allows any value when parsing `downloads.json`. Future features that re-use `job.url` (e.g., a "Re-download" button) inherit unvalidated data.
-- **Recommendation**: Replace with `z.string().url().refine((u) => u.startsWith("http://") || u.startsWith("https://"))`.
+- **Fix applied**: Replaced `url: z.string()` with `z.string().url().refine((u) => u.startsWith("http://") || u.startsWith("https://"), { message: "URL must use http or https protocol" })`. The `.url()` step rejects structurally invalid strings; the `.refine()` narrows to http/https only, blocking `ftp://`, `data:`, etc. 5 tests added to `schemas.test.ts` covering https acceptance, http acceptance, ftp rejection, data-URL rejection, and bare-string rejection.
 
 #### [SEC11] `DownloadJobSchema.outputPath` not sanitized before use as `Sound.filePath`
 - **File**: `src/lib/downloads.ts:22-28`; `src/lib/ytdlp.queries.ts:111-148`
@@ -617,3 +616,4 @@ None.
 | SEC7 | `symlink_metadata` + `is_file()` re-check added immediately before `writer.start_file` in the main WalkDir loop of `export_project`; closes TOCTOU window between cached readdir metadata and `File::open`; check placed before `start_file` to prevent zero-byte ghost entries on detected races |
 | SEC8 | `isAbsolutePath` helper extracted in `schemas.ts`; `.refine(isAbsolutePath)` added to `SoundSchema.filePath` and `GlobalFolderSchema.path`; 5 tests added/updated in `schemas.test.ts` |
 | SEC9 | `loadDownloadHistory` bare `catch {}` replaced with typed recovery: `SyntaxError`/`ZodError` → `backupCorruptFile` + write fresh `[]` + `onCorruption` callback; I/O errors rethrow; `useBootLoader` passes `onCorruption: toast.warning`; 9 tests added in `downloads.test.ts` |
+| SEC10 | `DownloadJobSchema.url` changed from `z.string()` to `z.string().url().refine(http/https only)`; 5 tests added to `schemas.test.ts` |

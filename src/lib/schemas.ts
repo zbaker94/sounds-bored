@@ -290,7 +290,10 @@ export type DownloadProgressEvent = z.infer<typeof DownloadProgressEventSchema>;
 
 export const DownloadJobSchema = z.object({
   id: z.string(),
-  url: z.string(),
+  url: z.string().url().refine(
+    (u) => u.startsWith("http://") || u.startsWith("https://"),
+    { message: "URL must use http or https protocol" }
+  ),
   outputName: z.string(),
   status: z.enum(["queued", "downloading", "processing", "completed", "failed", "cancelled"]),
   percent: z.number().min(0).max(100).default(0),
