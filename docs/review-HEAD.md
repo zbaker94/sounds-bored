@@ -379,11 +379,11 @@ None.
 - **Finding**: `forEachPadGain` iterates `padGainMap` — every pad that has ever received a gain node, whether currently playing or not. Gain nodes are not deleted on natural stop, so over a session `stopAllPads` schedules `linearRampToValueAtTime` on all cached gain nodes including silent ones.
 - **Fix applied**: Replaced `forEachPadGain` with `forEachActivePadGain` in `stopAllPads`. `forEachActivePadGain` iterates `voiceMap.keys()`, so only pads with currently-active voices have their gain ramped to zero. Pads that have played and stopped in a prior session naturally accumulate entries in `padGainMap` but no longer incur ramp scheduling on global stop. 1 test added verifying that a historically-seen but inactive pad's gain node is not ramped when `stopAllPads` is called while a different pad is playing.
 
-#### [PERF11] `liveVolume` prop causes `PadFadeControls` to re-render entire fade-controls tree at 60fps
-- **File**: `src/components/composite/SceneView/PadBackFace.tsx:398,526-537`
+#### ~~[PERF11] `liveVolume` prop causes `PadFadeControls` to re-render entire fade-controls tree at 60fps~~ ✅ FIXED
+- **File**: `src/components/composite/SceneView/PadBackFace.tsx:46,172-183`
 - **Severity**: Low
 - **Finding**: `liveVolume` (subscribed at RAF rate in `PadBackFace`) is passed as a prop to memoized `PadFadeControls`, invalidating the memo on every tick during a fade and causing two Sliders, text, and AnimatePresence to re-reconcile at ~60fps.
-- **Recommendation**: Move the `liveVolume` subscription inside `PadFadeControls` so only the live-volume section re-renders, or split `PadFadeControls` into a static wrapper + a live-volume child.
+- **Fix applied**: Moved `usePlaybackStore((s) => s.padVolumes[pad.id])` subscription from `PadBackFace` into `PadFadeControls`. Removed `liveVolume` from `PadFadeControlsProps`. `PadBackFace` no longer triggers on tick-rate store updates; only the focused fade-controls subtree re-renders during fades. Further split into a static wrapper + live-volume child was evaluated and rejected — Low severity, single animated section already gated on `isPlaying`, no measurable cost from adjacent static sliders at 60fps. Added `PadFadeControls.test.tsx` (8 tests) covering: live volume display from `padVolumes`, fallback to `pad.volume` when entry absent, fade button label (Fade Out / Fade In / disabled) driven by live volume vs fade target, and Current volume section visibility. All tests pass; TypeScript clean.
 
 #### [PERF12] `stopAllPads` ramp timeout races with immediate re-trigger
 - **File**: `src/lib/audio/padPlayer.ts:437-446`
@@ -583,6 +583,7 @@ None.
 | PERF8 | `saveCurrentLibrarySyncRef` added to `useAutoSave`; ref updated each render; effect closure calls `saveCurrentLibrarySyncRef.current()`; `saveCurrentLibrarySync` removed from dep array — interval no longer restarts on TanStack mutation identity changes; 1 regression test added |
 | PERF9 | `EMPTY_SCENES` module-level constant hoisted in `SceneView.tsx`; selector returns stable reference when project is null; suppresses spurious re-renders on every store update |
 | PERF10 | `forEachPadGain` → `forEachActivePadGain` in `stopAllPads`; only currently-playing pads are ramped; historical gain nodes no longer incur `linearRampToValueAtTime` scheduling on global stop; 1 test added |
+| PERF11 | `liveVolume` subscription moved from `PadBackFace` into `PadFadeControls`; removed from `PadFadeControlsProps`; `PadBackFace` no longer re-renders at tick rate; 8 tests added in `PadFadeControls.test.tsx` |
 | PERF7 | `_tagSetCache` WeakMap added to `resolveSounds.ts`; `tag`/`set` cases now check/populate cache before O(n) filter; key uses `JSON.stringify` (collision-safe); cross-component deduplication collapses N filters to 1 per render cycle; 12 tests added |
 | PERF6 | `BackFaceLayerRow` `layerVolumes` subscription throttled to ~10Hz via `usePlaybackStore.subscribe` + `useEffect`; leading-edge 100ms throttle; immediate clear on `undefined`; sync-read on `layer.id` change; zero re-renders during steady-state playback |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |

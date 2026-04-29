@@ -8,6 +8,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 import { useProjectStore } from "@/state/projectStore";
+import { usePlaybackStore } from "@/state/playbackStore";
 import { setPadVolume } from "@/lib/audio/padPlayer";
 import { padToConfig } from "@/lib/padDefaults";
 import { PadLabeledSlider } from "./PadLabeledSlider";
@@ -19,7 +20,6 @@ export interface PadFadeControlsProps {
   isFading: boolean;
   isReversing: boolean;
   globalFadeDurationMs: number;
-  liveVolume: number | undefined;
   onFade: () => void;
   onStopFade: () => void;
   onReverse: () => void;
@@ -32,11 +32,11 @@ export const PadFadeControls = memo(function PadFadeControls({
   isFading,
   isReversing,
   globalFadeDurationMs,
-  liveVolume,
   onFade,
   onStopFade,
   onReverse,
 }: PadFadeControlsProps) {
+  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
   const updatePad = useProjectStore((s) => s.updatePad);
   const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
 

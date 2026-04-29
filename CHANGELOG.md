@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved rendering performance during pad fades — only the fade controls section now updates at animation rate, reducing unnecessary UI work elsewhere on the pad.
 - Stopping all pads at once is now more efficient — only currently-playing pads have their audio ramped down, reducing unnecessary work on pads that have already stopped naturally during a session.
 - Fixed a performance issue where the scene view was unnecessarily re-rendering on every state update when no project was loaded.
 - Fixed auto-save interval restarting unexpectedly when the library save function changed identity after a mutation state change — saves now fire on schedule without being reset mid-countdown

@@ -43,7 +43,6 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
   const isFading = usePlaybackStore((s) => s.fadingPadIds.has(pad.id));
   const isReversing = usePlaybackStore((s) => s.reversingPadIds.has(pad.id));
-  const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
   const enterMultiFade = useMultiFadeStore((s) => s.enterMultiFade);
   const globalFadeDurationMs = useAppSettingsStore((s) => s.settings?.globalFadeDurationMs ?? 2000);
 
@@ -176,7 +175,6 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
           isFading={isFading}
           isReversing={isReversing}
           globalFadeDurationMs={globalFadeDurationMs}
-          liveVolume={liveVolume}
           onFade={handleFade}
           onStopFade={handleStopFade}
           onReverse={handleReverse}
