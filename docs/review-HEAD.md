@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 42 (5 fixed) |
+| Low | 41 (6 fixed) |
 | **Total** | **64** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -292,11 +292,11 @@ None.
 - **Recommendation**: Only treat lines beginning with `ERROR:` (yt-dlp's standard prefix) as errors. Truncate to a safe length (256 chars). Do not emit `failed` until the process actually terminates with non-zero exit code.
 - **Fix applied**: Extracted `parse_stderr_error(line: &str) -> Option<String>` helper that only matches lines whose first non-whitespace token is `"ERROR:"`, returning the message capped at 256 bytes. The `Stderr` event branch now captures errors silently (no mid-stream emission); the `Terminated` branch uses the captured message (if any) as the error detail for non-zero exits, falling back to the exit code. Eliminates the `failed`→`completed` double-event sequence. 6 unit tests added.
 
-#### [SEC7] Symlink TOCTOU gap in main `WalkDir` loop of `export_project`
+#### ~~[SEC7] Symlink TOCTOU gap in main `WalkDir` loop of `export_project`~~ ✅ FIXED
 - **File**: `src-tauri/src/commands.rs:544-598`
 - **Severity**: Low
 - **Finding**: `entry.file_type().is_symlink()` uses WalkDir's cached metadata from `readdir`; the subsequent `File::open(path)` follows symlinks. Between the two calls, an attacker with write access to the project folder could replace a regular file with a symlink to an out-of-scope file. The `extra_sound_paths` branch correctly uses pre-opened file handles to close this window; the main walk does not.
-- **Recommendation**: Immediately before `File::open(path)`, call `std::fs::symlink_metadata(path)?` and re-verify `is_file()`. On Unix, consider `O_NOFOLLOW`.
+- **Fix applied**: Added `std::fs::symlink_metadata(path)?` + `is_file()` re-check immediately before `writer.start_file` (not after). Placing the check before `start_file` is critical — a `continue` after `start_file` would leave a zero-byte ghost entry in the zip archive. The early-exit `ft.is_symlink()` check on WalkDir's cached metadata is preserved as a fast path. Cross-platform; no new dependencies.
 
 #### [SEC8] `SoundSchema.filePath` and `GlobalFolderSchema.path` accept relative paths
 - **File**: `src/lib/schemas.ts:32-38,216-225`
@@ -614,3 +614,4 @@ None.
 | REUSE9 | `addGlobalFolderAndReconcile` extracted to `library.reconcile.ts`; `useAddFolder` and `ResolveMissingFolderDialog` (add-parent path) both migrated; `setSounds` callback avoids cross-module `LibraryData` import; 4 tests added |
 | REUSE10 | `addToSet`/`removeFromSet` helper closures replace 8 copy-pasted Set action bodies in `playbackStore`; `SetField` union is single maintenance point; early-exit reference-equality optimization preserved; 16 tests added (per-group + cross-field isolation) |
 | SEC6 | `stderr.contains("ERROR")` replaced with `parse_stderr_error` helper (starts_with `"ERROR:"` after trim, 256-byte cap); no mid-stream `failed` emission; stderr error threaded into non-zero `Terminated` path |
+| SEC7 | `symlink_metadata` + `is_file()` re-check added immediately before `writer.start_file` in the main WalkDir loop of `export_project`; closes TOCTOU window between cached readdir metadata and `File::open`; check placed before `start_file` to prevent zero-byte ghost entries on detected races |

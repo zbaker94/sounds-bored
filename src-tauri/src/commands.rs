@@ -595,9 +595,11 @@ pub fn export_project(
                 let entry = entry.map_err(|e| e.to_string())?;
                 let path = entry.path();
 
-                // Skip directories and symlinks. walkdir does not follow symlinks by
-                // default (follow_links = false), but File::open does — skipping here
-                // prevents a crafted project folder from exfiltrating targets of symlinks.
+                // Skip directories and symlinks. WalkDir's cached readdir file-type is
+                // checked here for an early exit, but File::open below follows live
+                // filesystem state — a TOCTOU window exists between the two. The
+                // symlink_metadata re-check immediately before File::open closes that
+                // window (SEC-7).
                 let ft = entry.file_type();
                 if ft.is_dir() || ft.is_symlink() {
                     continue;
@@ -625,6 +627,16 @@ pub fn export_project(
                     .join("/");
 
                 let entry_name = entry_name.trim_start_matches('/').to_string();
+
+                // SEC-7: re-verify via live symlink_metadata immediately before open to
+                // close the TOCTOU window between WalkDir's cached readdir metadata and
+                // File::open (which follows symlinks). This check must precede
+                // writer.start_file so that a detected race does not leave a zero-byte
+                // ghost entry in the archive.
+                let live_meta = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+                if !live_meta.file_type().is_file() {
+                    continue;
+                }
 
                 writer
                     .start_file(&entry_name, options)
