@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 40 (7 fixed) |
+| Low | 39 (8 fixed) |
 | **Total** | **63** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -304,11 +304,11 @@ None.
 - **Finding**: Both schemas block `..` traversal but accept relative paths like `sounds/kick.wav`. Combined with SEC4, a locally-tampered `library.json` can feed relative paths to `export_project`.
 - **Fix applied**: Extracted `isAbsolutePath` module-level helper (Unix `/`, Windows drive `C:\`/`C:/`, Windows UNC `\\`) in `schemas.ts`. Added `.refine(isAbsolutePath, ...)` to both `SoundSchema.filePath` and `GlobalFolderSchema.path`. The existing relative-path test (`./sounds/kick.wav`) updated to assert rejection; 5 new tests added covering bare filename, Windows relative, UNC acceptance, and GlobalFolderSchema relative/dot-prefix rejection. 1892/1892 tests pass; TypeScript clean.
 
-#### [SEC9] `loadDownloadHistory` bare `catch {}` — no backup, no user notification
+#### ~~[SEC9] `loadDownloadHistory` bare `catch {}` — no backup, no user notification~~ ✅ FIXED
 - **File**: `src/lib/downloads.ts:29-31`
 - **Severity**: Low
 - **Finding**: Swallows every error category (corrupt JSON, Zod validation, I/O errors) and returns `[]` silently. Inconsistent with `loadProjectHistory` and `loadGlobalLibrary` which distinguish error types, call `backupCorruptFile`, and notify the user.
-- **Recommendation**: Mirror the recovery pattern from `loadProjectHistory`: on `SyntaxError`/`ZodError` call `backupCorruptFile` and notify the user; on other errors rethrow.
+- **Fix applied**: Added `LoadDownloadHistoryOptions` with `onCorruption?: (message: string) => void` (matching `loadProjectHistory` / `loadGlobalLibrary` pattern). `catch {}` replaced with typed recovery: `SyntaxError`/`ZodError` → `backupCorruptFile`, write fresh `[]`, call `onCorruption`; all other errors rethrow. `useBootLoader` updated to pass `onCorruption: (msg) => toast.warning(msg)` so users see a warning when their download history is cleared. 9 tests added in `src/lib/downloads.test.ts`.
 
 #### [SEC10] `DownloadJobSchema.url` accepts any string — no protocol constraint
 - **File**: `src/lib/schemas.ts:281-294`
@@ -616,3 +616,4 @@ None.
 | SEC6 | `stderr.contains("ERROR")` replaced with `parse_stderr_error` helper (starts_with `"ERROR:"` after trim, 256-byte cap); no mid-stream `failed` emission; stderr error threaded into non-zero `Terminated` path |
 | SEC7 | `symlink_metadata` + `is_file()` re-check added immediately before `writer.start_file` in the main WalkDir loop of `export_project`; closes TOCTOU window between cached readdir metadata and `File::open`; check placed before `start_file` to prevent zero-byte ghost entries on detected races |
 | SEC8 | `isAbsolutePath` helper extracted in `schemas.ts`; `.refine(isAbsolutePath)` added to `SoundSchema.filePath` and `GlobalFolderSchema.path`; 5 tests added/updated in `schemas.test.ts` |
+| SEC9 | `loadDownloadHistory` bare `catch {}` replaced with typed recovery: `SyntaxError`/`ZodError` → `backupCorruptFile` + write fresh `[]` + `onCorruption` callback; I/O errors rethrow; `useBootLoader` passes `onCorruption: toast.warning`; 9 tests added in `downloads.test.ts` |

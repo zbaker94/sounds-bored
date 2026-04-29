@@ -63,7 +63,7 @@ export function useBootLoader(): { ready: boolean } {
         toast.error("Failed to load sound library");
         setLibraryAttempted(true);
       });
-    loadDownloadHistory()
+    loadDownloadHistory({ onCorruption: (msg) => toast.warning(msg) })
       .then((jobs) => { useDownloadStore.getState().loadJobs(jobs); })
       .catch((err) => {
         // Non-critical — no toast. Log for dev visibility only.

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- If your download history file becomes corrupted, the app now automatically backs it up and resets it instead of silently failing — you'll see a warning notification when this happens.
 - Fixed a security issue where tampered project files could reference relative file paths to access files outside the project folder
 - Sound file paths and global folder paths are now required to be absolute, blocking a potential path traversal attack vector
 - Fixed a security vulnerability (SEC7) where a malicious symlink swapped into a project folder between file scanning and file opening could leak out-of-scope files during project export.
