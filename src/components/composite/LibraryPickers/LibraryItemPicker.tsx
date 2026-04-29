@@ -12,6 +12,12 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 
+// Sentinel value used internally to signal the "create new item" action via the Combobox
+// value-change path. Never reaches callers' onChange. Uses the "__" prefix that TagSchema and
+// SetSchema both reject at parse time (see schemas.ts `reservedIdPrefix`) as defense-in-depth
+// against id collisions. The component also guards at runtime via the items.some() check below.
+const CREATE_SENTINEL = "__create__";
+
 interface LibraryItemPickerProps {
   value: string[];
   onChange: (ids: string[]) => void;
@@ -43,13 +49,16 @@ export function LibraryItemPicker({
   const canCreate = trimmedInput.length > 0 && !inputMatchesExisting;
 
   function handleValueChange(newIds: string[]) {
-    if (newIds.includes("__create__")) {
+    if (
+      newIds.includes(CREATE_SENTINEL) &&
+      !items.some((i) => i.id === CREATE_SENTINEL)
+    ) {
       if (!trimmedInput) {
-        onChange(newIds.filter((id) => id !== "__create__"));
+        onChange(newIds.filter((id) => id !== CREATE_SENTINEL));
         return;
       }
       const created = onCreate(trimmedInput);
-      onChange([...newIds.filter((id) => id !== "__create__"), created.id]);
+      onChange([...newIds.filter((id) => id !== CREATE_SENTINEL), created.id]);
       return;
     }
     onChange(newIds);
@@ -83,7 +92,7 @@ export function LibraryItemPicker({
             )}
           </ComboboxCollection>
           {canCreate && (
-            <ComboboxItem value="__create__">
+            <ComboboxItem value={CREATE_SENTINEL}>
               Create "{trimmedInput}"
             </ComboboxItem>
           )}

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where selecting a tag or sound set with the id `__create__` would incorrectly trigger the "create new item" flow instead of selecting it
+- Tag and set ids starting with `__` are now rejected at load time, preventing reserved-prefix collisions with internal UI sentinels
 - Fixed a bug where the "missing sounds" warning notification would appear twice after using Save As to save a project to a new location.
 - Consolidated two internal sound-reconciliation modules (`projectSoundReconcile.ts` and `reconcileProject.ts`) into a single, consistently-named file (`project.reconcile.ts`), reducing internal complexity with no change to app behavior.
 - Fixed a bug where triggering a pad immediately after pressing Stop All could cause the newly triggered sound to be silenced mid-playback.

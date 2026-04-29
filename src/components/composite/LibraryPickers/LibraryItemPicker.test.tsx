@@ -109,4 +109,30 @@ describe("LibraryItemPicker", () => {
     expect(onCreate).toHaveBeenCalledWith("Gamma");
     expect(onChange).toHaveBeenCalledWith(["new-1"]);
   });
+
+  it('selects a real item whose id is "__create__" without triggering the create flow', async () => {
+    const sentinelItems = [
+      { id: "__create__", name: "Existing Tag" },
+      { id: "b", name: "Beta" },
+    ];
+    const onChange = vi.fn();
+    const onCreate = vi.fn().mockReturnValue({ id: "new-1" });
+    render(
+      <LibraryItemPicker
+        value={[]}
+        onChange={onChange}
+        items={sentinelItems}
+        onCreate={onCreate}
+        placeholder="Pick something..."
+        emptyText="Nothing here."
+      />,
+    );
+    const input = screen.getByPlaceholderText("Pick something...");
+    await userEvent.click(input);
+    const option = await screen.findByRole("option", { name: /Existing Tag/i });
+    await act(async () => { fireEvent.click(option); });
+    // The item should be selected normally — create flow must not fire
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledWith(["__create__"]);
+  });
 });

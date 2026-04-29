@@ -63,8 +63,12 @@ export function hasFilePath(sound: Sound): sound is Sound & { filePath: string }
 
 // ─── Tag / Set ───────────────────────────────────────────────────────────────
 
+const reservedIdPrefix = "__";
+
 export const TagSchema = z.object({
-  id: z.string(),
+  id: z.string().refine((id) => !id.startsWith(reservedIdPrefix), {
+    message: 'Tag id may not start with "__" (reserved prefix)',
+  }),
   name: z.string().min(1).max(100),
   color: z.string().optional(),
   isSystem: z.boolean().optional(),
@@ -73,7 +77,9 @@ export const TagSchema = z.object({
 // name validation mirrors TagSchema (.min(1).max(100), no trim).
 // The UI enforces non-empty names so no migration is needed for existing library.json data.
 export const SetSchema = z.object({
-  id: z.string(),
+  id: z.string().refine((id) => !id.startsWith(reservedIdPrefix), {
+    message: 'Set id may not start with "__" (reserved prefix)',
+  }),
   name: z.string().min(1).max(100),
 });
 

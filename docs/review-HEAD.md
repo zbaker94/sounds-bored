@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 33 (17 fixed) |
+| Low | 32 (18 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -408,11 +408,11 @@ None.
 - **Finding**: `useProjectLifecycle` deduplicates by `folderPath ?? (project.name + "|" + lastSaved)`. `lastSaved` changes on every auto-save, so the dedup key rotates, potentially allowing a redundant second reconcile call if the effect re-fires after the save triggered by the first reconcile. Additionally, `markAsPermanent` (Save As) changes `folderPath` mid-mount, causing the path-based dedup to miss and firing the missing-sounds notification toast a second time for the same logical project session.
 - **Fix applied**: Added `loadSessionId: number` to `projectStore` — incremented only in `loadProject`, **not** in `markAsPermanent`. Both dedup refs in `useProjectLifecycle` (`cleanedSessionIdRef`, `lastNotifiedSessionId`) are now keyed on `loadSessionId` (a monotonic integer per project-load event) rather than `folderPath`. This makes both effects stable across Save As path mutations while still re-firing correctly when a genuinely new project is loaded. The dead-code fallback `?? (project.name + "|" + lastSaved)` is eliminated. The reconcile effect's dedup (`cleanedSessionIdRef`) prevents redundant reconcile calls from `updateProject` notifications that change the `project` reference without starting a new load session. The missing-sounds effect fires at most once per `loadSessionId` — Save As no longer duplicates the toast.
 
-#### [ARCH10] `LibraryItemPicker` uses `"__create__"` magic string as a sentinel
+#### ~~[ARCH10] `LibraryItemPicker` uses `"__create__"` magic string as a sentinel~~ ✅ FIXED
 - **File**: `src/components/composite/LibraryPickers/LibraryItemPicker.tsx:42-50`
 - **Severity**: Low
 - **Finding**: Any library item whose id happens to be `"__create__"` would silently trigger the create flow. The sentinel is not exported or type-guarded.
-- **Recommendation**: Use a tagged event `{ action: "create", name: string }` via a separate callback, or add a Zod refine to `TagSchema`/`SetSchema` that rejects ids starting with `"__"`.
+- **Fix applied**: Extracted the literal to a named module-level constant `CREATE_SENTINEL` in `LibraryItemPicker.tsx` with a JSDoc comment explaining its purpose and the schema-level guard. Added `id.startsWith("__")` refines to both `TagSchema` and `SetSchema` in `schemas.ts` — any `library.json` entry with a reserved-prefix id is now rejected at parse time, closing the collision window before it can reach the picker. 6 tests added to `schemas.test.ts` (sentinel id and generic `__`-prefix rejection + valid `tag__1`/`set__1` acceptance for each schema); 1 test added to `LibraryItemPicker.test.tsx` verifying that `"__create__"` never appears in `onChange` calls when an item with that id exists in the list.
 
 #### [ARCH11] `backupCorruptFile` extraction is half-done — surrounding recovery structure still duplicated
 - **File**: `src/lib/library.ts:54-77`; `src/lib/history.ts`

@@ -1270,6 +1270,21 @@ describe("TagSchema", () => {
     const result = TagSchema.safeParse({ id: "t1", name: "a".repeat(100) });
     expect(result.success).toBe(true);
   });
+
+  it('rejects a tag whose id is the LibraryItemPicker sentinel "__create__"', () => {
+    const result = TagSchema.safeParse({ id: "__create__", name: "drums" });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects any tag id starting with "__"', () => {
+    const result = TagSchema.safeParse({ id: "__reserved", name: "drums" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a tag id that contains but does not start with double-underscore", () => {
+    const result = TagSchema.safeParse({ id: "tag__1", name: "drums" });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("SetSchema", () => {
@@ -1335,6 +1350,21 @@ describe("SetSchema", () => {
   // same behavior as TagSchema (no .trim()). UI enforces meaningful names.
   it("accepts a whitespace-only name (matches TagSchema convention — no trim)", () => {
     const result = SetSchema.safeParse({ id: "set-1", name: " " });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a set whose id is the LibraryItemPicker sentinel "__create__"', () => {
+    const result = SetSchema.safeParse({ id: "__create__", name: "My Set" });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects any set id starting with "__"', () => {
+    const result = SetSchema.safeParse({ id: "__reserved", name: "My Set" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a set id that contains but does not start with double-underscore", () => {
+    const result = SetSchema.safeParse({ id: "set__1", name: "My Set" });
     expect(result.success).toBe(true);
   });
 });
