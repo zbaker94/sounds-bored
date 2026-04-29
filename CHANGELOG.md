@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved performance when scrolling or editing the sound library: tag and set sound selections are now cached and shared across pads, eliminating redundant work per render cycle
 - Fixed a performance issue where layer volume sliders were re-rendering at 60fps during audio fades; updates are now throttled to ~10Hz, reducing unnecessary UI work during playback
 - Fixed a memory leak where event listeners on reused audio elements could accumulate over long sessions when sounds were stopped before metadata finished loading
 - Fixed a performance issue where idle pad buttons were allocating objects and iterating layers on every animation frame (~60fps), even when not playing — now skips all work for non-playing pads

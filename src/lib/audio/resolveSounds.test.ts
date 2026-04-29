@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { filterSoundsByTags, resolveLayerSounds, _soundByIdCache } from "./resolveSounds";
+import { filterSoundsByTags, resolveLayerSounds, _soundByIdCache, _tagSetCache } from "./resolveSounds";
 import { createMockLayer } from "@/test/factories";
 import type { Sound } from "@/lib/schemas";
 
@@ -266,5 +266,118 @@ describe("resolveLayerSounds — soundById Map caching", () => {
     expect(_soundByIdCache.get(soundsA)).not.toBe(_soundByIdCache.get(soundsB));
     expect(_soundByIdCache.get(soundsA)?.has("a1")).toBe(true);
     expect(_soundByIdCache.get(soundsB)?.has("b1")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _tagSetCache — tag and set selections are cached by (sounds ref, selection key)
+// ---------------------------------------------------------------------------
+
+describe("resolveLayerSounds — tag/set resolution caching", () => {
+  let sounds: Sound[];
+
+  beforeEach(() => {
+    sounds = [
+      makeSound({ id: "s1", tags: ["drums"], sets: ["set-a"] }),
+      makeSound({ id: "s2", tags: ["electronic"], sets: ["set-b"] }),
+      makeSound({ id: "s3", tags: ["drums", "electronic"], sets: ["set-a"] }),
+    ];
+  });
+
+  it("caches tag selection result and returns the same array reference on repeated calls", () => {
+    const layer = makeTagLayer(["drums"], "any");
+    const first = resolveLayerSounds(layer, sounds);
+    const second = resolveLayerSounds(layer, sounds);
+    expect(second).toBe(first);
+  });
+
+  it("caches set selection result and returns the same array reference on repeated calls", () => {
+    const layer = makeSetLayer("set-a");
+    const first = resolveLayerSounds(layer, sounds);
+    const second = resolveLayerSounds(layer, sounds);
+    expect(second).toBe(first);
+  });
+
+  it("cross-component hit — two layers with identical tag selection share the result", () => {
+    const layerA = makeTagLayer(["drums"], "any");
+    const layerB = makeTagLayer(["drums"], "any");
+    const resultA = resolveLayerSounds(layerA, sounds);
+    const resultB = resolveLayerSounds(layerB, sounds);
+    expect(resultB).toBe(resultA);
+  });
+
+  it("normalizes tag order — same tags in different order share a cache entry", () => {
+    const layerAB = makeTagLayer(["drums", "electronic"], "any");
+    const layerBA = makeTagLayer(["electronic", "drums"], "any");
+    const resultAB = resolveLayerSounds(layerAB, sounds);
+    const resultBA = resolveLayerSounds(layerBA, sounds);
+    expect(resultBA).toBe(resultAB);
+  });
+
+  it("different matchMode produces separate cache entries", () => {
+    const layerAny = makeTagLayer(["drums", "electronic"], "any");
+    const layerAll = makeTagLayer(["drums", "electronic"], "all");
+    const resultAny = resolveLayerSounds(layerAny, sounds);
+    const resultAll = resolveLayerSounds(layerAll, sounds);
+    expect(resultAll).not.toBe(resultAny);
+    expect(resultAny.map((s) => s.id)).toEqual(["s1", "s2", "s3"]);
+    expect(resultAll.map((s) => s.id)).toEqual(["s3"]);
+  });
+
+  it("different set IDs produce separate cache entries", () => {
+    const layerA = makeSetLayer("set-a");
+    const layerB = makeSetLayer("set-b");
+    const resultA = resolveLayerSounds(layerA, sounds);
+    const resultB = resolveLayerSounds(layerB, sounds);
+    expect(resultB).not.toBe(resultA);
+  });
+
+  it("new sounds reference causes a cache miss and re-runs the filter", () => {
+    const layer = makeTagLayer(["drums"], "any");
+    const first = resolveLayerSounds(layer, sounds);
+    const updatedSounds = [...sounds];
+    const second = resolveLayerSounds(layer, updatedSounds);
+    expect(second).not.toBe(first);
+    expect(_tagSetCache.has(updatedSounds)).toBe(true);
+  });
+
+  it("assigned selection does not populate _tagSetCache", () => {
+    const layer = makeAssignedLayer(["s1"]);
+    resolveLayerSounds(layer, sounds);
+    expect(_tagSetCache.has(sounds)).toBe(false);
+  });
+
+  it("empty tagIds bypasses the cache entirely and returns []", () => {
+    const layer = makeTagLayer([], "any");
+    const result = resolveLayerSounds(layer, sounds);
+    expect(result).toEqual([]);
+    expect(_tagSetCache.has(sounds)).toBe(false);
+  });
+
+  it("tag IDs containing the separator character do not collide in the cache key", () => {
+    // ["x\0y", "z"] and ["x", "y\0z"] must produce different cache entries
+    const layerA = makeTagLayer(["x\0y", "z"], "any");
+    const layerB = makeTagLayer(["x", "y\0z"], "any");
+    const resultA = resolveLayerSounds(layerA, sounds);
+    const resultB = resolveLayerSounds(layerB, sounds);
+    expect(resultB).not.toBe(resultA);
+  });
+
+  it("tag selection against an empty sounds array returns [] and is cached", () => {
+    const emptySounds: Sound[] = [];
+    const layer = makeTagLayer(["drums"], "any");
+    const result = resolveLayerSounds(layer, emptySounds);
+    expect(result).toEqual([]);
+    expect(_tagSetCache.has(emptySounds)).toBe(true);
+    expect(resolveLayerSounds(layer, emptySounds)).toBe(result);
+  });
+
+  it("set selection against an empty sounds array returns [] and is cached", () => {
+    const emptySounds: Sound[] = [];
+    const layer = makeSetLayer("set-a");
+    const result = resolveLayerSounds(layer, emptySounds);
+    expect(result).toEqual([]);
+    expect(_tagSetCache.has(emptySounds)).toBe(true);
+    expect(resolveLayerSounds(layer, emptySounds)).toBe(result);
   });
 });

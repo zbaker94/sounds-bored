@@ -12,6 +12,30 @@ import type { Layer, Sound } from "@/lib/schemas";
 export const _soundByIdCache = new WeakMap<Sound[], Map<string, Sound>>();
 
 /**
+ * Module-level cache for tag and set selections.
+ * Outer key: Sound[] reference. Inner key: normalized selection key string.
+ * Exported only for test introspection — do not use in production code.
+ *
+ * Eliminates redundant O(n) filters when multiple layers share the same
+ * tag/set selection against the same sounds array reference (same Immer
+ * snapshot). Each Immer update produces a new Sound[] reference, which
+ * naturally evicts the prior inner map via WeakMap GC semantics.
+ *
+ * IMPORTANT: Callers must not mutate the returned arrays — they are shared
+ * references. All current consumers read-only (length checks, iteration,
+ * spread to new arrays).
+ */
+export const _tagSetCache = new WeakMap<Sound[], Map<string, Sound[]>>();
+
+/** Normalized cache key for tag/set selections.
+ *  Uses JSON.stringify to safely encode tag IDs that may contain any character. */
+function tagSetKey(sel: { type: "tag"; tagIds: string[]; matchMode: "any" | "all" } | { type: "set"; setId: string }): string {
+  return sel.type === "tag"
+    ? `t:${JSON.stringify([...sel.tagIds].sort())}:${sel.matchMode}`
+    : `s:${JSON.stringify(sel.setId)}`;
+}
+
+/**
  * Resolve a layer's selection (assigned / tag / set) into the matching Sound[].
  *
  * Does NOT filter by filePath — returns all matching sounds including those
@@ -38,14 +62,27 @@ export function resolveLayerSounds(layer: Layer, sounds: Sound[]): Sound[] {
     }
     case "tag": {
       if (sel.tagIds.length === 0) return [];
-      return sounds.filter((s) =>
+      const key = tagSetKey(sel);
+      let inner = _tagSetCache.get(sounds);
+      if (inner?.has(key)) return inner.get(key)!;
+      const result = sounds.filter((s) =>
         sel.matchMode === "all"
           ? sel.tagIds.every((id) => s.tags.includes(id))
           : sel.tagIds.some((id) => s.tags.includes(id)),
       );
+      if (!inner) { inner = new Map(); _tagSetCache.set(sounds, inner); }
+      inner.set(key, result);
+      return result;
     }
-    case "set":
-      return sounds.filter((s) => s.sets.includes(sel.setId));
+    case "set": {
+      const key = tagSetKey(sel);
+      let inner = _tagSetCache.get(sounds);
+      if (inner?.has(key)) return inner.get(key)!;
+      const result = sounds.filter((s) => s.sets.includes(sel.setId));
+      if (!inner) { inner = new Map(); _tagSetCache.set(sounds, inner); }
+      inner.set(key, result);
+      return result;
+    }
     default: {
       const _exhaustive: never = sel;
       return _exhaustive;

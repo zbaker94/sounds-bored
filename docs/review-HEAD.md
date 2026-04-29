@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 35 (14 fixed) |
+| Low | 34 (15 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -355,11 +355,11 @@ None.
 - **Finding**: The slider re-renders at up to 60fps during an audio fade while the back face is visible. Slider DOM reflows at audio-rate are measurable for multiple layers.
 - **Fix applied**: Replaced `usePlaybackStore(selector)` (which caused 60fps re-renders) with a `usePlaybackStore.subscribe(selector, listener)` in a `useEffect` that throttles `setState` to ~10Hz (100ms). `liveLayerVol` state is initialized from a store snapshot on mount; the effect also re-syncs immediately on `layer.id` change before subscribing so there is no stale intermediate value. When `layerVolumes[layer.id]` is `undefined` (fade ended / layer stopped), `setLiveLayerVol(null)` fires immediately without throttle so the slider snaps to the static project value without delay. `localLayerVol` (drag gesture) continues to take priority via `sliderVol = localLayerVol ?? layerVol`. During steady-state playback with no fade in flight, `layerVolumes[layer.id]` is absent and the subscription listener never fires — zero re-renders beyond the initial mount. The throttle is leading-edge-only; the last sub-100ms intermediate value of a short fade will be missed, which is imperceptible in practice. 1928/1928 tests pass; TypeScript clean.
 
-#### [PERF7] `resolveLayerSounds` re-runs for every `sounds` array replacement
-- **File**: `src/components/composite/SceneView/PadBackFace.tsx:66-67`
+#### ~~[PERF7] `resolveLayerSounds` re-runs for every `sounds` array replacement~~ ✅ FIXED
+- **File**: `src/lib/audio/resolveSounds.ts` (finding cited `PadBackFace.tsx:66-67` — stale after ARCH4 extraction; actual call site is `BackFaceLayerRow.tsx:74`)
 - **Severity**: Low
-- **Finding**: `useMemo(() => resolveLayerSounds(layer, sounds), [layer, sounds])` re-runs whenever Immer replaces `libraryStore.sounds` (any tag/set/missing update). For `tag`/`set` selections this filters the full library. Scrolling or editing in the library can retrigger resolution for every visible back-face layer.
-- **Recommendation**: Add a module-level memo keyed on `(sounds reference, tagIds/setId, matchMode)` for tag/set selections, similar to the existing WeakMap cache for `assigned` selections in `resolveSounds.ts`.
+- **Finding**: `useMemo(() => resolveLayerSounds(layer, sounds), [layer, sounds])` re-runs whenever Immer replaces `libraryStore.sounds`. For `tag`/`set` selections this runs an O(n) `.filter()` over the full library for each visible `BackFaceLayerRow`.
+- **Fix applied**: Added `_tagSetCache = new WeakMap<Sound[], Map<string, Sound[]>>()` to `resolveSounds.ts` alongside the existing `_soundByIdCache`. The `tag` and `set` switch cases now check the cache before calling `.filter()` and populate it on a miss. Cache key uses `JSON.stringify` to safely encode tag IDs (including those containing any character), plus sorted tag IDs for order-normalization and matchMode discrimination. WeakMap GC semantics ensure each Immer snapshot's cached results are released when the snapshot is no longer referenced. All current consumers are read-only against the returned arrays; a JSDoc note on `_tagSetCache` documents the no-mutation contract. Primary benefit is cross-component deduplication: all `BackFaceLayerRow` instances sharing the same tag/set selection collapse N O(n) filters into 1 per render cycle. 12 tests added (9 initial + 3 post-review: `\0`-in-tagId collision regression, tag/set against empty sounds array); 1940/1940 tests pass; TypeScript clean.
 
 #### [PERF8] `useAutoSave` restarts the 30s interval when TanStack mutation identity changes
 - **File**: `src/hooks/useAutoSave.ts:101`
@@ -580,6 +580,7 @@ None.
 | SEC15 | yt-dlp sidecar hardened: `--ignore-config`, `--no-plugins`, HTTP(S)-only scheme enforcement |
 | SEC16 | Export TOCTOU on `extra_sound_paths` closed via pre-opened file handles |
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
+| PERF7 | `_tagSetCache` WeakMap added to `resolveSounds.ts`; `tag`/`set` cases now check/populate cache before O(n) filter; key uses `JSON.stringify` (collision-safe); cross-component deduplication collapses N filters to 1 per render cycle; 12 tests added |
 | PERF6 | `BackFaceLayerRow` `layerVolumes` subscription throttled to ~10Hz via `usePlaybackStore.subscribe` + `useEffect`; leading-edge 100ms throttle; immediate clear on `undefined`; sync-read on `layer.id` change; zero re-renders during steady-state playback |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |
 | PERF3 | `isAnyGainChanging()` + `markGainRamp()` added to `audioState.ts`; `audioTick` short-circuits volume rebuild when no fade/ramp is in flight; `triggerAndFade` ramp routed through `rampGainTo`; 6 tests added |
