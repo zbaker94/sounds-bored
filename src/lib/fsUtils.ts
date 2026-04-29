@@ -1,4 +1,4 @@
-import { writeTextFile, rename, remove, readDir, type DirEntry } from "@tauri-apps/plugin-fs";
+import { writeTextFile, readTextFile, rename, remove, readDir, type DirEntry } from "@tauri-apps/plugin-fs";
 import { dirname, basename, join } from "@tauri-apps/api/path";
 
 /**
@@ -74,6 +74,38 @@ export async function sweepOrphanedTmpFiles(filePath: string): Promise<void> {
     await Promise.allSettled(orphanPaths.map((p) => remove(p)));
   } catch {
     // sweep is opportunistic — never block loading on cleanup failures
+  }
+}
+
+export interface LoadJsonWithRecoveryOptions<T> {
+  path: string;
+  parse: (raw: unknown) => T;
+  /** Must be JSON-serializable — written to disk via `atomicWriteJson` on recovery. */
+  defaults: T;
+  onCorruption?: (message: string) => void;
+  corruptMessage: string;
+}
+
+/**
+ * Reads and parses a JSON file, recovering automatically if the file is corrupt.
+ *
+ * I/O errors from `readTextFile` propagate unchanged — callers should handle
+ * permission or missing-file errors before calling this function.
+ *
+ * On `SyntaxError` from `JSON.parse` or any error from `opts.parse`, the corrupt
+ * file is renamed to `<basename>.corrupt.json`, a fresh default is written in its
+ * place, the optional `onCorruption` callback is invoked, and `opts.defaults` is
+ * returned — callers never get an unrecoverable broken state.
+ */
+export async function loadJsonWithRecovery<T>(opts: LoadJsonWithRecoveryOptions<T>): Promise<T> {
+  const text = await readTextFile(opts.path);
+  try {
+    return opts.parse(JSON.parse(text));
+  } catch {
+    await backupCorruptFile(opts.path);
+    await atomicWriteJson(opts.path, opts.defaults);
+    opts.onCorruption?.(opts.corruptMessage);
+    return opts.defaults;
   }
 }
 

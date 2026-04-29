@@ -1,10 +1,9 @@
-import { ZodError } from "zod";
 import { GlobalLibrary, GlobalLibrarySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { readTextFile, exists } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson, backupCorruptFile, sweepOrphanedTmpFiles } from "./fsUtils";
+import { exists } from "@tauri-apps/plugin-fs";
+import { atomicWriteJson, loadJsonWithRecovery, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, LIBRARY_FILE_NAME, CURRENT_LIBRARY_VERSION } from "./constants";
-import { migrateLibrary, MigrationError } from "./migrations";
+import { migrateLibrary } from "./migrations";
 import { useLibraryStore } from "@/state/libraryStore";
 
 export class LibraryValidationError extends Error {
@@ -46,35 +45,13 @@ export async function loadGlobalLibrary(
     return GlobalLibrarySchema.parse({ sounds: [], tags: [], sets: [] });
   }
 
-  try {
-    const text = await readTextFile(filePath);
-    const parsed = JSON.parse(text);
-    const migrated = migrateLibrary(parsed);
-    return GlobalLibrarySchema.parse(migrated);
-  } catch (error) {
-    if (
-      error instanceof SyntaxError ||
-      error instanceof ZodError ||
-      error instanceof MigrationError
-    ) {
-      // Recovery path: rename corrupt file, write fresh default, notify caller.
-      await backupCorruptFile(filePath);
-      // If the write fails (e.g., directory deleted, disk full), the error
-      // propagates to the caller as an I/O failure, distinct from the original
-      // corruption error — callers should handle rejections accordingly.
-      await atomicWriteJson(filePath, {
-        version: CURRENT_LIBRARY_VERSION,
-        sounds: [],
-        tags: [],
-        sets: [],
-      });
-      options?.onCorruption?.(
-        `${LIBRARY_FILE_NAME} was corrupt and has been reset. Your sound library has been cleared.`,
-      );
-      return GlobalLibrarySchema.parse({ version: CURRENT_LIBRARY_VERSION, sounds: [], tags: [], sets: [] });
-    }
-    throw error;
-  }
+  return loadJsonWithRecovery({
+    path: filePath,
+    parse: (raw) => GlobalLibrarySchema.parse(migrateLibrary(raw as Record<string, unknown>)),
+    defaults: GlobalLibrarySchema.parse({ version: CURRENT_LIBRARY_VERSION, sounds: [], tags: [], sets: [] }),
+    onCorruption: options?.onCorruption,
+    corruptMessage: `${LIBRARY_FILE_NAME} was corrupt and has been reset. Your sound library has been cleared.`,
+  });
 }
 
 export async function saveGlobalLibrary(library: GlobalLibrary): Promise<void> {

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { atomicWriteJson, atomicWriteText, sweepOrphanedTmpFiles } from "./fsUtils";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { atomicWriteJson, atomicWriteText, loadJsonWithRecovery, sweepOrphanedTmpFiles } from "./fsUtils";
 import { mockFs, createMockFileSystem } from "@/test/tauri-mocks";
 
 describe("atomicWriteText", () => {
@@ -127,6 +127,130 @@ describe("atomicWriteJson", () => {
 
     const written = mockFs.writeTextFile.mock.calls[0][1] as string;
     expect(written).toBe("[]");
+  });
+});
+
+describe("loadJsonWithRecovery", () => {
+  beforeEach(() => {
+    mockFs.readTextFile.mockResolvedValue("[]");
+    mockFs.writeTextFile.mockResolvedValue(undefined);
+    mockFs.rename.mockResolvedValue(undefined);
+  });
+
+  it("parses and returns the value from the file on success", async () => {
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify({ value: 42 }));
+
+    const result = await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => (raw as { value: number }).value,
+      defaults: 0,
+      corruptMessage: "file was corrupt",
+    });
+
+    expect(result).toBe(42);
+    expect(mockFs.rename).not.toHaveBeenCalled();
+  });
+
+  it("recovers from SyntaxError — backs up, writes defaults, calls onCorruption, returns defaults", async () => {
+    mockFs.readTextFile.mockResolvedValue("not valid { json");
+    const onCorruption = vi.fn();
+
+    const result = await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => raw as string[],
+      defaults: [],
+      onCorruption,
+      corruptMessage: "file was corrupt",
+    });
+
+    expect(result).toEqual([]);
+    expect(mockFs.rename).toHaveBeenCalledWith("/dir/file.json", "/dir/file.corrupt.json");
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/dir\/file\.json\.[0-9a-f-]{36}\.tmp$/),
+      "[]",
+    );
+    expect(onCorruption).toHaveBeenCalledWith("file was corrupt");
+  });
+
+  it("recovers from a parse() error (e.g. ZodError) — backs up, writes defaults, returns defaults", async () => {
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify({ unexpected: true }));
+    const onCorruption = vi.fn();
+
+    const result = await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: () => { throw new Error("validation failed"); },
+      defaults: ["fallback"],
+      onCorruption,
+      corruptMessage: "schema mismatch",
+    });
+
+    expect(result).toEqual(["fallback"]);
+    expect(mockFs.rename).toHaveBeenCalledWith("/dir/file.json", "/dir/file.corrupt.json");
+    expect(onCorruption).toHaveBeenCalledWith("schema mismatch");
+  });
+
+  it("rethrows I/O errors from readTextFile without recovery", async () => {
+    mockFs.readTextFile.mockRejectedValue(new Error("EPERM: permission denied"));
+
+    await expect(
+      loadJsonWithRecovery({
+        path: "/dir/file.json",
+        parse: (raw) => raw,
+        defaults: null,
+        corruptMessage: "corrupt",
+      }),
+    ).rejects.toThrow("EPERM: permission denied");
+
+    expect(mockFs.rename).not.toHaveBeenCalled();
+    expect(mockFs.writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it("works without onCorruption callback — no crash on corrupt file", async () => {
+    mockFs.readTextFile.mockResolvedValue("bad json {{");
+
+    const result = await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => raw as string[],
+      defaults: [],
+      corruptMessage: "file was corrupt",
+    });
+
+    expect(result).toEqual([]);
+    expect(mockFs.writeTextFile).toHaveBeenCalled();
+  });
+
+  it("proceeds with recovery even if the backup rename fails — writes defaults and calls onCorruption", async () => {
+    mockFs.readTextFile.mockResolvedValue("bad json {{");
+    // First rename (backup to .corrupt.json) fails; second rename (atomic write tmp→final) resolves
+    mockFs.rename.mockRejectedValueOnce(new Error("EEXIST")).mockResolvedValue(undefined);
+    const onCorruption = vi.fn();
+
+    const result = await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => raw as string[],
+      defaults: [],
+      onCorruption,
+      corruptMessage: "file was corrupt",
+    });
+
+    expect(result).toEqual([]);
+    expect(mockFs.writeTextFile).toHaveBeenCalled();
+    expect(onCorruption).toHaveBeenCalledWith("file was corrupt");
+  });
+
+  it("writes defaults to disk on recovery so subsequent reads return a valid file", async () => {
+    const files = createMockFileSystem({ "/dir/file.json": "garbage" });
+
+    await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => { if (!Array.isArray(raw)) throw new Error("not array"); return raw as number[]; },
+      defaults: [1, 2, 3],
+      corruptMessage: "corrupt",
+    });
+
+    const written = files["/dir/file.json"];
+    expect(written).toBeDefined();
+    expect(JSON.parse(written)).toEqual([1, 2, 3]);
   });
 });
 

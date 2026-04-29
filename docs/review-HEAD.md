@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 32 (18 fixed) |
+| Low | 31 (19 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -414,11 +414,11 @@ None.
 - **Finding**: Any library item whose id happens to be `"__create__"` would silently trigger the create flow. The sentinel is not exported or type-guarded.
 - **Fix applied**: Extracted the literal to a named module-level constant `CREATE_SENTINEL` in `LibraryItemPicker.tsx` with a JSDoc comment explaining its purpose and the schema-level guard. Added `id.startsWith("__")` refines to both `TagSchema` and `SetSchema` in `schemas.ts` — any `library.json` entry with a reserved-prefix id is now rejected at parse time, closing the collision window before it can reach the picker. 6 tests added to `schemas.test.ts` (sentinel id and generic `__`-prefix rejection + valid `tag__1`/`set__1` acceptance for each schema); 1 test added to `LibraryItemPicker.test.tsx` verifying that `"__create__"` never appears in `onChange` calls when an item with that id exists in the list.
 
-#### [ARCH11] `backupCorruptFile` extraction is half-done — surrounding recovery structure still duplicated
+#### ~~[ARCH11] `backupCorruptFile` extraction is half-done — surrounding recovery structure still duplicated~~ ✅ FIXED
 - **File**: `src/lib/library.ts:54-77`; `src/lib/history.ts`
 - **Severity**: Low
 - **Finding**: `backupCorruptFile` is now imported and called, but the surrounding try/catch/backup/write-fresh-default/notify pattern is still duplicated verbatim between `loadGlobalLibrary` and `loadProjectHistory`.
-- **Recommendation**: Complete the extraction with `loadJsonWithRecovery<T>({ path, parse, defaults, onCorruption, corruptMessage })` in `fsUtils.ts`. Both loaders become one-liners.
+- **Fix applied**: Added `loadJsonWithRecovery<T>({ path, parse, defaults, onCorruption, corruptMessage })` to `fsUtils.ts`. `readTextFile` is called outside the `try` so I/O errors propagate freely; `opts.parse(JSON.parse(text))` is wrapped in a single `try/catch` that recovers from both `SyntaxError` (bad JSON) and any error from the `parse` callback (ZodError, MigrationError, etc.). `loadGlobalLibrary`, `loadProjectHistory`, and `loadDownloadHistory` all use the new helper — their try/catch/backup/write/notify blocks eliminated. `ZodError`, `MigrationError` (from library), and `readTextFile` imports removed from each caller. 6 tests added to `fsUtils.test.ts`. 1965/1965 tests pass; TypeScript clean.
 
 #### [ARCH12] `useDownloadEventListener` lives in `ytdlp.queries.ts` but uses no TanStack Query
 - **File**: `src/lib/ytdlp.queries.ts:91-174`
