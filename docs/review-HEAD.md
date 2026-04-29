@@ -13,8 +13,8 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 43 (4 fixed) |
-| **Total** | **65** |
+| Low | 42 (5 fixed) |
+| **Total** | **64** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -285,11 +285,12 @@ None.
 - **Severity**: Low
 - **Fix applied**: Added `validate_job_id(job_id: &str) -> Result<(), String>` helper that rejects empty strings, strings longer than 64 characters, and any character outside `[A-Za-z0-9_-]`. Called as the first statement in all four affected commands: `start_download`, `cancel_download`, `export_project`, and `cancel_export`. Additionally added duplicate-ID guards in `start_download` (before sidecar spawn and the initial `queued` event emission) and `export_project` (before async task spawn and HashMap insert) — `HashMap::insert` silently overwrites existing entries, which would orphan the first job's cancel handle and break cancellation. 10 unit tests added covering empty, too-long, invalid-charset (control chars, spaces, Unicode, special chars), UUID format, and slug format inputs.
 
-#### [SEC6] `stderr.contains("ERROR")` allows hostile video metadata to inject misleading events
+#### ~~[SEC6] `stderr.contains("ERROR")` allows hostile video metadata to inject misleading events~~ ✅ FIXED
 - **File**: `src-tauri/src/commands.rs:326-334`
 - **Severity**: Low
 - **Finding**: yt-dlp may print server-reported error text verbatim. A hostile video description containing "ERROR" emits a `failed` progress event mid-stream, producing both `failed` and `completed` events for the same job.
 - **Recommendation**: Only treat lines beginning with `ERROR:` (yt-dlp's standard prefix) as errors. Truncate to a safe length (256 chars). Do not emit `failed` until the process actually terminates with non-zero exit code.
+- **Fix applied**: Extracted `parse_stderr_error(line: &str) -> Option<String>` helper that only matches lines whose first non-whitespace token is `"ERROR:"`, returning the message capped at 256 bytes. The `Stderr` event branch now captures errors silently (no mid-stream emission); the `Terminated` branch uses the captured message (if any) as the error detail for non-zero exits, falling back to the exit code. Eliminates the `failed`→`completed` double-event sequence. 6 unit tests added.
 
 #### [SEC7] Symlink TOCTOU gap in main `WalkDir` loop of `export_project`
 - **File**: `src-tauri/src/commands.rs:544-598`
@@ -612,3 +613,4 @@ None.
 | REUSE8 | `classifyPickedAudioFile` + `findDuplicateByPath` extracted to `src/lib/fileResolve.ts`; both dialog handlers use shared helpers; `AudioFileClassification` discriminated union eliminates `!` assertions; 8 tests added |
 | REUSE9 | `addGlobalFolderAndReconcile` extracted to `library.reconcile.ts`; `useAddFolder` and `ResolveMissingFolderDialog` (add-parent path) both migrated; `setSounds` callback avoids cross-module `LibraryData` import; 4 tests added |
 | REUSE10 | `addToSet`/`removeFromSet` helper closures replace 8 copy-pasted Set action bodies in `playbackStore`; `SetField` union is single maintenance point; early-exit reference-equality optimization preserved; 16 tests added (per-group + cross-field isolation) |
+| SEC6 | `stderr.contains("ERROR")` replaced with `parse_stderr_error` helper (starts_with `"ERROR:"` after trim, 256-byte cap); no mid-stream `failed` emission; stderr error threaded into non-zero `Terminated` path |

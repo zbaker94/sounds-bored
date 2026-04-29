@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where video titles or metadata containing the word "ERROR" could incorrectly trigger a download failure notification mid-stream
+- Download error details now accurately reflect the actual yt-dlp error message when a download fails, rather than always showing a generic exit code message
 - Fixed a security vulnerability where malformed job IDs could exhaust memory or inject control characters into event payloads — job IDs are now strictly validated (alphanumeric, hyphens, underscores only; max 64 characters)
 - Fixed a bug where submitting a duplicate job ID could silently orphan an in-progress download or export, breaking its cancel button
 - Hardened path validation for download and export operations: file paths must now be absolute and are rejected if they contain traversal segments, UNC device-namespace paths, or control characters — reducing the risk of malicious or misconfigured paths redirecting files outside intended folders.

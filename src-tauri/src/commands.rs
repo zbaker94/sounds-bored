@@ -208,6 +208,27 @@ fn parse_output_path(line: &str) -> Option<String> {
     None
 }
 
+/// Parse a yt-dlp stderr line as a genuine error message.
+/// yt-dlp writes informational messages to stderr; only lines whose first
+/// non-whitespace token is "ERROR:" qualify as actual failures. Returns the
+/// trimmed message capped at 256 bytes to bound payload size and avoid
+/// false-positive "failed" events when video titles or metadata happen to
+/// contain the word "ERROR".
+fn parse_stderr_error(line: &str) -> Option<String> {
+    if !line.trim_start().starts_with("ERROR:") {
+        return None;
+    }
+    let trimmed = line.trim_end();
+    let bytes = trimmed.as_bytes();
+    if bytes.len() <= 256 {
+        Some(trimmed.to_string())
+    } else {
+        // Truncate at 256 bytes. This may split a multibyte UTF-8 sequence,
+        // so use from_utf8_lossy to produce a valid String.
+        Some(String::from_utf8_lossy(&bytes[..256]).into_owned())
+    }
+}
+
 #[tauri::command]
 pub fn start_download(
     app: AppHandle,
@@ -310,6 +331,7 @@ pub fn start_download(
         use tauri_plugin_shell::process::CommandEvent;
 
         let mut last_output_path: Option<String> = None;
+        let mut last_stderr_error: Option<String> = None;
 
         while let Some(event) = rx.recv().await {
             match event {
@@ -333,22 +355,21 @@ pub fn start_download(
                 }
                 CommandEvent::Stderr(line_bytes) => {
                     let line = String::from_utf8_lossy(&line_bytes);
-                    // yt-dlp writes some info to stderr; only emit as error if it looks like one
-                    if line.contains("ERROR") {
-                        let _ = app_clone.emit(
-                            DOWNLOAD_EVENT,
-                            DownloadProgressEvent::failed(&job_id_for_task, None, Some(line.to_string())),
-                        );
+                    if let Some(msg) = parse_stderr_error(&line) {
+                        last_stderr_error = Some(msg);
                     }
                 }
                 CommandEvent::Terminated(payload) => {
                     let event = if payload.code == Some(0) {
                         DownloadProgressEvent::completed(&job_id_for_task, last_output_path.clone())
                     } else {
+                        let error_msg = last_stderr_error
+                            .take()
+                            .unwrap_or_else(|| format!("yt-dlp exited with code {:?}", payload.code));
                         DownloadProgressEvent::failed(
                             &job_id_for_task,
                             last_output_path.clone(),
-                            Some(format!("yt-dlp exited with code {:?}", payload.code)),
+                            Some(error_msg),
                         )
                     };
                     let _ = app_clone.emit(DOWNLOAD_EVENT, event);
@@ -1172,6 +1193,51 @@ mod tests {
         let line = "[download]  45.3% of  3.45MiB at  1.23MiB/s ETA 00:02";
         let result = parse_output_path(line);
         assert!(result.is_none());
+    }
+
+    // ---- parse_stderr_error tests ----
+
+    #[test]
+    fn test_parse_stderr_error_genuine_error() {
+        let result = parse_stderr_error("ERROR: Something failed");
+        assert_eq!(result, Some("ERROR: Something failed".to_string()));
+    }
+
+    #[test]
+    fn test_parse_stderr_error_leading_whitespace() {
+        // Lines starting with whitespace then "ERROR:" qualify after trim_start.
+        let result = parse_stderr_error("  ERROR: Leading whitespace");
+        assert!(result.is_some(), "leading-whitespace ERROR: line should qualify");
+    }
+
+    #[test]
+    fn test_parse_stderr_error_word_error_in_metadata() {
+        // The word "ERROR" appearing mid-line (e.g. in a video title) must NOT trigger
+        // a failure event — this is the bug SEC6 fixes.
+        let result = parse_stderr_error("Video ERROR in download");
+        assert!(result.is_none(), "non-prefix ERROR must not qualify");
+    }
+
+    #[test]
+    fn test_parse_stderr_error_warning_line() {
+        // yt-dlp also writes WARNING: lines to stderr; these must not qualify as errors.
+        let result = parse_stderr_error("WARNING: something");
+        assert!(result.is_none(), "WARNING: lines must not qualify as errors");
+    }
+
+    #[test]
+    fn test_parse_stderr_error_empty_line() {
+        let result = parse_stderr_error("");
+        assert!(result.is_none(), "empty line must not qualify");
+    }
+
+    #[test]
+    fn test_parse_stderr_error_caps_at_256_bytes() {
+        // 300-char string (all ASCII) — must be truncated to exactly 256 bytes.
+        let line = format!("ERROR: {}", "x".repeat(293));
+        let result = parse_stderr_error(&line);
+        let msg = result.expect("long ERROR: line should qualify");
+        assert_eq!(msg.len(), 256, "message must be capped at 256 bytes");
     }
 
     // ---- ExportJobs lifecycle tests ----
