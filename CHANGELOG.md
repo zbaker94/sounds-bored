@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Consolidated two internal sound-reconciliation modules (`projectSoundReconcile.ts` and `reconcileProject.ts`) into a single, consistently-named file (`project.reconcile.ts`), reducing internal complexity with no change to app behavior.
 - Fixed a bug where triggering a pad immediately after pressing Stop All could cause the newly triggered sound to be silenced mid-playback.
 - Stale audio connections from previously stopped pads are now cleaned up instantly rather than after a delay, reducing the window for audio glitches during rapid stop-and-retrigger sequences.
 - Improved rendering performance during pad fades — only the fade controls section now updates at animation rate, reducing unnecessary UI work elsewhere on the pad.

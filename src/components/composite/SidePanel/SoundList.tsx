@@ -34,7 +34,7 @@ import { useResolveSoundQueue } from "@/hooks/useResolveSoundQueue";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
-import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
+import { getAffectedPads, type AffectedPad } from "@/lib/project.reconcile";
 import { cn } from "@/lib/utils";
 import { SoundListItemTags } from "./SoundListItemTags";
 import { ConfirmDeleteSoundsDialog } from "./ConfirmDeleteSoundsDialog";

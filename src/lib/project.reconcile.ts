@@ -1,8 +1,10 @@
 import type { Pad, Project, Sound } from "@/lib/schemas";
+import { useProjectStore } from "@/state/projectStore";
+import { useLibraryStore } from "@/state/libraryStore";
 
 // ── reconcileProjectSounds ────────────────────────────────────────────────────
 
-export type ReconcileResult = {
+export type ProjectReconcileResult = {
   project: Project;
   removedCount: number;
 };
@@ -12,7 +14,7 @@ export type ReconcileResult = {
  * Leaves empty layers in place — callers decide whether to surface them as warnings.
  * Pure function: no side effects, no Zustand access.
  */
-export function reconcileProjectSounds(project: Project, sounds: Sound[]): ReconcileResult {
+export function reconcileProjectSounds(project: Project, sounds: Sound[]): ProjectReconcileResult {
   const soundIdSet = new Set(sounds.map((s) => s.id));
   let removedCount = 0;
 
@@ -99,4 +101,27 @@ export function getAffectedPads(project: Project, soundIds: Set<string>): Affect
     }
   }
   return result;
+}
+
+// ─── Store-coupled orchestrators ─────────────────────────────────────────────
+// These functions read from / write to Zustand stores directly.
+// Pure reconciliation logic remains above.
+
+/**
+ * Reads the current project and library from the store, removes any sound
+ * references that no longer exist in the library, and persists the result.
+ * No-op if no project is loaded or no sounds need removing.
+ *
+ * Called from two paths:
+ *   - useProjectLifecycle: reactively, on project load
+ *   - useReconcileLibrary: explicitly, after a manual library scan
+ */
+export function applyProjectSoundReconcile(): void {
+  const project = useProjectStore.getState().project;
+  if (!project) return;
+  const sounds = useLibraryStore.getState().sounds;
+  const { project: cleaned, removedCount } = reconcileProjectSounds(project, sounds);
+  if (removedCount > 0) {
+    useProjectStore.getState().updateProject(cleaned);
+  }
 }

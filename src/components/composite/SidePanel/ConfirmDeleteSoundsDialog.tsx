@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { AffectedPad } from "@/lib/projectSoundReconcile";
+import type { AffectedPad } from "@/lib/project.reconcile";
 
 interface ConfirmDeleteSoundsDialogProps {
   open: boolean;

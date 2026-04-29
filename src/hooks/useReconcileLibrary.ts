@@ -4,7 +4,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
-import { applyProjectSoundReconcile } from "@/lib/reconcileProject";
+import { applyProjectSoundReconcile } from "@/lib/project.reconcile";
 
 export function useReconcileLibrary(): {
   reconcile: () => Promise<void>;

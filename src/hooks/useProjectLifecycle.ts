@@ -9,7 +9,7 @@ import { discardTemporaryProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
-import { applyProjectSoundReconcile } from "@/lib/reconcileProject";
+import { applyProjectSoundReconcile } from "@/lib/project.reconcile";
 
 /**
  * Manages the window close lifecycle for MainPage:

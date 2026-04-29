@@ -13,7 +13,7 @@ vi.mock("@/lib/library.reconcile", () => ({
   refreshMissingState: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/lib/reconcileProject", () => ({
+vi.mock("@/lib/project.reconcile", () => ({
   applyProjectSoundReconcile: vi.fn(),
 }));
 

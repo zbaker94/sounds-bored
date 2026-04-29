@@ -48,7 +48,7 @@ vi.mock("@/lib/project", () => ({
   discardTemporaryProject: mockDiscardTemporaryProject,
 }));
 
-vi.mock("@/lib/reconcileProject", () => ({
+vi.mock("@/lib/project.reconcile", () => ({
   applyProjectSoundReconcile: mockApplyProjectSoundReconcile,
 }));
 

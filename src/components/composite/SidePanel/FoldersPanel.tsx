@@ -54,7 +54,7 @@ import { useResolveFolderQueue } from "@/hooks/useResolveFolderQueue";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
-import { getAffectedPads, type AffectedPad } from "@/lib/projectSoundReconcile";
+import { getAffectedPads, type AffectedPad } from "@/lib/project.reconcile";
 import { ResolveMissingFolderDialog } from "@/components/modals/ResolveMissingFolderDialog";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 import { cn } from "@/lib/utils";

@@ -10,7 +10,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { usePadVolumeDisplay } from "@/hooks/usePadVolumeDisplay";
-import { getPadSoundState } from "@/lib/projectSoundReconcile";
+import { getPadSoundState } from "@/lib/project.reconcile";
 import { executeFadeTap } from "@/lib/audio/padPlayer";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";

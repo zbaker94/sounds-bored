@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 33 (16 fixed) |
+| Low | 33 (17 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -395,11 +395,12 @@ None.
 
 ### Architecture (8)
 
-#### [ARCH8] `reconcileProject.ts` and `projectSoundReconcile.ts` naming is confusing
+#### ~~[ARCH8] `reconcileProject.ts` and `projectSoundReconcile.ts` naming is confusing~~ ✅ FIXED
 - **File**: `src/lib/reconcileProject.ts`; `src/lib/projectSoundReconcile.ts`
 - **Severity**: Low
 - **Finding**: Two modules with near-identical names implement the same conceptual flow with opposite pure/impure splits. `library.reconcile.ts` uses yet a third split convention (mixes both in one file). File naming does not communicate the layering.
 - **Recommendation**: Adopt one convention, e.g.: `src/lib/reconcile/project.ts` (pure), `src/lib/reconcile/library.ts` (pure), `src/lib/reconcile/orchestrators.ts` (store-coupled).
+- **Fix applied**: Merged `projectSoundReconcile.ts` and `reconcileProject.ts` into `src/lib/project.reconcile.ts`, adopting the `domain.reconcile.ts` naming convention already established by `library.reconcile.ts`. The store-coupled orchestrator (`applyProjectSoundReconcile`) moved to a clearly-marked "Store-coupled orchestrators" section at the bottom of the file, matching the section structure in `library.reconcile.ts`. The `ReconcileResult` type renamed to `ProjectReconcileResult` to prevent collision with `library.reconcile.ts`'s identically-named but differently-shaped export. Test files merged into `project.reconcile.test.ts`; all 6 import sites updated; all 1952 tests pass.
 
 #### [ARCH9] `applyProjectSoundReconcile` dedup logic differs between its two callers
 - **File**: `src/hooks/useProjectLifecycle.ts:91-101`; `src/hooks/useReconcileLibrary.ts:77`
@@ -619,3 +620,4 @@ None.
 | SEC9 | `loadDownloadHistory` bare `catch {}` replaced with typed recovery: `SyntaxError`/`ZodError` → `backupCorruptFile` + write fresh `[]` + `onCorruption` callback; I/O errors rethrow; `useBootLoader` passes `onCorruption: toast.warning`; 9 tests added in `downloads.test.ts` |
 | SEC10 | `DownloadJobSchema.url` changed from `z.string()` to `z.string().url().refine(http/https only)`; 5 tests added to `schemas.test.ts` |
 | SEC11 | Traversal + absolute-path refines added to `DownloadJobSchema.outputPath` and `DownloadProgressEventSchema.outputPath`; `SoundSchema.safeParse()` guard added before `updateLibrary` push in `ytdlp.queries.ts`; 10 tests added to `schemas.test.ts` |
+| ARCH8 | `projectSoundReconcile.ts` + `reconcileProject.ts` merged into `project.reconcile.ts`; `domain.reconcile.ts` convention adopted; `ProjectReconcileResult` rename resolves type-name collision with `library.reconcile.ts`; 6 import sites and 2 hook test `vi.mock` paths updated; 1952/1952 tests pass |
