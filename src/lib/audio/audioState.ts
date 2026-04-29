@@ -32,8 +32,12 @@
  *   It clears fade tracking and chain queues first, nulls onended callbacks,
  *   ramps gain nodes to zero, then calls stopAllVoices().
  *
- * INVARIANT: padGainMap lifecycle mirrors voiceMap lifecycle â€” a pad entry in one
- *   implies an entry in the other. Both are cleared together in stopAllPads().
+ * NOTE: padGainMap is a persistent lazy cache — getPadGain() creates entries on
+ *   first trigger and they survive until clearAllPadGains() (called in the
+ *   post-ramp timeout of stopAllPads or by clearAllAudioState). voiceMap only
+ *   contains pads with currently-active voices; pads leave voiceMap when their
+ *   last voice stops naturally. The two maps are NOT kept in sync between a
+ *   natural voice stop and the next clearAllPadGains() call.
  *
  * INVARIANT: stopAllVoices() calls clearAllPlayingPads() on playbackStore to
  *   reset the reactive UI state after all voices are stopped.
@@ -317,13 +321,6 @@ export function getPadGain(padId: string): GainNode {
   gain.connect(getMasterGain());
   padGainMap.set(padId, gain);
   return gain;
-}
-
-/** Iterate all existing pad gain nodes. Used by stopAllPads to ramp all pads to zero. */
-export function forEachPadGain(fn: (padId: string, gain: GainNode) => void): void {
-  for (const [padId, gain] of padGainMap) {
-    fn(padId, gain);
-  }
 }
 
 /** Iterate active pad gain nodes â€” only pads currently in voiceMap (with active voices). */

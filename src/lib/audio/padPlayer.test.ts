@@ -1002,6 +1002,39 @@ describe("stopAllPads — ramped", () => {
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     expect(createdSources[0].stop).toHaveBeenCalledOnce();
   });
+
+  it("does not ramp gain nodes for historically-seen but currently-inactive pads", async () => {
+    const { triggerPad, stopAllPads, getPadGain } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const stoppedPad = createMockPad({ layers: [layer] });
+    const activePad = createMockPad({ layers: [layer] });
+
+    // Both pads share the same layer.id. Triggering activePad (retriggerMode:"restart")
+    // ramp-stops stoppedPad's voice via the shared layer ID — the ramp schedules a
+    // 30ms setTimeout(doStop). vi.runAllTimersAsync() fires that timer, so stoppedPad
+    // leaves voiceMap while activePad's fresh voice remains.
+    await triggerPad(stoppedPad);
+    await vi.runAllTimersAsync();
+
+    await triggerPad(activePad); // restart retrigger ramp-stops stoppedPad's voice
+    await vi.runAllTimersAsync(); // fires 30ms ramp timeout → stoppedPad cleared from voiceMap
+
+    const stoppedGain = getPadGain(stoppedPad.id);
+    vi.clearAllMocks(); // reset ramp call counts
+
+    stopAllPads();
+
+    // Active pad should be ramped
+    const activeGain = getPadGain(activePad.id);
+    expect(activeGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+    // Historical (inactive) pad should NOT be ramped
+    expect(stoppedGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  });
 });
 
 describe("releasePadHoldLayers", () => {

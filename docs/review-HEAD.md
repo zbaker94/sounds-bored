@@ -373,11 +373,11 @@ None.
 - **Finding**: Zustand uses `Object.is` by default; a new `[]` on every call causes SceneView to re-render on every store update while no project is loaded.
 - **Fix applied**: Hoisted `const EMPTY_SCENES: Scene[] = []` to module scope; selector now returns `s.project?.scenes ?? EMPTY_SCENES`. Stable reference means Zustand suppresses re-renders when project is null. `Scene` added to the `@/lib/schemas` import.
 
-#### [PERF10] `stopAllPads` ramps every historically-seen gain node, not just active ones
+#### ~~[PERF10] `stopAllPads` ramps every historically-seen gain node, not just active ones~~ ✅ FIXED
 - **File**: `src/lib/audio/padPlayer.ts:429-433`
 - **Severity**: Low
 - **Finding**: `forEachPadGain` iterates `padGainMap` — every pad that has ever received a gain node, whether currently playing or not. Gain nodes are not deleted on natural stop, so over a session `stopAllPads` schedules `linearRampToValueAtTime` on all cached gain nodes including silent ones.
-- **Recommendation**: Use `forEachActivePadGain` here — `stopAllPads` only cares about currently-playing pads.
+- **Fix applied**: Replaced `forEachPadGain` with `forEachActivePadGain` in `stopAllPads`. `forEachActivePadGain` iterates `voiceMap.keys()`, so only pads with currently-active voices have their gain ramped to zero. Pads that have played and stopped in a prior session naturally accumulate entries in `padGainMap` but no longer incur ramp scheduling on global stop. 1 test added verifying that a historically-seen but inactive pad's gain node is not ramped when `stopAllPads` is called while a different pad is playing.
 
 #### [PERF11] `liveVolume` prop causes `PadFadeControls` to re-render entire fade-controls tree at 60fps
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:398,526-537`
@@ -582,6 +582,7 @@ None.
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
 | PERF8 | `saveCurrentLibrarySyncRef` added to `useAutoSave`; ref updated each render; effect closure calls `saveCurrentLibrarySyncRef.current()`; `saveCurrentLibrarySync` removed from dep array — interval no longer restarts on TanStack mutation identity changes; 1 regression test added |
 | PERF9 | `EMPTY_SCENES` module-level constant hoisted in `SceneView.tsx`; selector returns stable reference when project is null; suppresses spurious re-renders on every store update |
+| PERF10 | `forEachPadGain` → `forEachActivePadGain` in `stopAllPads`; only currently-playing pads are ramped; historical gain nodes no longer incur `linearRampToValueAtTime` scheduling on global stop; 1 test added |
 | PERF7 | `_tagSetCache` WeakMap added to `resolveSounds.ts`; `tag`/`set` cases now check/populate cache before O(n) filter; key uses `JSON.stringify` (collision-safe); cross-component deduplication collapses N filters to 1 per render cycle; 12 tests added |
 | PERF6 | `BackFaceLayerRow` `layerVolumes` subscription throttled to ~10Hz via `usePlaybackStore.subscribe` + `useEffect`; leading-edge 100ms throttle; immediate clear on `undefined`; sync-read on `layer.id` change; zero re-renders during steady-state playback |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |

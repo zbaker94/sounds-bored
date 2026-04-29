@@ -29,7 +29,7 @@ import {
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
-  forEachPadGain,
+  forEachActivePadGain,
   getLayerChain,
   getLayerCycleIndex,
   getLayerPlayOrder,
@@ -424,7 +424,7 @@ export function stopAllPads(): void {
   nullAllOnEnded();
   stopAudioTick(); // immediately clear bars before the STOP_RAMP_S window
 
-  forEachPadGain((_padId, gain) => {
+  forEachActivePadGain((_padId, gain) => {
     rampGainTo(gain.gain, 0, STOP_RAMP_S);
   });
   // Track this timeout so clearAllAudioState() can cancel it if project close
