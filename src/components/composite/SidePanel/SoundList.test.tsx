@@ -68,7 +68,7 @@ vi.mock("@/lib/appSettings.queries", () => ({
   useSaveAppSettings: vi.fn(() => ({ mutateAsync: mockMutateAsync })),
 }));
 
-vi.mock("@/lib/ytdlp.queries", () => ({
+vi.mock("@/hooks/useDownloadEventListener", () => ({
   useDownloadEventListener: vi.fn(),
 }));
 

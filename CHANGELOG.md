@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Moved the download event listener hook to its own dedicated file for better code organization (no user-facing behavior change)
 - Corrupted data files (sound library, project history, download history) are now recovered more reliably and consistently, with cleaner fallback behavior if a file can't be parsed.
 - Fixed a bug where selecting a tag or sound set with the id `__create__` would incorrectly trigger the "create new item" flow instead of selecting it
 - Tag and set ids starting with `__` are now rejected at load time, preventing reserved-prefix collisions with internal UI sentinels

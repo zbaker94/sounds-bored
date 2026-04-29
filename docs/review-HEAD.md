@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 31 (19 fixed) |
+| Low | 30 (20 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -420,11 +420,10 @@ None.
 - **Finding**: `backupCorruptFile` is now imported and called, but the surrounding try/catch/backup/write-fresh-default/notify pattern is still duplicated verbatim between `loadGlobalLibrary` and `loadProjectHistory`.
 - **Fix applied**: Added `loadJsonWithRecovery<T>({ path, parse, defaults, onCorruption, corruptMessage })` to `fsUtils.ts`. `readTextFile` is called outside the `try` so I/O errors propagate freely; `opts.parse(JSON.parse(text))` is wrapped in a single `try/catch` that recovers from both `SyntaxError` (bad JSON) and any error from the `parse` callback (ZodError, MigrationError, etc.). `loadGlobalLibrary`, `loadProjectHistory`, and `loadDownloadHistory` all use the new helper — their try/catch/backup/write/notify blocks eliminated. `ZodError`, `MigrationError` (from library), and `readTextFile` imports removed from each caller. 6 tests added to `fsUtils.test.ts`. 1965/1965 tests pass; TypeScript clean.
 
-#### [ARCH12] `useDownloadEventListener` lives in `ytdlp.queries.ts` but uses no TanStack Query
+#### ~~[ARCH12] `useDownloadEventListener` lives in `ytdlp.queries.ts` but uses no TanStack Query~~ ✅ FIXED
 - **File**: `src/lib/ytdlp.queries.ts:91-174`
 - **Severity**: Low
-- **Finding**: `useDownloadEventListener` is a pure `useEffect` + Tauri event listener hook with no `useMutation`/`useQuery`. It's misplaced in the `.queries.ts` module whose stated role is React Query bindings.
-- **Recommendation**: Move to `src/hooks/useDownloadEventListener.ts`.
+- **Fix applied**: Moved `useDownloadEventListener` and its private helper `buildJobUpdate` to `src/hooks/useDownloadEventListener.ts`. Trimmed `ytdlp.queries.ts` of now-unused imports (`useEffect`, `useRef`, `stat`, `listenToDownloadEvents`, `DownloadJobUpdate`, `useLibraryStore`, `SoundSchema`, `DownloadProgressEvent`). Split `ytdlp.queries.test.ts` — listener tests moved to `src/hooks/useDownloadEventListener.test.ts`. Updated import in `MainPage.tsx` and mock path in `SoundList.test.tsx`. 1966/1966 tests pass; TypeScript clean.
 
 #### [ARCH13] `audioContext.ts` imports `playbackStore` — lowest audio primitive depends on UI store
 - **File**: `src/lib/audio/audioContext.ts:15`
@@ -622,3 +621,4 @@ None.
 | SEC11 | Traversal + absolute-path refines added to `DownloadJobSchema.outputPath` and `DownloadProgressEventSchema.outputPath`; `SoundSchema.safeParse()` guard added before `updateLibrary` push in `ytdlp.queries.ts`; 10 tests added to `schemas.test.ts` |
 | ARCH8 | `projectSoundReconcile.ts` + `reconcileProject.ts` merged into `project.reconcile.ts`; `domain.reconcile.ts` convention adopted; `ProjectReconcileResult` rename resolves type-name collision with `library.reconcile.ts`; 6 import sites and 2 hook test `vi.mock` paths updated; 1952/1952 tests pass |
 | ARCH9 | `loadSessionId: number` added to `projectStore` (incremented only in `loadProject`, not `markAsPermanent`); both dedup refs in `useProjectLifecycle` keyed on `loadSessionId` instead of `folderPath`; dead-code `?? (name + "\|" + lastSaved)` fallback eliminated; missing-sounds toast no longer fires twice after Save As |
+| ARCH12 | `useDownloadEventListener` + `buildJobUpdate` moved to `src/hooks/useDownloadEventListener.ts`; `ytdlp.queries.ts` now contains only TanStack Query bindings; listener tests split into `src/hooks/useDownloadEventListener.test.ts`; import updated in `MainPage.tsx` and mock path in `SoundList.test.tsx`; 1966/1966 tests pass |

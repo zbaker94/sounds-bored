@@ -12,7 +12,7 @@ import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
-import { useDownloadEventListener } from "@/lib/ytdlp.queries";
+import { useDownloadEventListener } from "@/hooks/useDownloadEventListener";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useDownloadStore, TERMINAL_STATUSES } from "@/state/downloadStore";
 import { saveDownloadHistory } from "@/lib/downloads";
