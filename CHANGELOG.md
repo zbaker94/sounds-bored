@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Reduced memory allocations in the audio engine's per-frame tick loop, lowering garbage collection pressure during playback at 60fps
 - Downloaded audio files are now validated before being added to your sound library, preventing corrupted or tampered download data from affecting your project.
 - Path traversal attacks via manipulated download output paths are now blocked at the schema level.
 - Download URLs are now validated to only accept `http://` and `https://` protocols, blocking unsafe schemes like `ftp://` or `data:` URIs from being stored in your download history.

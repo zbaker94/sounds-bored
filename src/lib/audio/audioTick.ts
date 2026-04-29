@@ -136,12 +136,12 @@ function tick(): void {
   // whenever any single layer's chain advances).
   const nextLayerPlayOrder: Record<string, string[]> = {};
   const nextLayerChain: Record<string, string[]> = {};
-  const seenPlayOrderLayerIds = new Set<string>();
-  const seenChainLayerIds = new Set<string>();
+  let seenPlayOrderCount = 0;
+  let seenChainCount = 0;
   for (const layerId of nextActiveLayerIds) {
     const playOrder = getLayerPlayOrder(layerId);
     if (playOrder && playOrder.length > 0) {
-      seenPlayOrderLayerIds.add(layerId);
+      seenPlayOrderCount++;
       // Fast path: if the audioState Sound[] array reference hasn't changed
       // since last tick, reuse the previous string[] snapshot and skip .map
       // entirely. The source array only swaps on explicit writes in audioState.
@@ -167,7 +167,7 @@ function tick(): void {
     }
     const chain = getLayerChain(layerId);
     if (chain && chain.length > 0) {
-      seenChainLayerIds.add(layerId);
+      seenChainCount++;
       const prevSource = prevLayerChainSource.get(layerId);
       const prevIds = prevLayerChain[layerId];
       if (prevSource === chain && prevIds) {
@@ -189,14 +189,16 @@ function tick(): void {
   }
   // Drop source references for layers that no longer contribute a play order /
   // chain this tick so the tracker maps don't grow unbounded as layers churn.
-  if (prevLayerPlayOrderSource.size > seenPlayOrderLayerIds.size) {
+  // seenPlayOrderCount == Object.keys(nextLayerPlayOrder).length because the outer
+  // loop iterates nextActiveLayerIds, a Set — each layerId is unique per tick.
+  if (prevLayerPlayOrderSource.size > seenPlayOrderCount) {
     for (const layerId of prevLayerPlayOrderSource.keys()) {
-      if (!seenPlayOrderLayerIds.has(layerId)) prevLayerPlayOrderSource.delete(layerId);
+      if (!(layerId in nextLayerPlayOrder)) prevLayerPlayOrderSource.delete(layerId);
     }
   }
-  if (prevLayerChainSource.size > seenChainLayerIds.size) {
+  if (prevLayerChainSource.size > seenChainCount) {
     for (const layerId of prevLayerChainSource.keys()) {
-      if (!seenChainLayerIds.has(layerId)) prevLayerChainSource.delete(layerId);
+      if (!(layerId in nextLayerChain)) prevLayerChainSource.delete(layerId);
     }
   }
   const layerPlayOrderChanged = !stringArrayRecordsEqual(nextLayerPlayOrder, prevLayerPlayOrder);

@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 37 (10 fixed) |
+| Low | 37 (11 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -325,11 +325,11 @@ None.
 
 ### Performance (11)
 
-#### [PERF2] `audioTick` allocates two `Set<string>` per RAF frame unnecessarily
+#### ~~[PERF2] `audioTick` allocates two `Set<string>` per RAF frame unnecessarily~~ ✅ FIXED
 - **File**: `src/lib/audio/audioTick.ts:139-140`
 - **Severity**: Low
-- **Finding**: `seenPlayOrderLayerIds` and `seenChainLayerIds` are allocated every frame even when no chained layers are present. `nextLayerPlayOrder` and `nextLayerChain` already contain exactly the layerIds that produced results this tick.
-- **Recommendation**: Use `layerId in nextLayerPlayOrder` / `layerId in nextLayerChain` for the pruning check and drop the `Set` allocations entirely. Saves two allocations per frame at 60fps.
+- **Finding**: `seenPlayOrderLayerIds` and `seenChainLayerIds` were allocated every frame even when no chained layers are present.
+- **Fix applied**: Replaced both `Set<string>` allocations with plain integer counters (`seenPlayOrderCount`, `seenChainCount`). The size-guard comparisons now use the counters; the inner pruning checks use `!(layerId in nextLayerPlayOrder)` and `!(layerId in nextLayerChain)` — O(1) property lookups on the already-populated result records. Saves two Set allocations + GC pressure per frame at 60fps with no behavioral change.
 
 #### [PERF3] `audioTick` rebuilds volume records from scratch every steady-state frame
 - **File**: `src/lib/audio/audioTick.ts:86-100`
@@ -588,6 +588,7 @@ None.
 | SEC15 | yt-dlp sidecar hardened: `--ignore-config`, `--no-plugins`, HTTP(S)-only scheme enforcement |
 | SEC16 | Export TOCTOU on `extra_sound_paths` closed via pre-opened file handles |
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
+| PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |
 | PERF-A | `audioTick` batches all tick updates into one `set()` call, skips when nothing changed |
 | PERF-B | `_padBestStreamingAudio` / `_layerBestStreamingAudio` caches eliminate per-frame linear scans |
 | PERF-C | `_padToLayerIds` reverse index makes `stopPadVoices` O(layers-in-pad) instead of O(all-layers) |
