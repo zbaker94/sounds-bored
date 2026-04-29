@@ -19,6 +19,7 @@ interface ProjectState {
   historyEntry: ProjectHistoryEntry | null;
   isTemporary: boolean;
   isDirty: boolean;
+  loadSessionId: number;
 }
 
 interface ProjectActions {
@@ -57,6 +58,7 @@ export const initialProjectState: ProjectState = {
   historyEntry: null,
   isTemporary: false,
   isDirty: false,
+  loadSessionId: 0,
 };
 
 export const useProjectStore = create<ProjectStore>()(
@@ -70,6 +72,7 @@ export const useProjectStore = create<ProjectStore>()(
         draft.folderPath = historyEntry.path;
         draft.isTemporary = isTemporary;
         draft.isDirty = false;
+        draft.loadSessionId += 1;
       });
       // Pass sceneIds so `setActiveSceneId` enforces the activeSceneId invariant.
       const sceneIds = project.scenes.map((s) => s.id);

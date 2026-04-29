@@ -21,10 +21,13 @@ export function useProjectLifecycle() {
   const folderPath = useProjectStore((s) => s.folderPath);
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const isDirty = useProjectStore((s) => s.isDirty);
+  // loadSessionId increments only on loadProject, not on markAsPermanent (Save As).
+  // Used as a stable per-session dedup key that doesn't rotate when folderPath changes.
+  const loadSessionId = useProjectStore((s) => s.loadSessionId);
   const navigate = useNavigate();
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
-  const lastNotifiedProjectKey = useRef<string | null>(null);
+  const lastNotifiedSessionId = useRef<number | null>(null);
 
   const { requestSaveAndThen } = useProjectActions();
 
@@ -86,27 +89,23 @@ export function useProjectLifecycle() {
     closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
   };
 
-  const cleanedProjectKeyRef = useRef<string | null>(null);
+  const cleanedSessionIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!project) return;
-    // Use folderPath as the dedup key — it is unique per project location and
-    // stable across updateProject calls (only changes on load/save-as).
-    // Falls back to name+lastSaved for temporary projects with no folderPath yet.
-    const key = folderPath ?? (project.name + "|" + (project.lastSaved ?? ""));
-    if (cleanedProjectKeyRef.current === key) return;
-    cleanedProjectKeyRef.current = key;
+    if (cleanedSessionIdRef.current === loadSessionId) return;
+    cleanedSessionIdRef.current = loadSessionId;
 
     applyProjectSoundReconcile();
-  }, [project, folderPath]);
+  }, [project, loadSessionId]);
 
-  // Notify user if missing sounds are used in the loaded project
+  // Notify user if missing sounds are used in the loaded project.
+  // Fires at most once per project-load session — Save As (markAsPermanent) does
+  // not increment loadSessionId and therefore does not re-trigger this toast.
   useEffect(() => {
     if (!project || missingSoundIds.size === 0) return;
-
-    const projectKey = folderPath ?? (project.name + "|" + (project.lastSaved ?? ""));
-    if (lastNotifiedProjectKey.current === projectKey) return;
-    lastNotifiedProjectKey.current = projectKey;
+    if (lastNotifiedSessionId.current === loadSessionId) return;
+    lastNotifiedSessionId.current = loadSessionId;
 
     const usedSoundIds = new Set(
       project.scenes.flatMap((scene) =>
@@ -126,7 +125,7 @@ export function useProjectLifecycle() {
         `${missingUsedCount} sound${missingUsedCount > 1 ? "s" : ""} used in this project are missing. Check the Sounds panel.`,
       );
     }
-  }, [project, missingSoundIds]);
+  }, [project, missingSoundIds, loadSessionId]);
 
   // Guard: project unexpectedly null while MainPage is mounted.
   // Re-arm the flag when a new project loads so the guard works across

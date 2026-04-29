@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where the "missing sounds" warning notification would appear twice after using Save As to save a project to a new location.
 - Consolidated two internal sound-reconciliation modules (`projectSoundReconcile.ts` and `reconcileProject.ts`) into a single, consistently-named file (`project.reconcile.ts`), reducing internal complexity with no change to app behavior.
 - Fixed a bug where triggering a pad immediately after pressing Stop All could cause the newly triggered sound to be silenced mid-playback.
 - Stale audio connections from previously stopped pads are now cleaned up instantly rather than after a delay, reducing the window for audio glitches during rapid stop-and-retrigger sequences.
