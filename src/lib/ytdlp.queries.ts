@@ -6,6 +6,7 @@ import { startDownload, cancelDownload, listenToDownloadEvents } from "@/lib/ytd
 import { useDownloadStore } from "@/state/downloadStore";
 import type { DownloadJobUpdate } from "@/state/downloadStore";
 import { useLibraryStore } from "@/state/libraryStore";
+import { SoundSchema } from "@/lib/schemas";
 import type { DownloadJob, DownloadProgressEvent } from "@/lib/schemas";
 
 type StartDownloadInput = {
@@ -126,17 +127,25 @@ export function useDownloadEventListener(downloadFolderId?: string) {
             // file stat failed — proceed without size
           }
 
-          updateLibrary((draft) => {
-            draft.sounds.push({
-              id: soundId,
-              name: job?.outputName ?? "Downloaded Sound",
-              filePath: outputPath,
-              folderId: downloadFolderIdRef.current,
-              sourceUrl: job?.url,
-              tags: job?.tags ?? [],
-              sets: job?.sets ?? [],
-              ...(fileSizeBytes !== undefined && { fileSizeBytes }),
+          const candidateSound = {
+            id: soundId,
+            name: job?.outputName ?? "Downloaded Sound",
+            filePath: outputPath,
+            folderId: downloadFolderIdRef.current,
+            sourceUrl: job?.url,
+            tags: job?.tags ?? [],
+            sets: job?.sets ?? [],
+            ...(fileSizeBytes !== undefined && { fileSizeBytes }),
+          };
+          const parsed = SoundSchema.safeParse(candidateSound);
+          if (!parsed.success) {
+            toast.error("Download complete but file path was rejected", {
+              description: parsed.error.issues[0]?.message,
             });
+            return;
+          }
+          updateLibrary((draft) => {
+            draft.sounds.push(parsed.data);
           });
           updateJob(eventId, { soundId });
           toast.success("Download complete", { description: job?.outputName });

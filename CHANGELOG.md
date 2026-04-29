@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Downloaded audio files are now validated before being added to your sound library, preventing corrupted or tampered download data from affecting your project.
+- Path traversal attacks via manipulated download output paths are now blocked at the schema level.
 - Download URLs are now validated to only accept `http://` and `https://` protocols, blocking unsafe schemes like `ftp://` or `data:` URIs from being stored in your download history.
 - If your download history file becomes corrupted, the app now automatically backs it up and resets it instead of silently failing — you'll see a warning notification when this happens.
 - Fixed a security issue where tampered project files could reference relative file paths to access files outside the project folder

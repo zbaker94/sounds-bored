@@ -283,7 +283,15 @@ export const DownloadProgressEventSchema = z.object({
   speed: z.string().optional(),
   eta: z.string().optional(),
   status: z.enum(["queued", "downloading", "processing", "completed", "failed", "cancelled"]),
-  outputPath: z.string().optional(),
+  outputPath: z
+    .string()
+    .refine((p) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(p), {
+      message: "outputPath must not contain path traversal sequences (..)",
+    })
+    .refine(isAbsolutePath, {
+      message: "outputPath must be an absolute path",
+    })
+    .optional(),
   error: z.string().optional(),
 });
 export type DownloadProgressEvent = z.infer<typeof DownloadProgressEventSchema>;
@@ -300,7 +308,15 @@ export const DownloadJobSchema = z.object({
   speed: z.string().optional(),
   eta: z.string().optional(),
   error: z.string().optional(),
-  outputPath: z.string().optional(),
+  outputPath: z
+    .string()
+    .refine((p) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(p), {
+      message: "outputPath must not contain path traversal sequences (..)",
+    })
+    .refine(isAbsolutePath, {
+      message: "outputPath must be an absolute path",
+    })
+    .optional(),
   soundId: z.string().optional(),
   tags: z.array(z.string()).default([]),
   sets: z.array(z.string()).default([]),

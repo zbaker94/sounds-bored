@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 38 (9 fixed) |
+| Low | 37 (10 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -315,11 +315,11 @@ None.
 - **Severity**: Low
 - **Fix applied**: Replaced `url: z.string()` with `z.string().url().refine((u) => u.startsWith("http://") || u.startsWith("https://"), { message: "URL must use http or https protocol" })`. The `.url()` step rejects structurally invalid strings; the `.refine()` narrows to http/https only, blocking `ftp://`, `data:`, etc. 5 tests added to `schemas.test.ts` covering https acceptance, http acceptance, ftp rejection, data-URL rejection, and bare-string rejection.
 
-#### [SEC11] `DownloadJobSchema.outputPath` not sanitized before use as `Sound.filePath`
+#### ~~[SEC11] `DownloadJobSchema.outputPath` not sanitized before use as `Sound.filePath`~~ ✅ FIXED
 - **File**: `src/lib/downloads.ts:22-28`; `src/lib/ytdlp.queries.ts:111-148`
 - **Severity**: Low
 - **Finding**: `outputPath: z.string().optional()` — no traversal or absolute-path refine. The completion handler pushes `outputPath` directly into `draft.sounds` before Zod validates the resulting `Sound`. A tampered `downloads.json` could inject a traversal-containing path into the in-memory library.
-- **Recommendation**: Add the same traversal/absolute refine to `DownloadJobSchema.outputPath`. Additionally validate with `SoundSchema` before pushing to the draft.
+- **Fix applied**: Added the same traversal + absolute-path refines (matching `SoundSchema.filePath`) to both `DownloadJobSchema.outputPath` and `DownloadProgressEventSchema.outputPath` in `schemas.ts`. In the completion handler (`ytdlp.queries.ts`), the candidate `Sound` object is now validated with `SoundSchema.safeParse()` before `updateLibrary` is called — an invalid path surfaces a toast and aborts the library push rather than injecting bad data. 10 tests added to `schemas.test.ts` (5 per schema: absent/Unix/Windows accepted; traversal/relative rejected).
 
 ---
 
@@ -617,3 +617,4 @@ None.
 | SEC8 | `isAbsolutePath` helper extracted in `schemas.ts`; `.refine(isAbsolutePath)` added to `SoundSchema.filePath` and `GlobalFolderSchema.path`; 5 tests added/updated in `schemas.test.ts` |
 | SEC9 | `loadDownloadHistory` bare `catch {}` replaced with typed recovery: `SyntaxError`/`ZodError` → `backupCorruptFile` + write fresh `[]` + `onCorruption` callback; I/O errors rethrow; `useBootLoader` passes `onCorruption: toast.warning`; 9 tests added in `downloads.test.ts` |
 | SEC10 | `DownloadJobSchema.url` changed from `z.string()` to `z.string().url().refine(http/https only)`; 5 tests added to `schemas.test.ts` |
+| SEC11 | Traversal + absolute-path refines added to `DownloadJobSchema.outputPath` and `DownloadProgressEventSchema.outputPath`; `SoundSchema.safeParse()` guard added before `updateLibrary` push in `ytdlp.queries.ts`; 10 tests added to `schemas.test.ts` |

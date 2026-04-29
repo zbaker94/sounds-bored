@@ -1174,6 +1174,82 @@ describe("DownloadJobSchema — url validation", () => {
   });
 });
 
+describe("DownloadJobSchema — outputPath validation", () => {
+  const baseJob = {
+    id: "job-1",
+    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    outputName: "track",
+    status: "completed",
+    percent: 100,
+    tags: [],
+    sets: [],
+  };
+
+  it("accepts when outputPath is absent", () => {
+    expect(DownloadJobSchema.safeParse(baseJob).success).toBe(true);
+  });
+
+  it("accepts an absolute Unix path", () => {
+    expect(DownloadJobSchema.safeParse({ ...baseJob, outputPath: "/home/user/sounds/track.mp3" }).success).toBe(true);
+  });
+
+  it("accepts an absolute Windows path", () => {
+    expect(DownloadJobSchema.safeParse({ ...baseJob, outputPath: "C:\\Users\\user\\sounds\\track.mp3" }).success).toBe(true);
+  });
+
+  it("rejects a traversal path", () => {
+    const result = DownloadJobSchema.safeParse({ ...baseJob, outputPath: "/home/user/../../../etc/passwd" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("outputPath must not contain path traversal sequences (..)");
+    }
+  });
+
+  it("rejects a relative path", () => {
+    const result = DownloadJobSchema.safeParse({ ...baseJob, outputPath: "sounds/track.mp3" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("outputPath must be an absolute path");
+    }
+  });
+});
+
+describe("DownloadProgressEventSchema — outputPath validation", () => {
+  const baseEvent = {
+    id: "job-1",
+    percent: 100,
+    status: "completed",
+  };
+
+  it("accepts when outputPath is absent", () => {
+    expect(DownloadProgressEventSchema.safeParse(baseEvent).success).toBe(true);
+  });
+
+  it("accepts an absolute Unix path", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, outputPath: "/home/user/sounds/track.mp3" }).success).toBe(true);
+  });
+
+  it("accepts an absolute Windows path", () => {
+    expect(DownloadProgressEventSchema.safeParse({ ...baseEvent, outputPath: "C:/Users/user/sounds/track.mp3" }).success).toBe(true);
+  });
+
+  it("rejects a traversal path", () => {
+    const result = DownloadProgressEventSchema.safeParse({ ...baseEvent, outputPath: "/home/user/../../etc/passwd" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("outputPath must not contain path traversal sequences (..)");
+    }
+  });
+
+  it("rejects a relative path", () => {
+    const result = DownloadProgressEventSchema.safeParse({ ...baseEvent, outputPath: "sounds/track.mp3" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("outputPath must be an absolute path");
+    }
+  });
+});
+
 describe("TagSchema", () => {
   it("accepts a valid tag", () => {
     const result = TagSchema.safeParse({ id: "t1", name: "drums" });
