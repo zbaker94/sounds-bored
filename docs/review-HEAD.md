@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 37 (11 fixed) |
+| Low | 37 (12 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -331,11 +331,11 @@ None.
 - **Finding**: `seenPlayOrderLayerIds` and `seenChainLayerIds` were allocated every frame even when no chained layers are present.
 - **Fix applied**: Replaced both `Set<string>` allocations with plain integer counters (`seenPlayOrderCount`, `seenChainCount`). The size-guard comparisons now use the counters; the inner pruning checks use `!(layerId in nextLayerPlayOrder)` and `!(layerId in nextLayerChain)` — O(1) property lookups on the already-populated result records. Saves two Set allocations + GC pressure per frame at 60fps with no behavioral change.
 
-#### [PERF3] `audioTick` rebuilds volume records from scratch every steady-state frame
+#### ~~[PERF3] `audioTick` rebuilds volume records from scratch every steady-state frame~~ ✅ FIXED
 - **File**: `src/lib/audio/audioTick.ts:86-100`
 - **Severity**: Low
 - **Finding**: `nextPadVolumes` and `nextLayerVolumes` are rebuilt as fresh objects every frame. During stable playback with no fade or gain change, every frame allocates two records, walks the active maps, and runs `volumesEqual` — O(N) per frame per category when nothing changes.
-- **Recommendation**: Add a "volumes dirty" flag set by fade/setPadVolume/setLayerVolume call sites. Short-circuit the rebuild entirely in steady-state (no fade running, no drag in flight).
+- **Fix applied**: Added `gainRampDeadline` module var, `markGainRamp(durationS)`, and `isAnyGainChanging()` to `audioState.ts`. `isAnyGainChanging()` returns true when `fadePadTimeouts`/`fadingOutPadIds`/`fadingInPadIds` are non-empty (ongoing fade) OR `AudioContext.currentTime < gainRampDeadline` (short ramp still animating); reclaims the `-Infinity` fast path once the deadline naturally expires. `rampGainTo()` in `gainManager.ts` calls `markGainRamp(rampS)` — covers all call sites including `triggerAndFade` (previously called `linearRampToValueAtTime` directly; replaced with `rampGainTo`). `audioTick` short-circuits both volume rebuilds when `isAnyGainChanging()` returns false, skipping the two object allocations and O(N) Map iterations. 6 tests added (2 in `audioTick.test.ts`; 4 in `audioState.test.ts`). `audioVoice.stopWithRamp` intentionally does not call `markGainRamp` — it ramps a per-voice gain node not tracked by the tick; circular dependency concern documented in a comment.
 
 #### [PERF4] `PadButtonProgress` `layerProgress` selector runs on every non-playing pad at 60fps
 - **File**: `src/components/composite/SceneView/PadButtonProgress.tsx:36-45`
@@ -589,6 +589,7 @@ None.
 | SEC16 | Export TOCTOU on `extra_sound_paths` closed via pre-opened file handles |
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |
+| PERF3 | `isAnyGainChanging()` + `markGainRamp()` added to `audioState.ts`; `audioTick` short-circuits volume rebuild when no fade/ramp is in flight; `triggerAndFade` ramp routed through `rampGainTo`; 6 tests added |
 | PERF-A | `audioTick` batches all tick updates into one `set()` call, skips when nothing changed |
 | PERF-B | `_padBestStreamingAudio` / `_layerBestStreamingAudio` caches eliminate per-frame linear scans |
 | PERF-C | `_padToLayerIds` reverse index makes `stopPadVoices` O(layers-in-pad) instead of O(all-layers) |

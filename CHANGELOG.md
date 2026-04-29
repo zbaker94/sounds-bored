@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Reduced CPU usage during stable audio playback — the audio engine no longer rebuilds volume state every frame (60fps) when no fades or gain changes are in flight.
+- Fade-in behavior (`triggerAndFade`) now consistently routes through the shared gain ramp utility, fixing a gap where ramp activity could be missed by the audio tick's change detection.
 - Reduced memory allocations in the audio engine's per-frame tick loop, lowering garbage collection pressure during playback at 60fps
 - Downloaded audio files are now validated before being added to your sound library, preventing corrupted or tampered download data from affecting your project.
 - Path traversal attacks via manipulated download output paths are now blocked at the schema level.

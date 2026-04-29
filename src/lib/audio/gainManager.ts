@@ -1,6 +1,6 @@
 // src/lib/audio/gainManager.ts
 import { getAudioContext } from "./audioContext";
-import { getPadGain, getLayerGain, cancelPadFade } from "./audioState";
+import { getPadGain, getLayerGain, cancelPadFade, markGainRamp } from "./audioState";
 
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
 const CLICK_FREE_RAMP_S = 0.016;
@@ -24,6 +24,7 @@ export function rampGainTo(
   param.cancelScheduledValues(ctx.currentTime);
   param.setValueAtTime(from, ctx.currentTime);
   param.linearRampToValueAtTime(target, ctx.currentTime + rampS);
+  markGainRamp(rampS);
 }
 
 /**

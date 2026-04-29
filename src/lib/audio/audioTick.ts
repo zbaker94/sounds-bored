@@ -28,6 +28,7 @@ import {
   computeAllLayerProgress,
   getLayerPlayOrder,
   getLayerChain,
+  isAnyGainChanging,
 } from "./audioState";
 
 const VOLUME_EPSILON = 0.001;
@@ -81,23 +82,36 @@ function tick(): void {
     return;
   }
 
-  // --- Compute padVolumes ---
-  // Only entries where gain < (1 - VOLUME_EPSILON). Absence = full volume.
-  const nextPadVolumes: Record<string, number> = {};
-  forEachActivePadGain((padId, gain) => {
-    const v = gain.gain.value;
-    if (v < 1 - VOLUME_EPSILON) {
-      nextPadVolumes[padId] = v;
-    }
-  });
-
-  // --- Compute layerVolumes ---
-  // Emit all active layer gains (no threshold filter â€” layers always show their live volume).
-  // volumesEqual avoids no-op store writes for stable values.
-  const nextLayerVolumes: Record<string, number> = {};
-  forEachActiveLayerGain((layerId, gain) => {
-    nextLayerVolumes[layerId] = gain.gain.value;
-  });
+  // --- Compute padVolumes and layerVolumes ---
+  // Skip both rebuilds in steady state (no fade or gain ramp in flight).
+  // When isAnyGainChanging() is false, gain node values are guaranteed stable
+  // this frame — reuse the previous records without allocating or iterating.
+  let nextPadVolumes: Record<string, number>;
+  let nextLayerVolumes: Record<string, number>;
+  let padVolumesChanged: boolean;
+  let layerVolumesChanged: boolean;
+  if (isAnyGainChanging()) {
+    nextPadVolumes = {};
+    forEachActivePadGain((padId, gain) => {
+      const v = gain.gain.value;
+      if (v < 1 - VOLUME_EPSILON) {
+        nextPadVolumes[padId] = v;
+      }
+    });
+    nextLayerVolumes = {};
+    forEachActiveLayerGain((layerId, gain) => {
+      nextLayerVolumes[layerId] = gain.gain.value;
+    });
+    padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
+    layerVolumesChanged = !volumesEqual(nextLayerVolumes, prevLayerVolumes);
+    if (padVolumesChanged) prevPadVolumes = nextPadVolumes;
+    if (layerVolumesChanged) prevLayerVolumes = nextLayerVolumes;
+  } else {
+    nextPadVolumes = prevPadVolumes;
+    nextLayerVolumes = prevLayerVolumes;
+    padVolumesChanged = false;
+    layerVolumesChanged = false;
+  }
 
   // --- Compute padProgress â€” diff to skip no-op store updates ---
   const nextPadProgress = computeAllPadProgress();
@@ -205,13 +219,6 @@ function tick(): void {
   const layerChainChanged = !stringArrayRecordsEqual(nextLayerChain, prevLayerChain);
   if (layerPlayOrderChanged) prevLayerPlayOrder = nextLayerPlayOrder;
   if (layerChainChanged) prevLayerChain = nextLayerChain;
-
-  // Diff padVolumes and layerVolumes to skip no-op updates.
-  const padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
-  const layerVolumesChanged = !volumesEqual(nextLayerVolumes, prevLayerVolumes);
-
-  if (padVolumesChanged) prevPadVolumes = nextPadVolumes;
-  if (layerVolumesChanged) prevLayerVolumes = nextLayerVolumes;
 
   // Only call setAudioTick if at least one field actually changed.
   // When nothing changed, skip the Zustand update entirely â€” this prevents

@@ -203,6 +203,14 @@ const fadingOutPadIds = new Set<string>();
 const padFadeFromVolumes = new Map<string, number>();
 
 /**
+ * AudioContext time after which all scheduled short gain ramps have settled.
+ * Set by markGainRamp(); read by isAnyGainChanging() to short-circuit the
+ * audioTick volume rebuild when no fade or ramp is in flight.
+ * -Infinity means no ramp is pending (steady-state fast path skips the time check).
+ */
+let gainRampDeadline = -Infinity;
+
+/**
  * Tracks pads that have started a fade-in but whose async triggerPad has not yet completed.
  * Set synchronously before `await triggerPad` in triggerAndFade; cleared by cancelPadFade.
  * Lets triggerAndFade detect post-await that it was pre-empted by a reverse-fade call during the gap.
@@ -232,6 +240,33 @@ export function isPadFadingOut(padId: string): boolean {
 
 export function isPadFading(padId: string): boolean {
   return fadePadTimeouts.has(padId);
+}
+
+/**
+ * Record that a gain ramp lasting `durationS` seconds was just scheduled.
+ * Called by gainManager.rampGainTo so the audioTick can continue reading
+ * gain node values until the ramp settles.
+ */
+export function markGainRamp(durationS: number): void {
+  // +5 ms safety margin absorbs AudioContext scheduling jitter: the audio rendering
+  // thread may commit the ramp slightly later than currentTime+durationS on loaded systems.
+  const deadline = getAudioContext().currentTime + durationS + 0.005;
+  if (deadline > gainRampDeadline) gainRampDeadline = deadline;
+}
+
+/**
+ * Returns true when any fade or short gain ramp is currently in flight,
+ * meaning gain node values may be changing this frame.
+ * Used by audioTick to short-circuit the volume rebuild in steady state.
+ */
+export function isAnyGainChanging(): boolean {
+  if (fadePadTimeouts.size > 0 || fadingOutPadIds.size > 0 || fadingInPadIds.size > 0) return true;
+  if (gainRampDeadline === -Infinity) return false;
+  if (getAudioContext().currentTime >= gainRampDeadline) {
+    gainRampDeadline = -Infinity; // reclaim the steady-state fast path
+    return false;
+  }
+  return true;
 }
 
 /** True while a streaming (large-file) voice is active for this pad. */
@@ -902,6 +937,7 @@ export function clearAllAudioState(): void {
   // Cancel any pending stopAllPads post-ramp setTimeout to prevent cross-session contamination.
   cancelGlobalStopTimeout();
   clearAllStopCleanupTimeouts();
+  gainRampDeadline = -Infinity;
   clearAllFadeTracking();
   clearAllLayerChains();
   clearAllLayerCycleIndexes();

@@ -1159,3 +1159,54 @@ describe("stop cleanup timeout tracking", () => {
     vi.useRealTimers();
   });
 });
+
+describe("markGainRamp / isAnyGainChanging", () => {
+  beforeEach(async () => {
+    const { clearAllAudioState } = await import("./audioState");
+    mockCtx.currentTime = 0;
+    clearAllAudioState();
+  });
+
+  it("isAnyGainChanging returns false in steady state (no fade, no ramp)", async () => {
+    const { isAnyGainChanging } = await import("./audioState");
+    expect(isAnyGainChanging()).toBe(false);
+  });
+
+  it("markGainRamp makes isAnyGainChanging return true before the deadline", async () => {
+    const { markGainRamp, isAnyGainChanging } = await import("./audioState");
+    mockCtx.currentTime = 10;
+    markGainRamp(0.016); // deadline = 10 + 0.016 + 0.005 = 10.021
+    mockCtx.currentTime = 10.010; // before deadline
+    expect(isAnyGainChanging()).toBe(true);
+  });
+
+  it("isAnyGainChanging returns false and resets deadline after it expires", async () => {
+    const { markGainRamp, isAnyGainChanging } = await import("./audioState");
+    mockCtx.currentTime = 10;
+    markGainRamp(0.016); // deadline = 10.021
+    mockCtx.currentTime = 10.022; // past deadline
+    expect(isAnyGainChanging()).toBe(false);
+    // Deadline reset to -Infinity: calling again should stay false without a new ramp
+    mockCtx.currentTime = 10.030;
+    expect(isAnyGainChanging()).toBe(false);
+  });
+
+  it("markGainRamp uses max semantics — a shorter ramp does not shorten an existing deadline", async () => {
+    const { markGainRamp, isAnyGainChanging } = await import("./audioState");
+    mockCtx.currentTime = 10;
+    markGainRamp(1.0); // deadline = 11.005
+    mockCtx.currentTime = 10.5;
+    markGainRamp(0.016); // candidate = 10.521 — shorter, must not replace 11.005
+    mockCtx.currentTime = 10.8; // before original deadline, after shorter candidate
+    expect(isAnyGainChanging()).toBe(true);
+  });
+
+  it("clearAllAudioState resets gainRampDeadline so isAnyGainChanging returns false", async () => {
+    const { markGainRamp, isAnyGainChanging, clearAllAudioState } = await import("./audioState");
+    mockCtx.currentTime = 10;
+    markGainRamp(1.0); // deadline = 11.005
+    mockCtx.currentTime = 10.5; // before deadline — would return true
+    clearAllAudioState();
+    expect(isAnyGainChanging()).toBe(false);
+  });
+});

@@ -15,6 +15,7 @@ vi.mock("./audioState", async (importOriginal) => {
     computeAllLayerProgress: vi.fn().mockReturnValue({}),
     getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
     getLayerChain: vi.fn().mockReturnValue(undefined),
+    isAnyGainChanging: vi.fn().mockReturnValue(true),
   };
 });
 
@@ -28,10 +29,12 @@ import {
   computeAllLayerProgress,
   getLayerPlayOrder,
   getLayerChain,
+  isAnyGainChanging,
 } from "./audioState";
 
 describe("audioTick", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     usePlaybackStore.setState({ ...initialPlaybackState });
     vi.mocked(getActivePadCount).mockReturnValue(0);
     vi.mocked(forEachActivePadGain).mockImplementation(() => {});
@@ -42,6 +45,7 @@ describe("audioTick", () => {
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
     vi.mocked(getLayerPlayOrder).mockReturnValue(undefined);
     vi.mocked(getLayerChain).mockReturnValue(undefined);
+    vi.mocked(isAnyGainChanging).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -236,6 +240,87 @@ describe("audioTick", () => {
     const state = usePlaybackStore.getState();
     expect(state.padVolumes["pad-1"]).toBe(0.5);
     expect(state.padVolumes["pad-2"]).toBeUndefined(); // full volume excluded
+
+    rafSpy.mockRestore();
+  });
+
+  it("skips forEachActivePadGain and forEachActiveLayerGain when isAnyGainChanging returns false", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.5 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(isAnyGainChanging).mockReturnValue(false);
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now());
+
+    expect(forEachActivePadGain).not.toHaveBeenCalled();
+    expect(forEachActiveLayerGain).not.toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+  });
+
+  it("calls forEachActivePadGain and forEachActiveLayerGain when isAnyGainChanging returns true", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.5 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(isAnyGainChanging).mockReturnValue(true);
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now());
+
+    expect(forEachActivePadGain).toHaveBeenCalled();
+    expect(forEachActiveLayerGain).toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+  });
+
+  it("preserves previous padVolumes and layerVolumes in the store when isAnyGainChanging returns false", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+
+    // Tick 1: isAnyGainChanging = true — populate volumes
+    vi.mocked(isAnyGainChanging).mockReturnValue(true);
+    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+      fn("pad-1", { gain: { value: 0.5 } } as unknown as GainNode);
+    });
+    vi.mocked(forEachActiveLayerGain).mockImplementation((fn) => {
+      fn("layer-1", { gain: { value: 0.7 } } as unknown as GainNode);
+    });
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // tick 1: populates padVolumes/layerVolumes
+
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.5);
+    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.7);
+
+    // Tick 2: isAnyGainChanging = false — should retain the values from tick 1
+    vi.mocked(isAnyGainChanging).mockReturnValue(false);
+    vi.mocked(forEachActivePadGain).mockClear();
+    vi.mocked(forEachActiveLayerGain).mockClear();
+
+    capturedCallback!(performance.now()); // tick 2: short-circuit
+
+    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.5);
+    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.7);
 
     rafSpy.mockRestore();
   });

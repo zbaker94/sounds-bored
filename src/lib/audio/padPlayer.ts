@@ -121,11 +121,8 @@ export async function triggerAndFade(pad: Pad, toVolume: number, durationMs: num
   removeFadingInPad(pad.id);
   usePlaybackStore.getState().addFadingPad(pad.id);
 
-  const ctx = getAudioContext();
   const gain = getPadGain(pad.id);
-  gain.gain.cancelScheduledValues(ctx.currentTime);
-  gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(toVolume, ctx.currentTime + durationMs / 1000);
+  rampGainTo(gain.gain, toVolume, durationMs / 1000, 0);
   setPadFadeFromVolume(pad.id, 0);
 
   const timeoutId = setTimeout(() => {
