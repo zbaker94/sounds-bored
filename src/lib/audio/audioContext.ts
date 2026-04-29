@@ -1,7 +1,9 @@
-import { usePlaybackStore } from "@/state/playbackStore";
-
 let ctx: AudioContext | null = null;
 let masterGain: GainNode | null = null;
+// Most recent volume from applyMasterVolume (0–1 scale). Applied immediately when
+// masterGain exists; queued here so getMasterGain() can initialize with the correct
+// value even if the slider was moved before the first sound triggered.
+let pendingVolume = 1.0;
 
 export function getAudioContext(): AudioContext {
   if (!ctx) ctx = new AudioContext();
@@ -12,19 +14,15 @@ export function getMasterGain(): GainNode {
   const c = getAudioContext();
   if (!masterGain) {
     masterGain = c.createGain();
-    masterGain.gain.value = usePlaybackStore.getState().masterVolume / 100;
+    masterGain.gain.value = pendingVolume;
     masterGain.connect(c.destination);
-
-    // Subscribe only to masterVolume so the callback never fires for unrelated
-    // state changes (e.g. the per-pad padVolumes tick at 60fps).
-    usePlaybackStore.subscribe(
-      (s) => s.masterVolume,
-      (masterVolume) => {
-        if (masterGain) masterGain.gain.value = masterVolume / 100;
-      },
-    );
   }
   return masterGain;
+}
+
+export function applyMasterVolume(volumePct: number): void {
+  pendingVolume = volumePct / 100;
+  if (masterGain) masterGain.gain.value = pendingVolume;
 }
 
 export async function ensureResumed(): Promise<AudioContext> {

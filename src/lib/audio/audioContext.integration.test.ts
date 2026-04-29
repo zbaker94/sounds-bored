@@ -1,9 +1,9 @@
 /**
- * Integration tests for audioContext.ts that use the REAL playbackStore
- * (no mock). These guard against accidental removal of the subscribeWithSelector
- * middleware from playbackStore — if the middleware is removed, the selector
- * overload in getMasterGain() silently stops working and unrelated tick updates
- * would no longer be filtered, re-introducing issue #60.
+ * Integration tests verifying the REAL playbackStore has subscribeWithSelector
+ * middleware active. audioTick.ts uses the selector overload to wire masterVolume
+ * changes to the audio context gain node — if the middleware is removed, the
+ * subscription silently stops filtering and every tick update would retrigger
+ * the master gain setter, re-introducing issue #60.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";

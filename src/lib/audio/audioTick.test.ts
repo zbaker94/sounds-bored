@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds } from "./audioTick";
+import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _stopMasterVolumeSync } from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { applyMasterVolume } from "./audioContext";
+
+vi.mock("./audioContext", () => ({
+  getAudioContext: vi.fn(),
+  getMasterGain: vi.fn(),
+  applyMasterVolume: vi.fn(),
+  ensureResumed: vi.fn(),
+}));
 
 vi.mock("./audioState", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./audioState")>();
@@ -489,7 +497,7 @@ describe("audioTick", () => {
       rafSpy.mockRestore();
     });
 
-    it("omits active layers whose play order is undefined (e.g. simultaneous arrangement)", () => {
+    it("omits active layers whose play order is undefined (e.g., simultaneous arrangement)", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
       vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
@@ -578,6 +586,30 @@ describe("audioTick", () => {
       expect(usePlaybackStore.getState().layerPlayOrder["layer-2"]).toBeUndefined();
 
       rafSpy.mockRestore();
+    });
+  });
+
+  describe("masterVolume sync", () => {
+    beforeEach(() => {
+      // Ensure store is at default and clear any calls accumulated during beforeEach resets
+      usePlaybackStore.getState().setMasterVolume(100);
+      vi.mocked(applyMasterVolume).mockClear();
+    });
+
+    it("module-level subscription calls applyMasterVolume when masterVolume changes", () => {
+      usePlaybackStore.getState().setMasterVolume(50);
+      expect(applyMasterVolume).toHaveBeenCalledWith(50);
+      expect(applyMasterVolume).toHaveBeenCalledTimes(1);
+    });
+
+    it("subscription does not call applyMasterVolume for unrelated store field changes", () => {
+      usePlaybackStore.getState().addPlayingPad("pad-x");
+      usePlaybackStore.getState().setAudioTick({ padVolumes: { "pad-x": 0.3 } });
+      expect(applyMasterVolume).not.toHaveBeenCalled();
+    });
+
+    it("_stopMasterVolumeSync is a function that can be used to detach the subscription", () => {
+      expect(typeof _stopMasterVolumeSync).toBe("function");
     });
   });
 });

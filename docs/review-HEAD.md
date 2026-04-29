@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 30 (20 fixed) |
+| Low | 29 (21 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -425,11 +425,11 @@ None.
 - **Severity**: Low
 - **Fix applied**: Moved `useDownloadEventListener` and its private helper `buildJobUpdate` to `src/hooks/useDownloadEventListener.ts`. Trimmed `ytdlp.queries.ts` of now-unused imports (`useEffect`, `useRef`, `stat`, `listenToDownloadEvents`, `DownloadJobUpdate`, `useLibraryStore`, `SoundSchema`, `DownloadProgressEvent`). Split `ytdlp.queries.test.ts` — listener tests moved to `src/hooks/useDownloadEventListener.test.ts`. Updated import in `MainPage.tsx` and mock path in `SoundList.test.tsx`. 1966/1966 tests pass; TypeScript clean.
 
-#### [ARCH13] `audioContext.ts` imports `playbackStore` — lowest audio primitive depends on UI store
+#### ~~[ARCH13] `audioContext.ts` imports `playbackStore` — lowest audio primitive depends on UI store~~ ✅ FIXED
 - **File**: `src/lib/audio/audioContext.ts:15`
 - **Severity**: Low
-- **Finding**: `audioContext.ts` subscribes to `masterVolume` from `playbackStore`, forming an inbound dependency from the lowest audio primitive into the top of the stack. The layering comment in `audioTick.ts:16-18` describes an intended graph that doesn't reflect reality.
-- **Recommendation**: Inject initial master volume as a parameter to `initAudioContext`, or subscribe from `audioTick` (the documented reactive bridge layer).
+- **Finding**: `audioContext.ts` subscribed to `masterVolume` from `playbackStore`, forming an inbound dependency from the lowest audio primitive into the top of the stack. The layering comment in `audioTick.ts:16-18` described an intended graph that didn't reflect reality.
+- **Fix applied**: Removed `usePlaybackStore` import and subscription from `audioContext.ts`. `audioContext.ts` is now a pure leaf — no upward store dependencies. Added `applyMasterVolume(volumePct)` export and a `pendingVolume` module variable that queues the most recent value; `getMasterGain()` initializes the new gain node from `pendingVolume` so volumes set before the first sound triggers are never silently dropped. `applyMasterVolume` always writes `pendingVolume` and additionally sets `masterGain.gain.value` when the node exists. `audioTick.ts` owns the reactive bridge: `export const _stopMasterVolumeSync = usePlaybackStore.subscribe(s => s.masterVolume, applyMasterVolume)` — the unsubscribe handle is exported (`_` prefix per convention) for test teardown. `startAudioTick()` no longer calls `applyMasterVolume` (the pending-volume queue in `audioContext.ts` makes that sync redundant). Layering comment updated. `audioContext.test.ts` rewritten (store mock removed; "queues volume before getMasterGain and applies on first construction" test added); 3 masterVolume sync tests retained in `audioTick.test.ts`. 1979/1979 tests pass; TypeScript clean.
 
 #### [ARCH14] `useProjectLifecycle` mixes 4 unrelated concerns
 - **File**: `src/hooks/useProjectLifecycle.ts:19-153`
@@ -622,3 +622,4 @@ None.
 | ARCH8 | `projectSoundReconcile.ts` + `reconcileProject.ts` merged into `project.reconcile.ts`; `domain.reconcile.ts` convention adopted; `ProjectReconcileResult` rename resolves type-name collision with `library.reconcile.ts`; 6 import sites and 2 hook test `vi.mock` paths updated; 1952/1952 tests pass |
 | ARCH9 | `loadSessionId: number` added to `projectStore` (incremented only in `loadProject`, not `markAsPermanent`); both dedup refs in `useProjectLifecycle` keyed on `loadSessionId` instead of `folderPath`; dead-code `?? (name + "\|" + lastSaved)` fallback eliminated; missing-sounds toast no longer fires twice after Save As |
 | ARCH12 | `useDownloadEventListener` + `buildJobUpdate` moved to `src/hooks/useDownloadEventListener.ts`; `ytdlp.queries.ts` now contains only TanStack Query bindings; listener tests split into `src/hooks/useDownloadEventListener.test.ts`; import updated in `MainPage.tsx` and mock path in `SoundList.test.tsx`; 1966/1966 tests pass |
+| ARCH13 | `usePlaybackStore` import + subscription removed from `audioContext.ts`; `pendingVolume` queue closes initialization gap; `applyMasterVolume(volumePct)` exported; `audioTick.ts` owns the reactive bridge via `_stopMasterVolumeSync = subscribe(masterVolume, applyMasterVolume)`; `startAudioTick()` sync removed (redundant after pending-volume fix); `audioContext.test.ts` rewritten; 1979/1979 tests pass |
