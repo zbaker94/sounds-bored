@@ -24,6 +24,10 @@ export type PlaybackMode = z.infer<typeof PlaybackModeSchema>;
 export type Arrangement = z.infer<typeof ArrangementSchema>;
 export type RetriggerMode = z.infer<typeof RetriggerModeSchema>;
 
+// Matches Unix absolute (/…), Windows drive absolute (C:\ or C:/), Windows UNC (\\…)
+const isAbsolutePath = (p: string) =>
+  p.startsWith("/") || /^[A-Za-z]:[\\/]/.test(p) || p.startsWith("\\\\");
+
 // ─── Sound (global library asset) ───────────────────────────────────────────
 
 export const SoundSchema = z.object({
@@ -34,6 +38,9 @@ export const SoundSchema = z.object({
     .min(1)
     .refine((p) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(p), {
       message: "filePath must not contain path traversal sequences (..)",
+    })
+    .refine(isAbsolutePath, {
+      message: "filePath must be an absolute path",
     })
     .optional(),  // absolute path on disk; optional for sounds awaiting download
   folderId: z.string().optional(),         // GlobalFolder ID — null for manually added sounds
@@ -220,6 +227,9 @@ export const GlobalFolderSchema = z.object({
     .min(1)
     .refine((p) => !/(?:^|[\\/])\.\.(?:[\\/]|$)/.test(p), {
       message: "path must not contain path traversal sequences (..)",
+    })
+    .refine(isAbsolutePath, {
+      message: "path must be an absolute path",
     }),  // absolute path on disk
   name: z.string().min(1),   // display name
 });

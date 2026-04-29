@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a security issue where tampered project files could reference relative file paths to access files outside the project folder
+- Sound file paths and global folder paths are now required to be absolute, blocking a potential path traversal attack vector
 - Fixed a security vulnerability (SEC7) where a malicious symlink swapped into a project folder between file scanning and file opening could leak out-of-scope files during project export.
 - Fixed a bug where video titles or metadata containing the word "ERROR" could incorrectly trigger a download failure notification mid-stream
 - Download error details now accurately reflect the actual yt-dlp error message when a download fails, rather than always showing a generic exit code message

@@ -369,8 +369,24 @@ describe("SoundSchema — filePath validation", () => {
     expect(SoundSchema.safeParse({ ...validSound, filePath: "C:/Users/user/Music/kick.wav" }).success).toBe(true);
   });
 
-  it("should accept a path with single-dot segments (./sounds/kick.wav)", () => {
-    expect(SoundSchema.safeParse({ ...validSound, filePath: "./sounds/kick.wav" }).success).toBe(true);
+  it("should reject a relative path (./sounds/kick.wav)", () => {
+    const result = SoundSchema.safeParse({ ...validSound, filePath: "./sounds/kick.wav" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("filePath must be an absolute path");
+    }
+  });
+
+  it("should reject a bare filename (kick.wav)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "kick.wav" }).success).toBe(false);
+  });
+
+  it("should reject a Windows relative path (sounds\\kick.wav)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "sounds\\kick.wav" }).success).toBe(false);
+  });
+
+  it("should accept a Windows UNC path (\\\\server\\share\\kick.wav)", () => {
+    expect(SoundSchema.safeParse({ ...validSound, filePath: "\\\\server\\share\\kick.wav" }).success).toBe(true);
   });
 
   it("should accept a filename containing consecutive dots not at a segment boundary (track..remastered.wav)", () => {
@@ -402,7 +418,7 @@ describe("SoundSchema — filePath validation", () => {
 
 describe("hasFilePath", () => {
   it("should return true when filePath is a non-empty string", () => {
-    const sound: Sound = { id: "s1", name: "Kick", filePath: "sounds/kick.wav", tags: [], sets: [] };
+    const sound: Sound = { id: "s1", name: "Kick", filePath: "/sounds/kick.wav", tags: [], sets: [] };
     expect(hasFilePath(sound)).toBe(true);
   });
 
@@ -459,6 +475,28 @@ describe("GlobalFolderSchema", () => {
   it("should reject a folder with invalid UUID id", () => {
     const folder = { id: "not-a-uuid", path: "/music/test", name: "Test" };
     expect(GlobalFolderSchema.safeParse(folder).success).toBe(false);
+  });
+
+  it("should accept a Windows absolute path", () => {
+    const folder = { id: crypto.randomUUID(), path: "C:\\Users\\user\\Music", name: "Music" };
+    expect(GlobalFolderSchema.safeParse(folder).success).toBe(true);
+  });
+
+  it("should accept a Windows UNC path", () => {
+    const folder = { id: crypto.randomUUID(), path: "\\\\server\\share\\music", name: "Music" };
+    expect(GlobalFolderSchema.safeParse(folder).success).toBe(true);
+  });
+
+  it("should reject a relative path", () => {
+    const result = GlobalFolderSchema.safeParse({ id: crypto.randomUUID(), path: "music/samples", name: "Test" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((i) => i.message)).toContain("path must be an absolute path");
+    }
+  });
+
+  it("should reject a single-dot-prefixed path (./music)", () => {
+    expect(GlobalFolderSchema.safeParse({ id: crypto.randomUUID(), path: "./music", name: "Test" }).success).toBe(false);
   });
 });
 
