@@ -43,6 +43,9 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const isLibrarySavePendingRef = useRef(isLibrarySavePending);
   isLibrarySavePendingRef.current = isLibrarySavePending;
 
+  const saveCurrentLibrarySyncRef = useRef(saveCurrentLibrarySync);
+  saveCurrentLibrarySyncRef.current = saveCurrentLibrarySync;
+
   // Timestamp (ms) of the most recent auto-save error toast. Used to debounce
   // repeated failure toasts — without this, a persistent write failure would
   // surface a toast every 30s.
@@ -85,7 +88,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       if (!isDirty) return;
       if (isLibrarySavePendingRef.current) return;
 
-      saveCurrentLibrarySync({
+      saveCurrentLibrarySyncRef.current({
         onError: notifyAutoSaveFailure,
       });
     };
@@ -98,5 +101,5 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       saveLibrary();
     }, interval);
     return () => clearInterval(intervalId);
-  }, [folderPath, isTemporary, interval, saveCurrentLibrarySync]);
+  }, [folderPath, isTemporary, interval]);
 }

@@ -71,6 +71,7 @@ beforeEach(() => {
   mockRefreshMissingState.mockReset();
   mockProjectMutation.isPending = false;
   mockLibraryMutation.isPending = false;
+  mockLibraryMutation.saveCurrentLibrarySync = mockSaveLibrarySync;
 });
 
 afterEach(() => {
@@ -444,6 +445,31 @@ describe("useAutoSave", () => {
     });
 
     expect(mockSaveLibrarySync).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not restart the interval when saveCurrentLibrarySync changes identity", () => {
+    seedDirtyPermanentProject();
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
+
+    // Advance to just before the first interval tick
+    const { rerender } = renderHook(() => useAutoSave(30_000));
+    act(() => {
+      vi.advanceTimersByTime(25_000);
+    });
+
+    // Simulate TanStack re-rendering with a new saveCurrentLibrarySync reference
+    // (what happens after a mutation success/error state change)
+    const newSaveLibrarySync = vi.fn();
+    mockLibraryMutation.saveCurrentLibrarySync = newSaveLibrarySync;
+    rerender();
+
+    // Advance the remaining 5s — if the interval was restarted the tick won't fire yet
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+
+    // The interval tick should have fired at t=30s (not restarted to t=25s+30s=55s)
+    expect(mockSaveLibrarySync.mock.calls.length + newSaveLibrarySync.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("does NOT call refreshMissingState on mount or interval ticks", () => {

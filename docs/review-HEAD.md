@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 34 (15 fixed) |
+| Low | 33 (16 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -361,11 +361,11 @@ None.
 - **Finding**: `useMemo(() => resolveLayerSounds(layer, sounds), [layer, sounds])` re-runs whenever Immer replaces `libraryStore.sounds`. For `tag`/`set` selections this runs an O(n) `.filter()` over the full library for each visible `BackFaceLayerRow`.
 - **Fix applied**: Added `_tagSetCache = new WeakMap<Sound[], Map<string, Sound[]>>()` to `resolveSounds.ts` alongside the existing `_soundByIdCache`. The `tag` and `set` switch cases now check the cache before calling `.filter()` and populate it on a miss. Cache key uses `JSON.stringify` to safely encode tag IDs (including those containing any character), plus sorted tag IDs for order-normalization and matchMode discrimination. WeakMap GC semantics ensure each Immer snapshot's cached results are released when the snapshot is no longer referenced. All current consumers are read-only against the returned arrays; a JSDoc note on `_tagSetCache` documents the no-mutation contract. Primary benefit is cross-component deduplication: all `BackFaceLayerRow` instances sharing the same tag/set selection collapse N O(n) filters into 1 per render cycle. 12 tests added (9 initial + 3 post-review: `\0`-in-tagId collision regression, tag/set against empty sounds array); 1940/1940 tests pass; TypeScript clean.
 
-#### [PERF8] `useAutoSave` restarts the 30s interval when TanStack mutation identity changes
+#### ~~[PERF8] `useAutoSave` restarts the 30s interval when TanStack mutation identity changes~~ ✅ FIXED
 - **File**: `src/hooks/useAutoSave.ts:101`
 - **Severity**: Low
-- **Finding**: `saveCurrentLibrarySync` appears in the effect dependency array. If `useMutation`'s `mutate` function gets a new identity after a success/error state change, the interval is torn down and re-created, restarting the cadence.
-- **Recommendation**: Mirror the `isPending` ref pattern at `useAutoSave.ts:40-44` — stash `saveCurrentLibrarySync` in a ref and remove it from the effect dep array.
+- **Finding**: `saveCurrentLibrarySync` appeared in the effect dependency array. If `useMutation`'s `mutate` function gets a new identity after a success/error state change, the interval is torn down and re-created, restarting the cadence.
+- **Fix applied**: Added `saveCurrentLibrarySyncRef` (mirroring the existing `isProjectSavePendingRef`/`isLibrarySavePendingRef` pattern): the ref is updated on every render, the effect closure calls `saveCurrentLibrarySyncRef.current(...)`, and `saveCurrentLibrarySync` is removed from the dep array. 1 regression test added: advances the interval to t=25s, rerenders with a new mock `saveCurrentLibrarySync` identity, then advances 5s more — asserts the tick fires at t=30s (interval was not restarted). 21/21 tests pass; TypeScript clean.
 
 #### [PERF9] `s.project?.scenes ?? []` allocates a new array every selector call when project is null
 - **File**: `src/components/composite/SceneView/SceneView.tsx:56`
@@ -580,6 +580,7 @@ None.
 | SEC15 | yt-dlp sidecar hardened: `--ignore-config`, `--no-plugins`, HTTP(S)-only scheme enforcement |
 | SEC16 | Export TOCTOU on `extra_sound_paths` closed via pre-opened file handles |
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
+| PERF8 | `saveCurrentLibrarySyncRef` added to `useAutoSave`; ref updated each render; effect closure calls `saveCurrentLibrarySyncRef.current()`; `saveCurrentLibrarySync` removed from dep array — interval no longer restarts on TanStack mutation identity changes; 1 regression test added |
 | PERF7 | `_tagSetCache` WeakMap added to `resolveSounds.ts`; `tag`/`set` cases now check/populate cache before O(n) filter; key uses `JSON.stringify` (collision-safe); cross-component deduplication collapses N filters to 1 per render cycle; 12 tests added |
 | PERF6 | `BackFaceLayerRow` `layerVolumes` subscription throttled to ~10Hz via `usePlaybackStore.subscribe` + `useEffect`; leading-edge 100ms throttle; immediate clear on `undefined`; sync-read on `layer.id` change; zero re-renders during steady-state playback |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |
