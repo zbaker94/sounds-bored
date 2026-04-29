@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where triggering a pad immediately after pressing Stop All could cause the newly triggered sound to be silenced mid-playback.
+- Stale audio connections from previously stopped pads are now cleaned up instantly rather than after a delay, reducing the window for audio glitches during rapid stop-and-retrigger sequences.
 - Improved rendering performance during pad fades — only the fade controls section now updates at animation rate, reducing unnecessary UI work elsewhere on the pad.
 - Stopping all pads at once is now more efficient — only currently-playing pads have their audio ramped down, reducing unnecessary work on pads that have already stopped naturally during a session.
 - Fixed a performance issue where the scene view was unnecessarily re-rendering on every state update when no project was loaded.

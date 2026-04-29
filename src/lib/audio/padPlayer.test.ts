@@ -1035,6 +1035,79 @@ describe("stopAllPads — ramped", () => {
     // Historical (inactive) pad should NOT be ramped
     expect(stoppedGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
   });
+
+  it("immediately disconnects inactive (stale) pad gain nodes on the same tick", async () => {
+    const { triggerPad, stopAllPads, getPadGain } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const staleLayer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const activeLayer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const stalePad = createMockPad({ layers: [staleLayer] });
+    const activePad = createMockPad({ layers: [activeLayer] });
+
+    // stalePad's voice ends naturally — gain node stays in padGainMap as a stale entry
+    await triggerPad(stalePad);
+    await vi.runAllTimersAsync();
+    createdSources[0].simulateEnd();
+
+    // activePad remains playing
+    await triggerPad(activePad);
+    await vi.runAllTimersAsync();
+
+    const staleGain = getPadGain(stalePad.id);
+    const activeGain = getPadGain(activePad.id);
+    vi.clearAllMocks();
+
+    stopAllPads(); // synchronous — no timer advance
+
+    // staleGain should be disconnected immediately (same tick, no ramp needed)
+    expect(staleGain.disconnect).toHaveBeenCalledOnce();
+    // activeGain still needs its ramp to complete — not yet disconnected
+    expect(activeGain.disconnect).not.toHaveBeenCalled();
+  });
+
+  it("does not disconnect or stop a pad triggered during the ramp window", async () => {
+    const { triggerPad, stopAllPads, getPadGain } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layerA = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const layerB = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const padA = createMockPad({ layers: [layerA] }); // stopped by stopAllPads
+    const padB = createMockPad({ layers: [layerB] }); // triggered during window
+
+    await triggerPad(padA);
+    await vi.runAllTimersAsync();
+
+    stopAllPads();
+
+    // Trigger padB inside the ramp window — no timer advance yet
+    await triggerPad(padB);
+
+    const gainB = getPadGain(padB.id);
+    const sourceB = createdSources[1]; // padB's source
+
+    // Fire the stopAllPads cleanup timeout
+    vi.advanceTimersByTime(35);
+
+    // padB's gain must not be disconnected by the scoped cleanup
+    expect(gainB.disconnect).not.toHaveBeenCalled();
+    // padB's voice must not be stopped
+    expect(sourceB.stop).not.toHaveBeenCalled();
+    // padA's voice should be stopped normally
+    expect(createdSources[0].stop).toHaveBeenCalledOnce();
+  });
 });
 
 describe("releasePadHoldLayers", () => {
@@ -2356,9 +2429,17 @@ describe("syncLayerConfig — selection-only change", () => {
 describe("stopAllPads clears fade tracking", () => {
   it("cancels pending fade timeouts so cleanup callbacks do not fire", async () => {
     vi.useFakeTimers();
-    const { fadePad, stopAllPads, clearAllFadeTracking } = await import("./padPlayer");
-    const pad = createMockPad({ id: "timeout-cancel-pad" });
-    usePlaybackStore.setState({ playingPadIds: new Set([pad.id]) });
+    const { triggerPad, fadePad, stopAllPads, clearAllFadeTracking } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ id: "timeout-cancel-pad", layers: [layer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
 
     fadePad(pad, 1.0, 0, 500);
     stopAllPads();

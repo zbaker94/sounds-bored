@@ -16,10 +16,8 @@ import {
   clearAllFadeTracking,
   clearAllLayerChains,
   clearAllLayerCycleIndexes,
-  clearAllLayerGains,
   clearAllLayerPending,
   clearAllLayerPlayOrders,
-  clearAllPadGains,
   clearAllStreamingAudio,
   clearAllPadProgressInfo,
   clearAllLayerProgressInfo,
@@ -30,12 +28,19 @@ import {
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
   forEachActivePadGain,
+  getActivePadIds,
+  getAllVoices,
   getLayerChain,
   getLayerCycleIndex,
+  getLayerIdsForPads,
   getLayerPlayOrder,
   getLayerVoices,
   getOrCreateLayerGain,
   getPadGain,
+  clearInactivePadGains,
+  clearLayerGainsForIds,
+  clearPadGainsForIds,
+  stopSpecificVoices,
   isLayerActive,
   isLayerPending,
   isPadActive,
@@ -52,7 +57,6 @@ import {
   setLayerCycleIndex,
   setLayerPending,
   setLayerPlayOrder,
-  stopAllVoices,
   stopPadVoices,
   setPadFadeFromVolume,
   getPadFadeFromVolume,
@@ -424,6 +428,16 @@ export function stopAllPads(): void {
   nullAllOnEnded();
   stopAudioTick(); // immediately clear bars before the STOP_RAMP_S window
 
+  // Snapshot active pads and voices before the ramp starts so the cleanup
+  // timeout can scope its work — pads triggered during the ramp window are
+  // excluded from cleanup (their gain nodes and voices are left intact).
+  const stoppedPadIds = getActivePadIds();
+  const stoppedVoices = getAllVoices();
+
+  // Immediately disconnect stale (inactive) pad gain nodes — they have no
+  // voices so no ramp is needed; same-tick removal shrinks the race window.
+  clearInactivePadGains();
+
   forEachActivePadGain((_padId, gain) => {
     rampGainTo(gain.gain, 0, STOP_RAMP_S);
   });
@@ -435,9 +449,9 @@ export function stopAllPads(): void {
     clearAllStreamingAudio();
     clearAllPadProgressInfo();
     clearAllLayerProgressInfo();
-    clearAllLayerGains();
-    clearAllPadGains();
-    stopAllVoices();
+    clearLayerGainsForIds(getLayerIdsForPads(stoppedPadIds));
+    clearPadGainsForIds(stoppedPadIds);
+    stopSpecificVoices(stoppedVoices, stoppedPadIds);
   }, STOP_RAMP_S * 1000 + 5);
   setGlobalStopTimeout(stopTimeoutId);
 }

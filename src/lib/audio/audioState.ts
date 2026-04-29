@@ -435,6 +435,104 @@ export function clearAllFadeTracking(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Scoped cleanup helpers — prevent the stopAllPads post-ramp timeout from
+// touching pads/voices that arrived during the race window after the ramp started.
+// ---------------------------------------------------------------------------
+
+/** Snapshot the IDs of all pads with active voices. */
+export function getActivePadIds(): Set<string> {
+  return new Set(voiceMap.keys());
+}
+
+/** Snapshot all currently active voice objects. */
+export function getAllVoices(): AudioVoice[] {
+  return [...voiceMap.values()].flat();
+}
+
+/** Collect the layer IDs owned by the given pad IDs, via the reverse index. */
+export function getLayerIdsForPads(padIds: ReadonlySet<string>): Set<string> {
+  const layerIds = new Set<string>();
+  for (const padId of padIds) {
+    const layers = _padToLayerIds.get(padId);
+    if (layers) for (const layerId of layers) layerIds.add(layerId);
+  }
+  return layerIds;
+}
+
+/**
+ * Immediately disconnect pad gain nodes that have no active voices.
+ * Called synchronously in stopAllPads before the ramp starts so stale entries
+ * from previous natural stops don't linger into the race window.
+ */
+export function clearInactivePadGains(): void {
+  for (const padId of [...padGainMap.keys()]) {
+    if (!voiceMap.has(padId)) {
+      padGainMap.get(padId)!.disconnect();
+      padGainMap.delete(padId);
+    }
+  }
+}
+
+/** Disconnect and remove pad gain nodes only for the specified pad IDs. */
+export function clearPadGainsForIds(padIds: ReadonlySet<string>): void {
+  for (const padId of padIds) {
+    const gain = padGainMap.get(padId);
+    if (gain) {
+      gain.disconnect();
+      padGainMap.delete(padId);
+    }
+  }
+}
+
+/** Disconnect and remove layer gain nodes only for the specified layer IDs. */
+export function clearLayerGainsForIds(layerIds: ReadonlySet<string>): void {
+  for (const layerId of layerIds) {
+    const gain = layerGainMap.get(layerId);
+    if (gain) {
+      gain.disconnect();
+      layerGainMap.delete(layerId);
+    }
+  }
+}
+
+/**
+ * Stop only the voice objects in the snapshot, scoped to the given pad IDs.
+ * Voices added to those pads after the snapshot was taken (new triggers during
+ * the ramp window) are left intact in voiceMap and layerVoiceMap.
+ */
+export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds: ReadonlySet<string>): void {
+  const voiceSet = new Set<AudioVoice>(voices);
+  for (const padId of stoppedPadIds) {
+    const padVoices = voiceMap.get(padId) ?? [];
+    const remaining = padVoices.filter(v => !voiceSet.has(v));
+    if (remaining.length === 0) {
+      voiceMap.delete(padId);
+      usePlaybackStore.getState().removePlayingPad(padId);
+    } else {
+      voiceMap.set(padId, remaining);
+    }
+    const padLayers = _padToLayerIds.get(padId);
+    if (padLayers) {
+      for (const layerId of [...padLayers]) {
+        const layerVoices = layerVoiceMap.get(layerId) ?? [];
+        const layerRemaining = layerVoices.filter(v => !voiceSet.has(v));
+        if (layerRemaining.length === 0) {
+          layerVoiceMap.delete(layerId);
+          padLayers.delete(layerId);
+        } else {
+          layerVoiceMap.set(layerId, layerRemaining);
+        }
+      }
+      if (padLayers.size === 0) _padToLayerIds.delete(padId);
+    }
+  }
+  layerVoiceVersion++;
+  for (const voice of voices) {
+    try { voice.stop(); } catch { /* already ended */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Fade tracking functions (used internally by padPlayer fade operations)
 // ---------------------------------------------------------------------------
 
