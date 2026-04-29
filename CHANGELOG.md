@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a memory leak where event listeners on reused audio elements could accumulate over long sessions when sounds were stopped before metadata finished loading
 - Fixed a performance issue where idle pad buttons were allocating objects and iterating layers on every animation frame (~60fps), even when not playing — now skips all work for non-playing pads
 - Reduced CPU usage during stable audio playback — the audio engine no longer rebuilds volume state every frame (60fps) when no fades or gain changes are in flight.
 - Fade-in behavior (`triggerAndFade`) now consistently routes through the shared gain ramp utility, fixing a gap where ramp activity could be missed by the audio tick's change detection.

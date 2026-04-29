@@ -51,6 +51,7 @@
  * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
  * layerProgressInfo  | layer ID   | { startedAt, duration, isLooping }        | Per-layer progress info for per-layer bars      | clearLayerProgressInfo(), stopAllPads()
  * padStreamingAudio  | pad ID     | Map<layerId, Set<HTMLAudioElement>>        | Active streaming elements for progress/cleanup  | clearLayerStreamingAudio(), stopAllPads()
+ * pendingMetadataAborts | element  | Map<padId|layerId, AbortController>       | In-flight loadedmetadata listeners; aborted on clear/unregister | unregisterStreamingAudio(), clearLayerStreamingAudio(), clearAllStreamingAudio()
  * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
  * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
  * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
@@ -132,6 +133,11 @@ export const _padBestStreamingAudio = new Map<string, HTMLAudioElement>();
  * Exported with underscore prefix for test introspection only.
  */
 export const _layerBestStreamingAudio = new Map<string, HTMLAudioElement>();
+
+/** AbortControllers for pending `loadedmetadata` listeners, keyed by element →
+ *  `${padId}|${layerId}`. Allows removing the listener when a layer is cleared
+ *  before metadata loads rather than letting dead closures accumulate on reused elements. */
+const pendingMetadataAborts = new WeakMap<HTMLAudioElement, Map<string, AbortController>>();
 
 /** Pick the element with the longest *finite* duration from a Set. NaN-duration elements
  *  are treated as -Infinity so any finite-duration element wins over an unloaded one. */
@@ -538,6 +544,18 @@ export function getLayerGain(layerId: string): GainNode | undefined {
 export function clearLayerStreamingAudio(padId: string, layerId: string): void {
   const padLayerMap = padStreamingAudio.get(padId);
   if (!padLayerMap) return;
+  const audioSet = padLayerMap.get(layerId);
+  if (audioSet) {
+    const key = `${padId}|${layerId}`;
+    for (const el of audioSet) {
+      const controllers = pendingMetadataAborts.get(el);
+      if (controllers) {
+        controllers.get(key)?.abort();
+        controllers.delete(key);
+        if (controllers.size === 0) pendingMetadataAborts.delete(el);
+      }
+    }
+  }
   padLayerMap.delete(layerId);
   if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
   _layerBestStreamingAudio.delete(layerId);
@@ -555,19 +573,26 @@ export function registerStreamingAudio(padId: string, layerId: string, el: HTMLA
   padLayerMap.set(layerId, audioSet);
   recomputePadBestStreaming(padId);
   recomputeLayerBestStreaming(padId, layerId);
-  // If duration is not yet known, re-evaluate once metadata loads so the cache
-  // reflects the true duration rather than NaN.
-  // Membership guard: only recompute if the element is still registered at fire time.
-  // This makes the listener a safe no-op after unregister and prevents stale closures
-  // from corrupting the cache when the same HTMLAudioElement is reused across triggers
-  // (streamingCache reuses elements per sound.id).
+  // Re-evaluate once metadata loads so the cache reflects the true duration rather than NaN.
+  // The listener is aborted on clear/unregister to prevent accumulation on reused elements;
+  // the membership guard is defense-in-depth.
   if (!isFinite(el.duration)) {
+    const key = `${padId}|${layerId}`;
+    let controllers = pendingMetadataAborts.get(el);
+    if (!controllers) {
+      controllers = new Map();
+      pendingMetadataAborts.set(el, controllers);
+    }
+    controllers.get(key)?.abort();
+    const ac = new AbortController();
+    controllers.set(key, ac);
     el.addEventListener("loadedmetadata", () => {
+      controllers!.delete(key);
       if (padStreamingAudio.get(padId)?.get(layerId)?.has(el)) {
         recomputePadBestStreaming(padId);
         recomputeLayerBestStreaming(padId, layerId);
       }
-    }, { once: true });
+    }, { once: true, signal: ac.signal });
   }
 }
 
@@ -576,6 +601,13 @@ export function unregisterStreamingAudio(padId: string, layerId: string, el: HTM
   if (!padLayerMap) return;
   const audioSet = padLayerMap.get(layerId);
   if (!audioSet) return;
+  const key = `${padId}|${layerId}`;
+  const controllers = pendingMetadataAborts.get(el);
+  if (controllers) {
+    controllers.get(key)?.abort();
+    controllers.delete(key);
+    if (controllers.size === 0) pendingMetadataAborts.delete(el);
+  }
   audioSet.delete(el);
   if (audioSet.size === 0) padLayerMap.delete(layerId);
   if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
@@ -585,6 +617,19 @@ export function unregisterStreamingAudio(padId: string, layerId: string, el: HTM
 
 /** Clear all streaming audio tracking. */
 export function clearAllStreamingAudio(): void {
+  for (const [padId, padLayerMap] of padStreamingAudio) {
+    for (const [layerId, audioSet] of padLayerMap) {
+      const key = `${padId}|${layerId}`;
+      for (const el of audioSet) {
+        const controllers = pendingMetadataAborts.get(el);
+        if (controllers) {
+          controllers.get(key)?.abort();
+          controllers.delete(key);
+          if (controllers.size === 0) pendingMetadataAborts.delete(el);
+        }
+      }
+    }
+  }
   padStreamingAudio.clear();
   _padBestStreamingAudio.clear();
   _layerBestStreamingAudio.clear();

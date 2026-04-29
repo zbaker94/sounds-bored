@@ -907,19 +907,29 @@ describe("padToLayerIds reverse index", () => {
 
 /** Create a mock audio element. Listeners registered via addEventListener are stored and
  *  can be fired by calling el.dispatchEvent(new Event("loadedmetadata")) — matching the
- *  real DOM API so the membership-guard path in registerStreamingAudio can be exercised. */
+ *  real DOM API so the membership-guard and abort-cleanup paths can be exercised. */
 function makeAudio(duration: number, currentTime = 0): HTMLAudioElement {
   const listeners = new Map<string, Array<(e: Event) => void>>();
   return {
     duration,
     currentTime,
-    addEventListener: vi.fn((event: string, cb: (e: Event) => void) => {
+    addEventListener: vi.fn((event: string, cb: (e: Event) => void, options?: AddEventListenerOptions | boolean) => {
       const arr = listeners.get(event) ?? [];
       arr.push(cb);
       listeners.set(event, arr);
+      const signal = typeof options === 'object' ? options?.signal : undefined;
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          const current = listeners.get(event);
+          if (current) {
+            const idx = current.indexOf(cb);
+            if (idx >= 0) current.splice(idx, 1);
+          }
+        }, { once: true });
+      }
     }),
     dispatchEvent: vi.fn((e: Event) => {
-      for (const cb of listeners.get(e.type) ?? []) cb(e);
+      for (const cb of (listeners.get(e.type) ?? []).slice()) cb(e);
       return true;
     }),
   } as unknown as HTMLAudioElement;
@@ -1114,6 +1124,61 @@ describe("registerStreamingAudio — loadedmetadata listener lifecycle", () => {
     (el2 as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
 
     expect(_padBestStreamingAudio.get("pad-1")).toBe(el2);
+  });
+
+  it("pending listener is removed from element when unregisterStreamingAudio is called before loadedmetadata fires", () => {
+    const el = makeAudio(NaN);
+    registerStreamingAudio("pad-1", "layer-1", el);
+    unregisterStreamingAudio("pad-1", "layer-1", el);
+
+    Object.defineProperty(el, "duration", { value: 10, configurable: true });
+    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
+
+    // Listener was removed by abort — caches must stay empty
+    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
+    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
+  });
+
+  it("pending listener is removed from element when clearLayerStreamingAudio is called before loadedmetadata fires", () => {
+    const el = makeAudio(NaN);
+    registerStreamingAudio("pad-1", "layer-1", el);
+    clearLayerStreamingAudio("pad-1", "layer-1");
+
+    Object.defineProperty(el, "duration", { value: 10, configurable: true });
+    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
+
+    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
+    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
+  });
+
+  it("aborting one layer's listener does not remove another active layer's listener on the same element", () => {
+    const el = makeAudio(NaN);
+    registerStreamingAudio("pad-1", "layer-1", el);
+    registerStreamingAudio("pad-2", "layer-2", el);
+
+    // Unregister only one — the other's listener must survive
+    unregisterStreamingAudio("pad-1", "layer-1", el);
+
+    Object.defineProperty(el, "duration", { value: 10, configurable: true });
+    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
+
+    // pad-2/layer-2 listener still fired and updated caches
+    expect(_padBestStreamingAudio.has("pad-2")).toBe(true);
+    expect(_layerBestStreamingAudio.has("layer-2")).toBe(true);
+  });
+
+  it("re-registering the same element before metadata fires aborts the previous listener", () => {
+    const el = makeAudio(NaN);
+    registerStreamingAudio("pad-1", "layer-1", el);
+    registerStreamingAudio("pad-1", "layer-1", el); // re-register: aborts the first listener
+    clearLayerStreamingAudio("pad-1", "layer-1");   // aborts the second listener
+
+    Object.defineProperty(el, "duration", { value: 10, configurable: true });
+    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
+
+    // Both listeners aborted — caches must stay empty
+    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
+    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
   });
 });
 

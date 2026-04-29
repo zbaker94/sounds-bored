@@ -343,11 +343,11 @@ None.
 - **Finding**: The `layerProgress` selector (and likewise `activeLayers`) allocated a fresh object/array and iterated `pad.layers` on every RAF tick for every pad instance, including non-playing ones. With 12 visible pads that's 720+ wasted allocations/sec while any pad plays.
 - **Fix applied**: Added module-level `EMPTY_RECORD` and `EMPTY_LAYERS` stable constants. Both selectors now guard with `if (!s.playingPadIds.has(padId)) return EMPTY_*` — short-circuiting all allocation and iteration for idle pads. Shallow equality sees the same reference each tick, so no re-render is triggered. The fix is broader than recommended: `activeLayers` had the same pattern and was fixed in the same commit.
 
-#### [PERF5] `loadedmetadata` listener accumulates without removal on early stop
+#### ~~[PERF5] `loadedmetadata` listener accumulates without removal on early stop~~ ✅ FIXED
 - **File**: `src/lib/audio/audioState.ts:522-529`
 - **Severity**: Low
 - **Finding**: `registerStreamingAudio` uses `{once: true}` so the listener auto-removes after firing. But when `clearLayerStreamingAudio` is called before metadata loads (common for rapid trigger-then-stop), the listener remains attached. Since `streamingCache` reuses the same `HTMLAudioElement` across triggers, dead closures accumulate over a long session.
-- **Recommendation**: Track the listener via an `AbortController` keyed by element; abort it in `clearLayerStreamingAudio`/`unregisterStreamingAudio`.
+- **Fix applied**: Added `pendingMetadataAborts: WeakMap<HTMLAudioElement, Map<"${padId}|${layerId}", AbortController>>`. `registerStreamingAudio` creates an `AbortController` per `(element, padId, layerId)` triple and passes `signal: ac.signal` alongside `{ once: true }` to `addEventListener`. `unregisterStreamingAudio`, `clearLayerStreamingAudio`, and `clearAllStreamingAudio` all abort and evict the controller, proactively removing the listener before it can accumulate. Empty inner maps are evicted from the `WeakMap` immediately. The existing membership guard is preserved as defense-in-depth. 4 new tests added covering: abort on unregister, abort on clear, per-key isolation (aborting one layer doesn't affect another), and re-register pre-abort.
 
 #### [PERF6] `BackFaceLayerRow` subscribes to `layerVolumes` at 60fps during fades
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:60-62`
