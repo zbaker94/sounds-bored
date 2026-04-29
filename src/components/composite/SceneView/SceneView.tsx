@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Sound, PadConfig } from "@/lib/schemas";
+import type { Scene, Sound, PadConfig } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
@@ -41,6 +41,8 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 
+const EMPTY_SCENES: Scene[] = [];
+
 const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
 
@@ -51,7 +53,7 @@ export function SceneView() {
   // scenes or activeSceneId actually changes. Notably, isDirty (toggled on every
   // auto-save) lives outside project, so it does not produce a new scenes reference
   // and won't trigger the scan — unlike a single inline selector which always scans.
-  const scenes = useProjectStore((s) => s.project?.scenes ?? []);
+  const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
   const activeSceneId = useUiStore((s) => s.activeSceneId);
   const activeScene = useMemo(
     () => scenes.find((sc) => sc.id === activeSceneId) ?? null,

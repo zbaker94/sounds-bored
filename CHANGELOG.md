@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a performance issue where the scene view was unnecessarily re-rendering on every state update when no project was loaded.
 - Fixed auto-save interval restarting unexpectedly when the library save function changed identity after a mutation state change — saves now fire on schedule without being reset mid-countdown
 - Improved performance when scrolling or editing the sound library: tag and set sound selections are now cached and shared across pads, eliminating redundant work per render cycle
 - Fixed a performance issue where layer volume sliders were re-rendering at 60fps during audio fades; updates are now throttled to ~10Hz, reducing unnecessary UI work during playback

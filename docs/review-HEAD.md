@@ -367,11 +367,11 @@ None.
 - **Finding**: `saveCurrentLibrarySync` appeared in the effect dependency array. If `useMutation`'s `mutate` function gets a new identity after a success/error state change, the interval is torn down and re-created, restarting the cadence.
 - **Fix applied**: Added `saveCurrentLibrarySyncRef` (mirroring the existing `isProjectSavePendingRef`/`isLibrarySavePendingRef` pattern): the ref is updated on every render, the effect closure calls `saveCurrentLibrarySyncRef.current(...)`, and `saveCurrentLibrarySync` is removed from the dep array. 1 regression test added: advances the interval to t=25s, rerenders with a new mock `saveCurrentLibrarySync` identity, then advances 5s more — asserts the tick fires at t=30s (interval was not restarted). 21/21 tests pass; TypeScript clean.
 
-#### [PERF9] `s.project?.scenes ?? []` allocates a new array every selector call when project is null
+#### ~~[PERF9] `s.project?.scenes ?? []` allocates a new array every selector call when project is null~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/SceneView.tsx:56`
 - **Severity**: Low
 - **Finding**: Zustand uses `Object.is` by default; a new `[]` on every call causes SceneView to re-render on every store update while no project is loaded.
-- **Recommendation**: Hoist: `const EMPTY_SCENES: Scene[] = []; const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);`
+- **Fix applied**: Hoisted `const EMPTY_SCENES: Scene[] = []` to module scope; selector now returns `s.project?.scenes ?? EMPTY_SCENES`. Stable reference means Zustand suppresses re-renders when project is null. `Scene` added to the `@/lib/schemas` import.
 
 #### [PERF10] `stopAllPads` ramps every historically-seen gain node, not just active ones
 - **File**: `src/lib/audio/padPlayer.ts:429-433`
@@ -581,6 +581,7 @@ None.
 | SEC16 | Export TOCTOU on `extra_sound_paths` closed via pre-opened file handles |
 | SEC17 | Download/export job HashMaps now bounded — entries removed on completion/cancellation |
 | PERF8 | `saveCurrentLibrarySyncRef` added to `useAutoSave`; ref updated each render; effect closure calls `saveCurrentLibrarySyncRef.current()`; `saveCurrentLibrarySync` removed from dep array — interval no longer restarts on TanStack mutation identity changes; 1 regression test added |
+| PERF9 | `EMPTY_SCENES` module-level constant hoisted in `SceneView.tsx`; selector returns stable reference when project is null; suppresses spurious re-renders on every store update |
 | PERF7 | `_tagSetCache` WeakMap added to `resolveSounds.ts`; `tag`/`set` cases now check/populate cache before O(n) filter; key uses `JSON.stringify` (collision-safe); cross-component deduplication collapses N filters to 1 per render cycle; 12 tests added |
 | PERF6 | `BackFaceLayerRow` `layerVolumes` subscription throttled to ~10Hz via `usePlaybackStore.subscribe` + `useEffect`; leading-edge 100ms throttle; immediate clear on `undefined`; sync-read on `layer.id` change; zero re-renders during steady-state playback |
 | PERF2 | `seenPlayOrderLayerIds`/`seenChainLayerIds` Set allocations replaced with integer counters; pruning checks use `in` operator on `nextLayerPlayOrder`/`nextLayerChain` — saves 2 allocations/frame at 60fps |
