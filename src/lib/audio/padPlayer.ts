@@ -47,24 +47,20 @@ import {
   isPadFading,
   isPadFadingOut,
   isPadFadingIn,
-  addFadingInPad,
-  removeFadingInPad,
   nullAllOnEnded,
   setGlobalStopTimeout,
-  setFadePadTimeout,
-  deleteFadePadTimeout,
   setLayerChain,
   setLayerCycleIndex,
   setLayerPending,
   setLayerPlayOrder,
-  stopPadVoices,
-  setPadFadeFromVolume,
   getPadFadeFromVolume,
 } from "./audioState";
 
 import {
   resolveFadeDuration,
   fadePad,
+  fadePadIn,
+  stopPadInternal,
 } from "./fadeMixer";
 
 import { rampGainTo } from "./gainManager";
@@ -109,32 +105,8 @@ export {
   setLayerVolume,
 } from "./gainManager";
 
-/**
- * Trigger a non-playing pad at silence then ramp its gain up to toVolume.
- * Marks the pad as fading-in BEFORE the await so a reverse-fade (press F again
- * while the trigger is pending) can be detected and bail correctly.
- */
 export async function triggerAndFade(pad: Pad, toVolume: number, durationMs: number): Promise<void> {
-  cancelPadFade(pad.id);
-  addFadingInPad(pad.id);
-
-  await triggerPad(pad, 0);
-
-  // If pre-empted during the await, bail without overwriting the interleaved ramp.
-  if (!isPadFadingIn(pad.id)) return;
-  removeFadingInPad(pad.id);
-  usePlaybackStore.getState().addFadingPad(pad.id);
-
-  const gain = getPadGain(pad.id);
-  rampGainTo(gain.gain, toVolume, durationMs / 1000, 0);
-  setPadFadeFromVolume(pad.id, 0);
-
-  const timeoutId = setTimeout(() => {
-    deleteFadePadTimeout(pad.id);
-    cancelPadFade(pad.id);
-    if (toVolume === 0) stopPad(pad);
-  }, durationMs + 5);
-  setFadePadTimeout(pad.id, timeoutId);
+  return fadePadIn(pad, toVolume, durationMs, (p) => triggerPad(p, 0));
 }
 
 /**
@@ -394,12 +366,7 @@ export function syncLayerConfig(layer: import("@/lib/schemas").Layer, original: 
 /** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
   cancelPadFade(pad.id);
-  for (const layer of pad.layers) {
-    deleteLayerChain(layer.id);
-    deleteLayerCycleIndex(layer.id);
-    deleteLayerPlayOrder(layer.id);
-  }
-  stopPadVoices(pad.id);
+  stopPadInternal(pad);
 }
 
 /** Stop all pads in a scene, clearing their chain queues before stopping voices. */

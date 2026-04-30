@@ -3,7 +3,9 @@ import { getAudioContext } from "./audioContext";
 import {
   cancelPadFade,
   addFadingOutPad,
+  addFadingInPad,
   removeFadingInPad,
+  isPadFadingIn,
   isPadFadingOut,
   setFadePadTimeout,
   deleteFadePadTimeout,
@@ -40,6 +42,15 @@ export function freezePadAtCurrentVolume(padId: string): void {
  */
 export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): number {
   return pad.fadeDurationMs ?? globalFadeDurationMs ?? 2000;
+}
+
+export function stopPadInternal(pad: Pad): void {
+  for (const layer of pad.layers) {
+    deleteLayerChain(layer.id);
+    deleteLayerCycleIndex(layer.id);
+    deleteLayerPlayOrder(layer.id);
+  }
+  stopPadVoices(pad.id);
 }
 
 /**
@@ -81,14 +92,37 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
     // cancelPadFade clears fadingOutPadIds + fadingPadIds on both sides atomically.
     cancelPadFade(pad.id);
     if (fadingDown && toVolume === 0) {
-      for (const layer of pad.layers) {
-        deleteLayerChain(layer.id);
-        deleteLayerCycleIndex(layer.id);
-        deleteLayerPlayOrder(layer.id);
-      }
-      stopPadVoices(pad.id);
+      stopPadInternal(pad);
       resetPadGain(pad.id);
     }
+  }, durationMs + 5);
+  setFadePadTimeout(pad.id, timeoutId);
+}
+
+export async function fadePadIn(
+  pad: Pad,
+  toVolume: number,
+  durationMs: number,
+  startPad: (pad: Pad) => Promise<void>,
+): Promise<void> {
+  cancelPadFade(pad.id);
+  addFadingInPad(pad.id);
+
+  await startPad(pad);
+
+  // If pre-empted during the await, bail without overwriting the interleaved ramp.
+  if (!isPadFadingIn(pad.id)) return;
+  removeFadingInPad(pad.id);
+  usePlaybackStore.getState().addFadingPad(pad.id);
+
+  const gain = getPadGain(pad.id);
+  rampGainTo(gain.gain, toVolume, durationMs / 1000, 0);
+  setPadFadeFromVolume(pad.id, 0);
+
+  const timeoutId = setTimeout(() => {
+    deleteFadePadTimeout(pad.id);
+    cancelPadFade(pad.id);
+    if (toVolume === 0) stopPadInternal(pad);
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);
 }

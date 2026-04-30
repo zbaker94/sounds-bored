@@ -223,4 +223,101 @@ describe("fadeMixer", () => {
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, 1);
     });
   });
+
+  describe("stopPadInternal", () => {
+    it("clears layer chain, cycle index, and play order for all layers", async () => {
+      const layer1 = createMockLayer({ id: "layer-si-1" });
+      const layer2 = createMockLayer({ id: "layer-si-2" });
+      const {
+        setLayerChain, setLayerCycleIndex, setLayerPlayOrder,
+        getLayerChain, getLayerCycleIndex, getLayerPlayOrder,
+      } = await import("./audioState");
+      setLayerChain("layer-si-1", []);
+      setLayerCycleIndex("layer-si-1", 2);
+      setLayerPlayOrder("layer-si-1", []);
+      setLayerChain("layer-si-2", []);
+      setLayerCycleIndex("layer-si-2", 3);
+      setLayerPlayOrder("layer-si-2", []);
+      const { stopPadInternal } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-si", layers: [layer1, layer2] });
+
+      stopPadInternal(pad);
+
+      expect(getLayerChain("layer-si-1")).toBeUndefined();
+      expect(getLayerCycleIndex("layer-si-1")).toBeUndefined();
+      expect(getLayerPlayOrder("layer-si-1")).toBeUndefined();
+      expect(getLayerChain("layer-si-2")).toBeUndefined();
+      expect(getLayerCycleIndex("layer-si-2")).toBeUndefined();
+      expect(getLayerPlayOrder("layer-si-2")).toBeUndefined();
+    });
+  });
+
+  describe("fadePadIn", () => {
+    it("calls startPad callback and ramps gain up to toVolume", async () => {
+      const mockGain = makeMockGain(0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain } = await import("./audioState");
+      getPadGain("pad-fpi");
+      const { fadePadIn } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-fpi" });
+      const startPad = vi.fn().mockResolvedValue(undefined);
+
+      await fadePadIn(pad, 0.8, 1000, startPad);
+
+      expect(startPad).toHaveBeenCalledWith(pad);
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, 1);
+    });
+
+    it("bails without ramping if pre-empted during startPad await", async () => {
+      const mockGain = makeMockGain(0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain, removeFadingInPad } = await import("./audioState");
+      getPadGain("pad-fpi-bail");
+      const { fadePadIn } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-fpi-bail" });
+      const startPad = vi.fn().mockImplementation(async () => {
+        // Simulate a pre-empting fadePad that clears the fading-in flag
+        removeFadingInPad("pad-fpi-bail");
+      });
+
+      await fadePadIn(pad, 0.8, 1000, startPad);
+
+      expect(mockGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    });
+
+    it("calls stopPadInternal on timeout when toVolume is 0", async () => {
+      const mockGain = makeMockGain(0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer = createMockLayer({ id: "layer-fpi-stop" });
+      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      getPadGain("pad-fpi-stop");
+      setLayerChain("layer-fpi-stop", []);
+      const { fadePadIn } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-fpi-stop", layers: [layer] });
+      const startPad = vi.fn().mockResolvedValue(undefined);
+
+      await fadePadIn(pad, 0, 500, startPad);
+      vi.advanceTimersByTime(600);
+
+      expect(getLayerChain("layer-fpi-stop")).toBeUndefined();
+    });
+
+    it("does not call stopPadInternal on timeout when toVolume is non-zero", async () => {
+      const mockGain = makeMockGain(0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer = createMockLayer({ id: "layer-fpi-nonzero" });
+      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      getPadGain("pad-fpi-nonzero");
+      setLayerChain("layer-fpi-nonzero", []);
+      const { fadePadIn } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-fpi-nonzero", layers: [layer] });
+      const startPad = vi.fn().mockResolvedValue(undefined);
+
+      await fadePadIn(pad, 0.8, 500, startPad);
+      vi.advanceTimersByTime(600);
+
+      // Chain should remain — stopPadInternal was not called
+      expect(getLayerChain("layer-fpi-nonzero")).toEqual([]);
+    });
+  });
 });
