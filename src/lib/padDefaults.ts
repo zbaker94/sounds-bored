@@ -27,15 +27,7 @@ export function createDefaultLayer(): LayerConfigForm {
 }
 
 export function createDefaultStoreLayer(): Layer {
-  return {
-    id: crypto.randomUUID(),
-    selection: { type: "assigned", instances: [] },
-    arrangement: "simultaneous",
-    cycleMode: false,
-    playbackMode: "one-shot",
-    retriggerMode: "restart",
-    volume: 100,
-  };
+  return formLayerToLayer(createDefaultLayer());
 }
 
 /**

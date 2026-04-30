@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (6 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 27 (27 fixed) |
+| Low | 26 (28 fixed) |
 | **Total** | **63** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -477,7 +477,7 @@ None.
 #### ~~[QUAL5] `createDefaultStoreLayer` round-trips through `LayerConfigForm` and uses `as Layer`~~ ✅ FIXED
 - **File**: `src/lib/padDefaults.ts:15-17`
 - **Severity**: Low
-- **Fix applied**: `createDefaultStoreLayer` now constructs the `Layer` object directly. The `as Layer` cast and the delegation to `createDefaultLayer()` are removed. Both functions are now independently correct for their declared return types. 1990/1990 tests pass; TypeScript clean.
+- **Fix applied (updated 2026-04-30)**: `createDefaultStoreLayer` delegates to `createDefaultLayer()` via the existing `formLayerToLayer` converter — no type assertion required, and no duplication (see REUSE-3). Earlier fix had made both functions construct directly, which eliminated the `as Layer` cast but re-introduced byte-for-byte duplication. Current approach satisfies both constraints: fully type-safe delegation, single source of truth for default values. 2019/2019 tests pass; TypeScript clean.
 
 #### ~~[QUAL-5] Dual-ownership of `fadingOutPadIds` creates synchronization hazard~~ ✅ FIXED *(cross-ref: ARCH-5)*
 - **File**: `src/lib/audio/fadeMixer.ts:68–75` (original); `src/lib/audio/audioState.ts:545–557`; `src/lib/audio/padPlayer.ts:227,398,568,616`
@@ -573,7 +573,7 @@ None.
 
 ---
 
-### Code Reuse (1 remaining)
+### Code Reuse (0 remaining)
 
 #### ~~[REUSE3] 0–1 volume clamp open-coded 6 times in audio engine~~ ✅ FIXED
 - **File**: `src/lib/audio/gainManager.ts:16,46,58`; `src/lib/audio/audioState.ts:468`; `src/lib/audio/layerTrigger.ts:88,98`; `src/hooks/usePadGesture.ts:174`
@@ -595,6 +595,12 @@ None.
 - **Finding**: `buildPadMap` builds an O(1) lookup Map but is file-private. `useGlobalHotkeys` and `useProjectLifecycle` still use `scenes.flatMap((s) => s.pads).find(...)` for the same operation.
 - **Recommendation**: Move `buildPadMap` to `src/lib/projectHelpers.ts` (or `padDefaults.ts`) and export it.
 - **Fix applied**: Moved `buildPadMap` to `src/lib/padDefaults.ts` and exported it. Removed the local copy from `useMultiFadeMode.ts`. Replaced the 3 `flatMap(...).find(...)` sites in `useGlobalHotkeys.ts` with `buildPadMap(...).get(id)`. Note: `useProjectLifecycle` had no `flatMap.find` — the review finding was inaccurate on that point. Added 4 tests to `padDefaults.test.ts`. 90/90 test files, 2021/2021 tests pass.
+
+#### ~~[REUSE-3] `createDefaultLayer` and `createDefaultStoreLayer` are byte-for-byte identical at runtime~~ ✅ FIXED
+- **File**: `src/lib/padDefaults.ts:17–39`
+- **Severity**: Low
+- **Finding**: Both functions returned identical object literals; only the return type annotation differed (`LayerConfigForm` vs `Layer`). Any change to one required a manual sync of the other. The `formLayerToLayer` converter already existed but was not used here.
+- **Fix applied**: `createDefaultStoreLayer` now delegates: `return formLayerToLayer(createDefaultLayer());`. No type assertion needed — `formLayerToLayer` is already the canonical `LayerConfigForm → Layer` converter and is fully type-safe. Four direct unit tests added to `padDefaults.test.ts` covering default field values, UUID uniqueness, field consistency between the two functions, and absence of the optional `name` field. 2019/2019 tests pass; TypeScript clean.
 
 #### ~~[REUSE13] `{ ...padToConfig(pad), field: v }` spread bypasses typed store setters in `PadBackFace`~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:285-286,292,409,476,493`
@@ -667,3 +673,4 @@ None.
 | QUAL8 | `LAYER_DIALOG_SCHEMA` and `LAYER_DIALOG_RESOLVER` hoisted to module scope in `LayerConfigDialog.tsx`; local `layerDialogSchema` variable and inline `zodResolver()` call removed; 2000/2000 tests pass |
 | QUAL10 | `deleteScene` `!` assertion + `scenes.length > 0` ternary replaced with `const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0]; const next = candidate?.id ?? null;` — eliminates the non-null assertion entirely; `?? scenes[0]` is defensive against a stale index; all 81 existing tests pass; TypeScript clean |
 | REUSE3 | `clampGain01(value, fallback = 0)` exported from `gainManager.ts` (renamed from private `clampGain`); `layerTrigger.ts` (×2) and `usePadGesture.ts` (×1) open-coded clamps replaced; `audioState.ts:612` left inline (circular dep + intentional `fallback = 1`); 2007/2007 tests pass |
+| REUSE-3 | `createDefaultStoreLayer` delegates to `formLayerToLayer(createDefaultLayer())`; duplicate object literal removed; 4 unit tests added to `padDefaults.test.ts`; 2019/2019 tests pass |

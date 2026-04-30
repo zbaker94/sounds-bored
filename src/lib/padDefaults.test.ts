@@ -1,7 +1,42 @@
 import { describe, it, expect } from "vitest";
 import { createMockLayer, createMockPad, createMockScene } from "@/test/factories";
 import type { LayerConfigForm } from "@/lib/schemas";
-import { buildPadMap, layerToFormLayer, formLayerToLayer } from "@/lib/padDefaults";
+import { buildPadMap, createDefaultLayer, createDefaultStoreLayer, layerToFormLayer, formLayerToLayer } from "@/lib/padDefaults";
+
+describe("createDefaultLayer", () => {
+  it("returns expected default field values", () => {
+    const layer = createDefaultLayer();
+    expect(layer.selection).toEqual({ type: "assigned", instances: [] });
+    expect(layer.arrangement).toBe("simultaneous");
+    expect(layer.cycleMode).toBe(false);
+    expect(layer.playbackMode).toBe("one-shot");
+    expect(layer.retriggerMode).toBe("restart");
+    expect(layer.volume).toBe(100);
+    expect(typeof layer.id).toBe("string");
+    expect(layer.id.length).toBeGreaterThan(0);
+  });
+
+  it("generates a unique id on each call", () => {
+    expect(createDefaultLayer().id).not.toBe(createDefaultLayer().id);
+  });
+});
+
+describe("createDefaultStoreLayer", () => {
+  it("returns field values consistent with createDefaultLayer", () => {
+    const form = createDefaultLayer();
+    const store = createDefaultStoreLayer();
+    expect(store.selection).toEqual(form.selection);
+    expect(store.arrangement).toBe(form.arrangement);
+    expect(store.cycleMode).toBe(form.cycleMode);
+    expect(store.playbackMode).toBe(form.playbackMode);
+    expect(store.retriggerMode).toBe(form.retriggerMode);
+    expect(store.volume).toBe(form.volume);
+  });
+
+  it("does not include a name field", () => {
+    expect("name" in createDefaultStoreLayer()).toBe(false);
+  });
+});
 
 describe("buildPadMap", () => {
   it("returns an empty map for an empty scene list", () => {
