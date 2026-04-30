@@ -490,11 +490,11 @@ None.
 - **Finding**: After the `if (retriggerMode === "next")` early return, `helpers[retriggerMode as Exclude<RetriggerMode, "next">]` is cast. If a fifth mode is added and `helpers` doesn't have that key, the access returns `undefined` silently.
 - **Fix applied**: Removed the redundant `as Exclude<RetriggerMode, "next">` cast. TypeScript already narrows `retriggerMode` to `Exclude<RetriggerMode, "next">` after the early-return guard, and `helpers` typed as `Record<Exclude<RetriggerMode, "next">, ...>` enforces exhaustiveness at the object literal — so adding a new mode would produce a compile error without any cast. TypeScript clean, all 2003 tests pass.
 
-#### [QUAL14] `PadBackFace` duplicates the `canRemove` guard and writes to a ref during render
+#### ~~[QUAL14] `PadBackFace` duplicates the `canRemove` guard and writes to a ref during render~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:371-372,435-439`
 - **Severity**: Low
 - **Finding**: `canRemove={pad.layers.length > 1}` and `if (padRef.current.layers.length <= 1) return;` duplicate the same guard. `padRef.current = pad` is written during render — a React anti-pattern fragile under concurrent features.
-- **Recommendation**: Read `pad` from the store inside the callback, or declare `handleRemoveLayer(pad: Pad, index: number)` and pass `pad` from JSX.
+- **Fix applied**: Replaced `padRef.current = pad` with `useLayoutEffect(() => { padRef.current = pad; }, [pad])` (correct concurrent-mode pattern). Removed `canRemove` prop from `PadLayerSection` → `BackFaceLayerRow`; `BackFaceLayerRow` now derives it locally from `pad.layers.length > 1` (it already had access to `pad`). The defensive guard in `handleRemoveLayer` is retained as a safety net — it and the UI guard serve different layers of defense. TypeScript clean, all 2003 tests pass.
 
 #### [QUAL15] `useMultiFadeMode` and `useGlobalHotkeys` both register `f` key handlers — ordering fragile
 - **File**: `src/hooks/useMultiFadeMode.ts:119-121`; `src/hooks/useGlobalHotkeys.ts:83-120,133-145`

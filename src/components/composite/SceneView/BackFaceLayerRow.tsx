@@ -29,17 +29,16 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
   pad,
   layer,
   index,
-  canRemove,
   onEditLayer,
   onRemoveLayer,
 }: {
   pad: Pad;
   layer: Layer;
   index: number;
-  canRemove: boolean;
   onEditLayer: () => void;
   onRemoveLayer: () => void;
 }) {
+  const canRemove = pad.layers.length > 1;
   const layerActive = usePlaybackStore((s) => s.activeLayerIds.has(layer.id));
   const [liveLayerVol, setLiveLayerVol] = useState<number | null>(() => {
     const stored = usePlaybackStore.getState().layerVolumes[layer.id];

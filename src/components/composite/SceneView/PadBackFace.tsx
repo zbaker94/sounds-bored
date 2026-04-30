@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   }
 
   const padRef = useRef(pad);
-  padRef.current = pad;
+  useLayoutEffect(() => { padRef.current = pad; }, [pad]);
 
   const [editingLayerIndex, setEditingLayerIndex] = useState<number | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);

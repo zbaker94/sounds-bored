@@ -37,7 +37,6 @@ export const PadLayerSection = memo(function PadLayerSection({
             pad={pad}
             layer={layer}
             index={i}
-            canRemove={pad.layers.length > 1}
             onEditLayer={() => onEditLayer(i)}
             onRemoveLayer={() => onRemoveLayer(i)}
           />
