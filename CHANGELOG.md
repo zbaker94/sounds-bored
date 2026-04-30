@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal reliability of layer configuration handling with cleaner conversion between layer data and form state.
 - Auto-save now correctly restarts when a project is marked temporary or when the save interval changes, preventing missed saves in edge cases
 - Save failures now show a user notification without logging internal error details to the console
 - Auto-save reliability improved: project and library saves now use direct async calls instead of query mutations, eliminating a class of edge-case save failures.
