@@ -1,6 +1,13 @@
 # Changelog
 
 ## Current Changes
+- Audio playback errors in one pad layer are now silently contained — a failed sound load no longer propagates or disrupts other layers.
+- Fixed a bug where a single layer failing to load its audio could silently prevent other layers in the same pad from playing.
+- The playback progress bar now resets immediately when a pad is re-triggered, preventing stale progress from the previous sound from appearing while the new sound loads
+- "Next" retrigger mode no longer attempts to start a new voice when a one-shot sound chain is exhausted, avoiding a silent no-op trigger
+- A layer is now correctly tracked as active in playback state immediately after triggering, keeping mute/stop logic consistent
+- Audio playback errors in individual layers are now reported via the error notification system instead of crashing other layers playing simultaneously on the same pad.
+- Internal refactor: per-layer trigger logic is now shared between single-layer and full-pad triggers, reducing the chance of subtle behavior differences between the two paths.
 - Improved reliability of pad fade-in behavior by consolidating audio fade logic into a dedicated module.
 - Internal code refactoring of pad stop and fade-in routines; no user-visible behavior changes.
 - Active layers in pad configuration now show a real-time progress bar indicating playback position.

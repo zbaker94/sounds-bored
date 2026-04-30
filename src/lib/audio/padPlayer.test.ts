@@ -4291,6 +4291,30 @@ describe("triggerLayer", () => {
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
   });
 
+  it("clears pad progress before starting so the bar resets while loading", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 2.0, numberOfChannels: 1, sampleRate: 44100 });
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 99, isLooping: false });
+    await triggerLayer(pad, layer);
+
+    // clearProgressOnProceed: true clears the seed before startLayerPlayback runs.
+    // Without the clear, loadLayerVoice would keep 99 (2.0 < 99 → no overwrite), so
+    // the final value 2.0 can only appear if the clear happened first.
+    expect(getPadProgressInfo(pad.id)?.duration).toBe(2.0);
+  });
+
   it("retriggerMode stop: stops the layer when active and does not restart", async () => {
     vi.useFakeTimers();
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
@@ -4467,7 +4491,7 @@ describe("pending leak guards", () => {
     expect(isLayerPending(layer.id)).toBe(false);
   });
 
-  it("clears layer pending when applyRetriggerMode throws inside triggerLayer", async () => {
+  it("clears layer pending and emits error when getOrCreateLayerGain throws inside triggerLayer", async () => {
     // Make getOrCreateLayerGain throw by rejecting createGain on the layer gain call
     // padGain is created first (call 1), layerGain second (call 2 — throws)
     let createGainCallCount = 0;
@@ -4487,7 +4511,9 @@ describe("pending leak guards", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
-    await expect(triggerLayer(pad, layer)).rejects.toThrow("createGain failed");
+    // Error is caught by triggerLayerOfPad and emitted via the error bus (not propagated)
+    await triggerLayer(pad, layer);
+    expect(mockEmitAudioError).toHaveBeenCalledWith(expect.objectContaining({ message: "createGain failed" }));
     expect(isLayerPending(layer.id)).toBe(false);
   });
 
@@ -4601,6 +4627,8 @@ describe("pending leak guards", () => {
 
     // Flush the ensureResumed() microtask — this causes triggerPad to resume and run the
     // synchronous pre-pass (setting both pending flags) before reaching Promise.all.
+    // COUPLING NOTE: this single flush matches exactly one await (ensureResumed) before the
+    // pre-pass at padPlayer.ts:462. If a new await is inserted before that line, update this.
     await Promise.resolve();
 
     // Both flags must be set: the pre-pass ran synchronously in the single microtask above.
