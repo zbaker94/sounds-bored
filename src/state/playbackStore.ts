@@ -7,6 +7,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 //
 // Tick-managed fields (padVolumes, layerVolumes, padProgress, activeLayerIds) are
 // written by the single global audioTick RAF loop in src/lib/audio/audioTick.ts.
+// Preview-managed fields (previewProgress) are written by preview.ts's own RAF loop.
 // All other writes to these fields are bugs.
 
 interface AudioTickSnapshot {
@@ -55,6 +56,15 @@ interface PlaybackState {
   // Whether a sound preview is currently playing (for Stop All button state)
   isPreviewPlaying: boolean;
   setIsPreviewPlaying: (v: boolean) => void;
+
+  // ---------------------------------------------------------------------------
+  // Preview-managed fields — written exclusively by preview.ts's own RAF loop.
+  // Independent of audioTick; preview.ts is not part of the padPlayer system.
+  // ---------------------------------------------------------------------------
+
+  /** Progress of the currently previewing sound (0–1). null = not previewing. */
+  previewProgress: number | null;
+  setPreviewProgress: (v: number | null) => void;
 
   // ---------------------------------------------------------------------------
   // Tick-managed fields — written exclusively by audioTick.ts via setAudioTick()
@@ -114,6 +124,7 @@ export const initialPlaybackState = {
   get layerPlayOrder() { return {} as Record<string, string[]>; },
   get layerChain() { return {} as Record<string, string[]>; },
   isPreviewPlaying: false,
+  previewProgress: null,
 };
 
 export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((set) => {
@@ -159,6 +170,9 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
 
   isPreviewPlaying: false,
   setIsPreviewPlaying: (v) => set({ isPreviewPlaying: v }),
+
+  previewProgress: null,
+  setPreviewProgress: (v) => set({ previewProgress: v }),
 
   padVolumes: {},
   layerVolumes: {},

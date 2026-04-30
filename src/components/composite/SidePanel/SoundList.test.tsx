@@ -9,6 +9,10 @@ import {
   useAppSettingsStore,
   initialAppSettingsState,
 } from "@/state/appSettingsStore";
+import {
+  usePlaybackStore,
+  initialPlaybackState,
+} from "@/state/playbackStore";
 import { useUiStore, initialUiState, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import {
   createMockAppSettings,
@@ -56,6 +60,18 @@ vi.mock("@/lib/audio/cacheUtils", () => ({
 vi.mock("@/lib/audio/preview", () => ({
   playPreview: vi.fn(() => Promise.resolve()),
   stopPreview: vi.fn(),
+}));
+
+// useSoundPreview is mocked so we can deterministically control `previewingId`
+// without dispatching pointer events through unlabeled icon buttons.
+const mockUseSoundPreview = vi.fn(() => ({
+  previewingId: null as string | null,
+  togglePreview: vi.fn(),
+  stopPreview: vi.fn(),
+}));
+
+vi.mock("@/hooks/useSoundPreview", () => ({
+  useSoundPreview: () => mockUseSoundPreview(),
 }));
 
 const mockMutateAsync = vi.fn(() => Promise.resolve());
@@ -128,6 +144,12 @@ beforeEach(() => {
   useProjectStore.setState({ ...initialProjectState });
   useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
   useUiStore.setState({ ...initialUiState });
+  usePlaybackStore.setState({ ...initialPlaybackState });
+  mockUseSoundPreview.mockReturnValue({
+    previewingId: null,
+    togglePreview: vi.fn(),
+    stopPreview: vi.fn(),
+  });
   mockMutateAsync.mockClear();
 });
 
@@ -235,5 +257,128 @@ describe("SoundList", () => {
     expect(nextSet.has("a")).toBe(true);
     expect(nextSet.has("b")).toBe(true);
     expect(nextSet.size).toBe(2);
+  });
+
+  describe("PreviewProgressBar", () => {
+    it("does not render the progress bar when no sound is being previewed", () => {
+      const kick = createMockSound({
+        id: "k",
+        name: "Kick",
+        filePath: "/sounds/kick.wav",
+      });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [kick],
+      });
+      mockUseSoundPreview.mockReturnValue({
+        previewingId: null,
+        togglePreview: vi.fn(),
+        stopPreview: vi.fn(),
+      });
+
+      renderList();
+      expect(
+        screen.queryByTestId("preview-progress-bar"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders the progress bar when a sound is being previewed", () => {
+      const kick = createMockSound({
+        id: "k",
+        name: "Kick",
+        filePath: "/sounds/kick.wav",
+      });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [kick],
+      });
+      mockUseSoundPreview.mockReturnValue({
+        previewingId: "k",
+        togglePreview: vi.fn(),
+        stopPreview: vi.fn(),
+      });
+
+      renderList();
+      expect(screen.getByTestId("preview-progress-bar")).toBeInTheDocument();
+    });
+
+    it("only renders the progress bar for the previewing sound, not others", () => {
+      const kick = createMockSound({
+        id: "k",
+        name: "Kick",
+        filePath: "/sounds/kick.wav",
+      });
+      const snare = createMockSound({
+        id: "s",
+        name: "Snare",
+        filePath: "/sounds/snare.wav",
+      });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [kick, snare],
+      });
+      mockUseSoundPreview.mockReturnValue({
+        previewingId: "k",
+        togglePreview: vi.fn(),
+        stopPreview: vi.fn(),
+      });
+
+      renderList();
+      // Only one progress bar is rendered (for "k"), not two.
+      expect(
+        screen.getAllByTestId("preview-progress-bar"),
+      ).toHaveLength(1);
+    });
+
+    it("sets fill bar width proportional to previewProgress (0.5 -> 50%)", () => {
+      const kick = createMockSound({
+        id: "k",
+        name: "Kick",
+        filePath: "/sounds/kick.wav",
+      });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [kick],
+      });
+      mockUseSoundPreview.mockReturnValue({
+        previewingId: "k",
+        togglePreview: vi.fn(),
+        stopPreview: vi.fn(),
+      });
+      usePlaybackStore.setState({
+        ...initialPlaybackState,
+        previewProgress: 0.5,
+      });
+
+      renderList();
+      const fill = screen.getByTestId("preview-progress-fill");
+      expect(fill.style.width).toBe("50%");
+    });
+
+    it("renders 0% width when previewProgress is null", () => {
+      const kick = createMockSound({
+        id: "k",
+        name: "Kick",
+        filePath: "/sounds/kick.wav",
+      });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [kick],
+      });
+      mockUseSoundPreview.mockReturnValue({
+        previewingId: "k",
+        togglePreview: vi.fn(),
+        stopPreview: vi.fn(),
+      });
+      // previewProgress defaults to null in initialPlaybackState
+      usePlaybackStore.setState({
+        ...initialPlaybackState,
+        previewProgress: null,
+      });
+
+      renderList();
+      const fill = screen.getByTestId("preview-progress-fill");
+      expect(fill.style.width).toBe("0%");
+    });
   });
 });
