@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Refactored pad fade overlay controls into a reusable `PadOverlaySlider` component, reducing code duplication across the volume, target, and fade duration sliders
+- Fade overlay sliders now use consistent spacing and layout via the shared component
+- `PadLabeledSlider` gained support for an `onThumbPointerDown` callback, used by the current-volume slider in fade controls
 - Fixed a bug where pads could get stuck showing a fading-out state in the UI permanently after being stopped mid-fade.
 - Fading state is now kept in sync between the audio engine and UI at all times, preventing visual desync after pad stop or retrigger during a fade.
 - Scene switching is now more reliable: adding, deleting, or loading scenes updates the active tab atomically, eliminating a brief window where the wrong scene could appear selected.

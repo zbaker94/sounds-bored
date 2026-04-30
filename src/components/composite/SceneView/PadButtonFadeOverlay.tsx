@@ -1,12 +1,12 @@
 import { memo, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Slider } from "@/components/ui/slider";
 import type { Pad } from "@/lib/schemas";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { setPadVolume } from "@/lib/audio/padPlayer";
+import { PadOverlaySlider } from "./PadOverlaySlider";
 
 interface PadButtonFadeOverlayProps {
   pad: Pad;
@@ -48,63 +48,49 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
     <AnimatePresence>
       {isMultiFadeSelected && multiFadeLevels && (
         <motion.div
-          className="absolute bottom-0 left-0 right-0 z-20 px-2 pb-1.5 pt-0.5 bg-black/60 backdrop-blur-sm rounded-b-xl"
+          className="absolute bottom-0 left-0 right-0 z-20 px-2 pb-1.5 pt-0.5 bg-black/60 backdrop-blur-sm rounded-b-xl flex flex-col gap-1.5"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.15 }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <Slider
-            compact
-            tooltipLabel={(v) => `${v}%`}
-            value={[multiFadeLevels[0]]}
-            onValueChange={([v]) => {
+          <PadOverlaySlider
+            label="volume"
+            value={multiFadeLevels[0]}
+            formatValue={(v) => `${v}%`}
+            onValueChange={(v) => {
               if (isPlaying) setPadVolume(pad.id, v / 100);
               setMultiFadeLevels(pad.id, [v, multiFadeLevels[1]]);
             }}
-            onValueCommit={([v]) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v)}
+            onValueCommit={(v) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v)}
             min={0}
             max={100}
             step={1}
-            className="[&_[data-slot=slider-track]]:bg-white/20"
+            sliderClassName="[&_[data-slot=slider-track]]:bg-white/20"
           />
-          <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
-            <span>volume</span>
-            <span>{multiFadeLevels[0]}%</span>
-          </div>
-
-          <Slider
-            compact
-            tooltipLabel={(v) => `${v}%`}
-            value={[multiFadeLevels[1]]}
-            onValueChange={([v]) => setMultiFadeLevels(pad.id, [multiFadeLevels[0], v])}
-            onValueCommit={([v]) => useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v)}
+          <PadOverlaySlider
+            label="target"
+            value={multiFadeLevels[1]}
+            formatValue={(v) => `${v}%`}
+            onValueChange={(v) => setMultiFadeLevels(pad.id, [multiFadeLevels[0], v])}
+            onValueCommit={(v) => useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, v)}
             min={0}
             max={100}
             step={1}
-            className="mt-1 [&_[data-slot=slider-track]]:bg-white/20"
+            sliderClassName="[&_[data-slot=slider-track]]:bg-white/20"
           />
-          <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
-            <span>target</span>
-            <span>{multiFadeLevels[1]}%</span>
-          </div>
-
-          <Slider
-            compact
-            tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
-            value={[displayDuration]}
-            onValueChange={([v]) => setDisplayDuration(v)}
-            onValueCommit={([v]) => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v)}
+          <PadOverlaySlider
+            label="fade"
+            value={displayDuration}
+            formatValue={(v) => `${(v / 1000).toFixed(1)}s`}
+            onValueChange={(v) => setDisplayDuration(v)}
+            onValueCommit={(v) => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v)}
             min={100}
             max={10000}
             step={100}
-            className="mt-1.5 [&_[data-slot=slider-track]]:bg-white/20"
+            sliderClassName="[&_[data-slot=slider-track]]:bg-white/20"
           />
-          <div className="flex justify-between text-[9px] text-white/70 mt-0.5">
-            <span>fade</span>
-            <span>{(displayDuration / 1000).toFixed(1)}s</span>
-          </div>
         </motion.div>
       )}
     </AnimatePresence>

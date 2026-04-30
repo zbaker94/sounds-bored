@@ -2,7 +2,6 @@ import { useState, useRef, memo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/kbd";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -60,32 +59,28 @@ export const PadFadeControls = memo(function PadFadeControls({
         {isPlaying && (
           <motion.div
             key="current-volume"
-            className="flex flex-col gap-1.5 overflow-hidden"
+            className="overflow-hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Current volume</span>
-              <span className="tabular-nums">{volumeSliderValue}%</span>
-            </div>
-            <Slider
-              compact
-              tooltipLabel={(v) => `${v}%`}
-              value={[volumeSliderValue]}
+            <PadLabeledSlider
+              label="Current volume"
+              value={volumeSliderValue}
+              min={0} max={100} step={1}
+              formatValue={(v) => `${v}%`}
               onThumbPointerDown={() => { volumeDragStartRef.current = volumeSliderValue; }}
-              onValueChange={([v]) => {
+              onValueChange={(v) => {
                 setLocalVolume(v);
                 setPadVolume(pad.id, v / 100);
               }}
-              onValueCommit={([v]) => {
+              onValueCommit={(v) => {
                 const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
                 volumeDragStartRef.current = null;
                 setLocalVolume(null);
                 if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v);
               }}
-              min={0} max={100} step={1}
             />
           </motion.div>
         )}
