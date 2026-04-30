@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code comment added to the layer configuration dialog to document why sound-selection validation cannot be expressed as a Zod schema rule — no user-visible behavior changed.
 - Internal TypeScript type cleanup: removed unnecessary public export from `PadBackFaceProps` interface (no user-facing behavior change)
 - Fixed a TypeScript type narrowing issue in the audio engine that required an unnecessary non-null assertion (`!`), improving internal code safety with no behavior change.
 - Minor internal code consistency fix in the fade duration slider — no change in behavior for users.

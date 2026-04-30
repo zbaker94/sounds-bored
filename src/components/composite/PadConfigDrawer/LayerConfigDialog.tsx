@@ -87,6 +87,11 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
     let hasError = false;
 
     // Validate tag/set selections (form wraps single layer at index 0).
+    // This check cannot be expressed in Zod: LAYER_DIALOG_SCHEMA is a module-level
+    // constant so it has no access to runtime library state (the sounds array).
+    // Even a z.refine() callback would not help — the schema instance is fixed at
+    // module load, not per-submit. Keep this out-of-band; do not consolidate into
+    // the schema.
     const formLayer = data.layers[0];
     if (formLayer) {
       const sel = formLayer.selection;

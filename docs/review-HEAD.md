@@ -537,6 +537,7 @@ None.
 - **Severity**: Low
 - **Finding**: The dialog performs a manual emptiness check for tag/set selections (lines 118-138) alongside Zod's automatic `assigned` validation. No comment explains why this is out-of-band.
 - **Recommendation**: Add an inline comment explaining that "sounds exist for tag/set" is not Zod-expressible (requires runtime library state), to prevent future maintainers from consolidating it incorrectly.
+- **Fix applied**: Expanded the comment at the top of the validation block to explain that `LAYER_DIALOG_SCHEMA` is a module-level constant with no access to runtime library state, and that even a `z.refine()` callback would not help because the schema instance is fixed at module load. Added explicit "do not consolidate into the schema" guard sentence. Review also flagged a potential inconsistency in missing-file guards between the `tag` and `set` paths — confirmed not an issue: `filterSoundsByTags` already excludes missing-file sounds via `if (!s.filePath) return false`.
 
 ---
 
