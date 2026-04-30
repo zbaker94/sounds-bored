@@ -24,7 +24,7 @@ import { buildPlayOrder, isChained } from "./arrangement";
 import { resolveLayerSounds } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectStore } from "@/state/projectStore";
-import type { Layer, Pad, Sound } from "@/lib/schemas";
+import type { Layer, LayerSelection, Pad, Sound } from "@/lib/schemas";
 import { emitAudioError } from "./audioEvents";
 import { startAudioTick } from "./audioTick";
 import {
@@ -570,7 +570,7 @@ export async function triggerLayerOfPad(
  * Structural equality check for LayerSelection — avoids JSON.stringify overhead.
  * Compares all fields that affect playback resolution (sounds, volume, match rules).
  */
-export function selectionsEqual(a: import("@/lib/schemas").LayerSelection, b: import("@/lib/schemas").LayerSelection): boolean {
+export function selectionsEqual(a: LayerSelection, b: LayerSelection): boolean {
   if (a.type !== b.type) return false;
   switch (a.type) {
     case "assigned": {
@@ -614,7 +614,7 @@ export function selectionsEqual(a: import("@/lib/schemas").LayerSelection, b: im
  *
  * No-op if the layer has no active voices.
  */
-export function syncLayerPlaybackMode(layer: import("@/lib/schemas").Layer): void {
+export function syncLayerPlaybackMode(layer: Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
   const isLoopMode = layer.playbackMode === "loop" || layer.playbackMode === "hold";
@@ -643,7 +643,7 @@ export function syncLayerPlaybackMode(layer: import("@/lib/schemas").Layer): voi
  *
  * No-op if the layer has no active voices.
  */
-export function syncLayerArrangement(layer: import("@/lib/schemas").Layer): void {
+export function syncLayerArrangement(layer: Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
 
@@ -670,7 +670,7 @@ export function syncLayerArrangement(layer: import("@/lib/schemas").Layer): void
  *
  * No-op if the layer has no active voices.
  */
-export function syncLayerSelection(layer: import("@/lib/schemas").Layer): void {
+export function syncLayerSelection(layer: Layer): void {
   const voices = getLayerVoices(layer.id);
   if (voices.length === 0) return;
 
@@ -690,7 +690,7 @@ export function syncLayerSelection(layer: import("@/lib/schemas").Layer): void {
  * Calls syncLayerPlaybackMode, syncLayerArrangement, and/or syncLayerSelection
  * only for the fields that actually changed.
  */
-export function syncLayerConfig(layer: import("@/lib/schemas").Layer, original: import("@/lib/schemas").Layer): void {
+export function syncLayerConfig(layer: Layer, original: Layer): void {
   if (original.playbackMode !== layer.playbackMode) syncLayerPlaybackMode(layer);
   const arrangementChanged = original.arrangement !== layer.arrangement;
   if (arrangementChanged) syncLayerArrangement(layer);
@@ -773,9 +773,6 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
     setLayerPlayOrder(layerId, playOrder);
     setLayerCycleIndex(layerId, newCycleIdx);
     const sound = playOrder[nextIdx];
-
-    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
-    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
     startSoundInLayer(pad, layer, sound, resolved);
   } else {
     // Regular chained mode: advance via the chain queue.
@@ -792,9 +789,6 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
     // Re-persist playOrder so subsequent skip backs can calculate position correctly.
     if (playOrder) setLayerPlayOrder(layerId, playOrder);
     setLayerChain(layerId, rest);
-
-    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
-    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
     startSoundInLayer(pad, layer, next, resolved);
   }
 }
@@ -828,9 +822,6 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
     setLayerPlayOrder(layerId, playOrder);
     setLayerCycleIndex(layerId, newCycleIdx);
     const sound = playOrder[prevIdx];
-
-    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
-    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
     startSoundInLayer(pad, layer, sound, resolved);
   } else {
     // Regular chained mode: calculate position from playOrder + remaining chain.
@@ -851,9 +842,6 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
     // Rebuild chain from prevIndex+1 onward so the sequence continues naturally.
     setLayerChain(layerId, playOrder.slice(prevIndex + 1));
     const sound = playOrder[prevIndex];
-
-    // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill the
-    // newly-started skip voice (same fix as triggerPad / triggerLayer in PR #248).
     startSoundInLayer(pad, layer, sound, resolved);
   }
 }
