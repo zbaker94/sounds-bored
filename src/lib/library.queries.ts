@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { getCurrentLibraryPayload, loadGlobalLibrary, saveCurrentLibraryAndClearDirty } from "./library";
+import { logError } from "@/lib/logger";
 
 export function useSaveGlobalLibrary() {
   return useMutation({
@@ -14,7 +15,7 @@ export function useSaveGlobalLibrary() {
     // surface the failure (immediate toast for manual saves, debounced toast
     // for auto-save so a persistent failure doesn't spam the user every 30s).
     onError: (error) => {
-      console.error("Failed to save library:", error);
+      logError("Failed to save library", error instanceof Error ? error : { error: String(error) });
     },
   });
 }

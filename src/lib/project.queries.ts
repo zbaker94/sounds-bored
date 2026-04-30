@@ -11,6 +11,7 @@ import {
 import type { Project } from "./schemas";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
+import { logError } from "@/lib/logger";
 import { addOrUpdateProjectInHistory, addSavedProjectToHistory, removeProjectFromHistory } from "./history.helpers";
 import { APP_FOLDER } from "./constants";
 
@@ -29,7 +30,7 @@ export function useLoadProject() {
             description: `Successfully loaded "${data.project.name}"`,
           });
         } catch (error) {
-          console.error("Failed to update project history:", error);
+          logError("Failed to update project history", error instanceof Error ? error : { error: String(error) });
           toast.success("Project Loaded", {
             description: `Successfully loaded "${data.project.name}"`,
           });
@@ -49,7 +50,7 @@ export function useLoadProject() {
         toast.error("Error", {
           description: "Failed to load project. Please try again.",
         });
-        console.error("Failed to load project:", error);
+        logError("Failed to load project", error);
       }
     },
   });
@@ -67,7 +68,7 @@ export function useCreateProject() {
       toast.error("Error", {
         description: error instanceof Error ? error.message : "Failed to create project. Please try again.",
       });
-      console.error("Failed to create project:", error);
+      logError("Failed to create project", error);
     },
   });
 }
@@ -85,7 +86,7 @@ export function useSaveProject() {
     // surface the failure (immediate toast for manual saves, debounced toast
     // for auto-save so a persistent failure doesn't spam the user every 30s).
     onError: (error) => {
-      console.error("Failed to save project:", error);
+      logError("Failed to save project", error);
     },
   });
 }
@@ -106,7 +107,7 @@ export function useSaveProjectAs() {
             description: `Successfully saved "${data.project.name}"`,
           });
         } catch (error) {
-          console.error("Failed to update project history:", error);
+          logError("Failed to update project history", error instanceof Error ? error : { error: String(error) });
           toast.warning("Project Saved", {
             description: "File saved but history could not be updated.",
           });
@@ -116,7 +117,7 @@ export function useSaveProjectAs() {
     // NOTE: No toast at the mutation level — each call site decides how to
     // surface the failure. Consistent with useSaveProject.
     onError: (error) => {
-      console.error("Failed to save project as:", error);
+      logError("Failed to save project as", error);
     },
   });
 }
@@ -139,7 +140,7 @@ export function useLoadProjectFromPath() {
             description: `Successfully loaded "${data.project.name}"`,
           });
         } catch (error) {
-          console.error("Failed to update project history:", error);
+          logError("Failed to update project history", error instanceof Error ? error : { error: String(error) });
           toast.success("Project Loaded", {
             description: `Successfully loaded "${data.project.name}"`,
           });
@@ -153,7 +154,7 @@ export function useLoadProjectFromPath() {
           await removeProjectFromHistory(variables);
           queryClient.invalidateQueries({ queryKey: ["projectHistory"] });
         } catch (historyError) {
-          console.error("Failed to remove project from history:", historyError);
+          logError("Failed to remove project from history", historyError instanceof Error ? historyError : { error: String(historyError) });
         }
 
         toast.error("Project Not Found", {
@@ -167,7 +168,7 @@ export function useLoadProjectFromPath() {
         toast.error("Error", {
           description: "Failed to load project. Please try again.",
         });
-        console.error("Failed to load project:", error);
+        logError("Failed to load project", error);
       }
     },
   });
