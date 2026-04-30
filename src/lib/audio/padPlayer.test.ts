@@ -4291,6 +4291,28 @@ describe("triggerLayer", () => {
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
   });
 
+  it("clears pad progress before starting so the bar resets while loading", async () => {
+    mockLoadBuffer.mockResolvedValue({ duration: 2.0, numberOfChannels: 1, sampleRate: 44100 });
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { triggerLayer } = await import("./padPlayer");
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "restart",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 99, isLooping: false });
+    await triggerLayer(pad, layer);
+
+    // clearProgressOnProceed: true clears the stale entry; new progress (2.0) is written
+    expect(getPadProgressInfo(pad.id)?.duration).toBe(2.0);
+  });
+
   it("retriggerMode stop: stops the layer when active and does not restart", async () => {
     vi.useFakeTimers();
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });

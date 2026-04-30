@@ -1233,21 +1233,6 @@ describe("startLayerSound chain-state cleanup on error", () => {
 });
 
 describe("triggerLayerOfPad", () => {
-  const mockCtx = {
-    currentTime: 0,
-    createGain: vi.fn(),
-    createBufferSource: vi.fn(),
-    createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
-  };
-
-  function makeMockGain() {
-    return {
-      gain: { value: 1.0, cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    };
-  }
-
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -1278,7 +1263,7 @@ describe("triggerLayerOfPad", () => {
 
   it("starts playback and clears pending on proceed", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { isLayerPending } = await import("./audioState");
+    const { isLayerPending, isLayerActive } = await import("./audioState");
     const { pad, layer, padGain, loadBuffer } = await setup();
     const sound = createMockSound({ id: "s1", filePath: "s1.wav" });
 
@@ -1287,6 +1272,7 @@ describe("triggerLayerOfPad", () => {
     await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain, [sound]);
 
     expect(isLayerPending(layer.id)).toBe(false);
+    expect(isLayerActive(layer.id)).toBe(true);
   });
 
   it("clears pending and skips playback when action is 'skip' (continue mode, layer playing)", async () => {
@@ -1360,27 +1346,23 @@ describe("triggerLayerOfPad", () => {
     await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
       [createMockSound({ filePath: "a.wav" })], { clearProgressOnProceed: true });
 
-    // startLayerPlayback wrote new progress (duration 1.0); stale entry (duration 5) is gone
+    // clearProgressOnProceed erased the seed; startLayerPlayback wrote new progress
     const info = getPadProgressInfo(pad.id);
-    expect(info?.duration).not.toBe(5);
+    expect(info?.duration).toBe(1.0);
   });
 
-  it("preserves sibling pad progress when clearProgressOnProceed is omitted", async () => {
+  it("does not clear pad progress when clearProgressOnProceed is omitted", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const audioStateMod = await import("./audioState");
     const { pad, layer, padGain, loadBuffer } = await setup();
 
-    // Seed progress as if a sibling layer with a longer duration already started
-    setPadProgressInfo(pad.id, { startedAt: 0, duration: 99, isLooping: false });
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const spy = vi.spyOn(audioStateMod, "clearPadProgressInfo");
 
     await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
       [createMockSound({ filePath: "a.wav" })]);
 
-    // startLayerSound only overwrites if new duration > existing (simultaneous logic);
-    // the sibling's longer duration (99) should survive
-    const info = getPadProgressInfo(pad.id);
-    expect(info?.duration).toBe(99);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("clears pending and emits error when an internal error occurs", async () => {
@@ -1398,5 +1380,27 @@ describe("triggerLayerOfPad", () => {
       expect.objectContaining({ message: "load failed" }),
       expect.any(Object),
     );
+  });
+
+  it("does not start new playback when 'next' mode exhausts a one-shot chain", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { recordLayerVoice, isLayerPending } = await import("./audioState");
+    const { loadBuffer } = await import("./bufferCache");
+    const { pad, layer, padGain } = await setup({
+      retriggerMode: "next",
+      playbackMode: "one-shot",
+      arrangement: "sequential",
+    });
+
+    const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
+    recordLayerVoice(pad.id, layer.id, fakeVoice);
+    // No chain set → chain is exhausted on the first re-trigger; one-shot has no loop-back
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
+      [createMockSound({ filePath: "a.wav" })]);
+
+    // Exhausted one-shot chain-advanced: no new voice was started (no buffer load)
+    expect(vi.mocked(loadBuffer)).not.toHaveBeenCalled();
+    expect(isLayerPending(layer.id)).toBe(false);
   });
 });

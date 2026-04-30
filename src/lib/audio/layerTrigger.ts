@@ -338,8 +338,9 @@ export async function startLayerSound(
  * Result of applying retrigger logic for one layer:
  * - "skip"           — don't start new playback (stop mode stopped; continue mode kept going)
  * - "proceed"        — clear progress and start new playback via startLayerPlayback
- * - "chain-advanced" — "next" mode already started the chain's next sound; caller should
- *                      record addPlayingPad if needed (triggerLayer) and then return/continue
+ * - "chain-advanced" — "next" mode advanced (or exhausted) the sound chain; addPlayingPad is
+ *                      handled implicitly by recordVoice when a new voice starts — callers must
+ *                      not call it explicitly
  */
 export type RetriggerAction = "skip" | "proceed" | "chain-advanced";
 
