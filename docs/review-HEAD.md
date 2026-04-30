@@ -496,11 +496,11 @@ None.
 - **Finding**: `canRemove={pad.layers.length > 1}` and `if (padRef.current.layers.length <= 1) return;` duplicate the same guard. `padRef.current = pad` is written during render — a React anti-pattern fragile under concurrent features.
 - **Fix applied**: Replaced `padRef.current = pad` with `useLayoutEffect(() => { padRef.current = pad; }, [pad])` (correct concurrent-mode pattern). Removed `canRemove` prop from `PadLayerSection` → `BackFaceLayerRow`; `BackFaceLayerRow` now derives it locally from `pad.layers.length > 1` (it already had access to `pad`). The defensive guard in `handleRemoveLayer` is retained as a safety net — it and the UI guard serve different layers of defense. TypeScript clean, all 2003 tests pass.
 
-#### [QUAL15] `useMultiFadeMode` and `useGlobalHotkeys` both register `f` key handlers — ordering fragile
-- **File**: `src/hooks/useMultiFadeMode.ts:119-121`; `src/hooks/useGlobalHotkeys.ts:83-120,133-145`
+#### ~~[QUAL15] `useMultiFadeMode` and `useGlobalHotkeys` both register `f` key handlers — ordering fragile~~ ✅ FIXED
+- **File**: `src/hooks/useGlobalHotkeys.ts:74`; `src/hooks/useGlobalHotkeys.test.ts`
 - **Severity**: Low
 - **Finding**: The global `f` handler early-returns when `useMultiFadeStore.getState().active` is true. Any future `f`-handler registered without this guard will multi-fire. No test verifies the deferral.
-- **Recommendation**: Document the ordering invariant in both hooks. Add a regression test asserting the global `f` handler is a no-op when `multiFadeStore.active === true`.
+- **Fix applied**: The file reference was stale — `f` hotkeys were previously in `useMultiFadeMode.ts` but had already been refactored into `useMultiFadeSideEffects.ts`. Two changes made: (1) updated the stale comment in `useGlobalHotkeys.ts` from `"useMultiFadeMode owns F"` to `"useMultiFadeSideEffects owns F"`; (2) added a regression test to `useGlobalHotkeys.test.ts` asserting the global `f` callback is a no-op (no `executeFadeTap`, no `setFadePopoverPadId`) when `multiFadeStore.active === true`. The symmetric guard structure (`if (active) return` in globalHotkeys / `if (!active) return` in sideEffects) was evaluated and confirmed sound — no structural change needed.
 
 #### [QUAL16] `PadDurationSlider` / `PadPercentSlider` return Fragments — leaks layout semantics to callers
 - **File**: `src/components/composite/SceneView/PadDurationSlider.tsx:18-36`; `src/components/composite/SceneView/PadPercentSlider.tsx:18-36`

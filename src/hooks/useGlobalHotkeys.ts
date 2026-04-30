@@ -71,7 +71,7 @@ export function useGlobalHotkeys() {
   // F: configure/execute a fade on the relevant pad.
   //
   // Behavior matrix:
-  //   multi-fade already active                                       → no-op (useMultiFadeMode owns F)
+  //   multi-fade already active                                       → no-op (useMultiFadeSideEffects owns F)
   //   edit mode with editingPadId set                                 → execute fade for editingPadId immediately
   //                                                                     (do NOT exit edit mode, do NOT enter multi-fade)
   //   normal mode, hovering, fadePopoverPadId === hoveredPadId        → execute fade then close popover

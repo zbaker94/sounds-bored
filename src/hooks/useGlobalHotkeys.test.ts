@@ -204,6 +204,22 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     expect(mockUiState.toggleEditMode).not.toHaveBeenCalled();
   });
 
+  it("F callback is a no-op when multi-fade is active (deferred to useMultiFadeSideEffects)", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
+    const { useMultiFadeStore } = await import("@/state/multiFadeStore");
+    vi.mocked(useMultiFadeStore.getState).mockReturnValue({
+      active: true,
+    } as ReturnType<typeof useMultiFadeStore.getState>);
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = "pad-1";
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("f");
+
+    expect(executeFadeTap).not.toHaveBeenCalled();
+    expect(mockUiState.setFadePopoverPadId).not.toHaveBeenCalled();
+  });
+
   it("F callback is a no-op when no pad is hovered (prevents accidental fire while typing)", async () => {
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     mockUiState.editMode = false;

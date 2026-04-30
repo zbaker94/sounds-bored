@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a stale internal comment that incorrectly attributed the `F` key handler ownership to a renamed hook (`useMultiFadeMode` → `useMultiFadeSideEffects`).
+- Added a regression test confirming the `F` key is correctly suppressed while multi-fade mode is active, preventing accidental fade triggers.
 - Fixed a React anti-pattern where pad state was written to a ref during render; it now syncs via `useLayoutEffect`, making it safe under React concurrent features
 - Simplified the layer row component by removing the redundant `canRemove` prop — each row now derives this value directly from the pad data it already has access to
 - Removed an unnecessary type cast in layer config code, improving type safety so adding new retrigger modes in the future will produce a compile error instead of silently failing at runtime.
