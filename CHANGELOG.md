@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed pad slider components (duration, percent) to render with consistent vertical spacing, preventing potential layout issues in certain parent containers.
 - Fixed a stale internal comment that incorrectly attributed the `F` key handler ownership to a renamed hook (`useMultiFadeMode` → `useMultiFadeSideEffects`).
 - Added a regression test confirming the `F` key is correctly suppressed while multi-fade mode is active, preventing accidental fade triggers.
 - Fixed a React anti-pattern where pad state was written to a ref during render; it now syncs via `useLayoutEffect`, making it safe under React concurrent features

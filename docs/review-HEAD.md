@@ -502,11 +502,11 @@ None.
 - **Finding**: The global `f` handler early-returns when `useMultiFadeStore.getState().active` is true. Any future `f`-handler registered without this guard will multi-fire. No test verifies the deferral.
 - **Fix applied**: The file reference was stale — `f` hotkeys were previously in `useMultiFadeMode.ts` but had already been refactored into `useMultiFadeSideEffects.ts`. Two changes made: (1) updated the stale comment in `useGlobalHotkeys.ts` from `"useMultiFadeMode owns F"` to `"useMultiFadeSideEffects owns F"`; (2) added a regression test to `useGlobalHotkeys.test.ts` asserting the global `f` callback is a no-op (no `executeFadeTap`, no `setFadePopoverPadId`) when `multiFadeStore.active === true`. The symmetric guard structure (`if (active) return` in globalHotkeys / `if (!active) return` in sideEffects) was evaluated and confirmed sound — no structural change needed.
 
-#### [QUAL16] `PadDurationSlider` / `PadPercentSlider` return Fragments — leaks layout semantics to callers
+#### ~~[QUAL16] `PadDurationSlider` / `PadPercentSlider` return Fragments — leaks layout semantics to callers~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadDurationSlider.tsx:18-36`; `src/components/composite/SceneView/PadPercentSlider.tsx:18-36`
 - **Severity**: Low
 - **Finding**: Both return `<> <div>…</div> <Slider /> </>`. Callers must rely on parent flex/grid layout behaving correctly with two injected children.
-- **Recommendation**: Wrap in `<div className="flex flex-col gap-1">` so each component renders as a single child and owns its own layout.
+- **Fix applied**: These components were already consolidated into `PadLabeledSlider` by the REUSE5 fix, but the Fragment pattern carried over. Replaced `<> … </>` with `<div className="flex flex-col gap-1">` in `PadLabeledSlider.tsx` so the component renders as a single child and owns its own layout.
 
 #### [QUAL17] `PadButtonFadeOverlay` duration slider uses `onPointerUp` instead of `onValueCommit`
 - **File**: `src/components/composite/SceneView/PadButtonFadeOverlay.tsx:93-103`

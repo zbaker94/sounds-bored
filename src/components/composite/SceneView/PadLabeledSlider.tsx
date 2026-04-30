@@ -24,7 +24,7 @@ export function PadLabeledSlider({
   sliderClassName,
 }: PadLabeledSliderProps) {
   return (
-    <>
+    <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between text-muted-foreground">
         <span>{label}</span>
         <span className="tabular-nums">{formatValue(value)}</span>
@@ -40,6 +40,6 @@ export function PadLabeledSlider({
         step={step}
         className={sliderClassName}
       />
-    </>
+    </div>
   );
 }
