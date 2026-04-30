@@ -5,8 +5,8 @@ import { getPadGain, getLayerGain, cancelPadFade, markGainRamp } from "./audioSt
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
 const CLICK_FREE_RAMP_S = 0.016;
 
-function clampGain(x: number): number {
-  return Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0;
+export function clampGain01(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 }
 
 /**
@@ -33,7 +33,7 @@ export function rampGainTo(
  */
 export function setPadVolume(padId: string, volume: number): void {
   const gain = getPadGain(padId);
-  rampGainTo(gain.gain, clampGain(volume));
+  rampGainTo(gain.gain, clampGain01(volume));
   // Tick reads the gain node value automatically — no store call needed.
 }
 
@@ -59,7 +59,7 @@ export function resetPadGain(padId: string): void {
 export function syncLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
-  rampGainTo(gain.gain, clampGain(volume));
+  rampGainTo(gain.gain, clampGain01(volume));
 }
 
 /**
@@ -69,7 +69,7 @@ export function syncLayerVolume(layerId: string, volume: number): void {
 export function setLayerVolume(layerId: string, volume: number): void {
   const gain = getLayerGain(layerId);
   if (!gain) return;
-  rampGainTo(gain.gain, clampGain(volume));
+  rampGainTo(gain.gain, clampGain01(volume));
 }
 
 // Persisting layer volume on drag-end is a UI-layer concern. Callers use

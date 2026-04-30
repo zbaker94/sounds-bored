@@ -9,6 +9,7 @@
 //   - startLayerPlayback — deduplicates the start-playback section shared by both
 
 import { getAudioContext } from "./audioContext";
+import { clampGain01 } from "./gainManager";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
@@ -85,7 +86,7 @@ export function getVoiceVolume(layer: Layer, sound: Sound): number {
   if (layer.selection.type === "assigned") {
     const inst = layer.selection.instances.find((i) => i.soundId === sound.id);
     if (!inst) return 1.0;
-    return Number.isFinite(inst.volume) ? Math.max(0, Math.min(1, inst.volume / 100)) : 0;
+    return clampGain01(inst.volume / 100);
   }
   return 1.0;
 }
@@ -95,7 +96,7 @@ export function getVoiceVolume(layer: Layer, sound: Sound): number {
  *  for malformed data — the Zod schema rejects non-finite at parse time, so this path
  *  is a last-resort guard against data bypassing validation). */
 export function getLayerNormalizedVolume(layer: Layer): number {
-  return Number.isFinite(layer.volume) ? Math.max(0, Math.min(1, layer.volume / 100)) : 0;
+  return clampGain01(layer.volume / 100);
 }
 
 /** Resolve a layer's sound selection to playable Sound objects (filePath required). */

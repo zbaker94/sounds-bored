@@ -2,6 +2,7 @@ import { useRef, useMemo, useState, useEffect } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
+import { clampGain01 } from "@/lib/audio/gainManager";
 import { isLayerActive } from "@/lib/audio/audioState";
 import { emitAudioError } from "@/lib/audio/audioEvents";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -172,7 +173,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
       if (s.phase === "drag") {
         const rampFactor = Math.min(1, (now() - s.startTime) / DRAG_RAMP_MS);
-        const newVolume = Math.max(0, Math.min(1, s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX));
+        const newVolume = clampGain01(s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX);
         s.currentVolume = newVolume;
 
         if (!justTriggered && !s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
