@@ -32,8 +32,9 @@ function useElapsedTime(active: boolean): string {
     if (startRef.current === null) {
       startRef.current = Date.now();
     }
+    const start = startRef.current!;
     const id = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startRef.current!) / 1000));
+      setElapsed(Math.floor((Date.now() - start) / 1000));
     }, 1000);
     return () => clearInterval(id);
   }, [active]);

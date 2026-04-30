@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a potential crash in download timer logic where a mutable ref was read inside an interval callback; the value is now captured once when the interval starts, making the code safer against future refactors.
 - Fixed a visual glitch where a side-panel background image did not tile correctly along the vertical axis.
 - Improved rendering performance in the layer config dialog by eliminating redundant object allocations on each render.
 - Internal code cleanup: renamed `DownloadButton` component to `DownloadStatusButton` to match its filename (no user-visible behavior change)

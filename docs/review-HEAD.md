@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 28 (22 fixed) |
+| Low | 27 (23 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -466,11 +466,11 @@ None.
 - **Finding**: `PadConfigSchema.extend({ name: z.string() })` and `zodResolver(...)` are constructed inside the component body, allocating fresh objects on every render.
 - **Fix applied**: Hoisted `LAYER_DIALOG_SCHEMA` and `LAYER_DIALOG_RESOLVER` to module scope (after imports). Removed the local `layerDialogSchema` variable; `useForm` now references `LAYER_DIALOG_RESOLVER` directly. The explanatory comment about overriding `name` to `z.string()` moved to the `resolver:` call site. 2000/2000 tests pass; TypeScript clean.
 
-#### [QUAL9] `useElapsedTime` non-null asserts `startRef.current` inside `setInterval`
+#### ~~[QUAL9] `useElapsedTime` non-null asserts `startRef.current` inside `setInterval`~~ ✅ FIXED
 - **File**: `src/components/composite/DownloadManager/DownloadItem.tsx:32-39`
 - **Severity**: Low
 - **Finding**: `startRef.current!` is asserted inside the interval callback. The guard runs before `setInterval`, so it's safe now, but a future refactor moving the interval above the guard would produce a silent runtime crash.
-- **Recommendation**: Capture the value before the interval: `const start = startRef.current!; setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000)`.
+- **Fix applied**: Captured `const start = startRef.current!` immediately after the guard (where non-nullness is guaranteed), then closed over `start` inside the interval callback instead of re-reading the ref. The assertion is now co-located with the proof of its safety; the interval closes over a plain `number` rather than a mutable ref.
 
 #### [QUAL10] `projectStore.deleteScene` non-null asserts a double-indexed array access
 - **File**: `src/state/projectStore.ts:152-161`
