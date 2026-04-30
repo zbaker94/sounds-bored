@@ -61,6 +61,18 @@ export const initialProjectState: ProjectState = {
   loadSessionId: 0,
 };
 
+const withPad =
+  (sceneId: string, padId: string, update: (pad: Pad) => void) =>
+  (draft: ProjectStore) => {
+    if (!draft.project) return;
+    const scene = draft.project.scenes.find((s) => s.id === sceneId);
+    if (!scene) return;
+    const pad = scene.pads.find((p) => p.id === padId);
+    if (!pad) return;
+    update(pad);
+    draft.isDirty = true;
+  };
+
 export const useProjectStore = create<ProjectStore>()(
   immer((set, get) => ({
     ...initialProjectState,
@@ -268,36 +280,12 @@ export const useProjectStore = create<ProjectStore>()(
       }),
 
     setPadFadeDuration: (sceneId, padId, durationMs) =>
-      set((draft) => {
-        if (!draft.project) return;
-        const scene = draft.project.scenes.find((s) => s.id === sceneId);
-        if (!scene) return;
-        const pad = scene.pads.find((p) => p.id === padId);
-        if (!pad) return;
-        pad.fadeDurationMs = durationMs;
-        draft.isDirty = true;
-      }),
+      set(withPad(sceneId, padId, (pad) => { pad.fadeDurationMs = durationMs; })),
 
     setPadFadeTarget: (sceneId, padId, targetVol) =>
-      set((draft) => {
-        if (!draft.project) return;
-        const scene = draft.project.scenes.find((s) => s.id === sceneId);
-        if (!scene) return;
-        const pad = scene.pads.find((p) => p.id === padId);
-        if (!pad) return;
-        pad.fadeTargetVol = targetVol;
-        draft.isDirty = true;
-      }),
+      set(withPad(sceneId, padId, (pad) => { pad.fadeTargetVol = targetVol; })),
 
     setPadVolume: (sceneId, padId, vol) =>
-      set((draft) => {
-        if (!draft.project) return;
-        const scene = draft.project.scenes.find((s) => s.id === sceneId);
-        if (!scene) return;
-        const pad = scene.pads.find((p) => p.id === padId);
-        if (!pad) return;
-        pad.volume = vol;
-        draft.isDirty = true;
-      }),
+      set(withPad(sceneId, padId, (pad) => { pad.volume = vol; })),
   }))
 );

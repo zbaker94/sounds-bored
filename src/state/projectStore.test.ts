@@ -781,4 +781,88 @@ describe("projectStore", () => {
       expect(pad?.fadeDurationMs).toBeUndefined();
     });
   });
+
+  describe("setPadFadeTarget", () => {
+    function loadWithPad() {
+      const entry = createMockHistoryEntry();
+      const pad = createMockPad({ id: "pad-1", name: "Kick" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return { sceneId: scene.id, padId: pad.id };
+    }
+
+    it("should set fadeTargetVol on the pad", () => {
+      const { sceneId, padId } = loadWithPad();
+      getState().setPadFadeTarget(sceneId, padId, 50);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.fadeTargetVol).toBe(50);
+    });
+
+    it("should mark project as dirty", () => {
+      const { sceneId, padId } = loadWithPad();
+      getState().setPadFadeTarget(sceneId, padId, 75);
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("should do nothing if no project is loaded", () => {
+      getState().setPadFadeTarget("any-scene", "any-pad", 50);
+      expect(getState().project).toBeNull();
+    });
+
+    it("should do nothing if padId does not exist in the scene", () => {
+      const { sceneId } = loadWithPad();
+      getState().setPadFadeTarget(sceneId, "nonexistent-pad", 50);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.fadeTargetVol).toBeUndefined();
+    });
+
+    it("should do nothing if sceneId does not exist", () => {
+      loadWithPad();
+      getState().setPadFadeTarget("nonexistent-scene", "pad-1", 50);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.fadeTargetVol).toBeUndefined();
+    });
+  });
+
+  describe("setPadVolume", () => {
+    function loadWithPad() {
+      const entry = createMockHistoryEntry();
+      const pad = createMockPad({ id: "pad-1", name: "Kick" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return { sceneId: scene.id, padId: pad.id };
+    }
+
+    it("should set volume on the pad", () => {
+      const { sceneId, padId } = loadWithPad();
+      getState().setPadVolume(sceneId, padId, 80);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.volume).toBe(80);
+    });
+
+    it("should mark project as dirty", () => {
+      const { sceneId, padId } = loadWithPad();
+      getState().setPadVolume(sceneId, padId, 60);
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("should do nothing if no project is loaded", () => {
+      getState().setPadVolume("any-scene", "any-pad", 80);
+      expect(getState().project).toBeNull();
+    });
+
+    it("should do nothing if padId does not exist in the scene", () => {
+      const { sceneId } = loadWithPad();
+      getState().setPadVolume(sceneId, "nonexistent-pad", 80);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.volume).toBeUndefined();
+    });
+
+    it("should do nothing if sceneId does not exist", () => {
+      loadWithPad();
+      getState().setPadVolume("nonexistent-scene", "pad-1", 80);
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.volume).toBeUndefined();
+    });
+  });
 });

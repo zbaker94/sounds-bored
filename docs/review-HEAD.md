@@ -541,7 +541,7 @@ None.
 
 ---
 
-### Code Reuse (2 remaining)
+### Code Reuse (1 remaining)
 
 #### ~~[REUSE3] 0–1 volume clamp open-coded 6 times in audio engine~~ ✅ FIXED
 - **File**: `src/lib/audio/gainManager.ts:16,46,58`; `src/lib/audio/audioState.ts:468`; `src/lib/audio/layerTrigger.ts:88,98`; `src/hooks/usePadGesture.ts:174`
@@ -550,11 +550,12 @@ None.
 - **Recommendation**: Add `clampGain01(value: number, fallback = 0): number` in `src/lib/audio/gainManager.ts` (or alongside `getLayerNormalizedVolume`). Every clamp site becomes a one-liner.
 - **Fix applied**: The review's "6 times" count was stale — `gainManager.ts` had already extracted a private `clampGain` helper; its 3 internal uses were not open-coded. The truly open-coded sites were 4. `clampGain` renamed to `clampGain01(value, fallback = 0)` and exported. `layerTrigger.ts:88,98` replaced with `clampGain01(x / 100)` (the `/100` scale-conversion stays at the call site). `usePadGesture.ts:175` replaced with `clampGain01(...)`. `audioState.ts:612` left inline: `gainManager` → `audioState` is an existing import, so importing in the reverse direction would create a cycle; additionally that site uses `fallback = 1` intentionally (non-finite volume defaults to full gain on initialization, not silence). 90/90 test files, 2007/2007 tests pass.
 
-#### [REUSE11] `projectStore` pad-field setters are 3 copies of the same scene→pad lookup
+#### ~~[REUSE11] `projectStore` pad-field setters are 3 copies of the same scene→pad lookup~~ ✅ FIXED
 - **File**: `src/state/projectStore.ts:262-293`
 - **Severity**: Low
 - **Finding**: `setPadFadeDuration`, `setPadFadeTarget`, and `setPadVolume` each perform the identical scene-lookup → pad-lookup → field-assign → `isDirty = true` pattern.
 - **Recommendation**: Add a private `withPad(sceneId, padId, update: (pad: Draft<Pad>) => void)` helper inside the store creator. All three setters become one-liners, and future pad-field setters stay cheap.
+- **Fix applied**: Added module-level `withPad` curried helper (typed against `ProjectStore`, no Immer import needed) before `useProjectStore`. The three setters are now single-expression one-liners. `isDirty = true` and both guard returns live exclusively in `withPad`. Also added 10 missing tests for `setPadFadeTarget` and `setPadVolume` (5 each, mirroring `setPadFadeDuration` coverage). 91/91 tests pass.
 
 #### [REUSE12] `buildPadMap` not exported — other hooks use O(N×M) `flatMap.find` instead
 - **File**: `src/hooks/useMultiFadeMode.ts:16-24`; `src/hooks/useGlobalHotkeys.ts:90,105,141`

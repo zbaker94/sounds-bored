@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Refactored internal pad state update logic to eliminate duplicated code, improving maintainability with no change to behavior
 - Marked the volume clamp code-reuse issue (REUSE3) as fixed in the internal code review document.
 - Refactored internal volume clamping logic into a shared `clampGain01` utility, reducing duplicated code across the audio engine without changing any playback behavior.
 - Fixed a bug where sounds missing their audio file were not properly excluded when validating set-based pad layer configurations
