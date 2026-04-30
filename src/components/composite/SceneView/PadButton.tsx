@@ -131,14 +131,18 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     mouseY.set(0);
   }
 
-  // When tilt is disabled (e.g. entering edit mode mid-hover), snap motion values to 0
-  // so the springs settle immediately and stop running RAF callbacks.
+  // When tilt is disabled, snap both source values and spring outputs to 0.
+  // Sources must be zeroed first so useTransform derives target=0 before we
+  // call .set(0) on the springs; .set() bypasses physics and snaps immediately,
+  // eliminating the ~5-frame RAF settlement window.
   useEffect(() => {
     if (!tiltEnabled) {
       mouseX.set(0);
       mouseY.set(0);
+      rotateX.set(0);
+      rotateY.set(0);
     }
-  }, [tiltEnabled, mouseX, mouseY]);
+  }, [tiltEnabled, mouseX, mouseY, rotateX, rotateY]);
 
   // Gate PadBackFace mount behind a delayed-unmount state so the flip-out animation
   // can finish before the back face's store subscriptions (RAF-driven at 60fps)

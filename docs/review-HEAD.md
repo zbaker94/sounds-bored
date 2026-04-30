@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 27 (26 fixed) |
+| Low | 27 (27 fixed) |
 | **Total** | **63** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -391,6 +391,12 @@ None.
 - **Finding**: `PadButton` was mounting `PadBackFace` unconditionally inside the flip container. Each `BackFaceLayerRow` holds two playback subscriptions: a React hook on `activeLayerIds` (`usePlaybackStore((s) => s.activeLayerIds.has(layer.id))`) and a direct `usePlaybackStore.subscribe` on `layerVolumes[layer.id]`. Both stores are written by the RAF tick on every frame during playback. With 12 pads each having 1–3 layers, all layer rows across all pads subscribed to 60fps updates while their containing back face was invisible, incurring 12–36 active subscriptions firing at audio-tick rate and triggering re-renders for no visible output.
 - **Fix applied**: Added `showBackFace` state to `PadButton` (initialized to `isFlipped`) with a delayed-unmount timer. When a pad flips to front (`isFlipped` → false), `showBackFace` is set to false after `PAD_FLIP_DURATION_MS + 50ms` — enough for the CSS flip animation to complete. When a pad flips to back (`isFlipped` → true), `showBackFace` is set immediately. The `PadBackFace` mount is gated by `{showBackFace && <PadBackFace …/>}`, so all `BackFaceLayerRow` subscriptions are torn down as soon as the back face is no longer visible. Non-editing pads pay zero subscription cost. The delayed-unmount approach is intentionally more robust than a plain `editingPadId === pad.id` gate: it prevents the back face from disappearing mid-animation and avoids a flash when global edit mode is toggled on all pads simultaneously.
 
+#### ~~[PERF-4] Unconditional AnimatePresence + continuous spring machinery on all visible pads~~ ✅ FIXED
+- **File**: `src/components/composite/SceneView/PadButton.tsx:111–141, 247–264`
+- **Severity**: Low
+- **Finding**: Every visible pad allocated `useMotionValue`/`useSpring`/`useTransform` hooks unconditionally, even when `tiltEnabled` is false (edit mode, sort drag, multi-fade). The existing `useEffect` that snapped source values to 0 set `mouseX`/`mouseY` to 0, but the spring outputs (`rotateX`, `rotateY`) still animated toward 0 over ~5 RAF frames rather than snapping immediately — keeping the RAF loop alive briefly for all 12 pads whenever tilt was toggled off. A separate concern about a Motion `animate={{ opacity: [0.3, 0.8, 0.3] }}` keyframe loop on the pulse ring was already addressed prior to this finding: the current implementation uses a CSS `@keyframes pad-pulse` animation with Motion only for mount/unmount opacity transitions.
+- **Fix applied**: Added `rotateX.set(0)` and `rotateY.set(0)` calls alongside the existing `mouseX.set(0)`/`mouseY.set(0)` in the `tiltEnabled` effect. Calling `.set(0)` directly on spring `MotionValue`s bypasses the spring physics and snaps their output to 0 immediately, eliminating the ~5-frame RAF settlement window when entering edit/multi-fade mode. Source values are still zeroed first so the spring target (via `useTransform`) is also 0, preventing any rebound. Comment updated to accurately describe the immediate snap. Extracting tilt into a conditionally-mounted child component was evaluated and rejected: changing the wrapper component type at the same tree position would force React to unmount/remount the entire pad content tree (flip container, front face button, back face) on every tilt toggle, causing visual glitches that are worse than the settled-spring overhead.
+
 #### ~~[PERF12] `stopAllPads` ramp timeout races with immediate re-trigger~~ ✅ FIXED
 - **File**: `src/lib/audio/padPlayer.ts:437-446`
 - **Severity**: Low
@@ -607,6 +613,7 @@ None.
 | PERF-D | SceneView preload guard prevents re-running on every Immer scenes replacement |
 | PERF-E | `PadBackFace` gated behind delayed-unmount so its store subscriptions don't fire on front-facing pads |
 | PERF-F | `PadButton` delegates progress/fade-overlay to `PadButtonProgress`/`PadButtonFadeOverlay` — outer pad no longer re-renders at 60fps |
+| PERF-4 | `rotateX.set(0)`/`rotateY.set(0)` added alongside source-value snap in the `tiltEnabled` effect; spring outputs now snap immediately instead of settling over ~5 RAF frames when tilt is disabled; pulse ring CSS animation already in place (finding partially stale) |
 | ARCH-A | Dual TanStack Query → Zustand state ownership eliminated |
 | ARCH-B | `PadButton` decomposed from god component into focused sub-components |
 | ARCH-C | `activeSceneId` moved from `projectStore` to `uiStore` (no circular dep) |

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed pad tilt animation snapping immediately when entering edit mode, eliminating a brief lag where spring physics continued running after tilt was disabled
 - Improved performance by unmounting hidden pad edit views when not in use, reducing unnecessary background audio subscriptions during playback
 - Resolved 15 code review findings across security, performance, architecture, code quality, and reuse categories, reducing total open issues from 47 to 32
 - Fixed all 3 security findings (symlink TOCTOU and yt-dlp config injection vulnerabilities) and both high-priority performance issues
