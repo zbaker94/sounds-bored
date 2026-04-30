@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Active layers in pad configuration now show a real-time progress bar indicating playback position.
+- Previewing a sound in the sound library now displays a live progress bar beneath the sound name.
+- Preview audio is now properly stopped when closing a project, preventing audio bleed between project sessions.
 - Duplicate filename-extraction logic consolidated into a single shared `basename()` utility, eliminating redundant code across 8+ files
 - Eliminated duplicate code in the audio layer defaults, reducing the risk of inconsistent behavior if defaults ever diverge.
 - Added unit tests covering default layer field values and uniqueness guarantees, improving reliability of new pad creation.

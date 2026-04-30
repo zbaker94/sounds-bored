@@ -35,9 +35,13 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 const mockSetIsPreviewPlaying = vi.fn();
+const mockSetPreviewProgress = vi.fn();
 vi.mock("@/state/playbackStore", () => ({
   usePlaybackStore: {
-    getState: vi.fn(() => ({ setIsPreviewPlaying: mockSetIsPreviewPlaying })),
+    getState: vi.fn(() => ({
+      setIsPreviewPlaying: mockSetIsPreviewPlaying,
+      setPreviewProgress: mockSetPreviewProgress,
+    })),
   },
 }));
 
@@ -83,6 +87,7 @@ describe("preview — streaming path (large files)", () => {
     mockSourceNode.connect.mockClear();
     mockSourceNode.disconnect.mockClear();
     mockSetIsPreviewPlaying.mockClear();
+    mockSetPreviewProgress.mockClear();
     // Restore default happy-path Audio stub so tests that replace it don't bleed into siblings
     vi.stubGlobal("Audio", makeDefaultAudioStub());
     // Force the streaming branch (large file)
@@ -156,6 +161,7 @@ describe("preview — streaming path (large files)", () => {
 describe("preview — buffer path (small files)", () => {
   beforeEach(async () => {
     mockSetIsPreviewPlaying.mockClear();
+    mockSetPreviewProgress.mockClear();
     // Force the buffer branch (not a large file)
     const mod = await import("./streamingCache");
     (mod.checkIsLargeFile as ReturnType<typeof vi.fn>).mockResolvedValue(false);
@@ -172,5 +178,58 @@ describe("preview — buffer path (small files)", () => {
     await expect(playPreview(createMockSound({ filePath: "kick.wav" }))).rejects.toThrow("fetch failed");
 
     expect(mockSetIsPreviewPlaying).toHaveBeenCalledWith(false);
+  });
+
+  it("clears previewProgress (sets null) when stopPreview() is called explicitly", async () => {
+    const { stopPreview } = await import("./preview");
+    mockSetPreviewProgress.mockClear(); // isolate from the beforeEach stopPreview() call
+    stopPreview();
+    expect(mockSetPreviewProgress).toHaveBeenCalledWith(null);
+  });
+
+  it("clears previewProgress when source.onended fires naturally", async () => {
+    const { playPreview } = await import("./preview");
+    const sound = createMockSound({ filePath: "kick.wav" });
+    await playPreview(sound);
+
+    // Capture the source that was created and trigger its natural end
+    const source = mockCtx.createBufferSource.mock.results[mockCtx.createBufferSource.mock.results.length - 1].value;
+    mockSetPreviewProgress.mockClear();
+    source.onended?.();
+
+    expect(mockSetPreviewProgress).toHaveBeenCalledWith(null);
+    expect(mockSetIsPreviewPlaying).toHaveBeenCalledWith(false);
+  });
+
+  it("clears previewProgress on error (loadBuffer rejection)", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    (loadBuffer as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("network error"));
+    const { playPreview } = await import("./preview");
+
+    await expect(playPreview(createMockSound({ filePath: "kick.wav" }))).rejects.toThrow();
+
+    expect(mockSetPreviewProgress).toHaveBeenCalledWith(null);
+  });
+
+  it("does not call onEnded callback when a newer preview has replaced the source", async () => {
+    const onEnded = vi.fn();
+    const { playPreview, stopPreview } = await import("./preview");
+    const sound = createMockSound({ filePath: "kick.wav" });
+    await playPreview(sound, onEnded);
+
+    // Capture the onended handler BEFORE stopPreview() nullifies it on the source object
+    const allSources = mockCtx.createBufferSource.mock.results;
+    const oldSource = allSources[allSources.length - 1].value;
+    const capturedOnEnded = oldSource.onended as (() => void) | null;
+
+    // Simulate a newer preview taking over — currentSource now points to a different source
+    stopPreview();
+    await playPreview(sound);
+
+    // Invoke the captured handler: currentSource !== oldSource so the guard fires and
+    // onEnded must NOT be called, confirming the stale-source check at preview.ts:105
+    capturedOnEnded?.();
+
+    expect(onEnded).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import { clearAllAudioState } from "@/lib/audio/audioState";
 import { clearAllBuffers } from "@/lib/audio/bufferCache";
 import { clearAllStreamingElements, clearAllSizeCache } from "@/lib/audio/streamingCache";
 import { stopAudioTick } from "@/lib/audio/audioTick";
+import { stopPreview } from "@/lib/audio/preview";
 import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { SceneView } from "@/components/composite/SceneView/SceneView";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -63,6 +64,10 @@ function MainPageInner() {
     return () => {
       stopAudioTick();
       clearAllAudioState();
+      // Stop any active sound preview. preview.ts manages its own module-level
+      // state (currentSource, previewRafId) outside clearAllAudioState's scope,
+      // so it must be torn down explicitly here.
+      stopPreview();
       // Release decoded PCM memory from the closed project and discard pre-buffered
       // HTMLAudioElements so they do not accumulate across project switches.
       // These caches live outside audioState's pure-state-container boundary, so

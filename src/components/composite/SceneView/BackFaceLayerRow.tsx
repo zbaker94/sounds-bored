@@ -40,6 +40,11 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
 }) {
   const canRemove = pad.layers.length > 1;
   const layerActive = usePlaybackStore((s) => s.activeLayerIds.has(layer.id));
+  // Gate on activeLayerIds to short-circuit the layerProgress lookup for idle layers,
+  // avoiding selector work on every audioTick frame when the bar isn't visible.
+  const layerProgress = usePlaybackStore((s) =>
+    s.activeLayerIds.has(layer.id) ? (s.layerProgress[layer.id] ?? 0) : 0
+  );
   const [liveLayerVol, setLiveLayerVol] = useState<number | null>(() => {
     const stored = usePlaybackStore.getState().layerVolumes[layer.id];
     return stored !== undefined ? Math.round(stored * 100) : null;
@@ -192,6 +197,15 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
         max={100}
         step={1}
       />
+
+      {layerActive && (
+        <div className="h-0.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-primary/60 rounded-full"
+            style={{ width: `${layerProgress * 100}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 });

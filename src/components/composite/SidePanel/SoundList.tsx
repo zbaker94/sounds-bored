@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo } from "react";
 import { remove } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLibraryStore } from "@/state/libraryStore";
+import { usePlaybackStore } from "@/state/playbackStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictSoundCaches } from "@/lib/audio/cacheUtils";
@@ -38,6 +39,29 @@ import { getAffectedPads, type AffectedPad } from "@/lib/project.reconcile";
 import { cn } from "@/lib/utils";
 import { SoundListItemTags } from "./SoundListItemTags";
 import { ConfirmDeleteSoundsDialog } from "./ConfirmDeleteSoundsDialog";
+
+/**
+ * Thin progress fill bar shown under a previewing sound's name.
+ *
+ * Subscribes directly to playbackStore so that 60Hz RAF tick updates are
+ * isolated to this component — SoundList itself does not re-render on ticks.
+ * Mounted only when a sound is being previewed (gated by parent).
+ */
+const PreviewProgressBar = memo(function PreviewProgressBar() {
+  const progress = usePlaybackStore((s) => s.previewProgress ?? 0);
+  return (
+    <div
+      data-testid="preview-progress-bar"
+      className="w-full h-0.5 bg-muted rounded-full overflow-hidden mt-1"
+    >
+      <div
+        data-testid="preview-progress-fill"
+        className="h-full bg-primary/60 rounded-full"
+        style={{ width: `${progress * 100}%` }}
+      />
+    </div>
+  );
+});
 
 const panelClass =
   "backdrop-blur-sm hover:backdrop-blur-lg bg-black/50 rounded-lg";
@@ -319,6 +343,7 @@ export function SoundList({
                   {sound.name}
                 </ItemTitle>
                 <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
+                {previewingId === sound.id && <PreviewProgressBar />}
               </ItemContent>
               <ItemActions>
                 {isSoundMissing ? (
