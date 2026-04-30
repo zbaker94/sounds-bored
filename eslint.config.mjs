@@ -8,16 +8,16 @@ export default [
     },
   },
   {
-    // Enforce the coupling direction: domain stores (project/library/playback)
-    // may import uiStore, but uiStore and other peripheral stores must never
-    // import from domain stores — doing so would create a Vite module evaluation
-    // cycle. This mirrors the documented invariant in projectStore.ts.
+    // Enforce store coupling direction: no store may import from domain stores
+    // (projectStore, libraryStore, playbackStore). This prevents circular deps
+    // and keeps the architecture layered. Domain stores themselves are exempt so
+    // they can import from each other if ever needed; test files are exempt since
+    // they need to set up and inspect store state directly.
     //
     // Applied to the whole src/state/ folder so new stores are automatically
-    // covered without requiring a config edit. Domain stores are the ignores.
+    // covered without requiring a config edit.
     files: ["src/state/**/*.ts"],
     ignores: [
-      "src/state/projectStore.ts",
       "src/state/libraryStore.ts",
       "src/state/playbackStore.ts",
       "src/state/*.test.ts",

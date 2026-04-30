@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Scene switching is now more reliable: adding, deleting, or loading scenes updates the active tab atomically, eliminating a brief window where the wrong scene could appear selected.
+- Deleting the currently active scene now correctly auto-selects the next available scene with no intermediate flicker.
+- Volume slider dragging no longer triggers unnecessary state writes on every frame, reducing potential UI jank during playback.
 - Fixed pad tilt animation snapping immediately when entering edit mode, eliminating a brief lag where spring physics continued running after tilt was disabled
 - Improved performance by unmounting hidden pad edit views when not in use, reducing unnecessary background audio subscriptions during playback
 - Resolved 15 code review findings across security, performance, architecture, code quality, and reuse categories, reducing total open issues from 47 to 32

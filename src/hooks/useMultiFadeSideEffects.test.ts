@@ -138,7 +138,7 @@ describe("useMultiFadeSideEffects — auto-cancel on editMode", () => {
 
     act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
     // Some other uiStore change that leaves editMode false
-    act(() => { useUiStore.getState().setActiveSceneId(null); });
+    act(() => { useUiStore.getState().setHoveredPadId("pad-0"); });
 
     expect(useMultiFadeStore.getState().active).toBe(true);
   });

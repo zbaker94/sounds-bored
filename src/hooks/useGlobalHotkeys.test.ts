@@ -32,7 +32,6 @@ vi.mock("@/contexts/ProjectActionsContext", () => ({
 
 const mockUiState = {
   editMode: false,
-  activeSceneId: null as string | null,
   hoveredPadId: null as string | null,
   editingPadId: null as string | null,
   fadePopoverPadId: null as string | null,
@@ -45,7 +44,6 @@ const mockUiState = {
   isTopOverlay: vi.fn(() => false),
   isOverlayOpen: vi.fn(() => false),
   toggleEditMode: vi.fn(),
-  setActiveSceneId: vi.fn((id: string | null, _sceneIds?: string[]) => { mockUiState.activeSceneId = id; }),
   setHoveredPadId: vi.fn(),
   setEditingPadId: vi.fn((id: string | null) => { mockUiState.editingPadId = id; }),
   setFadePopoverPadId: vi.fn((id: string | null) => { mockUiState.fadePopoverPadId = id; }),
@@ -108,7 +106,6 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     useProjectStore.setState({ ...initialProjectState });
     // Reset mutable fields on the shared mockUiState object
     mockUiState.editMode = false;
-    mockUiState.activeSceneId = null;
     mockUiState.hoveredPadId = null;
     mockUiState.editingPadId = null;
     mockUiState.fadePopoverPadId = null;
@@ -254,7 +251,6 @@ describe("useGlobalHotkeys — mod+shift+n (add pad)", () => {
     vi.clearAllMocks();
     Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
     useProjectStore.setState({ ...initialProjectState });
-    mockUiState.activeSceneId = null;
     mockUiState.editingPadId = null;
     mockUiState.pageByScene = {};
   });
@@ -268,7 +264,6 @@ describe("useGlobalHotkeys — mod+shift+n (add pad)", () => {
       scenes: [{ id: "scene-1", name: "Scene 1", pads: [] }],
     });
     useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = null;
 
     const addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
     renderHook(() => useGlobalHotkeys());
@@ -282,8 +277,7 @@ describe("useGlobalHotkeys — mod+shift+n (add pad)", () => {
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: [] }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
 
     const addPadSpy = vi.spyOn(useProjectStore.getState(), "addPad");
     renderHook(() => useGlobalHotkeys());
@@ -321,8 +315,11 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
         pads: [],
       })),
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = activeIdx !== null ? `scene-${activeIdx}` : null;
+    useProjectStore.setState({
+      ...initialProjectState,
+      project,
+      activeSceneId: activeIdx !== null ? `scene-${activeIdx}` : null,
+    });
     return project;
   }
 
@@ -338,36 +335,32 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
   it("does nothing on alt+right when project is null", () => {
     useProjectStore.setState({ ...initialProjectState, project: null });
-    mockUiState.activeSceneId = null;
     renderHook(() => useGlobalHotkeys());
     triggerKey("alt+right");
-    expect(mockUiState.activeSceneId).toBeNull();
+    expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
   it("does nothing on alt+left when project is null", () => {
     useProjectStore.setState({ ...initialProjectState, project: null });
-    mockUiState.activeSceneId = null;
     renderHook(() => useGlobalHotkeys());
     triggerKey("alt+left");
-    expect(mockUiState.activeSceneId).toBeNull();
+    expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
   it("does nothing on alt+right when scenes array is empty", () => {
     const project = createMockProject({ scenes: [] });
     useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = null;
     renderHook(() => useGlobalHotkeys());
     triggerKey("alt+right");
-    expect(mockUiState.activeSceneId).toBeNull();
+    expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
   it("does nothing on alt+left when scenes array is empty", () => {
     const project = createMockProject({ scenes: [] });
     useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = null;
     renderHook(() => useGlobalHotkeys());
     triggerKey("alt+left");
-    expect(mockUiState.activeSceneId).toBeNull();
+    expect(useProjectStore.getState().activeSceneId).toBeNull();
   });
 
   // ── Alt+Right ───────────────────────────────────────────────────────────────
@@ -379,7 +372,7 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
       triggerKey("alt+right");
 
-      expect(mockUiState.activeSceneId).toBe("scene-1");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-1");
     });
 
     it("wraps from last scene to first scene", () => {
@@ -388,7 +381,7 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
       triggerKey("alt+right");
 
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
 
     it("falls back to first scene when activeSceneId is null (idx === -1)", () => {
@@ -397,32 +390,31 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
       triggerKey("alt+right");
 
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
 
     it("falls back to first scene when activeSceneId is stale/invalid", () => {
       setupScenes(3, 0);
       // Manually set an ID that doesn't match any scene
-      mockUiState.activeSceneId = "scene-stale-id";
+      useProjectStore.setState({ activeSceneId: "scene-stale-id" });
       renderHook(() => useGlobalHotkeys());
 
       triggerKey("alt+right");
 
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
 
     it("does nothing when fewer than 2 scenes", () => {
       const project = createMockProject({
         scenes: [{ id: "scene-0", name: "Scene 1", pads: [] }],
       });
-      useProjectStore.setState({ ...initialProjectState, project });
-      mockUiState.activeSceneId = "scene-0";
+      useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-0" });
       renderHook(() => useGlobalHotkeys());
 
       triggerKey("alt+right");
 
       // activeSceneId stays as-is — single-scene guard fires
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
   });
 
@@ -435,7 +427,7 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
       triggerKey("alt+left");
 
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
 
     it("wraps from first scene to last scene", () => {
@@ -444,7 +436,7 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
 
       triggerKey("alt+left");
 
-      expect(mockUiState.activeSceneId).toBe("scene-2");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-2");
     });
 
     it("falls back to first scene when activeSceneId is null (idx === -1)", () => {
@@ -454,30 +446,29 @@ describe("useGlobalHotkeys — alt+arrow scene navigation", () => {
       triggerKey("alt+left");
 
       // Before fix: (-1 - 1 + 3) % 3 = 1 → scene-1. After fix: scene-0.
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
 
     it("falls back to first scene when activeSceneId is stale/invalid", () => {
       setupScenes(3, 0);
-      mockUiState.activeSceneId = "scene-stale-id";
+      useProjectStore.setState({ activeSceneId: "scene-stale-id" });
       renderHook(() => useGlobalHotkeys());
 
       triggerKey("alt+left");
 
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
 
     it("does nothing when fewer than 2 scenes", () => {
       const project = createMockProject({
         scenes: [{ id: "scene-0", name: "Scene 1", pads: [] }],
       });
-      useProjectStore.setState({ ...initialProjectState, project });
-      mockUiState.activeSceneId = "scene-0";
+      useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-0" });
       renderHook(() => useGlobalHotkeys());
 
       triggerKey("alt+left");
 
-      expect(mockUiState.activeSceneId).toBe("scene-0");
+      expect(useProjectStore.getState().activeSceneId).toBe("scene-0");
     });
   });
 });
@@ -489,7 +480,6 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     vi.clearAllMocks();
     Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
     useProjectStore.setState({ ...initialProjectState });
-    mockUiState.activeSceneId = null;
     mockUiState.pageByScene = {};
     mockUiState.setScenePage.mockClear();
   });
@@ -516,7 +506,6 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
     });
     useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = null;
     mockUiState.pageByScene = {};
 
     renderHook(() => useGlobalHotkeys());
@@ -530,7 +519,6 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
     });
     useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = null;
     mockUiState.pageByScene = {};
 
     renderHook(() => useGlobalHotkeys());
@@ -545,8 +533,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(1) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 0 };
 
     renderHook(() => useGlobalHotkeys());
@@ -560,8 +547,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(1) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 0 };
 
     renderHook(() => useGlobalHotkeys());
@@ -577,8 +563,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 1 };
 
     renderHook(() => useGlobalHotkeys());
@@ -594,8 +579,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 0 };
 
     renderHook(() => useGlobalHotkeys());
@@ -611,8 +595,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 0 };
 
     renderHook(() => useGlobalHotkeys());
@@ -628,8 +611,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(25) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 2 };
 
     renderHook(() => useGlobalHotkeys());
@@ -646,8 +628,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(12) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 5 };
 
     renderHook(() => useGlobalHotkeys());
@@ -662,8 +643,7 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
     const project = createMockProject({
       scenes: [{ id: "scene-1", name: "Scene 1", pads: makePads(12) }],
     });
-    useProjectStore.setState({ ...initialProjectState, project });
-    mockUiState.activeSceneId = "scene-1";
+    useProjectStore.setState({ ...initialProjectState, project, activeSceneId: "scene-1" });
     mockUiState.pageByScene = { "scene-1": 5 };
 
     renderHook(() => useGlobalHotkeys());

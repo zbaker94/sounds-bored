@@ -54,7 +54,7 @@ export function SceneView() {
   // auto-save) lives outside project, so it does not produce a new scenes reference
   // and won't trigger the scan — unlike a single inline selector which always scans.
   const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
-  const activeSceneId = useUiStore((s) => s.activeSceneId);
+  const activeSceneId = useProjectStore((s) => s.activeSceneId);
   const activeScene = useMemo(
     () => scenes.find((sc) => sc.id === activeSceneId) ?? null,
     [scenes, activeSceneId],

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useProjectStore } from "@/state/projectStore";
-import { useUiStore } from "@/state/uiStore";
 import { Tabs, TabsList } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -25,8 +24,8 @@ const EMPTY_SCENES: Scene[] = [];
 
 export function SceneTabBar() {
   const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
-  const activeSceneId = useUiStore((s) => s.activeSceneId);
-  const setActiveSceneId = useUiStore((s) => s.setActiveSceneId);
+  const activeSceneId = useProjectStore((s) => s.activeSceneId);
+  const setActiveSceneId = useProjectStore((s) => s.setActiveSceneId);
   const addScene = useProjectStore((s) => s.addScene);
   const reorderScenes = useProjectStore((s) => s.reorderScenes);
 
@@ -56,7 +55,7 @@ export function SceneTabBar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="min-w-0 max-w-[940px] overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
-              <Tabs value={activeSceneId ?? ""} onValueChange={(id) => setActiveSceneId(id, sceneIds)}>
+              <Tabs value={activeSceneId ?? ""} onValueChange={(id) => setActiveSceneId(id)}>
                 <TabsList variant="line">
                   <DndContext
                     sensors={sensors}

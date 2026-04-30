@@ -21,20 +21,9 @@ export const OVERLAY_ID = {
   CONFIRM_REMOVE_MISSING_FOLDERS: "confirm-remove-missing-folders",
 } as const;
 
-/** Overloaded setter for activeSceneId: sceneIds is required when id is non-null. */
-export type SetActiveSceneIdFn = {
-  (id: null, sceneIds?: string[]): void;
-  (id: string, sceneIds: string[]): void;
-};
-
 interface UiState {
   overlayStack: OverlayEntry[];
   editMode: boolean;
-  /** The currently active scene tab, or null when no project is loaded.
-   * Invariant: must be null or a scene id that exists in the current project.
-   * `setActiveSceneId` enforces this invariant when callers pass the current
-   * scene id list (see its docstring). */
-  activeSceneId: string | null;
   /** The pad currently under the mouse cursor, or null if none. */
   hoveredPadId: string | null;
   /** The pad currently being edited (showing its back face), or null if none. */
@@ -66,15 +55,6 @@ interface UiActions {
   setHoveredPadId: (id: string | null) => void;
   /** Set the pad currently being edited, or null to clear. */
   setEditingPadId: (id: string | null) => void;
-  /** Set the active scene tab. Pass null to clear (e.g., on project close).
-   *
-   * When `id` is non-null, `sceneIds` is required: a non-null `id` that is NOT
-   * in `sceneIds` is silently rejected, guaranteeing `activeSceneId` never
-   * dangles on a non-existent scene. Pass the post-mutation scene id list from
-   * project lifecycle callers (load/clear/add/delete). Tab bar and hotkey
-   * callers derive `id` directly from the rendered scene list and must also
-   * pass that list so the invariant is always enforced. */
-  setActiveSceneId: SetActiveSceneIdFn;
   /** Set the pad whose fade-config popover is open, or null to close. */
   setFadePopoverPadId: (id: string | null) => void;
   /** Set the in-flight popover fade target (0–1), or null to clear. */
@@ -88,7 +68,6 @@ export type UiStore = UiState & UiActions;
 export const initialUiState: UiState = {
   overlayStack: [],
   editMode: false,
-  activeSceneId: null,
   hoveredPadId: null,
   editingPadId: null,
   fadePopoverPadId: null,
@@ -138,13 +117,6 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   setHoveredPadId: (id) => set({ hoveredPadId: id }),
 
   setEditingPadId: (id) => set({ editingPadId: id }),
-
-  setActiveSceneId: ((id: string | null, sceneIds?: string[]) => {
-    // Enforce activeSceneId invariant: when sceneIds is provided and id is
-    // non-null, silently reject ids that don't exist in the current scene list.
-    if (id !== null && sceneIds !== undefined && !sceneIds.includes(id)) return;
-    set({ activeSceneId: id });
-  }) as SetActiveSceneIdFn,
 
   setFadePopoverPadId: (id) => set(id === null ? { fadePopoverPadId: null, fadePopoverTarget: null } : { fadePopoverPadId: id }),
 

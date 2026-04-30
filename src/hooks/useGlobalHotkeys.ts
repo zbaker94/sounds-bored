@@ -146,7 +146,8 @@ export function useGlobalHotkeys() {
 
   // Shift+Left: previous page of the active scene's pad grid (wraps to last page).
   useHotkeys("shift+left", () => {
-    const { activeSceneId, pageByScene, setScenePage } = useUiStore.getState();
+    const { activeSceneId } = useProjectStore.getState();
+    const { pageByScene, setScenePage } = useUiStore.getState();
     if (!activeSceneId) return;
     const pads = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId)?.pads ?? [];
     const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
@@ -157,7 +158,8 @@ export function useGlobalHotkeys() {
 
   // Shift+Right: next page of the active scene's pad grid (wraps to first page).
   useHotkeys("shift+right", () => {
-    const { activeSceneId, pageByScene, setScenePage } = useUiStore.getState();
+    const { activeSceneId } = useProjectStore.getState();
+    const { pageByScene, setScenePage } = useUiStore.getState();
     if (!activeSceneId) return;
     const pads = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId)?.pads ?? [];
     const totalPages = Math.max(1, Math.ceil(pads.length / PADS_PER_PAGE));
@@ -168,8 +170,8 @@ export function useGlobalHotkeys() {
 
   // Mod+Shift+N: add a new pad to the active scene, navigate to its page, and flip it into edit mode.
   useHotkeys("mod+shift+n", () => {
-    const { project, addPad } = useProjectStore.getState();
-    const { activeSceneId, setEditingPadId, setScenePage } = useUiStore.getState();
+    const { project, activeSceneId, addPad } = useProjectStore.getState();
+    const { setEditingPadId, setScenePage } = useUiStore.getState();
     if (!activeSceneId || !project?.scenes.some((s) => s.id === activeSceneId)) return;
     const newId = crypto.randomUUID();
     const config: PadConfig = {
@@ -187,11 +189,10 @@ export function useGlobalHotkeys() {
 
   // 1-9: jump directly to scene by index.
   useHotkeys("1,2,3,4,5,6,7,8,9", (e) => {
-    const { project } = useProjectStore.getState();
+    const { project, setActiveSceneId } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
-    const sceneIds = scenes.map((s) => s.id);
     const idx = parseInt(e.key) - 1;
-    if (idx < scenes.length) useUiStore.getState().setActiveSceneId(scenes[idx].id, sceneIds);
+    if (idx < scenes.length) setActiveSceneId(scenes[idx].id);
   });
 
   // Alt+Left/Right: navigate between scenes with wrapping.
@@ -207,24 +208,20 @@ export function useGlobalHotkeys() {
   //     it via preventDefault: true (the app has no in-webview history anyway).
   // Guard idx === -1: when activeSceneId is null or stale, fall back to the first scene.
   useHotkeys("alt+left", () => {
-    const { project } = useProjectStore.getState();
-    const { activeSceneId, setActiveSceneId } = useUiStore.getState();
+    const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
-    const sceneIds = scenes.map((s) => s.id);
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
-    if (idx === -1) { setActiveSceneId(scenes[0].id, sceneIds); return; }
-    setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id, sceneIds);
+    if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
+    setActiveSceneId(scenes[(idx - 1 + scenes.length) % scenes.length].id);
   }, { preventDefault: true /* suppress webview Alt+Left = Back */ });
 
   useHotkeys("alt+right", () => {
-    const { project } = useProjectStore.getState();
-    const { activeSceneId, setActiveSceneId } = useUiStore.getState();
+    const { project, activeSceneId, setActiveSceneId } = useProjectStore.getState();
     const scenes = project?.scenes ?? [];
     if (scenes.length < 2) return;
-    const sceneIds = scenes.map((s) => s.id);
     const idx = scenes.findIndex((s) => s.id === activeSceneId);
-    if (idx === -1) { setActiveSceneId(scenes[0].id, sceneIds); return; }
-    setActiveSceneId(scenes[(idx + 1) % scenes.length].id, sceneIds);
+    if (idx === -1) { setActiveSceneId(scenes[0].id); return; }
+    setActiveSceneId(scenes[(idx + 1) % scenes.length].id);
   }, { preventDefault: true /* suppress webview Alt+Right = Forward */ });
 }

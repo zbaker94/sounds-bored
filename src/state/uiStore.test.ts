@@ -200,35 +200,6 @@ describe("uiStore", () => {
     });
   });
 
-  describe("activeSceneId", () => {
-    it("starts as null", () => {
-      expect(useUiStore.getState().activeSceneId).toBeNull();
-    });
-
-    it("setActiveSceneId updates the value", () => {
-      useUiStore.getState().setActiveSceneId("scene-1", ["scene-1"]);
-      expect(useUiStore.getState().activeSceneId).toBe("scene-1");
-    });
-
-    it("setActiveSceneId accepts null to clear the selection", () => {
-      useUiStore.getState().setActiveSceneId("scene-1", ["scene-1"]);
-      useUiStore.getState().setActiveSceneId(null);
-      expect(useUiStore.getState().activeSceneId).toBeNull();
-    });
-
-    it("silently rejects a non-null id not present in sceneIds", () => {
-      useUiStore.getState().setActiveSceneId("scene-1", ["scene-1"]);
-      useUiStore.getState().setActiveSceneId("scene-99", ["scene-1", "scene-2"]);
-      expect(useUiStore.getState().activeSceneId).toBe("scene-1");
-    });
-
-    it("resets to null when initialUiState is applied in beforeEach", () => {
-      useUiStore.getState().setActiveSceneId("scene-x", ["scene-x"]);
-      useUiStore.setState({ ...initialUiState });
-      expect(useUiStore.getState().activeSceneId).toBeNull();
-    });
-  });
-
   describe("editingPadId", () => {
     it("starts as null", () => {
       expect(useUiStore.getState().editingPadId).toBeNull();

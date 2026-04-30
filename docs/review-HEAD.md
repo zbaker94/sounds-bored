@@ -11,7 +11,7 @@
 | Severity | Count |
 |----------|-------|
 | Critical | 0 |
-| High | 0 (5 fixed) |
+| High | 0 (6 fixed) |
 | Medium | 14 (19 fixed) |
 | Low | 27 (27 fixed) |
 | **Total** | **63** |
@@ -27,6 +27,14 @@ None.
 ---
 
 ## High (4)
+
+### ~~[ARCH-1] Cross-store import introduces hidden coupling and non-atomic state transitions~~ ✅ FIXED
+- **File**: `src/state/projectStore.ts:10–16`
+- **Severity**: High
+- **Finding**: `projectStore` imported and called `useUiStore.getState().setActiveSceneId(...)` from `loadProject`, `clearProject`, `addScene`, and `deleteScene`. This broke store independence: Immer's `set` published the project mutation, then a second Zustand `set` fired on `uiStore` — non-component subscribers (e.g. `useMultiFadeSideEffects` subscribe callbacks) could observe inconsistent intermediate state (new/cleared scenes with stale `activeSceneId`). The coupling also bypassed the ESLint ARCH3 rule via the `ignores` list, making it an invisible exception to the project's own architectural invariant.
+- **Fix applied**: Moved `activeSceneId` from `uiStore` into `projectStore`. All four scene lifecycle actions now update `activeSceneId` atomically within the same Immer `set` call — there is no intermediate state window. `setActiveSceneId` is now an action on `projectStore` that self-validates against its own scene list (no external `sceneIds` argument needed). `SetActiveSceneIdFn` overloaded type removed from `uiStore`. `SceneTabBar`, `SceneView`, and `useGlobalHotkeys` updated to read from `projectStore`. `projectStore.ts` removed from the ESLint `ignores` list — it no longer imports any other store. All 2016 tests pass; TypeScript clean.
+
+---
 
 ### ~~[ARCH1] Cross-store scene coupling creates observable intermediate state~~ ✅ FIXED
 - **File**: `src/state/projectStore.ts:66-79, 103-108, 110-129, 142-162`
@@ -397,6 +405,12 @@ None.
 - **Finding**: Every visible pad allocated `useMotionValue`/`useSpring`/`useTransform` hooks unconditionally, even when `tiltEnabled` is false (edit mode, sort drag, multi-fade). The existing `useEffect` that snapped source values to 0 set `mouseX`/`mouseY` to 0, but the spring outputs (`rotateX`, `rotateY`) still animated toward 0 over ~5 RAF frames rather than snapping immediately — keeping the RAF loop alive briefly for all 12 pads whenever tilt was toggled off. A separate concern about a Motion `animate={{ opacity: [0.3, 0.8, 0.3] }}` keyframe loop on the pulse ring was already addressed prior to this finding: the current implementation uses a CSS `@keyframes pad-pulse` animation with Motion only for mount/unmount opacity transitions.
 - **Fix applied**: Added `rotateX.set(0)` and `rotateY.set(0)` calls alongside the existing `mouseX.set(0)`/`mouseY.set(0)` in the `tiltEnabled` effect. Calling `.set(0)` directly on spring `MotionValue`s bypasses the spring physics and snaps their output to 0 immediately, eliminating the ~5-frame RAF settlement window when entering edit/multi-fade mode. Source values are still zeroed first so the spring target (via `useTransform`) is also 0, preventing any rebound. Comment updated to accurately describe the immediate snap. Extracting tilt into a conditionally-mounted child component was evaluated and rejected: changing the wrapper component type at the same tree position would force React to unmount/remount the entire pad content tree (flip container, front face button, back face) on every tilt toggle, causing visual glitches that are worse than the settled-spring overhead.
 
+#### ~~[PERF-5] `updateLayerVolume` spreads entire `layerVolumes` record on every call~~ ✅ INVALID
+- **File**: `src/state/playbackStore.ts:202–203` (cited; no longer exists)
+- **Severity**: Low
+- **Finding**: `updateLayerVolume: (layerId, volume) => set(s => ({ layerVolumes: { ...s.layerVolumes, [layerId]: volume } }))` spreads the full record on every slider drag (~60×/sec). Flagged as a structural risk if `layerVolumes` grows large.
+- **Resolution**: Finding is stale. The cited `playbackStore.updateLayerVolume` was removed by the ARCH7 fix. The current architecture avoids the pattern entirely: live drag (`onValueChange`) calls `gainManager.setLayerVolume`, which writes directly to the Web Audio gain node with no Zustand mutation; commit (`onValueCommit`) calls `projectStore.updateLayerVolume`, which uses Immer to mutate `layer.volume` once per release (not per frame); the runtime `layerVolumes` record in `playbackStore` is written exclusively by the `audioTick` RAF loop via `setAudioTick`, which has its own short-circuit logic. No spreading of `layerVolumes` occurs at 60fps anywhere in the current codebase.
+
 #### ~~[PERF12] `stopAllPads` ramp timeout races with immediate re-trigger~~ ✅ FIXED
 - **File**: `src/lib/audio/padPlayer.ts:437-446`
 - **Severity**: Low
@@ -614,6 +628,7 @@ None.
 | PERF-E | `PadBackFace` gated behind delayed-unmount so its store subscriptions don't fire on front-facing pads |
 | PERF-F | `PadButton` delegates progress/fade-overlay to `PadButtonProgress`/`PadButtonFadeOverlay` — outer pad no longer re-renders at 60fps |
 | PERF-4 | `rotateX.set(0)`/`rotateY.set(0)` added alongside source-value snap in the `tiltEnabled` effect; spring outputs now snap immediately instead of settling over ~5 RAF frames when tilt is disabled; pulse ring CSS animation already in place (finding partially stale) |
+| PERF-5 | Finding invalid — `playbackStore.updateLayerVolume` removed by ARCH7; live drag routes through `gainManager.setLayerVolume` (no Zustand write); commit routes through `projectStore.updateLayerVolume` (Immer, once per release); `layerVolumes` in `playbackStore` is tick-managed only |
 | ARCH-A | Dual TanStack Query → Zustand state ownership eliminated |
 | ARCH-B | `PadButton` decomposed from god component into focused sub-components |
 | ARCH-C | `activeSceneId` moved from `projectStore` to `uiStore` (no circular dep) |

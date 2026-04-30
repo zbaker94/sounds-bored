@@ -1,17 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { Pad, PadConfig, Project, ProjectHistoryEntry, Scene } from "@/lib/schemas";
-// Cross-store side effect: projectStore calls useUiStore.getState() in loadProject,
-// clearProject, addScene, and deleteScene to keep activeSceneId in sync with scene
-// lifecycle changes. This is a deliberate pragmatic choice — uiStore does not import
-// projectStore, so there is no circular dependency. The inverse (having UI callers
-// update both stores) would require duplicating scene-selection logic across all call
-// sites (SceneTabBar, useGlobalHotkeys, drag-to-add, keyboard shortcuts, etc.).
-//
-// These four call sites pass the post-mutation `sceneIds` list to
-// `setActiveSceneId` so it can enforce the activeSceneId invariant (ARCH1):
-// silently rejecting ids that don't exist in the current project.
-import { useUiStore } from "./uiStore";
 
 interface ProjectState {
   project: Project | null;
@@ -20,10 +9,16 @@ interface ProjectState {
   isTemporary: boolean;
   isDirty: boolean;
   loadSessionId: number;
+  /** The currently active scene tab, or null when no project is loaded.
+   * Invariant: null or a scene id that exists in the current project.
+   * Kept in projectStore so scene lifecycle transitions are atomic. */
+  activeSceneId: string | null;
 }
 
 interface ProjectActions {
   loadProject: (historyEntry: ProjectHistoryEntry, project: Project, isTemporary: boolean) => void;
+  /** Set the active scene. Silently rejects ids that don't exist in the current project. */
+  setActiveSceneId: (id: string | null) => void;
   /**
    * Replaces the entire project object and marks state as dirty.
    *
@@ -61,6 +56,7 @@ export const initialProjectState: ProjectState = {
   isTemporary: false,
   isDirty: false,
   loadSessionId: 0,
+  activeSceneId: null,
 };
 
 const withPad =
@@ -76,10 +72,10 @@ const withPad =
   };
 
 export const useProjectStore = create<ProjectStore>()(
-  immer((set, get) => ({
+  immer((set) => ({
     ...initialProjectState,
 
-    loadProject: (historyEntry, project, isTemporary) => {
+    loadProject: (historyEntry, project, isTemporary) =>
       set((draft) => {
         draft.historyEntry = historyEntry;
         draft.project = project;
@@ -87,15 +83,19 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isTemporary = isTemporary;
         draft.isDirty = false;
         draft.loadSessionId += 1;
-      });
-      // Pass sceneIds so `setActiveSceneId` enforces the activeSceneId invariant.
-      const sceneIds = project.scenes.map((s) => s.id);
-      if (sceneIds.length > 0) {
-        useUiStore.getState().setActiveSceneId(sceneIds[0]!, sceneIds);
-      } else {
-        useUiStore.getState().setActiveSceneId(null);
-      }
-    },
+        draft.activeSceneId = project.scenes[0]?.id ?? null;
+      }),
+
+    setActiveSceneId: (id) =>
+      set((draft) => {
+        if (id === null) {
+          draft.activeSceneId = null;
+          return;
+        }
+        if (draft.project?.scenes.some((s) => s.id === id)) {
+          draft.activeSceneId = id;
+        }
+      }),
 
     updateProject: (project) =>
       set((draft) => {
@@ -119,15 +119,9 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = false;
       }),
 
-    clearProject: () => {
-      set(() => ({ ...initialProjectState }));
-      // Null is always accepted by `setActiveSceneId`; pass an empty scene list
-      // for consistency with other lifecycle call sites.
-      useUiStore.getState().setActiveSceneId(null, []);
-    },
+    clearProject: () => set(() => ({ ...initialProjectState })),
 
-    addScene: (name) => {
-      let newSceneId: string | null = null;
+    addScene: (name) =>
       set((draft) => {
         if (!draft.project) return;
         const newScene: Scene = {
@@ -137,15 +131,8 @@ export const useProjectStore = create<ProjectStore>()(
         };
         draft.project.scenes.push(newScene);
         draft.isDirty = true;
-        newSceneId = newScene.id;
-      });
-      if (newSceneId) {
-        // Pass updated sceneIds so `setActiveSceneId` can validate the new id
-        // exists (invariant enforcement).
-        const sceneIds = get().project?.scenes.map((s) => s.id) ?? [];
-        useUiStore.getState().setActiveSceneId(newSceneId, sceneIds);
-      }
-    },
+        draft.activeSceneId = newScene.id;
+      }),
 
     renameScene: (sceneId, name) =>
       set((draft) => {
@@ -158,30 +145,20 @@ export const useProjectStore = create<ProjectStore>()(
         draft.isDirty = true;
       }),
 
-    deleteScene: (sceneId) => {
-      const wasActive = useUiStore.getState().activeSceneId === sceneId;
-      let deletedIdx = -1;
+    deleteScene: (sceneId) =>
       set((draft) => {
         if (!draft.project) return;
-        deletedIdx = draft.project.scenes.findIndex((s) => s.id === sceneId);
+        const deletedIdx = draft.project.scenes.findIndex((s) => s.id === sceneId);
         if (deletedIdx === -1) return;
+        const wasActive = draft.activeSceneId === sceneId;
         draft.project.scenes.splice(deletedIdx, 1);
         draft.isDirty = true;
-      });
-      if (wasActive && deletedIdx !== -1) {
-        const scenes = get().project?.scenes ?? [];
-        const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0];
-        const next = candidate?.id ?? null;
-        // Pass updated sceneIds so `setActiveSceneId` enforces the invariant
-        // against the post-delete scene list.
-        const sceneIds = scenes.map((s) => s.id);
-        if (next !== null) {
-          useUiStore.getState().setActiveSceneId(next, sceneIds);
-        } else {
-          useUiStore.getState().setActiveSceneId(null);
+        if (wasActive) {
+          const { scenes } = draft.project;
+          const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0];
+          draft.activeSceneId = candidate?.id ?? null;
         }
-      }
-    },
+      }),
 
     addPad: (sceneId, config, id) =>
       set((draft) => {
