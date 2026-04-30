@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Marked the volume clamp code-reuse issue (REUSE3) as fixed in the internal code review document.
 - Refactored internal volume clamping logic into a shared `clampGain01` utility, reducing duplicated code across the audio engine without changing any playback behavior.
 - Fixed a bug where sounds missing their audio file were not properly excluded when validating set-based pad layer configurations
 - Extracted a shared `filterSoundsBySet` utility so set and tag paths use consistent filtering logic

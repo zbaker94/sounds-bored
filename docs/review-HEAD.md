@@ -543,7 +543,7 @@ None.
 
 ### Code Reuse (2 remaining)
 
-#### [REUSE3] 0–1 volume clamp open-coded 6 times in audio engine
+#### ~~[REUSE3] 0–1 volume clamp open-coded 6 times in audio engine~~ ✅ FIXED
 - **File**: `src/lib/audio/gainManager.ts:16,46,58`; `src/lib/audio/audioState.ts:468`; `src/lib/audio/layerTrigger.ts:88,98`; `src/hooks/usePadGesture.ts:174`
 - **Severity**: Low
 - **Finding**: `Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : fallback` duplicated 6 times.
