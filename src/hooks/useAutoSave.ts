@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useSaveProject } from "@/lib/project.queries";
-import { useSaveCurrentLibrary } from "@/lib/library.queries";
+import { saveProject } from "@/lib/project";
+import { saveCurrentLibraryAndClearDirty } from "@/lib/library";
 import { AUTOSAVE_INTERVAL } from "@/lib/constants";
 
 /**
@@ -30,21 +30,8 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const projectRef = useRef(useProjectStore.getState().project);
   const isDirtyRef = useRef(useProjectStore.getState().isDirty);
-  const saveProjectMutation = useSaveProject();
-  const { saveCurrentLibrarySync, isPending: isLibrarySavePending } = useSaveCurrentLibrary();
-
-  // Refs updated synchronously on every render so the save closures always read
-  // the latest pending state without restarting the interval on mutation state changes.
-  // TanStack Query creates a new mutation result object each render, so reading
-  // .isPending from the stale closure-captured object would see a stale value.
-  const isProjectSavePendingRef = useRef(saveProjectMutation.isPending);
-  isProjectSavePendingRef.current = saveProjectMutation.isPending;
-
-  const isLibrarySavePendingRef = useRef(isLibrarySavePending);
-  isLibrarySavePendingRef.current = isLibrarySavePending;
-
-  const saveCurrentLibrarySyncRef = useRef(saveCurrentLibrarySync);
-  saveCurrentLibrarySyncRef.current = saveCurrentLibrarySync;
+  const isProjectSavePendingRef = useRef(false);
+  const isLibrarySavePendingRef = useRef(false);
 
   // Timestamp (ms) of the most recent auto-save error toast. Used to debounce
   // repeated failure toasts — without this, a persistent write failure would
@@ -75,12 +62,18 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       if (!isDirtyRef.current) return;
       if (isProjectSavePendingRef.current) return;
 
-      saveProjectMutation.mutate({ folderPath, project }, {
-        // Do NOT clear the dirty flag on failure — the hook should keep retrying
-        // on the next interval tick so the project is saved once the underlying
-        // problem (disk full, permission issue, missing drive) is resolved.
-        onError: notifyAutoSaveFailure,
-      });
+      isProjectSavePendingRef.current = true;
+      saveProject(folderPath, project)
+        .then(() => {
+          useProjectStore.getState().clearDirtyFlag();
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to save project:", error);
+          notifyAutoSaveFailure();
+        })
+        .finally(() => {
+          isProjectSavePendingRef.current = false;
+        });
     };
 
     const saveLibrary = () => {
@@ -88,9 +81,15 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
       if (!isDirty) return;
       if (isLibrarySavePendingRef.current) return;
 
-      saveCurrentLibrarySyncRef.current({
-        onError: notifyAutoSaveFailure,
-      });
+      isLibrarySavePendingRef.current = true;
+      saveCurrentLibraryAndClearDirty()
+        .catch((error: unknown) => {
+          console.error("Failed to save library:", error);
+          notifyAutoSaveFailure();
+        })
+        .finally(() => {
+          isLibrarySavePendingRef.current = false;
+        });
     };
 
     saveCurrentProject();

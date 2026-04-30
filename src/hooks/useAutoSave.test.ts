@@ -7,18 +7,17 @@ import { createMockProject, createMockHistoryEntry } from "@/test/factories";
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
-const mockSaveProjectMutate = vi.fn();
-// Mutable object — tests can set .isPending = true to simulate an in-flight save
-const mockProjectMutation = { mutate: mockSaveProjectMutate, isPending: false };
-vi.mock("@/lib/project.queries", () => ({
-  useSaveProject: () => mockProjectMutation,
+const { mockSaveProject, mockSaveCurrentLibraryAndClearDirty } = vi.hoisted(() => ({
+  mockSaveProject: vi.fn<() => Promise<void>>(),
+  mockSaveCurrentLibraryAndClearDirty: vi.fn<() => Promise<void>>(),
 }));
 
-const mockSaveLibrarySync = vi.fn();
-// Mutable object — tests can set .isPending = true to simulate an in-flight library save
-const mockLibraryMutation = { saveCurrentLibrarySync: mockSaveLibrarySync, isPending: false };
-vi.mock("@/lib/library.queries", () => ({
-  useSaveCurrentLibrary: () => mockLibraryMutation,
+vi.mock("@/lib/project", () => ({
+  saveProject: mockSaveProject,
+}));
+
+vi.mock("@/lib/library", () => ({
+  saveCurrentLibraryAndClearDirty: mockSaveCurrentLibraryAndClearDirty,
 }));
 
 vi.mock("@/lib/library.reconcile", () => ({
@@ -65,13 +64,13 @@ beforeEach(() => {
   vi.useFakeTimers();
   useProjectStore.setState({ ...initialProjectState });
   useLibraryStore.setState({ ...initialLibraryState });
-  mockSaveProjectMutate.mockReset();
-  mockSaveLibrarySync.mockReset();
+  mockSaveProject.mockReset();
+  mockSaveCurrentLibraryAndClearDirty.mockReset();
   mockToastError.mockReset();
   mockRefreshMissingState.mockReset();
-  mockProjectMutation.isPending = false;
-  mockLibraryMutation.isPending = false;
-  mockLibraryMutation.saveCurrentLibrarySync = mockSaveLibrarySync;
+  // Default: both resolve immediately (success path)
+  mockSaveProject.mockResolvedValue(undefined);
+  mockSaveCurrentLibraryAndClearDirty.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -79,6 +78,8 @@ afterEach(() => {
 });
 
 describe("useAutoSave", () => {
+  // ── Guard conditions ────────────────────────────────────────────────────────
+
   it("does not save when isDirty is false", () => {
     const project = createMockProject();
     useProjectStore.setState({
@@ -91,7 +92,7 @@ describe("useAutoSave", () => {
 
     renderHook(() => useAutoSave(30_000));
 
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+    expect(mockSaveProject).not.toHaveBeenCalled();
   });
 
   it("does not save when project is null", () => {
@@ -105,7 +106,7 @@ describe("useAutoSave", () => {
 
     renderHook(() => useAutoSave(30_000));
 
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+    expect(mockSaveProject).not.toHaveBeenCalled();
   });
 
   it("does not save when folderPath is null", () => {
@@ -120,7 +121,7 @@ describe("useAutoSave", () => {
 
     renderHook(() => useAutoSave(30_000));
 
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+    expect(mockSaveProject).not.toHaveBeenCalled();
   });
 
   it("does not save when project is temporary", () => {
@@ -135,88 +136,57 @@ describe("useAutoSave", () => {
 
     renderHook(() => useAutoSave(30_000));
 
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
+    expect(mockSaveProject).not.toHaveBeenCalled();
   });
 
-  it("calls saveProjectMutation.mutate when dirty and eligible", () => {
+  // ── Success path ────────────────────────────────────────────────────────────
+
+  it("calls saveProject with folderPath and project when eligible", () => {
     seedDirtyPermanentProject();
 
     renderHook(() => useAutoSave(30_000));
 
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
-    const [args, options] = mockSaveProjectMutate.mock.calls[0];
-    expect(args).toEqual({
-      folderPath: "/path/to/project",
-      project: expect.objectContaining({ name: "Auto Save Test" }),
-    });
-    expect(options).toEqual(
-      expect.objectContaining({
-        onError: expect.any(Function),
-      }),
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
+    expect(mockSaveProject).toHaveBeenCalledWith(
+      "/path/to/project",
+      expect.objectContaining({ name: "Auto Save Test" }),
     );
-    // onSuccess should NOT be present — isDirty drives re-save, not a stored JSON snapshot
-    expect(options.onSuccess).toBeUndefined();
   });
 
-  it("stops saving on subsequent ticks once a successful save clears isDirty", () => {
+  it("clears the dirty flag after a successful project save", async () => {
     seedDirtyPermanentProject();
-
-    // Simulate the real useSaveProject behavior: on success, clearDirtyFlag() is called.
-    mockSaveProjectMutate.mockImplementation(() => {
-      useProjectStore.getState().clearDirtyFlag();
-    });
 
     renderHook(() => useAutoSave(30_000));
 
-    // Initial tick fires and the mock immediately clears isDirty.
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+
+    expect(useProjectStore.getState().isDirty).toBe(false);
+  });
+
+  it("stops saving on subsequent ticks once a successful save clears isDirty", async () => {
+    seedDirtyPermanentProject();
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Flush the initial save — clearDirtyFlag is called
+    await act(async () => {});
     expect(useProjectStore.getState().isDirty).toBe(false);
 
-    // Advance one interval — isDirty is now false, so no re-save.
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
+    // Advance one interval — isDirty is now false, no re-save
+    act(() => { vi.advanceTimersByTime(30_000); });
 
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
   });
 
-  it("saves on the next interval tick even when project data is identical to the last successful save", () => {
-    // Regression test: the old code had a JSON.stringify equality gate that blocked a
-    // second save if the project data hadn't changed since the last successful save.
-    // isDirty alone must control whether a save fires — if the store says dirty, save.
+  // ── Error path ──────────────────────────────────────────────────────────────
+
+  it("shows an error toast when project save fails", async () => {
     seedDirtyPermanentProject();
+    mockSaveProject.mockRejectedValue(new Error("ENOSPC: no space left on device"));
 
     renderHook(() => useAutoSave(30_000));
 
-    // Initial save fires immediately.
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
-
-    // Simulate the old-style onSuccess that stored the JSON snapshot (no-op after fix,
-    // but calling it here ensures the test catches any lingering snapshot logic).
-    const firstOptions = mockSaveProjectMutate.mock.calls[0][1];
-    if (firstOptions?.onSuccess) {
-      act(() => { firstOptions.onSuccess(); });
-    }
-
-    // isDirty was never cleared (clearDirtyFlag was not called) — advance one tick.
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
-
-    // Must fire again because isDirty is still true.
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(2);
-  });
-
-  it("shows an error toast when auto-save fails", () => {
-    seedDirtyPermanentProject();
-
-    renderHook(() => useAutoSave(30_000));
-
-    // Simulate the mutation invoking its onError callback (disk full, permission lost, etc).
-    const options = mockSaveProjectMutate.mock.calls[0][1];
-    act(() => {
-      options.onError(new Error("ENOSPC: no space left on device"));
-    });
+    await act(async () => {});
 
     expect(mockToastError).toHaveBeenCalledTimes(1);
     expect(mockToastError).toHaveBeenCalledWith(
@@ -224,299 +194,250 @@ describe("useAutoSave", () => {
     );
   });
 
-  it("debounces the error toast — repeated failures within 60s only toast once", () => {
+  it("does NOT clear the dirty flag on error (keeps retrying)", async () => {
     seedDirtyPermanentProject();
+    mockSaveProject.mockRejectedValue(new Error("ENOSPC"));
 
     renderHook(() => useAutoSave(30_000));
 
-    // First save tick — trigger a failure on the initial (synchronous) save call.
-    const firstOptions = mockSaveProjectMutate.mock.calls[0][1];
-    act(() => {
-      firstOptions.onError(new Error("ENOSPC"));
-    });
+    await act(async () => {});
+
+    // isDirty must remain true so the next interval tick retries the save
+    expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+
+  it("retries save on the next interval tick after an error", async () => {
+    seedDirtyPermanentProject();
+    mockSaveProject.mockRejectedValue(new Error("ENOSPC"));
+
+    renderHook(() => useAutoSave(30_000));
+
+    // First save fires and fails
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
+    await act(async () => {});  // flush: pending resets, dirty stays true
+
+    // Advance one interval — should retry
+    act(() => { vi.advanceTimersByTime(30_000); });
+
+    expect(mockSaveProject).toHaveBeenCalledTimes(2);
+    expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+
+  // ── Debounce ────────────────────────────────────────────────────────────────
+
+  it("debounces the error toast — repeated failures within 60s only toast once", async () => {
+    seedDirtyPermanentProject();
+    mockSaveProject.mockRejectedValue(new Error("ENOSPC"));
+
+    renderHook(() => useAutoSave(30_000));
+
+    // First failure (t=0)
+    await act(async () => {});
     expect(mockToastError).toHaveBeenCalledTimes(1);
 
-    // Advance 30s so the next interval tick fires a second save attempt.
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
+    // Advance 30s — second save tick fires and fails (within 60s debounce window)
+    act(() => { vi.advanceTimersByTime(30_000); });
+    await act(async () => {});
 
-    // A new mutate call should have happened for the interval tick.
-    expect(mockSaveProjectMutate.mock.calls.length).toBeGreaterThanOrEqual(2);
-    const secondOptions =
-      mockSaveProjectMutate.mock.calls[mockSaveProjectMutate.mock.calls.length - 1][1];
-    act(() => {
-      secondOptions.onError(new Error("ENOSPC"));
-    });
-
-    // Still only one toast — the second failure is within the 60s debounce window.
+    // Still only one toast
     expect(mockToastError).toHaveBeenCalledTimes(1);
   });
 
-  it("fires the error toast again after the 60s debounce window elapses", () => {
+  it("fires the error toast again after the 60s debounce window elapses", async () => {
     seedDirtyPermanentProject();
+    mockSaveProject.mockRejectedValue(new Error("ENOSPC"));
 
     renderHook(() => useAutoSave(30_000));
 
-    // First failure
-    const firstOptions = mockSaveProjectMutate.mock.calls[0][1];
-    act(() => {
-      firstOptions.onError(new Error("ENOSPC"));
-    });
+    // First failure (t=0)
+    await act(async () => {});
     expect(mockToastError).toHaveBeenCalledTimes(1);
 
-    // Advance well past the debounce window (60s). Using 61s keeps the interval
-    // ticks (every 30s) still firing along the way.
-    act(() => {
-      vi.advanceTimersByTime(61_000);
-    });
+    // Advance to t=30s (within debounce window) — no second toast
+    act(() => { vi.advanceTimersByTime(30_000); });
+    await act(async () => {});
+    expect(mockToastError).toHaveBeenCalledTimes(1);
 
-    // Pull the options from the most recent save attempt and fire another failure.
-    const lastOptions =
-      mockSaveProjectMutate.mock.calls[mockSaveProjectMutate.mock.calls.length - 1][1];
-    act(() => {
-      lastOptions.onError(new Error("ENOSPC"));
-    });
-
-    // Debounce window has passed — the toast should show again.
+    // Advance to t=61s (past debounce window) — toast fires again
+    act(() => { vi.advanceTimersByTime(31_000); });
+    await act(async () => {});
     expect(mockToastError).toHaveBeenCalledTimes(2);
   });
 
-  it("does NOT clear the dirty flag on error (keeps retrying)", () => {
+  // ── In-flight guard (project) ───────────────────────────────────────────────
+
+  it("skips project save when a previous save is still in flight", () => {
     seedDirtyPermanentProject();
+    // saveProject never resolves — keeps isProjectSavePendingRef.current = true
+    mockSaveProject.mockImplementation(() => new Promise(() => {}));
 
     renderHook(() => useAutoSave(30_000));
 
-    const options = mockSaveProjectMutate.mock.calls[0][1];
-    act(() => {
-      options.onError(new Error("ENOSPC"));
-    });
+    // Initial save fires and is in-flight
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
 
-    // isDirty must remain true so the next interval tick retries the save.
-    expect(useProjectStore.getState().isDirty).toBe(true);
+    // Advance two intervals — still in flight, both skipped
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
   });
 
-  it("retries save on the next interval tick after an error (dirty flag unchanged)", () => {
+  it("resumes project saves after the in-flight save completes", async () => {
     seedDirtyPermanentProject();
+
+    let resolveFirst!: () => void;
+    mockSaveProject
+      .mockImplementationOnce(() => new Promise<void>(resolve => { resolveFirst = resolve; }))
+      .mockResolvedValue(undefined);
 
     renderHook(() => useAutoSave(30_000));
 
-    // First tick — save attempt fires, then fails.
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
-    const firstOptions = mockSaveProjectMutate.mock.calls[0][1];
-    act(() => {
-      firstOptions.onError(new Error("ENOSPC"));
-    });
+    // Initial save fires and is in-flight
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
 
-    // Advance one interval tick — should retry because isDirty is still true.
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
+    // Advance interval — still in flight, skipped
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
 
-    expect(mockSaveProjectMutate.mock.calls.length).toBeGreaterThanOrEqual(2);
-    // isDirty is still true — nothing cleared it.
-    expect(useProjectStore.getState().isDirty).toBe(true);
+    // Complete the first save — clearDirtyFlag called, isDirty becomes false
+    await act(async () => { resolveFirst(); });
+
+    // Re-dirty so the next tick has something to save
+    useProjectStore.getState().updateProject(useProjectStore.getState().project!);
+
+    // Advance interval — pending cleared and isDirty is true again
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveProject).toHaveBeenCalledTimes(2);
   });
 
-  it("project-save error and library-save error share the same debounce window (only one toast total)", () => {
+  // ── Library save ────────────────────────────────────────────────────────────
+
+  it("calls saveCurrentLibraryAndClearDirty when library is dirty", () => {
     seedDirtyPermanentProject();
-    // Mark the library dirty so the library path is also entered.
-    useLibraryStore.setState({
-      ...initialLibraryState,
-      isDirty: true,
-    });
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
 
     renderHook(() => useAutoSave(30_000));
 
-    // Both mutations are called on the initial tick.
-    const projectOptions = mockSaveProjectMutate.mock.calls[0][1];
-    const libraryOptions = mockSaveLibrarySync.mock.calls[0][0];
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
+  });
 
-    // Project save fails first — toast fires.
-    act(() => {
-      projectOptions.onError(new Error("ENOSPC"));
-    });
+  it("shows an error toast when library save fails", async () => {
+    seedDirtyPermanentProject();
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
+    // Project save succeeds; only library save fails
+    mockSaveCurrentLibraryAndClearDirty.mockRejectedValue(new Error("EACCES"));
+
+    renderHook(() => useAutoSave(30_000));
+
+    await act(async () => {});
+
     expect(mockToastError).toHaveBeenCalledTimes(1);
-
-    // Library save fails in the same tick (within debounce window) — no second toast.
-    act(() => {
-      libraryOptions.onError(new Error("ENOSPC"));
-    });
-    expect(mockToastError).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips project save when a previous project save is still in flight", () => {
-    seedDirtyPermanentProject();
-    // Simulate an in-flight save from a previous tick
-    mockProjectMutation.isPending = true;
-
-    renderHook(() => useAutoSave(30_000));
-
-    // Even though isDirty is true, mutate must not be called while isPending is true
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
-
-    // Advance one full interval — still in flight, still no save
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
-
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
-  });
-
-  it("resumes project saves once the in-flight save completes", () => {
-    seedDirtyPermanentProject();
-    mockProjectMutation.isPending = true;
-
-    const { rerender } = renderHook(() => useAutoSave(30_000));
-
-    // First tick — skipped because isPending
-    expect(mockSaveProjectMutate).not.toHaveBeenCalled();
-
-    // Simulate TanStack Query re-rendering the component when the save completes.
-    // rerender() is required: it re-executes the hook body, which writes the new
-    // isPending value to the ref. Without rerender(), the ref stays stale.
-    mockProjectMutation.isPending = false;
-    rerender();
-
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
-
-    // Next tick fires now that isPending is false and isDirty is still true
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips the next interval tick when the initial save (from mount) is still in flight", () => {
-    seedDirtyPermanentProject();
-
-    // Simulate TanStack Query: when mutate() is called, isPending goes true
-    mockSaveProjectMutate.mockImplementation(() => {
-      mockProjectMutation.isPending = true;
-    });
-
-    const { rerender } = renderHook(() => useAutoSave(30_000));
-
-    // Mount fires the first save — mutate is called, which sets isPending = true
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
-
-    // Simulate TanStack Query re-rendering the hook with the new isPending = true
-    rerender();
-
-    // Advance one interval — save still in flight, should skip
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
-
-    expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
+    expect(mockToastError).toHaveBeenCalledWith(
+      "Auto-save failed — your changes may not be saved to disk.",
+    );
   });
 
   it("skips library save when a previous library save is still in flight", () => {
     seedDirtyPermanentProject();
     useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
-    mockLibraryMutation.isPending = true;
+    mockSaveCurrentLibraryAndClearDirty.mockImplementation(() => new Promise(() => {}));
 
     renderHook(() => useAutoSave(30_000));
 
-    expect(mockSaveLibrarySync).not.toHaveBeenCalled();
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
 
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
 
-    expect(mockSaveLibrarySync).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
   });
 
-  it("resumes library saves once the in-flight library save completes", () => {
-    seedDirtyPermanentProject();
-    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
-    mockLibraryMutation.isPending = true;
-
-    const { rerender } = renderHook(() => useAutoSave(30_000));
-
-    expect(mockSaveLibrarySync).not.toHaveBeenCalled();
-
-    // Simulate TanStack Query re-rendering the component when the save completes.
-    // rerender() updates the ref — without it the ref stays stale.
-    mockLibraryMutation.isPending = false;
-    rerender();
-
-    act(() => {
-      vi.advanceTimersByTime(30_000);
-    });
-
-    expect(mockSaveLibrarySync).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not restart the interval when saveCurrentLibrarySync changes identity", () => {
+  it("resumes library saves after the in-flight library save completes", async () => {
     seedDirtyPermanentProject();
     useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
 
-    // Advance to just before the first interval tick
-    const { rerender } = renderHook(() => useAutoSave(30_000));
-    act(() => {
-      vi.advanceTimersByTime(25_000);
-    });
+    let resolveFirst!: () => void;
+    // First call hangs; subsequent calls resolve (mock doesn't clear isDirty so library stays dirty)
+    mockSaveCurrentLibraryAndClearDirty
+      .mockImplementationOnce(() => new Promise<void>(resolve => { resolveFirst = resolve; }))
+      .mockResolvedValue(undefined);
 
-    // Simulate TanStack re-rendering with a new saveCurrentLibrarySync reference
-    // (what happens after a mutation success/error state change)
-    const newSaveLibrarySync = vi.fn();
-    mockLibraryMutation.saveCurrentLibrarySync = newSaveLibrarySync;
-    rerender();
+    renderHook(() => useAutoSave(30_000));
 
-    // Advance the remaining 5s — if the interval was restarted the tick won't fire yet
-    act(() => {
-      vi.advanceTimersByTime(5_000);
-    });
+    // Initial library save fires and is in-flight
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
 
-    // The interval tick should have fired at t=30s (not restarted to t=25s+30s=55s)
-    expect(mockSaveLibrarySync.mock.calls.length + newSaveLibrarySync.mock.calls.length).toBeGreaterThanOrEqual(2);
+    // Advance interval — still in flight, skipped
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
+
+    // Complete the first library save — mock doesn't clear libraryStore.isDirty
+    await act(async () => { resolveFirst(); });
+
+    // Advance interval — pending cleared, library still dirty → fires again
+    act(() => { vi.advanceTimersByTime(30_000); });
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(2);
   });
+
+  // ── Shared debounce ─────────────────────────────────────────────────────────
+
+  it("project-save error and library-save error share the same debounce window (only one toast total)", async () => {
+    seedDirtyPermanentProject();
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
+    mockSaveProject.mockRejectedValue(new Error("ENOSPC"));
+    mockSaveCurrentLibraryAndClearDirty.mockRejectedValue(new Error("ENOSPC"));
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Both saves fire and fail — only one toast (shared debounce window)
+    await act(async () => {});
+
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Interval stability ──────────────────────────────────────────────────────
+
+  it("does not restart the interval when the project store updates after a save", async () => {
+    seedDirtyPermanentProject();
+
+    renderHook(() => useAutoSave(30_000));
+
+    // t=0: initial save fires
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
+
+    // Advance to t=25s (before the first interval tick)
+    act(() => { vi.advanceTimersByTime(25_000); });
+
+    // Flush: clearDirtyFlag called, isDirty becomes false
+    await act(async () => {});
+    expect(useProjectStore.getState().isDirty).toBe(false);
+
+    // Re-dirty so the next tick has something to save
+    useProjectStore.getState().updateProject(useProjectStore.getState().project!);
+
+    // Advance remaining 5s to t=30s — interval fires (was NOT restarted by the store update)
+    act(() => { vi.advanceTimersByTime(5_000); });
+
+    // t=0 (initial) + t=30s (interval) = 2 total; if interval restarted it would fire at 55s
+    expect(mockSaveProject).toHaveBeenCalledTimes(2);
+  });
+
+  // ── No filesystem scan ──────────────────────────────────────────────────────
 
   it("does NOT call refreshMissingState on mount or interval ticks", () => {
     seedDirtyPermanentProject();
 
     renderHook(() => useAutoSave(30_000));
 
-    // Initial mount must not trigger a filesystem scan
     expect(mockRefreshMissingState).not.toHaveBeenCalled();
 
-    // Advance two full intervals — still no filesystem scan
-    act(() => {
-      vi.advanceTimersByTime(60_000);
-    });
+    act(() => { vi.advanceTimersByTime(60_000); });
 
-    // The effect did run (saves were attempted) but the missing-state scan did not
-    expect(mockSaveProjectMutate).toHaveBeenCalled();
+    // Saves were attempted but the missing-state scan was not triggered
+    expect(mockSaveProject).toHaveBeenCalled();
     expect(mockRefreshMissingState).not.toHaveBeenCalled();
-  });
-
-  it("wires an onError handler to the library save as well", () => {
-    seedDirtyPermanentProject();
-    // Mark the library dirty so saveLibrary() is entered.
-    useLibraryStore.setState({
-      ...initialLibraryState,
-      isDirty: true,
-    });
-
-    renderHook(() => useAutoSave(30_000));
-
-    expect(mockSaveLibrarySync).toHaveBeenCalledTimes(1);
-    const libOptions = mockSaveLibrarySync.mock.calls[0][0];
-    expect(libOptions).toEqual(
-      expect.objectContaining({
-        onError: expect.any(Function),
-      }),
-    );
-    // onSuccess should NOT be present — isDirty drives re-save, not a stored JSON snapshot
-    expect(libOptions.onSuccess).toBeUndefined();
-
-    // A library-save failure also triggers the (debounced) auto-save error toast.
-    act(() => {
-      libOptions.onError(new Error("EACCES"));
-    });
-    expect(mockToastError).toHaveBeenCalledTimes(1);
-    expect(mockToastError).toHaveBeenCalledWith(
-      "Auto-save failed — your changes may not be saved to disk.",
-    );
   });
 });

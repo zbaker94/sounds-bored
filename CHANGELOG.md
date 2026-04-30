@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Auto-save reliability improved: project and library saves now use direct async calls instead of query mutations, eliminating a class of edge-case save failures.
+- Failed auto-saves now correctly retry on the next interval tick without requiring a manual trigger.
+- Auto-save error toast debouncing preserved: repeated disk failures within 60 seconds still show only one notification.
 - Internal code quality improvements with no user-visible behavior changes: missing-sounds warning and sound library reconciliation on project load continue to work as before.
 - Master volume changes made before any sound plays are now correctly applied — the slider value is no longer silently dropped if adjusted before the first pad is triggered.
 - Moved the download event listener hook to its own dedicated file for better code organization (no user-facing behavior change)
