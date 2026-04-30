@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal code quality by centralizing layer configuration conversion logic, reducing duplication and potential for type-related bugs
 - Internal layer configuration logic was consolidated into a shared module, improving code maintainability with no change to visible behavior.
 - Fixed tag-based sound selection to correctly preserve "match all tags" mode when editing layer configuration
 - Improved internal reliability of layer configuration handling with cleaner conversion between layer data and form state.

@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 29 (21 fixed) |
+| Low | 28 (22 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -448,11 +448,10 @@ None.
 
 ### Code Quality (17)
 
-#### [QUAL5] `createDefaultStoreLayer` round-trips through `LayerConfigForm` and uses `as Layer`
+#### ~~[QUAL5] `createDefaultStoreLayer` round-trips through `LayerConfigForm` and uses `as Layer`~~ ✅ FIXED
 - **File**: `src/lib/padDefaults.ts:15-17`
 - **Severity**: Low
-- **Finding**: `createDefaultLayer()` returns `LayerConfigForm`; the result is cast with `as Layer`. The cast is benign because TS types are structurally compatible, but it obscures intent and would hide a real mismatch if either schema's TS shape were tightened.
-- **Recommendation**: Define a `Layer` default directly without round-tripping through `LayerConfigForm`.
+- **Fix applied**: `createDefaultStoreLayer` now constructs the `Layer` object directly. The `as Layer` cast and the delegation to `createDefaultLayer()` are removed. Both functions are now independently correct for their declared return types. 1990/1990 tests pass; TypeScript clean.
 
 #### [QUAL6] `DownloadStatusButton.tsx` exports a component named `DownloadButton`
 - **File**: `src/components/composite/DownloadManager/DownloadStatusButton.tsx:14`
