@@ -6,8 +6,8 @@ import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { PadConfigSchema } from "@/lib/schemas";
-import type { PadConfigForm, LayerConfigForm, Layer, Pad } from "@/lib/schemas";
-import { padToConfig } from "@/lib/padDefaults";
+import type { PadConfigForm, Layer, Pad } from "@/lib/schemas";
+import { padToConfig, layerToFormLayer, formLayerToLayer } from "@/lib/padDefaults";
 import {
   Dialog,
   DialogContent,
@@ -20,32 +20,6 @@ import { LayerConfigSection } from "./LayerConfigSection";
 import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
-
-// ─── Local helpers ────────────────────────────────────────────────────────────
-
-function toLayer(form: LayerConfigForm): Layer {
-  return {
-    id: form.id,
-    selection: form.selection,
-    arrangement: form.arrangement,
-    cycleMode: form.cycleMode,
-    playbackMode: form.playbackMode,
-    retriggerMode: form.retriggerMode,
-    volume: form.volume,
-  };
-}
-
-function layerToFormValues(layer: Layer): LayerConfigForm {
-  return {
-    id: layer.id,
-    selection: layer.selection as LayerConfigForm["selection"],
-    arrangement: layer.arrangement,
-    cycleMode: layer.cycleMode,
-    playbackMode: layer.playbackMode,
-    retriggerMode: layer.retriggerMode,
-    volume: layer.volume,
-  };
-}
 
 // ─── Component contract ───────────────────────────────────────────────────────
 
@@ -81,7 +55,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
     resolver: zodResolver(layerDialogSchema) as Resolver<PadConfigForm>,
     defaultValues: {
       name: pad.name,
-      layers: [layerToFormValues(layer)],
+      layers: [layerToFormLayer(layer)],
       fadeDurationMs: pad.fadeDurationMs,
       volume: pad.volume ?? 100,
       fadeTargetVol: pad.fadeTargetVol ?? 0,
@@ -95,7 +69,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
     if (!isOpen) return;
     reset({
       name: pad.name,
-      layers: [layerToFormValues(layer)],
+      layers: [layerToFormLayer(layer)],
       fadeDurationMs: pad.fadeDurationMs,
       volume: pad.volume ?? 100,
       fadeTargetVol: pad.fadeTargetVol ?? 0,
@@ -139,7 +113,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
     if (hasError) return;
 
     // Build the updated layers array by replacing the layer at layerIndex.
-    const updatedLayer = toLayer(data.layers[0]);
+    const updatedLayer = formLayerToLayer(data.layers[0]);
     const newLayers: Layer[] = pad.layers.map((l, i) =>
       i === layerIndex ? updatedLayer : l
     );

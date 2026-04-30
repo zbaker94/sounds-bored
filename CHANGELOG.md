@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal layer configuration logic was consolidated into a shared module, improving code maintainability with no change to visible behavior.
 - Fixed tag-based sound selection to correctly preserve "match all tags" mode when editing layer configuration
 - Improved internal reliability of layer configuration handling with cleaner conversion between layer data and form state.
 - Auto-save now correctly restarts when a project is marked temporary or when the save interval changes, preventing missed saves in edge cases
