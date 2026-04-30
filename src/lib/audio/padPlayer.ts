@@ -459,7 +459,7 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
     const resolved = resolveSounds(layer, sounds);
     if (resolved.length === 0) continue;
     if (isLayerPending(layer.id)) continue;
-    setLayerPending(layer.id);
+    setLayerPending(layer.id); // triggerLayerOfPad clears this on all exit paths (skip/chain-advanced/proceed/error).
     layerWork.push({ layer, resolved });
   }
 
