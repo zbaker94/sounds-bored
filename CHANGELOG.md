@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an internal code ordering issue in the audio engine (no behavior change for users)
 - Improved audio error reporting: errors that occurred while starting a sound in a layer are now properly surfaced instead of being silently ignored.
 - No user-facing changes — this release contains internal code cleanup only (type import consolidation and removal of stale comments).
 - Internal audio engine code was reorganized for maintainability — no change to playback behavior or features.

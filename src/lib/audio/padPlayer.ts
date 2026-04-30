@@ -175,12 +175,6 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
 }
 
 /**
- * Orchestration entry point for a single-pad fade tap (fade mode).
- * Determines whether to reverse a fade-out, start a fade-out, or fade in
- * based on current audio state — keeping that decision in the audio layer
- * rather than in the UI hook.
- */
-/**
  * Cancel an in-progress fade, freezing the gain at the current ramp position.
  * Uses the last RAF-sampled volume from the store rather than gain.gain.value
  * to avoid anchoring back to the ramp's start point.
@@ -195,6 +189,12 @@ export function stopFade(pad: Pad): void {
   cancelPadFade(pad.id);
 }
 
+/**
+ * Orchestration entry point for a single-pad fade tap (fade mode).
+ * Determines whether to reverse a fade-out, start a fade-out, or fade in
+ * based on current audio state — keeping that decision in the audio layer
+ * rather than in the UI hook.
+ */
 export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
   if (!isFadeablePad(pad)) return;
   const lowVol = (pad.fadeTargetVol ?? 0) / 100;
