@@ -543,6 +543,13 @@ None.
 
 ### Code Reuse (2 remaining)
 
+#### [REUSE3] 0–1 volume clamp open-coded 6 times in audio engine
+- **File**: `src/lib/audio/gainManager.ts:16,46,58`; `src/lib/audio/audioState.ts:468`; `src/lib/audio/layerTrigger.ts:88,98`; `src/hooks/usePadGesture.ts:174`
+- **Severity**: Low
+- **Finding**: `Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : fallback` duplicated 6 times.
+- **Recommendation**: Add `clampGain01(value: number, fallback = 0): number` in `src/lib/audio/gainManager.ts` (or alongside `getLayerNormalizedVolume`). Every clamp site becomes a one-liner.
+- **Fix applied**: The review's "6 times" count was stale — `gainManager.ts` had already extracted a private `clampGain` helper; its 3 internal uses were not open-coded. The truly open-coded sites were 4. `clampGain` renamed to `clampGain01(value, fallback = 0)` and exported. `layerTrigger.ts:88,98` replaced with `clampGain01(x / 100)` (the `/100` scale-conversion stays at the call site). `usePadGesture.ts:175` replaced with `clampGain01(...)`. `audioState.ts:612` left inline: `gainManager` → `audioState` is an existing import, so importing in the reverse direction would create a cycle; additionally that site uses `fallback = 1` intentionally (non-finite volume defaults to full gain on initialization, not silence). 90/90 test files, 2007/2007 tests pass.
+
 #### [REUSE11] `projectStore` pad-field setters are 3 copies of the same scene→pad lookup
 - **File**: `src/state/projectStore.ts:262-293`
 - **Severity**: Low
