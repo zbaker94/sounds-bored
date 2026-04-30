@@ -538,9 +538,13 @@ export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds:
 // ---------------------------------------------------------------------------
 
 /**
- * Cancel all fade-related resources for a pad: pending timeout and fadingOut tracking.
- * The global audioTick handles padVolumes â€” no store call needed here.
- * Safe to call even if no fade is registered -- all operations are idempotent.
+ * Cancel all fade-related resources for a pad: pending timeout, fadingOut tracking
+ * (both audioState and playbackStore mirrors), fadingPad tracking, and fromVolume.
+ * Safe to call even if no fade is registered — all operations are idempotent.
+ *
+ * Note: fadingInPadIds is NOT cleared here — triggerPad calls cancelPadFade internally
+ * and must not accidentally pre-empt a triggerAndFade that is still in flight.
+ * Only fadePad (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
  */
 export function cancelPadFade(padId: string): void {
   const tId = fadePadTimeouts.get(padId);
@@ -551,14 +555,16 @@ export function cancelPadFade(padId: string): void {
   fadingOutPadIds.delete(padId);
   padFadeFromVolumes.delete(padId);
   usePlaybackStore.getState().removeFadingPad(padId);
-  // fadingInPadIds is NOT cleared here â€” triggerPad calls cancelPadFade internally
-  // and must not accidentally pre-empt a triggerAndFade that is still in flight.
-  // Only fadePad (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
+  usePlaybackStore.getState().removeFadingOutPad(padId);
 }
 
-/** Mark a pad as fading out. */
+/**
+ * Mark a pad as fading out on both audioState and playbackStore sides atomically.
+ * Symmetric counterpart to the removal path in cancelPadFade.
+ */
 export function addFadingOutPad(padId: string): void {
   fadingOutPadIds.add(padId);
+  usePlaybackStore.getState().addFadingOutPad(padId);
 }
 
 /** Remove a pad from fading-out tracking. */

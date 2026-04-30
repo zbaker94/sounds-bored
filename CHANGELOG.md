@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where pads could get stuck showing a fading-out state in the UI permanently after being stopped mid-fade.
+- Fading state is now kept in sync between the audio engine and UI at all times, preventing visual desync after pad stop or retrigger during a fade.
 - Scene switching is now more reliable: adding, deleting, or loading scenes updates the active tab atomically, eliminating a brief window where the wrong scene could appear selected.
 - Deleting the currently active scene now correctly auto-selects the next available scene with no intermediate flicker.
 - Volume slider dragging no longer triggers unnecessary state writes on every frame, reducing potential UI jank during playback.

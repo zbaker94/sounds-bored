@@ -3,7 +3,6 @@ import { getAudioContext } from "./audioContext";
 import {
   cancelPadFade,
   addFadingOutPad,
-  removeFadingOutPad,
   removeFadingInPad,
   isPadFadingOut,
   setFadePadTimeout,
@@ -19,25 +18,6 @@ import {
 import { rampGainTo, resetPadGain } from "./gainManager";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
-
-/**
- * Mark a pad as fading-out in BOTH the audioState set and the playbackStore set.
- * These two sets are always kept in lock-step from fadePad's fade-down path, so
- * the paired calls are wrapped here to prevent one side from drifting out of sync.
- */
-function markFadingOut(padId: string): void {
-  addFadingOutPad(padId);
-  usePlaybackStore.getState().addFadingOutPad(padId);
-}
-
-/**
- * Remove a pad from fading-out tracking in BOTH the audioState set and the
- * playbackStore set. Paired counterpart to markFadingOut.
- */
-function unmarkFadingOut(padId: string): void {
-  removeFadingOutPad(padId);
-  usePlaybackStore.getState().removeFadingOutPad(padId);
-}
 
 /**
  * Freeze a pad's gain at its current value — cancels any in-progress ramp
@@ -76,6 +56,8 @@ export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): nu
  */
 export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number): void {
   usePlaybackStore.getState().removeReversingPad(pad.id);
+  // cancelPadFade atomically clears fadingOutPadIds on both audioState and
+  // playbackStore sides, so no explicit removeFadingOutPad call is needed here.
   cancelPadFade(pad.id);
   removeFadingInPad(pad.id);
   usePlaybackStore.getState().addFadingPad(pad.id);
@@ -86,12 +68,7 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
   if (fadingDown) {
     // Null onended callbacks so chained voices don't restart at the faded-down level.
     nullPadOnEnded(pad.id);
-    markFadingOut(pad.id);
-  } else {
-    // cancelPadFade (called above) already removed pad.id from the audioState
-    // fadingOutPadIds set, so only the playbackStore mirror needs to be cleared
-    // here. Using unmarkFadingOut would be a redundant (but harmless) Set.delete.
-    usePlaybackStore.getState().removeFadingOutPad(pad.id);
+    addFadingOutPad(pad.id);
   }
 
   rampGainTo(gain.gain, toVolume, durationMs / 1000, fromVolume);
@@ -99,25 +76,18 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
 
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
-
-    if (fadingDown) {
-      // Guard: if pad is no longer fading out (e.g. re-triggered), skip cleanup.
-      if (!isPadFadingOut(pad.id)) return;
-      unmarkFadingOut(pad.id);
-      if (toVolume === 0) {
-        cancelPadFade(pad.id);
-        for (const layer of pad.layers) {
-          deleteLayerChain(layer.id);
-          deleteLayerCycleIndex(layer.id);
-          deleteLayerPlayOrder(layer.id);
-        }
-        stopPadVoices(pad.id);
-        resetPadGain(pad.id);
-      } else {
-        usePlaybackStore.getState().removeFadingPad(pad.id);
+    // Guard: if pad is no longer fading out (e.g. re-triggered), skip cleanup.
+    if (fadingDown && !isPadFadingOut(pad.id)) return;
+    // cancelPadFade clears fadingOutPadIds + fadingPadIds on both sides atomically.
+    cancelPadFade(pad.id);
+    if (fadingDown && toVolume === 0) {
+      for (const layer of pad.layers) {
+        deleteLayerChain(layer.id);
+        deleteLayerCycleIndex(layer.id);
+        deleteLayerPlayOrder(layer.id);
       }
-    } else {
-      cancelPadFade(pad.id);
+      stopPadVoices(pad.id);
+      resetPadGain(pad.id);
     }
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);

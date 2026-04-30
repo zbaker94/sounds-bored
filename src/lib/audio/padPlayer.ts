@@ -224,7 +224,6 @@ export function stopFade(pad: Pad): void {
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(currentVol, ctx.currentTime);
   cancelPadFade(pad.id);
-  usePlaybackStore.getState().removeFadingOutPad(pad.id);
 }
 
 export function executeFadeTap(pad: Pad, globalFadeDurationMs?: number): void {
@@ -395,7 +394,6 @@ export function syncLayerConfig(layer: import("@/lib/schemas").Layer, original: 
 /** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
   cancelPadFade(pad.id);
-  usePlaybackStore.getState().removeFadingOutPad(pad.id);
   for (const layer of pad.layers) {
     deleteLayerChain(layer.id);
     deleteLayerCycleIndex(layer.id);
@@ -565,7 +563,7 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
           deleteStopCleanupTimeout(timeoutId);
           if (!isPadActive(pad.id)) {
             usePlaybackStore.getState().removePlayingPad(pad.id);
-            usePlaybackStore.getState().removeFadingOutPad(pad.id);
+            cancelPadFade(pad.id);
           }
         }, STOP_RAMP_S * 1000 + 10);
         addStopCleanupTimeout(timeoutId);
@@ -613,7 +611,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
     deleteStopCleanupTimeout(stopCleanupId);
     if (!isPadActive(pad.id)) {
       usePlaybackStore.getState().removePlayingPad(pad.id);
-      usePlaybackStore.getState().removeFadingOutPad(pad.id);
+      cancelPadFade(pad.id);
     }
   }, STOP_RAMP_S * 1000 + 10);
   addStopCleanupTimeout(stopCleanupId);

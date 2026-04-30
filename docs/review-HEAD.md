@@ -479,6 +479,12 @@ None.
 - **Severity**: Low
 - **Fix applied**: `createDefaultStoreLayer` now constructs the `Layer` object directly. The `as Layer` cast and the delegation to `createDefaultLayer()` are removed. Both functions are now independently correct for their declared return types. 1990/1990 tests pass; TypeScript clean.
 
+#### ~~[QUAL-5] Dual-ownership of `fadingOutPadIds` creates synchronization hazard~~ ✅ FIXED *(cross-ref: ARCH-5)*
+- **File**: `src/lib/audio/fadeMixer.ts:68–75` (original); `src/lib/audio/audioState.ts:545–557`; `src/lib/audio/padPlayer.ts:227,398,568,616`
+- **Severity**: Low
+- **Finding**: Every call to `addFadingOutPad`/`removeFadingOutPad` must be paired with a matching call to `usePlaybackStore.getState().addFadingOutPad`/`removeFadingOutPad`. The partial fix (private `markFadingOut`/`unmarkFadingOut` wrappers in `fadeMixer.ts`) left real bugs in `padPlayer.ts:568` and `616`, where stop-ramp cleanup callbacks cleared only the `playbackStore` side of `fadingOutPadIds`, leaving `audioState.fadingOutPadIds` stale and the UI permanently desynced from audio-engine state after layer-stop ramps.
+- **Fix applied**: Made both `addFadingOutPad` and `cancelPadFade` in `audioState.ts` fully atomic — each now updates both audioState and playbackStore sides in a single call. `cancelPadFade` gained `usePlaybackStore.getState().removeFadingOutPad(padId)`; `addFadingOutPad` gained `usePlaybackStore.getState().addFadingOutPad(padId)`. `unmarkFadingOut` and `markFadingOut` private wrappers eliminated — callers use the atomic primitives directly. Fading-up `else` branch explicit `removeFadingOutPad` call removed (now handled by `cancelPadFade`). `padPlayer.ts` stop-ramp cleanup callbacks at `triggerLayer` and `stopLayerWithRamp` updated to call `cancelPadFade` inside the `!isPadActive` guard, fixing the desync bugs where only the playbackStore side was cleared. Redundant explicit `removeFadingOutPad` calls in `stopFade` and `stopPad` (after `cancelPadFade`) removed. 3 tests added to `audioState.test.ts`: `cancelPadFade` calls `removeFadingOutPad` on the playbackStore; idempotency (called even when pad was never fading out); `addFadingOutPad` calls `addFadingOutPad` on the playbackStore. 2019/2019 tests pass; TypeScript clean.
+
 #### [QUAL6] `DownloadStatusButton.tsx` exports a component named `DownloadButton` ✅ FIXED
 - **File**: `src/components/composite/DownloadManager/DownloadStatusButton.tsx:14`
 - **Severity**: Low

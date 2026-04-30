@@ -20,6 +20,8 @@ const mockPlaybackState = {
   clearVolumes: vi.fn(),
   padVolumes: {} as Record<string, number>,
   removeFadingPad: vi.fn(),
+  removeFadingOutPad: vi.fn(),
+  addFadingOutPad: vi.fn(),
 };
 
 vi.mock("@/state/playbackStore", () => ({
@@ -356,6 +358,37 @@ describe("cancelPadFade", () => {
 
     expect(isPadFadingOut("pad-1")).toBe(false);
     expect(isPadFading("pad-1")).toBe(false);
+  });
+
+  it("clears fadingOutPadIds on both audioState and playbackStore sides", () => {
+    addFadingOutPad("pad-sync");
+    mockPlaybackState.removeFadingOutPad.mockClear();
+
+    cancelPadFade("pad-sync");
+
+    expect(isPadFadingOut("pad-sync")).toBe(false);
+    expect(mockPlaybackState.removeFadingOutPad).toHaveBeenCalledWith("pad-sync");
+  });
+
+  it("calls removeFadingOutPad on playbackStore even when pad was never fading out", () => {
+    mockPlaybackState.removeFadingOutPad.mockClear();
+
+    cancelPadFade("pad-never-fading");
+
+    expect(mockPlaybackState.removeFadingOutPad).toHaveBeenCalledWith("pad-never-fading");
+  });
+});
+
+// ── addFadingOutPad ──────────────────────────────────────────────────────────
+
+describe("addFadingOutPad", () => {
+  it("marks fading-out on both audioState and playbackStore sides", () => {
+    mockPlaybackState.addFadingOutPad.mockClear();
+
+    addFadingOutPad("pad-add");
+
+    expect(isPadFadingOut("pad-add")).toBe(true);
+    expect(mockPlaybackState.addFadingOutPad).toHaveBeenCalledWith("pad-add");
   });
 });
 
