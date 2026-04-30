@@ -472,11 +472,11 @@ None.
 - **Finding**: `startRef.current!` is asserted inside the interval callback. The guard runs before `setInterval`, so it's safe now, but a future refactor moving the interval above the guard would produce a silent runtime crash.
 - **Fix applied**: Captured `const start = startRef.current!` immediately after the guard (where non-nullness is guaranteed), then closed over `start` inside the interval callback instead of re-reading the ref. The assertion is now co-located with the proof of its safety; the interval closes over a plain `number` rather than a mutable ref.
 
-#### [QUAL10] `projectStore.deleteScene` non-null asserts a double-indexed array access
+#### ~~[QUAL10] `projectStore.deleteScene` non-null asserts a double-indexed array access~~ ✅ FIXED
 - **File**: `src/state/projectStore.ts:152-161`
 - **Severity**: Low
 - **Finding**: `(scenes[deletedIdx] ?? scenes[deletedIdx - 1])!.id` — if `deletedIdx` is stale and both indices are undefined, the `!` produces a runtime crash instead of a graceful `null`.
-- **Recommendation**: `const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0]; const next = candidate?.id ?? null;`
+- **Fix applied**: Replaced the ternary + `!` assertion with `const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0]; const next = candidate?.id ?? null;`. The `scenes.length > 0` guard is subsumed by `candidate?.id ?? null` which returns `null` when the array is empty. The `?? scenes[0]` third fallback is defensive against a stale `deletedIdx`; the existing `scenes.length > 0` ternary and `!` assertion are both removed. All 81 existing tests pass; TypeScript clean.
 
 #### [QUAL12] All `PadButton` instances subscribe to `fadePopoverTarget` — only one ever reads it
 - **File**: `src/components/composite/SceneView/PadButton.tsx:46-49`
@@ -626,3 +626,4 @@ None.
 | ARCH13 | `usePlaybackStore` import + subscription removed from `audioContext.ts`; `pendingVolume` queue closes initialization gap; `applyMasterVolume(volumePct)` exported; `audioTick.ts` owns the reactive bridge via `_stopMasterVolumeSync = subscribe(masterVolume, applyMasterVolume)`; `startAudioTick()` sync removed (redundant after pending-volume fix); `audioContext.test.ts` rewritten; 1979/1979 tests pass |
 | ARCH15 | `useSaveProject`/`useSaveCurrentLibrary` mutations removed from `useAutoSave`; replaced with direct `saveProject` + `saveCurrentLibraryAndClearDirty` calls; plain boolean refs track pending state; `clearDirtyFlag` called in `.then()`, errors routed to shared debounce in `.catch()`, pending reset in `.finally()`; three TanStack-workaround refs eliminated; test file rewritten to mock raw save functions; 1990/1990 tests pass |
 | QUAL8 | `LAYER_DIALOG_SCHEMA` and `LAYER_DIALOG_RESOLVER` hoisted to module scope in `LayerConfigDialog.tsx`; local `layerDialogSchema` variable and inline `zodResolver()` call removed; 2000/2000 tests pass |
+| QUAL10 | `deleteScene` `!` assertion + `scenes.length > 0` ternary replaced with `const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0]; const next = candidate?.id ?? null;` — eliminates the non-null assertion entirely; `?? scenes[0]` is defensive against a stale index; all 81 existing tests pass; TypeScript clean |

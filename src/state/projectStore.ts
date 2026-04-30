@@ -156,9 +156,8 @@ export const useProjectStore = create<ProjectStore>()(
       });
       if (wasActive && deletedIdx !== -1) {
         const scenes = get().project?.scenes ?? [];
-        const next = scenes.length > 0
-          ? (scenes[deletedIdx] ?? scenes[deletedIdx - 1])!.id
-          : null;
+        const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0];
+        const next = candidate?.id ?? null;
         // Pass updated sceneIds so `setActiveSceneId` enforces the invariant
         // against the post-delete scene list.
         const sceneIds = scenes.map((s) => s.id);

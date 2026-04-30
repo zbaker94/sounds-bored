@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a crash that could occur when deleting the last scene in a project — the app now safely falls back to `null` instead of throwing a runtime error
 - Fixed a potential crash in download timer logic where a mutable ref was read inside an interval callback; the value is now captured once when the interval starts, making the code safer against future refactors.
 - Fixed a visual glitch where a side-panel background image did not tile correctly along the vertical axis.
 - Improved rendering performance in the layer config dialog by eliminating redundant object allocations on each render.
