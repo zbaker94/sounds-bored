@@ -6,19 +6,16 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { useProjectStore } from "@/state/projectStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { usePadVolumeDisplay } from "@/hooks/usePadVolumeDisplay";
 import { getPadSoundState } from "@/lib/project.reconcile";
-import { executeFadeTap } from "@/lib/audio/padPlayer";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { PadBackFace } from "./PadBackFace";
 import { PadButtonProgress } from "./PadButtonProgress";
 import { PadButtonFadeOverlay } from "./PadButtonFadeOverlay";
+import { PadFadePopoverContent } from "./PadFadePopoverContent";
 import { PAD_FLIP_DURATION_MS, PAD_FLIP_EASE, PAD_STAGGER_MS } from "./padAnimations";
-import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -45,8 +42,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
   const isPopoverOpen = useUiStore((s) => s.fadePopoverPadId === pad.id);
   const setFadePopoverPadId = useUiStore((s) => s.setFadePopoverPadId);
-  const fadePopoverTarget = useUiStore((s) => s.fadePopoverTarget);
-  const setFadePopoverTarget = useUiStore((s) => s.setFadePopoverTarget);
   const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
 
   // Volume display state is fully managed by the hook — PadButton only consumes the result.
@@ -92,15 +87,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pad.id]);
-
-  // Commit the popover's target-volume selection: persist to project, execute fade, close popover.
-  const handlePopoverCommit = useCallback((target: number) => {
-    useProjectStore.getState().setPadFadeTarget(sceneId, pad.id, target);
-    const globalMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
-    executeFadeTap({ ...pad, fadeTargetVol: target }, globalMs);
-    setFadePopoverTarget(null);
-    setFadePopoverPadId(null);
-  }, [pad, sceneId, setFadePopoverPadId, setFadePopoverTarget]);
 
   const {
     attributes,
@@ -348,33 +334,15 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
                   </motion.div>
                 )}
               </div>
-              {/* Amber line at the target level — tells the user where the fade will land */}
-              {(isFadingOut || isPopoverOpen) && (
+              {/* Amber line during fade-out — uses persisted target, no live subscription needed */}
+              {isFadingOut && (
                 <div
                   className="absolute left-0 right-0 h-px bg-amber-400/80 pointer-events-none z-10"
-                  style={{ bottom: `${fadePopoverTarget ?? (pad.fadeTargetVol ?? 0)}%` }}
+                  style={{ bottom: `${pad.fadeTargetVol ?? 0}%` }}
                 />
               )}
-              {isPopoverOpen && (
-                <div
-                  className="absolute bottom-0 left-0 right-0 z-20 px-2 pb-1.5 pt-0.5 bg-black/60 backdrop-blur-sm rounded-b-xl"
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <Slider
-                    compact
-                    tooltipLabel={(v) => `${v}%`}
-                    value={[Math.round(fadePopoverTarget ?? (pad.fadeTargetVol ?? 0))]}
-                    onValueChange={([v]) => setFadePopoverTarget(v)}
-                    onValueCommit={([v]) => handlePopoverCommit(v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                  <div className="text-[9px] text-white/70 mt-0.5 text-center">
-                    target · press F to fade
-                  </div>
-                </div>
-              )}
+              {/* Popover content isolated so pointer-move updates only re-render this subtree */}
+              {isPopoverOpen && <PadFadePopoverContent pad={pad} sceneId={sceneId} />}
               {/* Multi-fade slider overlay — isolated in PadButtonFadeOverlay with its own store subscriptions */}
               <PadButtonFadeOverlay pad={pad} sceneId={sceneId} />
             </button>

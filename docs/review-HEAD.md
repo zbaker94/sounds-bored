@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 27 (23 fixed) |
+| Low | 26 (24 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -478,11 +478,11 @@ None.
 - **Finding**: `(scenes[deletedIdx] ?? scenes[deletedIdx - 1])!.id` — if `deletedIdx` is stale and both indices are undefined, the `!` produces a runtime crash instead of a graceful `null`.
 - **Fix applied**: Replaced the ternary + `!` assertion with `const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0]; const next = candidate?.id ?? null;`. The `scenes.length > 0` guard is subsumed by `candidate?.id ?? null` which returns `null` when the array is empty. The `?? scenes[0]` third fallback is defensive against a stale `deletedIdx`; the existing `scenes.length > 0` ternary and `!` assertion are both removed. All 81 existing tests pass; TypeScript clean.
 
-#### [QUAL12] All `PadButton` instances subscribe to `fadePopoverTarget` — only one ever reads it
+#### ~~[QUAL12] All `PadButton` instances subscribe to `fadePopoverTarget` — only one ever reads it~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadButton.tsx:46-49`
 - **Severity**: Low
-- **Finding**: `const fadePopoverTarget = useUiStore((s) => s.fadePopoverTarget)` subscribes every pad instance to pointer-move-rate updates during popover drags, even though only the pad with an open popover reads the value.
-- **Recommendation**: Move the `fadePopoverTarget` subscription into the popover-content branch, or compute: `useUiStore((s) => s.fadePopoverPadId === pad.id ? s.fadePopoverTarget : null)`.
+- **Finding**: `const fadePopoverTarget = useUiStore((s) => s.fadePopoverTarget)` subscribed every pad instance to pointer-move-rate updates during popover drags, even though only the pad with an open popover reads the value.
+- **Fix applied**: Extracted the fade popover UI (amber indicator line + slider panel + commit handler) into a new `PadFadePopoverContent` component, following the same isolation pattern as `PadButtonProgress` and `PadButtonFadeOverlay`. `PadButton` now renders `{isPopoverOpen && <PadFadePopoverContent pad={pad} sceneId={sceneId} />}` — the subscription only exists while the popover is open and only for that one instance. The `isFadingOut` amber line uses `pad.fadeTargetVol ?? 0` directly (the popover commit already persists the target before starting the fade). `fadePopoverTarget` and `setFadePopoverTarget` subscriptions removed from `PadButton`; `handlePopoverCommit` moved into the sub-component. 3 tests added; TypeScript clean.
 
 #### [QUAL13] `LayerConfigSection.getRetriggerHelper` casts to `Exclude<RetriggerMode, "next">`
 - **File**: `src/components/composite/PadConfigDrawer/LayerConfigSection.tsx:218`

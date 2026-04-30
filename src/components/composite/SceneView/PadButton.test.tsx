@@ -23,6 +23,7 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   stopPad: vi.fn(),
   isPadFading: vi.fn().mockReturnValue(false),
   freezePadAtCurrentVolume: vi.fn(),
+  executeFadeTap: vi.fn(),
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
@@ -325,6 +326,34 @@ describe("right-click / context menu", () => {
     useUiStore.setState({ ...initialUiState, editMode: true });
     render(<PadButton pad={pad} sceneId="scene-1" />);
     expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
+  });
+});
+
+describe("fade popover", () => {
+  beforeEach(() => {
+    useUiStore.setState({ ...initialUiState });
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+  });
+
+  it("renders the fade slider when fadePopoverPadId matches this pad", () => {
+    const pad = loadPadInStore({ fadeTargetVol: 20 });
+    useUiStore.setState({ ...initialUiState, fadePopoverPadId: "pad-1" });
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(screen.getByRole("slider")).toBeInTheDocument();
+  });
+
+  it("does not render the fade slider when fadePopoverPadId does not match", () => {
+    const pad = loadPadInStore();
+    useUiStore.setState({ ...initialUiState, fadePopoverPadId: "other-pad" });
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  });
+
+  it("does not render the fade slider when no popover is open", () => {
+    const pad = loadPadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   });
 });
 
