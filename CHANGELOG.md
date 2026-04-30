@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code cleanup: renamed `DownloadButton` component to `DownloadStatusButton` to match its filename (no user-visible behavior change)
 - Improved internal code quality by centralizing layer configuration conversion logic, reducing duplication and potential for type-related bugs
 - Internal layer configuration logic was consolidated into a shared module, improving code maintainability with no change to visible behavior.
 - Fixed tag-based sound selection to correctly preserve "match all tags" mode when editing layer configuration

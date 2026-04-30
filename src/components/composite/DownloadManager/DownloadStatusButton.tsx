@@ -7,11 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useDownloadStore, selectActiveJobs } from "@/state/downloadStore";
 import { DownloadManager } from "./DownloadManager";
 
-interface DownloadButtonProps {
+interface DownloadStatusButtonProps {
   onOpenDialog: () => void;
 }
 
-export function DownloadButton({ onOpenDialog }: DownloadButtonProps) {
+export function DownloadStatusButton({ onOpenDialog }: DownloadStatusButtonProps) {
   const { hasJobs, hasActive, activeCount } = useDownloadStore(
     useShallow((s) => {
       const active = selectActiveJobs(s);

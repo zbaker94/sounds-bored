@@ -14,7 +14,7 @@ import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
 import { DownloadDialog } from "@/components/modals/DownloadDialog";
-import { DownloadButton } from "@/components/composite/DownloadManager/DownloadStatusButton";
+import { DownloadStatusButton } from "@/components/composite/DownloadManager/DownloadStatusButton";
 import { FolderBrowser } from "./FolderBrowser";
 import { SoundList } from "./SoundList";
 import { ConfirmRemoveMissingDialog } from "@/components/modals/ConfirmRemoveMissingDialog";
@@ -105,7 +105,7 @@ export function SoundsPanel() {
           <HugeiconsIcon icon={CloudUploadIcon} size={14} />
           {isImporting ? "Importing..." : "Import Sounds"}
         </Button>
-        <DownloadButton onOpenDialog={() => setDownloadDialogOpen(true)} />
+        <DownloadStatusButton onOpenDialog={() => setDownloadDialogOpen(true)} />
         <div className="relative ml-auto flex items-center">
           <HugeiconsIcon icon={Search01Icon} size={14} className="absolute left-2.5 text-white/50 pointer-events-none" />
           <Input

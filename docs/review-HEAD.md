@@ -453,11 +453,12 @@ None.
 - **Severity**: Low
 - **Fix applied**: `createDefaultStoreLayer` now constructs the `Layer` object directly. The `as Layer` cast and the delegation to `createDefaultLayer()` are removed. Both functions are now independently correct for their declared return types. 1990/1990 tests pass; TypeScript clean.
 
-#### [QUAL6] `DownloadStatusButton.tsx` exports a component named `DownloadButton`
+#### [QUAL6] `DownloadStatusButton.tsx` exports a component named `DownloadButton` ✅ FIXED
 - **File**: `src/components/composite/DownloadManager/DownloadStatusButton.tsx:14`
 - **Severity**: Low
 - **Finding**: File named `DownloadStatusButton.tsx`, prop interface `DownloadButtonProps`, export `function DownloadButton`. The mismatch hinders searchability.
 - **Recommendation**: Either rename the export to `DownloadStatusButton` (and update consumers) or rename the file to `DownloadButton.tsx`.
+- **Fix applied**: Rename the export to `DownloadStatusButton` (and update consumers)
 
 #### [QUAL8] `LayerConfigDialog` reallocates Zod schema and resolver on every render
 - **File**: `src/components/composite/PadConfigDrawer/LayerConfigDialog.tsx:78-81`
