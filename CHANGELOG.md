@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal pad lookup performance by replacing linear searches with an O(1) map-based lookup, making hotkey handling and fade operations more efficient with large projects.
 - Refactored internal pad state update logic to eliminate duplicated code, improving maintainability with no change to behavior
 - Marked the volume clamp code-reuse issue (REUSE3) as fixed in the internal code review document.
 - Refactored internal volume clamping logic into a shared `clampGain01` utility, reducing duplicated code across the audio engine without changing any playback behavior.

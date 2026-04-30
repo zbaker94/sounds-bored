@@ -557,11 +557,12 @@ None.
 - **Recommendation**: Add a private `withPad(sceneId, padId, update: (pad: Draft<Pad>) => void)` helper inside the store creator. All three setters become one-liners, and future pad-field setters stay cheap.
 - **Fix applied**: Added module-level `withPad` curried helper (typed against `ProjectStore`, no Immer import needed) before `useProjectStore`. The three setters are now single-expression one-liners. `isDirty = true` and both guard returns live exclusively in `withPad`. Also added 10 missing tests for `setPadFadeTarget` and `setPadVolume` (5 each, mirroring `setPadFadeDuration` coverage). 91/91 tests pass.
 
-#### [REUSE12] `buildPadMap` not exported — other hooks use O(N×M) `flatMap.find` instead
+#### ~~[REUSE12] `buildPadMap` not exported — other hooks use O(N×M) `flatMap.find` instead~~ ✅ FIXED
 - **File**: `src/hooks/useMultiFadeMode.ts:16-24`; `src/hooks/useGlobalHotkeys.ts:90,105,141`
 - **Severity**: Low
 - **Finding**: `buildPadMap` builds an O(1) lookup Map but is file-private. `useGlobalHotkeys` and `useProjectLifecycle` still use `scenes.flatMap((s) => s.pads).find(...)` for the same operation.
 - **Recommendation**: Move `buildPadMap` to `src/lib/projectHelpers.ts` (or `padDefaults.ts`) and export it.
+- **Fix applied**: Moved `buildPadMap` to `src/lib/padDefaults.ts` and exported it. Removed the local copy from `useMultiFadeMode.ts`. Replaced the 3 `flatMap(...).find(...)` sites in `useGlobalHotkeys.ts` with `buildPadMap(...).get(id)`. Note: `useProjectLifecycle` had no `flatMap.find` — the review finding was inaccurate on that point. Added 4 tests to `padDefaults.test.ts`. 90/90 test files, 2021/2021 tests pass.
 
 #### [REUSE13] `{ ...padToConfig(pad), field: v }` spread bypasses typed store setters in `PadBackFace`
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:285-286,292,409,476,493`

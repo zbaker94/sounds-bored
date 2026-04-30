@@ -1,4 +1,18 @@
-import type { Layer, LayerConfigForm, Pad, PadConfig } from "@/lib/schemas";
+import type { Layer, LayerConfigForm, Pad, PadConfig, Scene } from "@/lib/schemas";
+
+/**
+ * Build an O(1) lookup map of padId → Pad across all scenes. Avoids the
+ * O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops.
+ */
+export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
+  const map = new Map<string, Pad>();
+  for (const scene of scenes) {
+    for (const pad of scene.pads) {
+      map.set(pad.id, pad);
+    }
+  }
+  return map;
+}
 
 export function createDefaultLayer(): LayerConfigForm {
   return {

@@ -5,7 +5,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { executeFadeTap } from "@/lib/audio/padPlayer";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { createDefaultStoreLayer } from "@/lib/padDefaults";
+import { buildPadMap, createDefaultStoreLayer } from "@/lib/padDefaults";
 import type { PadConfig } from "@/lib/schemas";
 import { PADS_PER_PAGE } from "@/lib/constants";
 
@@ -88,8 +88,8 @@ export function useGlobalHotkeys() {
 
     // Edit mode with a pad being edited: immediately execute that pad's configured fade.
     if (editMode && editingPadId) {
-      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
-      const pad = pads.find((p) => p.id === editingPadId);
+      const scenes = useProjectStore.getState().project?.scenes ?? [];
+      const pad = buildPadMap(scenes).get(editingPadId);
       if (!pad) return;
       executeFadeTap(pad, globalFadeDurationMs);
       return;
@@ -103,8 +103,7 @@ export function useGlobalHotkeys() {
     // If user dragged the slider without committing, apply in-flight target and persist it.
     if (fadePopoverPadId === hoveredPadId) {
       const project = useProjectStore.getState().project;
-      const pads = project?.scenes.flatMap((s) => s.pads) ?? [];
-      const pad = pads.find((p) => p.id === hoveredPadId);
+      const pad = buildPadMap(project?.scenes ?? []).get(hoveredPadId);
       if (!pad) return;
       if (fadePopoverTarget !== null) {
         const scene = project?.scenes.find((s) => s.pads.some((p) => p.id === hoveredPadId));
@@ -139,8 +138,8 @@ export function useGlobalHotkeys() {
 
     // Normal mode: enter multi-fade if hovering a pad and no context popover is open
     if (hoveredPadId && !editingPadId && !fadePopoverPadId) {
-      const pads = useProjectStore.getState().project?.scenes.flatMap((s) => s.pads) ?? [];
-      const pad = pads.find((p) => p.id === hoveredPadId);
+      const scenes = useProjectStore.getState().project?.scenes ?? [];
+      const pad = buildPadMap(scenes).get(hoveredPadId);
       useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
     }
   }, { enableOnFormTags: true });

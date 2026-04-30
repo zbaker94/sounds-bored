@@ -3,23 +3,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { executeFadeTap } from "@/lib/audio/padPlayer";
-import type { Pad, Scene } from "@/lib/schemas";
-
-export type { SelectedPadFade } from "@/state/multiFadeStore";
-
-/**
- * Build an O(1) lookup map of padId → Pad across all scenes. Avoids the
- * O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops.
- */
-function buildPadMap(scenes: Scene[]): Map<string, Pad> {
-  const map = new Map<string, Pad>();
-  for (const scene of scenes) {
-    for (const pad of scene.pads) {
-      map.set(pad.id, pad);
-    }
-  }
-  return map;
-}
+import { buildPadMap } from "@/lib/padDefaults";
 
 export function executeMultiFadeNow(): void {
   const { selectedPads, resetMultiFade } = useMultiFadeStore.getState();

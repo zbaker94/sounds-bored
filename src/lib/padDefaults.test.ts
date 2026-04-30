@@ -1,7 +1,37 @@
 import { describe, it, expect } from "vitest";
-import { createMockLayer } from "@/test/factories";
+import { createMockLayer, createMockPad, createMockScene } from "@/test/factories";
 import type { LayerConfigForm } from "@/lib/schemas";
-import { layerToFormLayer, formLayerToLayer } from "@/lib/padDefaults";
+import { buildPadMap, layerToFormLayer, formLayerToLayer } from "@/lib/padDefaults";
+
+describe("buildPadMap", () => {
+  it("returns an empty map for an empty scene list", () => {
+    expect(buildPadMap([])).toEqual(new Map());
+  });
+
+  it("indexes pads from a single scene by id", () => {
+    const pad1 = createMockPad({ id: "p1" });
+    const pad2 = createMockPad({ id: "p2" });
+    const scene = createMockScene({ pads: [pad1, pad2] });
+    const map = buildPadMap([scene]);
+    expect(map.get("p1")).toBe(pad1);
+    expect(map.get("p2")).toBe(pad2);
+  });
+
+  it("indexes pads from multiple scenes", () => {
+    const pad1 = createMockPad({ id: "p1" });
+    const pad2 = createMockPad({ id: "p2" });
+    const scene1 = createMockScene({ pads: [pad1] });
+    const scene2 = createMockScene({ pads: [pad2] });
+    const map = buildPadMap([scene1, scene2]);
+    expect(map.get("p1")).toBe(pad1);
+    expect(map.get("p2")).toBe(pad2);
+  });
+
+  it("returns undefined for an unknown id", () => {
+    const scene = createMockScene({ pads: [createMockPad({ id: "p1" })] });
+    expect(buildPadMap([scene]).get("nonexistent")).toBeUndefined();
+  });
+});
 
 describe("layerToFormLayer", () => {
   it("converts all shared fields from Layer to LayerConfigForm", () => {
