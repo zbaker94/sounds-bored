@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved reliability of pad fade-in behavior by consolidating audio fade logic into a dedicated module.
+- Internal code refactoring of pad stop and fade-in routines; no user-visible behavior changes.
 - Active layers in pad configuration now show a real-time progress bar indicating playback position.
 - Previewing a sound in the sound library now displays a live progress bar beneath the sound name.
 - Preview audio is now properly stopped when closing a project, preventing audio bleed between project sessions.
