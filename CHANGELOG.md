@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Auto-save now correctly restarts when a project is marked temporary or when the save interval changes, preventing missed saves in edge cases
+- Save failures now show a user notification without logging internal error details to the console
 - Auto-save reliability improved: project and library saves now use direct async calls instead of query mutations, eliminating a class of edge-case save failures.
 - Failed auto-saves now correctly retry on the next interval tick without requiring a manual trigger.
 - Auto-save error toast debouncing preserved: repeated disk failures within 60 seconds still show only one notification.

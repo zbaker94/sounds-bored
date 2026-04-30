@@ -16,7 +16,7 @@ const AUTO_SAVE_ERROR_DEBOUNCE_MS = 60_000;
 /**
  * Hook to periodically save the current project and library.
  * Only saves when isDirty is true. The interval is stable across project mutations
- * — only restarts when folderPath changes.
+ * — only restarts when folderPath, isTemporary, or interval changes.
  *
  * Missing-status checks (`refreshMissingState`) are NOT performed here.
  * They are triggered on specific events instead (project load, audio errors,
@@ -67,8 +67,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
         .then(() => {
           useProjectStore.getState().clearDirtyFlag();
         })
-        .catch((error: unknown) => {
-          console.error("Failed to save project:", error);
+        .catch(() => {
           notifyAutoSaveFailure();
         })
         .finally(() => {
@@ -83,8 +82,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
 
       isLibrarySavePendingRef.current = true;
       saveCurrentLibraryAndClearDirty()
-        .catch((error: unknown) => {
-          console.error("Failed to save library:", error);
+        .catch(() => {
           notifyAutoSaveFailure();
         })
         .finally(() => {
