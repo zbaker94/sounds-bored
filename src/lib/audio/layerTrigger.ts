@@ -574,7 +574,7 @@ export function selectionsEqual(a: LayerSelection, b: LayerSelection): boolean {
   if (a.type !== b.type) return false;
   switch (a.type) {
     case "assigned": {
-      const bA = b as Extract<import("@/lib/schemas").LayerSelection, { type: "assigned" }>;
+      const bA = b as Extract<LayerSelection, { type: "assigned" }>;
       if (a.instances.length !== bA.instances.length) return false;
       return a.instances.every(
         (inst, i) =>
@@ -585,7 +585,7 @@ export function selectionsEqual(a: LayerSelection, b: LayerSelection): boolean {
       );
     }
     case "tag": {
-      const bT = b as Extract<import("@/lib/schemas").LayerSelection, { type: "tag" }>;
+      const bT = b as Extract<LayerSelection, { type: "tag" }>;
       return (
         a.matchMode === bT.matchMode &&
         a.defaultVolume === bT.defaultVolume &&
@@ -594,7 +594,7 @@ export function selectionsEqual(a: LayerSelection, b: LayerSelection): boolean {
       );
     }
     case "set": {
-      const bS = b as Extract<import("@/lib/schemas").LayerSelection, { type: "set" }>;
+      const bS = b as Extract<LayerSelection, { type: "set" }>;
       return a.setId === bS.setId && a.defaultVolume === bS.defaultVolume;
     }
   }
@@ -741,7 +741,7 @@ function startSoundInLayer(pad: Pad, layer: Layer, sound: Sound, resolved: Sound
   ensureResumed().then((ctx) => {
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
-    startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
+    startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved).catch(emitAudioError);
     usePlaybackStore.getState().addPlayingPad(pad.id);
   }).catch((err: unknown) => { emitAudioError(err); });
 }
