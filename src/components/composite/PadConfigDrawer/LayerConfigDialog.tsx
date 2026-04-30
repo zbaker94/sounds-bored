@@ -21,6 +21,9 @@ import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
 import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
 
+const LAYER_DIALOG_SCHEMA = PadConfigSchema.extend({ name: z.string() });
+const LAYER_DIALOG_RESOLVER = zodResolver(LAYER_DIALOG_SCHEMA) as Resolver<PadConfigForm>;
+
 // ─── Component contract ───────────────────────────────────────────────────────
 
 export interface LayerConfigDialogProps {
@@ -45,14 +48,11 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
   const closeOverlay = useUiStore((s) => s.closeOverlay);
   const updatePad = useProjectStore((s) => s.updatePad);
 
-  // LayerConfigDialog edits a single layer; it never reads or writes the pad
-  // name from the form (onSubmit uses pad.name directly via padToConfig).
-  // Override name to z.string() so a new pad with an empty name doesn't block
-  // the Zod resolver from accepting an otherwise valid layer config.
-  const layerDialogSchema = PadConfigSchema.extend({ name: z.string() });
-
   const methods = useForm<PadConfigForm>({
-    resolver: zodResolver(layerDialogSchema) as Resolver<PadConfigForm>,
+    // LAYER_DIALOG_RESOLVER overrides name to z.string() so a new pad with an
+    // empty name doesn't block the Zod resolver from accepting an otherwise
+    // valid layer config. The dialog never reads or writes the pad name.
+    resolver: LAYER_DIALOG_RESOLVER,
     defaultValues: {
       name: pad.name,
       layers: [layerToFormLayer(layer)],

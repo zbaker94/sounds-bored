@@ -227,7 +227,7 @@
     background-image:
       linear-gradient(color-mix(in oklch, var(--color-yellow-500) 65%, transparent), color-mix(in oklch, var(--color-yellow-500) 65%, transparent)),
       url("./assets/side-illumination.png");
-    background-repeat: no-repeat;
+    background-repeat: repeat-y;
     background-size: contain;
     background-position: center;
   }

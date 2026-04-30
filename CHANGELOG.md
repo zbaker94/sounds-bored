@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a visual glitch where a side-panel background image did not tile correctly along the vertical axis.
+- Improved rendering performance in the layer config dialog by eliminating redundant object allocations on each render.
 - Internal code cleanup: renamed `DownloadButton` component to `DownloadStatusButton` to match its filename (no user-visible behavior change)
 - Improved internal code quality by centralizing layer configuration conversion logic, reducing duplication and potential for type-related bugs
 - Internal layer configuration logic was consolidated into a shared module, improving code maintainability with no change to visible behavior.

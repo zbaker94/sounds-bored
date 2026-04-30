@@ -460,11 +460,11 @@ None.
 - **Recommendation**: Either rename the export to `DownloadStatusButton` (and update consumers) or rename the file to `DownloadButton.tsx`.
 - **Fix applied**: Rename the export to `DownloadStatusButton` (and update consumers)
 
-#### [QUAL8] `LayerConfigDialog` reallocates Zod schema and resolver on every render
+#### ~~[QUAL8] `LayerConfigDialog` reallocates Zod schema and resolver on every render~~ ✅ FIXED
 - **File**: `src/components/composite/PadConfigDrawer/LayerConfigDialog.tsx:78-81`
 - **Severity**: Low
 - **Finding**: `PadConfigSchema.extend({ name: z.string() })` and `zodResolver(...)` are constructed inside the component body, allocating fresh objects on every render.
-- **Recommendation**: Hoist `const LAYER_DIALOG_SCHEMA = PadConfigSchema.extend({ name: z.string() })` to module scope.
+- **Fix applied**: Hoisted `LAYER_DIALOG_SCHEMA` and `LAYER_DIALOG_RESOLVER` to module scope (after imports). Removed the local `layerDialogSchema` variable; `useForm` now references `LAYER_DIALOG_RESOLVER` directly. The explanatory comment about overriding `name` to `z.string()` moved to the `resolver:` call site. 2000/2000 tests pass; TypeScript clean.
 
 #### [QUAL9] `useElapsedTime` non-null asserts `startRef.current` inside `setInterval`
 - **File**: `src/components/composite/DownloadManager/DownloadItem.tsx:32-39`
@@ -625,3 +625,4 @@ None.
 | ARCH12 | `useDownloadEventListener` + `buildJobUpdate` moved to `src/hooks/useDownloadEventListener.ts`; `ytdlp.queries.ts` now contains only TanStack Query bindings; listener tests split into `src/hooks/useDownloadEventListener.test.ts`; import updated in `MainPage.tsx` and mock path in `SoundList.test.tsx`; 1966/1966 tests pass |
 | ARCH13 | `usePlaybackStore` import + subscription removed from `audioContext.ts`; `pendingVolume` queue closes initialization gap; `applyMasterVolume(volumePct)` exported; `audioTick.ts` owns the reactive bridge via `_stopMasterVolumeSync = subscribe(masterVolume, applyMasterVolume)`; `startAudioTick()` sync removed (redundant after pending-volume fix); `audioContext.test.ts` rewritten; 1979/1979 tests pass |
 | ARCH15 | `useSaveProject`/`useSaveCurrentLibrary` mutations removed from `useAutoSave`; replaced with direct `saveProject` + `saveCurrentLibraryAndClearDirty` calls; plain boolean refs track pending state; `clearDirtyFlag` called in `.then()`, errors routed to shared debounce in `.catch()`, pending reset in `.finally()`; three TanStack-workaround refs eliminated; test file rewritten to mock raw save functions; 1990/1990 tests pass |
+| QUAL8 | `LAYER_DIALOG_SCHEMA` and `LAYER_DIALOG_RESOLVER` hoisted to module scope in `LayerConfigDialog.tsx`; local `layerDialogSchema` variable and inline `zodResolver()` call removed; 2000/2000 tests pass |
