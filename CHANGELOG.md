@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal TypeScript type cleanup: removed unnecessary public export from `PadBackFaceProps` interface (no user-facing behavior change)
 - Fixed a TypeScript type narrowing issue in the audio engine that required an unnecessary non-null assertion (`!`), improving internal code safety with no behavior change.
 - Minor internal code consistency fix in the fade duration slider — no change in behavior for users.
 - Internal code review documentation for v1.5.4 has been cleaned up; no user-facing functionality was added, removed, or changed in this diff.

@@ -526,11 +526,11 @@ None.
 - **Finding**: `layerMap` is narrowed to non-null via a guard, but TS loses the narrowing inside the inner generator function, requiring `layerMap!.values()`.
 - **Fix applied**: Assigned `layerMap` to a narrowed `const lm = layerMap` before the generator declaration. TypeScript infers `lm` as `Map<string, Set<HTMLAudioElement>>` (non-null) because `const` bindings are not re-narrowable, so the generator can access `lm.values()` without the `!` assertion. Zero behavior change.
 
-#### [QUAL20] `PadBackFaceProps` exported but unreferenced externally
-- **File**: `src/components/composite/SceneView/PadBackFace.tsx:195-206`
+#### ~~[QUAL20] `PadBackFaceProps` exported but unreferenced externally~~ ✅ FIXED
+- **File**: `src/components/composite/SceneView/PadBackFace.tsx:29`
 - **Severity**: Low
-- **Finding**: `export interface PadBackFaceProps` is exported but nothing outside the file imports it. `PadFadeControlsProps` and `PadLayerSectionProps` are declared for non-exported components (no `export` modifier).
-- **Recommendation**: Remove `export` from `PadBackFaceProps` unless an external consumer needs it.
+- **Finding**: `export interface PadBackFaceProps` was exported but nothing outside the file imported it.
+- **Fix applied**: Removed `export` modifier — `PadBackFaceProps` is now a file-private interface. `PadBackFace` (the component) remains exported; only the props type loses public visibility. Zero behavior change.
 
 #### [QUAL21] `LayerConfigDialog` tag/set emptiness check is out-of-band with no explanation
 - **File**: `src/components/composite/PadConfigDrawer/LayerConfigDialog.tsx:78,118-138`

@@ -26,7 +26,7 @@ import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDial
 import { PadFadeControls } from "./PadFadeControls";
 import { PadLayerSection } from "./PadLayerSection";
 
-export interface PadBackFaceProps {
+interface PadBackFaceProps {
   pad: Pad;
   sceneId: string;
   onMultiFade: () => void;
