@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { filterSoundsByTags, resolveLayerSounds, _soundByIdCache, _tagSetCache } from "./resolveSounds";
+import { filterSoundsByTags, filterSoundsBySet, resolveLayerSounds, _soundByIdCache, _tagSetCache } from "./resolveSounds";
 import { createMockLayer } from "@/test/factories";
 import type { Sound } from "@/lib/schemas";
 
@@ -88,6 +88,30 @@ describe("filterSoundsByTags", () => {
       const result = filterSoundsByTags(sounds, ["drums"], "all");
       expect(result.find((s) => s.id === "s5")).toBeUndefined();
     });
+  });
+});
+
+describe("filterSoundsBySet", () => {
+  const sounds: Sound[] = [
+    makeSound({ id: "s1", sets: ["set-a"] }),
+    makeSound({ id: "s2", sets: ["set-a", "set-b"] }),
+    makeSound({ id: "s3", sets: ["set-b"] }),
+    makeSound({ id: "s4", sets: ["set-a"], filePath: undefined }),
+  ];
+
+  it("returns sounds belonging to the set", () => {
+    const result = filterSoundsBySet(sounds, "set-a");
+    expect(result.map((s) => s.id)).toEqual(["s1", "s2"]);
+  });
+
+  it("excludes sounds without filePath", () => {
+    const result = filterSoundsBySet(sounds, "set-a");
+    expect(result.find((s) => s.id === "s4")).toBeUndefined();
+  });
+
+  it("returns empty array when no sounds belong to the set", () => {
+    const result = filterSoundsBySet(sounds, "set-unknown");
+    expect(result).toEqual([]);
   });
 });
 

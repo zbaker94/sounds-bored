@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { LayerConfigSection } from "./LayerConfigSection";
 import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
 import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
-import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
+import { filterSoundsByTags, filterSoundsBySet } from "@/lib/audio/resolveSounds";
 
 const LAYER_DIALOG_SCHEMA = PadConfigSchema.extend({ name: z.string() });
 const LAYER_DIALOG_RESOLVER = zodResolver(LAYER_DIALOG_SCHEMA) as Resolver<PadConfigForm>;
@@ -105,7 +105,7 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
           hasError = true;
         }
       } else if (sel.type === "set") {
-        if (sounds.filter((s) => s.sets.includes(sel.setId) && !!s.filePath).length === 0) {
+        if (filterSoundsBySet(sounds, sel.setId).length === 0) {
           const field: FieldPath<PadConfigForm> = "layers.0.selection.setId";
           setError(field, {
             type: "manual",

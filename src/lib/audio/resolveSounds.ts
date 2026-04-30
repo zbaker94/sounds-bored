@@ -118,3 +118,13 @@ export function filterSoundsByTags(
       : tagIds.some((tid) => s.tags.includes(tid));
   });
 }
+
+/**
+ * Filter sounds belonging to a set, excluding those with missing file paths.
+ *
+ * Mirrors `filterSoundsByTags` — intended for UI validation checks only.
+ * Prefer `resolveLayerSounds` + `.filter(s => !!s.filePath)` for full resolution.
+ */
+export function filterSoundsBySet(sounds: Sound[], setId: string): Sound[] {
+  return sounds.filter((s) => s.sets.includes(setId) && !!s.filePath);
+}

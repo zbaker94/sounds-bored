@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 26 (24 fixed) |
+| Low | 26 (25 fixed) |
 | **Total** | **62** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -537,7 +537,7 @@ None.
 - **Severity**: Low
 - **Finding**: The dialog performs a manual emptiness check for tag/set selections (lines 118-138) alongside Zod's automatic `assigned` validation. No comment explains why this is out-of-band.
 - **Recommendation**: Add an inline comment explaining that "sounds exist for tag/set" is not Zod-expressible (requires runtime library state), to prevent future maintainers from consolidating it incorrectly.
-- **Fix applied**: Expanded the comment at the top of the validation block to explain that `LAYER_DIALOG_SCHEMA` is a module-level constant with no access to runtime library state, and that even a `z.refine()` callback would not help because the schema instance is fixed at module load. Added explicit "do not consolidate into the schema" guard sentence. Review also flagged a potential inconsistency in missing-file guards between the `tag` and `set` paths — confirmed not an issue: `filterSoundsByTags` already excludes missing-file sounds via `if (!s.filePath) return false`.
+- **Fix applied**: Expanded the comment at the top of the validation block to explain that `LAYER_DIALOG_SCHEMA` is a module-level constant with no access to runtime library state, and that even a `z.refine()` callback would not help because the schema instance is fixed at module load. Added explicit "do not consolidate into the schema" guard sentence. Secondary fix: extracted `filterSoundsBySet(sounds, setId)` in `resolveSounds.ts` (mirroring `filterSoundsByTags`) so the set path in `onSubmit` delegates to the shared utility instead of inlining `!!s.filePath`, closing the maintenance gap flagged by code review. 3 tests added to `resolveSounds.test.ts`.
 
 ---
 
