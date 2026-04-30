@@ -6,6 +6,7 @@ import { Project, ProjectSchema } from "./schemas";
 import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT_DESCRIPTION, SOUNDS_SUBFOLDER } from "./constants";
 import { migrateProject, MigrationError } from "./migrations";
 import { pickFolder, restorePathScope } from "@/lib/scope";
+import { logInfo } from "@/lib/logger";
 
 /** Fallback folder/zip-base name used when sanitization yields an unusable result. */
 const FALLBACK_PROJECT_NAME = "project";
@@ -84,7 +85,9 @@ export async function loadProjectFile(
     const fileContent = await readTextFile(projectFilePath);
     const raw = JSON.parse(fileContent);
     const migrated = migrateProject(raw);
-    return ProjectSchema.parse(migrated);
+    const project = ProjectSchema.parse(migrated);
+    logInfo("Project loaded", { name: project.name, version: project.version });
+    return project;
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new ProjectValidationError(`Invalid JSON in ${PROJECT_FILE_NAME}`);
@@ -208,6 +211,8 @@ export async function createNewProject(projectName?: string): Promise<{
   const folderPath = await createProjectFolder(name);
   const project = await createProjectFile(folderPath, name);
 
+  logInfo("Project created", { name });
+
   return {
     project,
     folderPath,
@@ -230,6 +235,7 @@ export async function saveProject(
     lastSaved: new Date().toISOString(),
   };
   await atomicWriteJson(projectFilePath, projectWithTimestamp);
+  logInfo("Project saved", { folderPath });
   return projectWithTimestamp;
 }
 
@@ -325,6 +331,8 @@ export async function saveProjectAs(
   if (await isTempProjectFolder(currentPath)) {
     await discardTemporaryProject(currentPath);
   }
+
+  logInfo("Project saved as", { name: projectName, folderPath: newProjectPath });
 
   return {
     newPath: newProjectPath,

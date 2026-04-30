@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { initLogger, logInfo } from "@/lib/logger";
 
 const rootEl = document.getElementById("root") as HTMLElement;
 
@@ -18,6 +19,7 @@ if (!(rootEl as any).__reactRoot) {
 }
 const root = (rootEl as any).__reactRoot as ReturnType<typeof ReactDOM.createRoot>;
 
+initLogger().then(() => { logInfo("App started"); }).catch(() => {});
 root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

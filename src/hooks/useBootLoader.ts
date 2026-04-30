@@ -10,6 +10,7 @@ import { loadAppSettings } from "@/lib/appSettings";
 import { loadDownloadHistory } from "@/lib/downloads";
 import { restorePathScope } from "@/lib/scope";
 import { SYSTEM_TAG_IMPORTED } from "@/lib/constants";
+import { logInfo, logWarn, logError } from "@/lib/logger";
 
 /**
  * Loads appSettings and globalLibrary from disk into their respective
@@ -36,6 +37,7 @@ export function useBootLoader(): { ready: boolean } {
     loadAppSettings()
       .then(async (settings) => {
         useAppSettingsStore.getState().loadSettings(settings);
+        logInfo("App settings loaded");
         // Re-establish runtime fs-scope grants for all persisted folders.
         // Tauri's allow_directory grants are session-only and are lost on restart,
         // so they must be replayed before reconciliation reads those directories.
@@ -44,30 +46,31 @@ export function useBootLoader(): { ready: boolean } {
         );
         const failedGrants = grantResults.filter((r) => r.status === "rejected").length;
         if (failedGrants > 0) {
+          logWarn("Could not re-grant folder access", { failedGrants });
           toast.warning(`Could not re-grant access to ${failedGrants} folder(s). Some library folders may be inaccessible.`);
         }
         setSettingsAttempted(true);
       })
       .catch((err) => {
-        console.error(err);
+        logError("Failed to load app settings", err instanceof Error ? err : { error: String(err) });
         toast.error("Failed to load app settings");
         setSettingsAttempted(true);
       });
     loadGlobalLibrary({ onCorruption: (msg) => toast.warning(msg) })
       .then((library) => {
         useLibraryStore.getState().loadLibrary(library);
+        logInfo("Sound library loaded", { soundCount: library.sounds.length });
         setLibraryAttempted(true);
       })
       .catch((err) => {
-        console.error(err);
+        logError("Failed to load sound library", err instanceof Error ? err : { error: String(err) });
         toast.error("Failed to load sound library");
         setLibraryAttempted(true);
       });
     loadDownloadHistory({ onCorruption: (msg) => toast.warning(msg) })
       .then((jobs) => { useDownloadStore.getState().loadJobs(jobs); })
       .catch((err) => {
-        // Non-critical — no toast. Log for dev visibility only.
-        console.error(err);
+        logError("Failed to load download history", err instanceof Error ? err : { error: String(err) });
       });
   }, []);
 
@@ -88,6 +91,7 @@ export function useBootLoader(): { ready: boolean } {
 
     reconcileGlobalLibrary(settings.globalFolders, soundsAtReconcileStart)
       .then((result) => {
+        logInfo("Library reconciled", { changed: result.changed });
         // Only apply if the store hasn't been mutated since we started the scan.
         // If isDirty is true, the user (or another effect) modified the library
         // while the async folder scan was running — their changes take priority.
@@ -121,14 +125,14 @@ export function useBootLoader(): { ready: boolean } {
         if (useLibraryStore.getState().isDirty) {
           saveCurrentLibrarySync({
             onError: (err) => {
-              console.error(err);
+              logError("Failed to save sound library", err instanceof Error ? err : { error: String(err) });
               toast.error("Failed to save sound library");
             },
           });
         }
       })
       .catch((err) => {
-        console.error(err);
+        logError("Failed to scan sound folders", err instanceof Error ? err : { error: String(err) });
         toast.error("Failed to scan sound folders");
       })
       .finally(() => {

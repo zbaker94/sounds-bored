@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useRouteError } from "react-router-dom";
+import { logError } from "@/lib/logger";
 
 // ─── Route-level error element (used by React Router errorElement prop) ───────
 
@@ -39,7 +40,7 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("AppErrorBoundary caught:", error, info);
+    logError("AppErrorBoundary caught unhandled error", { message: error.message, componentStack: info.componentStack ?? "" });
   }
 
   render() {
