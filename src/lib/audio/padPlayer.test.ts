@@ -4467,7 +4467,7 @@ describe("pending leak guards", () => {
     expect(isLayerPending(layer.id)).toBe(false);
   });
 
-  it("clears layer pending when applyRetriggerMode throws inside triggerLayer", async () => {
+  it("clears layer pending and emits error when getOrCreateLayerGain throws inside triggerLayer", async () => {
     // Make getOrCreateLayerGain throw by rejecting createGain on the layer gain call
     // padGain is created first (call 1), layerGain second (call 2 — throws)
     let createGainCallCount = 0;
@@ -4487,7 +4487,9 @@ describe("pending leak guards", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
-    await expect(triggerLayer(pad, layer)).rejects.toThrow("createGain failed");
+    // Error is caught by triggerLayerOfPad and emitted via the error bus (not propagated)
+    await triggerLayer(pad, layer);
+    expect(mockEmitAudioError).toHaveBeenCalledWith(expect.objectContaining({ message: "createGain failed" }));
     expect(isLayerPending(layer.id)).toBe(false);
   });
 

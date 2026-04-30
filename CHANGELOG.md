@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Audio playback errors in individual layers are now reported via the error notification system instead of crashing other layers playing simultaneously on the same pad.
+- Internal refactor: per-layer trigger logic is now shared between single-layer and full-pad triggers, reducing the chance of subtle behavior differences between the two paths.
 - Improved reliability of pad fade-in behavior by consolidating audio fade logic into a dedicated module.
 - Internal code refactoring of pad stop and fade-in routines; no user-visible behavior changes.
 - Active layers in pad configuration now show a real-time progress bar indicating playback position.

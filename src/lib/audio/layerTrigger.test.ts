@@ -1231,3 +1231,172 @@ describe("startLayerSound chain-state cleanup on error", () => {
     expect(getLayerChain("cleanup-layer-5")).toBeUndefined();
   });
 });
+
+describe("triggerLayerOfPad", () => {
+  const mockCtx = {
+    currentTime: 0,
+    createGain: vi.fn(),
+    createBufferSource: vi.fn(),
+    createMediaElementSource: vi.fn(() => ({ connect: vi.fn() })),
+  };
+
+  function makeMockGain() {
+    return {
+      gain: { value: 1.0, cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  }
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
+    });
+    const { clearAllPadGains, clearAllLayerGains, clearAllLayerChains, clearAllFadeTracking, clearAllVoices } = await import("./audioState");
+    clearAllPadGains();
+    clearAllLayerGains();
+    clearAllLayerChains();
+    clearAllFadeTracking();
+    clearAllVoices();
+  });
+
+  async function setup(layerOpts?: Parameters<typeof createMockLayer>[0]) {
+    const { getPadGain, getOrCreateLayerGain, setLayerPending } = await import("./audioState");
+    const { loadBuffer } = await import("./bufferCache");
+    const pad = createMockPad({ id: "pad-tlop" });
+    const layer = createMockLayer({ id: "layer-tlop", ...layerOpts });
+    const padGain = getPadGain(pad.id);
+    // Pre-seed layerGain so getOrCreateLayerGain returns without calling createGain a second time.
+    getOrCreateLayerGain(layer.id, 1, padGain);
+    setLayerPending(layer.id);
+    return { pad, layer, padGain, loadBuffer };
+  }
+
+  it("starts playback and clears pending on proceed", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { isLayerPending } = await import("./audioState");
+    const { pad, layer, padGain, loadBuffer } = await setup();
+    const sound = createMockSound({ id: "s1", filePath: "s1.wav" });
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain, [sound]);
+
+    expect(isLayerPending(layer.id)).toBe(false);
+  });
+
+  it("clears pending and skips playback when action is 'skip' (continue mode, layer playing)", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { recordLayerVoice, isLayerPending } = await import("./audioState");
+    const { pad, layer, padGain, loadBuffer } = await setup({ retriggerMode: "continue" });
+
+    const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
+    recordLayerVoice(pad.id, layer.id, fakeVoice);
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain, [createMockSound({ filePath: "a.wav" })]);
+
+    expect(isLayerPending(layer.id)).toBe(false);
+  });
+
+  it("clears pending when action is 'chain-advanced' (next mode, chain has remaining)", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { recordLayerVoice, setLayerChain, isLayerPending } = await import("./audioState");
+    const { pad, layer, padGain, loadBuffer } = await setup({ retriggerMode: "next", arrangement: "sequential" });
+
+    const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
+    recordLayerVoice(pad.id, layer.id, fakeVoice);
+    const next = createMockSound({ id: "s2", filePath: "s2.wav" });
+    setLayerChain(layer.id, [next]);
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain, [next]);
+
+    expect(isLayerPending(layer.id)).toBe(false);
+  });
+
+  it("calls afterStopCleanup when 'stop' mode stops a playing layer", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { recordLayerVoice } = await import("./audioState");
+    const { pad, layer, padGain } = await setup({ retriggerMode: "stop" });
+
+    const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
+    recordLayerVoice(pad.id, layer.id, fakeVoice);
+
+    const afterStopCleanup = vi.fn();
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
+      [createMockSound({ filePath: "a.wav" })], { afterStopCleanup });
+
+    expect(afterStopCleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call afterStopCleanup when layer is not playing", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { pad, layer, padGain, loadBuffer } = await setup({ retriggerMode: "stop" });
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+
+    const afterStopCleanup = vi.fn();
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
+      [createMockSound({ filePath: "a.wav" })], { afterStopCleanup });
+
+    expect(afterStopCleanup).not.toHaveBeenCalled();
+  });
+
+  it("clears pad progress before startLayerPlayback when clearProgressOnProceed is true", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { pad, layer, padGain, loadBuffer } = await setup();
+
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 5, isLooping: false });
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
+      [createMockSound({ filePath: "a.wav" })], { clearProgressOnProceed: true });
+
+    // startLayerPlayback wrote new progress (duration 1.0); stale entry (duration 5) is gone
+    const info = getPadProgressInfo(pad.id);
+    expect(info?.duration).not.toBe(5);
+  });
+
+  it("preserves sibling pad progress when clearProgressOnProceed is omitted", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { pad, layer, padGain, loadBuffer } = await setup();
+
+    // Seed progress as if a sibling layer with a longer duration already started
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 99, isLooping: false });
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
+      [createMockSound({ filePath: "a.wav" })]);
+
+    // startLayerSound only overwrites if new duration > existing (simultaneous logic);
+    // the sibling's longer duration (99) should survive
+    const info = getPadProgressInfo(pad.id);
+    expect(info?.duration).toBe(99);
+  });
+
+  it("clears pending and emits error when an internal error occurs", async () => {
+    const { triggerLayerOfPad } = await import("./layerTrigger");
+    const { isLayerPending } = await import("./audioState");
+    const { pad, layer, padGain, loadBuffer } = await setup();
+
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
+
+    await triggerLayerOfPad(pad, layer, mockCtx as unknown as AudioContext, padGain,
+      [createMockSound({ filePath: "a.wav" })]);
+
+    expect(isLayerPending(layer.id)).toBe(false);
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "load failed" }),
+      expect.any(Object),
+    );
+  });
+});

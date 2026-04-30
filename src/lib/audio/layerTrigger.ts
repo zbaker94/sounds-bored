@@ -32,8 +32,10 @@ import {
   getLayerCycleIndex,
   getLayerGain,
   getLayerVoices,
+  getOrCreateLayerGain,
   getPadProgressInfo,
   incrementLayerConsecutiveFailures,
+  isLayerActive,
   recordLayerVoice,
   registerStreamingAudio,
   resetLayerConsecutiveFailures,
@@ -43,9 +45,9 @@ import {
   setLayerProgressInfo,
   setPadProgressInfo,
   clearLayerProgressInfo,
+  clearLayerPending,
   clearPadProgressInfo,
   setLayerPending,
-  clearLayerPending,
   stopLayerVoices,
   unregisterStreamingAudio,
 } from "./audioState";
@@ -491,6 +493,60 @@ export async function startLayerPlayback(
     }
   } finally {
     clearLayerPending(layer.id);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// triggerLayerOfPad — per-layer trigger sequence shared by triggerPad and
+//   triggerLayer (extracted from the loop body in triggerPad per issue #130).
+// ---------------------------------------------------------------------------
+
+export interface TriggerLayerOfPadOpts {
+  /** Callback fired after a "stop"-mode ramp-stop; used by triggerLayer to schedule
+   *  a deferred removePlayingPad check. triggerPad omits it — pad state is managed globally. */
+  afterStopCleanup?: () => void;
+  /** When true, clears pad progress info immediately before starting playback.
+   *  triggerLayer passes true (single-layer path); triggerPad clears upfront once
+   *  for all parallel layers instead, so passes false (the default). */
+  clearProgressOnProceed?: boolean;
+}
+
+/**
+ * Core per-layer trigger sequence used by both triggerPad and triggerLayer.
+ *
+ * Preconditions (caller's responsibility):
+ *   - resolveSounds already called and returned a non-empty array
+ *   - setLayerPending already called
+ *
+ * Clears pending on skip / chain-advanced / error; startLayerPlayback's own
+ * finally block handles it on the proceed path.
+ */
+export async function triggerLayerOfPad(
+  pad: Pad,
+  layer: Layer,
+  ctx: AudioContext,
+  padGain: GainNode,
+  resolved: Sound[],
+  opts?: TriggerLayerOfPadOpts,
+): Promise<void> {
+  try {
+    const isLayerPlaying = isLayerActive(layer.id);
+    const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
+
+    const action = await applyRetriggerMode(
+      pad, layer, isLayerPlaying, ctx, layerGain, resolved, opts?.afterStopCleanup,
+    );
+    if (action === "skip" || action === "chain-advanced") {
+      clearLayerPending(layer.id);
+      return;
+    }
+
+    if (opts?.clearProgressOnProceed) clearPadProgressInfo(pad.id);
+    await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
+    // startLayerPlayback clears pending in its own finally block
+  } catch (err) {
+    clearLayerPending(layer.id);
+    emitAudioError(err);
   }
 }
 

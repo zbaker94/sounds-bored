@@ -41,7 +41,6 @@ import {
   clearLayerGainsForIds,
   clearPadGainsForIds,
   stopSpecificVoices,
-  isLayerActive,
   isLayerPending,
   isPadActive,
   isPadFading,
@@ -66,13 +65,12 @@ import {
 import { rampGainTo } from "./gainManager";
 
 import {
-  applyRetriggerMode,
-  startLayerPlayback,
   startLayerSound,
   rampStopLayerVoices,
   resolveSounds,
   getVoiceVolume,
   getLayerNormalizedVolume,
+  triggerLayerOfPad,
 } from "./layerTrigger";
 
 // Re-export public query/clear functions for backward compatibility
@@ -477,28 +475,11 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
 
   // Run all eligible layers in parallel. Each layer is independent — all per-layer state
   // (gains, voices, chains, cycle indexes) is keyed by layerId with no cross-layer reads.
+  // triggerPad does not pass afterStopCleanup — pad-level playback store state is managed
+  // globally (stopAllPads / clearVoice). clearProgressOnProceed is omitted: progress is
+  // cleared once upfront above so parallel layers don't erase each other's progress writes.
   await Promise.all(
-    layerWork.map(async ({ layer, resolved }) => {
-      try {
-        const isLayerPlaying = isLayerActive(layer.id);
-        const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
-
-        const action = await applyRetriggerMode(pad, layer, isLayerPlaying, ctx, layerGain, resolved);
-        // triggerPad does not pass afterStopCleanup — pad-level playback store state
-        // is managed globally (stopAllPads / clearVoice).
-        if (action === "skip" || action === "chain-advanced") {
-          clearLayerPending(layer.id);
-          return;
-        }
-
-        await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
-        // startLayerPlayback clears pending in its finally block — no explicit clear needed here.
-      } catch (err) {
-        // Unexpected failures in one layer must not block sibling layers or leave pending set.
-        clearLayerPending(layer.id);
-        emitAudioError(err);
-      }
-    }),
+    layerWork.map(({ layer, resolved }) => triggerLayerOfPad(pad, layer, ctx, padGain, resolved)),
   );
 }
 
@@ -518,14 +499,11 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
     // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
     // that are about to be started below (same fix as triggerPad).
     cancelPadFade(pad.id);
-    const isPlaying = isLayerActive(layer.id);
-    const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
 
-    const action = await applyRetriggerMode(
-      pad, layer, isPlaying, ctx, layerGain, resolved,
+    await triggerLayerOfPad(pad, layer, ctx, padGain, resolved, {
       // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad
       // still has any active voices and remove it from the playing-pads set if not.
-      () => {
+      afterStopCleanup: () => {
         const timeoutId = setTimeout(() => {
           deleteStopCleanupTimeout(timeoutId);
           if (!isPadActive(pad.id)) {
@@ -535,23 +513,13 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
         }, STOP_RAMP_S * 1000 + 10);
         addStopCleanupTimeout(timeoutId);
       },
-    );
-
-    if (action === "skip") {
-      return;
-    }
-    if (action === "chain-advanced") {
-      usePlaybackStore.getState().addPlayingPad(pad.id);
-      return;
-    }
-
-    clearPadProgressInfo(pad.id);
-    await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
-    usePlaybackStore.getState().addPlayingPad(pad.id);
+      // Single-layer path: clear progress right before starting so the bar resets
+      // while the buffer loads. triggerPad clears upfront for all parallel layers instead.
+      clearProgressOnProceed: true,
+    });
   } finally {
     // Safety net: clearLayerPending is idempotent.
-    // Guards against unexpected throws from ensureResumed or applyRetriggerMode
-    // before startLayerPlayback's own finally can run.
+    // Guards against unexpected throws from ensureResumed before triggerLayerOfPad runs.
     clearLayerPending(layer.id);
   }
 }
