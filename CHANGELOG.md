@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Resolved 15 code review findings across security, performance, architecture, code quality, and reuse categories, reducing total open issues from 47 to 32
+- Fixed all 3 security findings (symlink TOCTOU and yt-dlp config injection vulnerabilities) and both high-priority performance issues
+- Addressed several code quality and reuse issues including type-unsafe casts, duplicated helpers, and inconsistent use of shared constants
 - Pad name and color changes now use targeted store updates instead of full-config overwrites, reducing the risk of overwriting concurrent changes
 - Fade duration slider now updates the UI immediately during drag and only commits to the project state on release, matching the existing fade target slider behavior
 - Improved internal pad lookup performance by replacing linear searches with an O(1) map-based lookup, making hotkey handling and fade operations more efficient with large projects.
