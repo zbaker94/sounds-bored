@@ -478,8 +478,13 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
   // triggerPad does not pass afterStopCleanup — pad-level playback store state is managed
   // globally (stopAllPads / clearVoice). clearProgressOnProceed is omitted: progress is
   // cleared once upfront above so parallel layers don't erase each other's progress writes.
+  // .catch is a defensive guard: triggerLayerOfPad never rejects in practice (its own
+  // catch handles all errors), but the explicit .catch prevents a future regression where
+  // an escape path causes Promise.all to reject and abandon remaining sibling layers.
   await Promise.all(
-    layerWork.map(({ layer, resolved }) => triggerLayerOfPad(pad, layer, ctx, padGain, resolved)),
+    layerWork.map(({ layer, resolved }) =>
+      triggerLayerOfPad(pad, layer, ctx, padGain, resolved).catch(emitAudioError),
+    ),
   );
 }
 

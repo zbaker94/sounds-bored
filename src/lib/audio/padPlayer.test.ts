@@ -4309,7 +4309,9 @@ describe("triggerLayer", () => {
     setPadProgressInfo(pad.id, { startedAt: 0, duration: 99, isLooping: false });
     await triggerLayer(pad, layer);
 
-    // clearProgressOnProceed: true clears the stale entry; new progress (2.0) is written
+    // clearProgressOnProceed: true clears the seed before startLayerPlayback runs.
+    // Without the clear, loadLayerVoice would keep 99 (2.0 < 99 → no overwrite), so
+    // the final value 2.0 can only appear if the clear happened first.
     expect(getPadProgressInfo(pad.id)?.duration).toBe(2.0);
   });
 
@@ -4625,6 +4627,8 @@ describe("pending leak guards", () => {
 
     // Flush the ensureResumed() microtask — this causes triggerPad to resume and run the
     // synchronous pre-pass (setting both pending flags) before reaching Promise.all.
+    // COUPLING NOTE: this single flush matches exactly one await (ensureResumed) before the
+    // pre-pass at padPlayer.ts:462. If a new await is inserted before that line, update this.
     await Promise.resolve();
 
     // Both flags must be set: the pre-pass ran synchronously in the single microtask above.
