@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code review documentation for v1.5.4 has been cleaned up; no user-facing functionality was added, removed, or changed in this diff.
 - Fixed fade duration slider so keyboard users (arrow keys) now correctly persist their changes — previously only mouse/touch interactions saved the value
 - Fixed pad slider components (duration, percent) to render with consistent vertical spacing, preventing potential layout issues in certain parent containers.
 - Fixed a stale internal comment that incorrectly attributed the `F` key handler ownership to a renamed hook (`useMultiFadeMode` → `useMultiFadeSideEffects`).
