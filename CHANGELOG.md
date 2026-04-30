@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code review documentation updated to remove a resolved finding about audio volume clamping (the fix was already applied in a previous release).
 - Refactored internal volume clamping logic into a shared `clampGain01` utility, reducing duplicated code across the audio engine without changing any playback behavior.
 - Fixed a bug where sounds missing their audio file were not properly excluded when validating set-based pad layer configurations
 - Extracted a shared `filterSoundsBySet` utility so set and tag paths use consistent filtering logic
