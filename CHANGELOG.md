@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Duplicate filename-extraction logic consolidated into a single shared `basename()` utility, eliminating redundant code across 8+ files
 - Eliminated duplicate code in the audio layer defaults, reducing the risk of inconsistent behavior if defaults ever diverge.
 - Added unit tests covering default layer field values and uniqueness guarantees, improving reliability of new pad creation.
 - Refactored pad fade overlay controls into a reusable `PadOverlaySlider` component, reducing code duplication across the volume, target, and fade duration sliders

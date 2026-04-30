@@ -13,7 +13,7 @@
 | Critical | 0 |
 | High | 0 (6 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 26 (28 fixed) |
+| Low | 25 (29 fixed) |
 | **Total** | **63** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
@@ -596,6 +596,12 @@ None.
 - **Recommendation**: Move `buildPadMap` to `src/lib/projectHelpers.ts` (or `padDefaults.ts`) and export it.
 - **Fix applied**: Moved `buildPadMap` to `src/lib/padDefaults.ts` and exported it. Removed the local copy from `useMultiFadeMode.ts`. Replaced the 3 `flatMap(...).find(...)` sites in `useGlobalHotkeys.ts` with `buildPadMap(...).get(id)`. Note: `useProjectLifecycle` had no `flatMap.find` — the review finding was inaccurate on that point. Added 4 tests to `padDefaults.test.ts`. 90/90 test files, 2021/2021 tests pass.
 
+#### ~~[REUSE-5] `basename` path extraction duplicated 8+ times across the codebase~~ ✅ FIXED
+- **File**: `src/components/composite/DownloadManager/DownloadItem.tsx:22–27`, `src/lib/export.ts:37–39`, `src/hooks/useAddFolder.ts:43`, `src/components/modals/SettingsDialog.tsx:97`, `src/components/modals/ResolveMissingDialog.tsx:163`, `src/components/modals/ResolveMissingFolderDialog.tsx:469`, `src/lib/library.reconcile.ts:114`, `src/lib/utils.ts:47`
+- **Severity**: Low
+- **Finding**: `.split(/[\\/]/).pop() ?? fallback` to extract a filename appeared at 8+ call sites. `export.ts` had a private `extractBasename`; `DownloadItem.tsx` had its own `getDisplayName`. `utils.ts` already used the same regex internally for `truncatePath`.
+- **Fix applied**: `basename(path: string, fallback = ""): string` exported from `src/lib/utils.ts`. All 8 call sites now import and use it; private duplicates deleted. 7 unit tests added to `utils.test.ts` covering forward-slash paths, Windows backslash paths, bare filenames, trailing-slash normalization, empty path with and without a custom fallback, and mixed separators. 2019/2019 tests pass; TypeScript clean.
+
 #### ~~[REUSE-3] `createDefaultLayer` and `createDefaultStoreLayer` are byte-for-byte identical at runtime~~ ✅ FIXED
 - **File**: `src/lib/padDefaults.ts:17–39`
 - **Severity**: Low
@@ -674,3 +680,4 @@ None.
 | QUAL10 | `deleteScene` `!` assertion + `scenes.length > 0` ternary replaced with `const candidate = scenes[deletedIdx] ?? scenes[deletedIdx - 1] ?? scenes[0]; const next = candidate?.id ?? null;` — eliminates the non-null assertion entirely; `?? scenes[0]` is defensive against a stale index; all 81 existing tests pass; TypeScript clean |
 | REUSE3 | `clampGain01(value, fallback = 0)` exported from `gainManager.ts` (renamed from private `clampGain`); `layerTrigger.ts` (×2) and `usePadGesture.ts` (×1) open-coded clamps replaced; `audioState.ts:612` left inline (circular dep + intentional `fallback = 1`); 2007/2007 tests pass |
 | REUSE-3 | `createDefaultStoreLayer` delegates to `formLayerToLayer(createDefaultLayer())`; duplicate object literal removed; 4 unit tests added to `padDefaults.test.ts`; 2019/2019 tests pass |
+| REUSE-5 | `basename(path, fallback?)` exported from `utils.ts`; all 8 call sites migrated; private duplicates deleted; 7 unit tests added to `utils.test.ts`; 2019/2019 tests pass |

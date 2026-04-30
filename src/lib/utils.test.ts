@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { truncatePath, detectIsMac, nameFromFilename } from "./utils";
+import { truncatePath, detectIsMac, nameFromFilename, basename } from "./utils";
 
 describe("detectIsMac", () => {
   let originalUADataDescriptor: PropertyDescriptor | undefined;
@@ -107,6 +107,36 @@ describe("detectIsMac", () => {
     );
     // Empty platform string is falsy → falls through to userAgent branch
     expect(detectIsMac()).toBe(true);
+  });
+});
+
+describe("basename", () => {
+  it("extracts the filename from a forward-slash path", () => {
+    expect(basename("/foo/bar/baz.wav")).toBe("baz.wav");
+  });
+
+  it("extracts the filename from a Windows backslash path", () => {
+    expect(basename("C:\\Users\\Zack\\Music\\kick.wav")).toBe("kick.wav");
+  });
+
+  it("handles a path with no separator (bare filename)", () => {
+    expect(basename("kick.wav")).toBe("kick.wav");
+  });
+
+  it("ignores a trailing slash when extracting basename", () => {
+    expect(basename("/foo/bar/")).toBe("bar");
+  });
+
+  it("returns the fallback when path is empty", () => {
+    expect(basename("", "fallback")).toBe("fallback");
+  });
+
+  it("returns the default empty-string fallback when path is empty and no fallback is given", () => {
+    expect(basename("")).toBe("");
+  });
+
+  it("handles mixed forward and backslash separators", () => {
+    expect(basename("C:/Users\\Zack/sound.mp3")).toBe("sound.mp3");
   });
 });
 
