@@ -160,8 +160,9 @@ function recomputePadBestStreaming(padId: string): void {
   const layerMap = padStreamingAudio.get(padId);
   if (!layerMap) { _padBestStreamingAudio.delete(padId); return; }
   // Flatten all elements across all layers and pick the best
+  const lm = layerMap; // TS loses narrowing inside function declarations; const alias preserves non-null type
   function* allElements() {
-    for (const audioSet of layerMap!.values()) yield* audioSet;
+    for (const audioSet of lm.values()) yield* audioSet;
   }
   const best = pickBestStreaming(allElements());
   if (best) { _padBestStreamingAudio.set(padId, best); }

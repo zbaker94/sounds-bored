@@ -520,11 +520,11 @@ None.
 - **Finding**: `onValueChange={(v) => setDisplayDuration(v[0])}` while the two adjacent sliders use `onValueChange={([v]) => …}` destructure style.
 - **Fix applied**: Changed to `onValueChange={([v]) => setDisplayDuration(v)}` — functionally equivalent, now consistent with all other sliders in the component.
 
-#### [QUAL19] `audioState.ts` non-null asserts inside generator due to TS closure narrowing
-- **File**: `src/lib/audio/audioState.ts:143-151`
+#### ~~[QUAL19] `audioState.ts` non-null asserts inside generator due to TS closure narrowing~~ ✅ FIXED
+- **File**: `src/lib/audio/audioState.ts`
 - **Severity**: Low
 - **Finding**: `layerMap` is narrowed to non-null via a guard, but TS loses the narrowing inside the inner generator function, requiring `layerMap!.values()`.
-- **Recommendation**: Assign to a narrowed local const: `const lm = layerMap; function* allElements() { for (const s of lm.values()) yield* s; }`.
+- **Fix applied**: Assigned `layerMap` to a narrowed `const lm = layerMap` before the generator declaration. TypeScript infers `lm` as `Map<string, Set<HTMLAudioElement>>` (non-null) because `const` bindings are not re-narrowable, so the generator can access `lm.values()` without the `!` assertion. Zero behavior change.
 
 #### [QUAL20] `PadBackFaceProps` exported but unreferenced externally
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:195-206`

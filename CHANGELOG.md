@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a TypeScript type narrowing issue in the audio engine that required an unnecessary non-null assertion (`!`), improving internal code safety with no behavior change.
 - Minor internal code consistency fix in the fade duration slider — no change in behavior for users.
 - Internal code review documentation for v1.5.4 has been cleaned up; no user-facing functionality was added, removed, or changed in this diff.
 - Fixed fade duration slider so keyboard users (arrow keys) now correctly persist their changes — previously only mouse/touch interactions saved the value
