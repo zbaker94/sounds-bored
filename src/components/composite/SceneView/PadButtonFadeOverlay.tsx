@@ -95,7 +95,7 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
             tooltipLabel={(v) => `${(v / 1000).toFixed(1)}s`}
             value={[displayDuration]}
             onValueChange={(v) => setDisplayDuration(v[0])}
-            onPointerUp={() => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, displayDuration)}
+            onValueCommit={([v]) => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v)}
             min={100}
             max={10000}
             step={100}

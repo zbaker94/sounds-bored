@@ -110,7 +110,7 @@ describe("PadButtonFadeOverlay", () => {
     expect(onPointerDown).not.toHaveBeenCalled();
   });
 
-  it("calls setPadFadeDuration when the duration slider is released", () => {
+  it("calls setPadFadeDuration when the duration slider value is committed", () => {
     const pad = makePad({ fadeDurationMs: 2000 });
     loadPadInProjectStore(pad);
     useMultiFadeStore.setState({
@@ -122,11 +122,15 @@ describe("PadButtonFadeOverlay", () => {
     const mockSetFadeDuration = vi.fn();
     useProjectStore.setState((s) => ({ ...s, setPadFadeDuration: mockSetFadeDuration }));
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // Three sliders total: volume, target, duration. Duration is the last one.
     const sliders = screen.getAllByRole("slider");
-    const durationSlider = sliders[sliders.length - 1];
-    fireEvent.pointerUp(durationSlider);
-    expect(mockSetFadeDuration).toHaveBeenCalledWith(SCENE_ID, PAD_ID, 2000);
+    const durationThumb = sliders[sliders.length - 1];
+    // Radix calls onValueCommit synchronously after each keydown — keyboard users
+    // now correctly persist the value (was broken with onPointerUp).
+    act(() => {
+      durationThumb.focus();
+      fireEvent.keyDown(durationThumb, { key: "ArrowRight" });
+    });
+    expect(mockSetFadeDuration).toHaveBeenCalledWith(SCENE_ID, PAD_ID, expect.any(Number));
   });
 
   it("calls setMultiFadeLevels when the volume slider changes", () => {

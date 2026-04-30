@@ -508,11 +508,11 @@ None.
 - **Finding**: Both return `<> <div>…</div> <Slider /> </>`. Callers must rely on parent flex/grid layout behaving correctly with two injected children.
 - **Fix applied**: These components were already consolidated into `PadLabeledSlider` by the REUSE5 fix, but the Fragment pattern carried over. Replaced `<> … </>` with `<div className="flex flex-col gap-1">` in `PadLabeledSlider.tsx` so the component renders as a single child and owns its own layout.
 
-#### [QUAL17] `PadButtonFadeOverlay` duration slider uses `onPointerUp` instead of `onValueCommit`
+#### ~~[QUAL17] `PadButtonFadeOverlay` duration slider uses `onPointerUp` instead of `onValueCommit`~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadButtonFadeOverlay.tsx:93-103`
 - **Severity**: Low
 - **Finding**: All other sliders in the codebase use `onValueCommit` for persistence. `onPointerUp` does not fire when the slider thumb is committed via keyboard — keyboard users change the display value but never persist it.
-- **Recommendation**: Use `onValueCommit={([v]) => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v)}`.
+- **Fix applied**: Replaced `onPointerUp` with `onValueCommit={([v]) => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v)}`. The committed value `v` is passed directly from Radix rather than closing over local `displayDuration` state. Test updated to verify keyboard commit persists the value.
 
 #### [QUAL18] `onValueChange` style inconsistency in `PadButtonFadeOverlay`
 - **File**: `src/components/composite/SceneView/PadButtonFadeOverlay.tsx:97`
