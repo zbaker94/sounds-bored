@@ -24,6 +24,13 @@ export function createDefaultStoreLayer(): Layer {
   };
 }
 
+/**
+ * Maps store Layer fields to LayerConfigForm for react-hook-form initialization.
+ * The output reflects the store state verbatim — it is not guaranteed to pass
+ * LayerConfigFormSchema validation (e.g. an empty `instances` array is valid in
+ * the store but rejected by the form schema). Callers must handle validation
+ * separately before submission.
+ */
 export function layerToFormLayer(layer: Layer): LayerConfigForm {
   return {
     id: layer.id,

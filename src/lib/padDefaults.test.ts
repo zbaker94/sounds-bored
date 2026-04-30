@@ -123,6 +123,24 @@ describe("formLayerToLayer", () => {
     });
   });
 
+  it("preserves tag selection with matchMode 'all'", () => {
+    const form: LayerConfigForm = {
+      id: "jkl",
+      selection: { type: "tag", tagIds: ["t1", "t2"], matchMode: "all", defaultVolume: 80 },
+      arrangement: "simultaneous",
+      cycleMode: false,
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    };
+    expect(formLayerToLayer(form).selection).toEqual({
+      type: "tag",
+      tagIds: ["t1", "t2"],
+      matchMode: "all",
+      defaultVolume: 80,
+    });
+  });
+
   it("preserves set selection fields", () => {
     const form: LayerConfigForm = {
       id: "ghi",
