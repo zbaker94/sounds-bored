@@ -48,6 +48,8 @@ interface ProjectActions {
   setPadFadeDuration: (sceneId: string, padId: string, durationMs: number | undefined) => void;
   setPadFadeTarget: (sceneId: string, padId: string, targetVol: number) => void;
   setPadVolume: (sceneId: string, padId: string, vol: number) => void;
+  setPadName: (sceneId: string, padId: string, name: string) => void;
+  setPadColor: (sceneId: string, padId: string, color: string | undefined) => void;
 }
 
 export type ProjectStore = ProjectState & ProjectActions;
@@ -287,5 +289,11 @@ export const useProjectStore = create<ProjectStore>()(
 
     setPadVolume: (sceneId, padId, vol) =>
       set(withPad(sceneId, padId, (pad) => { pad.volume = vol; })),
+
+    setPadName: (sceneId, padId, name) =>
+      set(withPad(sceneId, padId, (pad) => { pad.name = name; })),
+
+    setPadColor: (sceneId, padId, color) =>
+      set(withPad(sceneId, padId, (pad) => { pad.color = color; })),
   }))
 );

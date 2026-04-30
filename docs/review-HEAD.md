@@ -564,11 +564,12 @@ None.
 - **Recommendation**: Move `buildPadMap` to `src/lib/projectHelpers.ts` (or `padDefaults.ts`) and export it.
 - **Fix applied**: Moved `buildPadMap` to `src/lib/padDefaults.ts` and exported it. Removed the local copy from `useMultiFadeMode.ts`. Replaced the 3 `flatMap(...).find(...)` sites in `useGlobalHotkeys.ts` with `buildPadMap(...).get(id)`. Note: `useProjectLifecycle` had no `flatMap.find` — the review finding was inaccurate on that point. Added 4 tests to `padDefaults.test.ts`. 90/90 test files, 2021/2021 tests pass.
 
-#### [REUSE13] `{ ...padToConfig(pad), field: v }` spread bypasses typed store setters in `PadBackFace`
+#### ~~[REUSE13] `{ ...padToConfig(pad), field: v }` spread bypasses typed store setters in `PadBackFace`~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:285-286,292,409,476,493`
 - **Severity**: Low
 - **Finding**: 5 call sites use `updatePad(sceneId, pad.id, { ...padToConfig(pad), <field>: v })` while `projectStore` already exposes `setPadFadeDuration`, `setPadVolume`, and `setPadFadeTarget` that do this more safely (no full-config round-trip, no risk of clobbering concurrent field changes).
 - **Recommendation**: Replace the spread call sites with the typed store setters. For fields without dedicated setters, add them via the `withPad` helper suggested in REUSE11.
+- **Fix applied**: The 3 `fadeDurationMs` call sites in `PadFadeControls.tsx` now use `setPadFadeDuration`; the Duration slider adds `localFadeDuration` local state (mirrors the existing `localFadeTarget` pattern) so the store is only written on commit, not on every drag tick. The `name` and `color` call sites in `PadBackFace.tsx` use two new `withPad`-based setters — `setPadName` and `setPadColor` — added to `projectStore.ts`. `padToConfig` import removed from `PadFadeControls.tsx`. 2021/2021 tests pass.
 
 ---
 

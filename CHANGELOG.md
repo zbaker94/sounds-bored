@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad name and color changes now use targeted store updates instead of full-config overwrites, reducing the risk of overwriting concurrent changes
+- Fade duration slider now updates the UI immediately during drag and only commits to the project state on release, matching the existing fade target slider behavior
 - Improved internal pad lookup performance by replacing linear searches with an O(1) map-based lookup, making hotkey handling and fade operations more efficient with large projects.
 - Refactored internal pad state update logic to eliminate duplicated code, improving maintainability with no change to behavior
 - Marked the volume clamp code-reuse issue (REUSE3) as fixed in the internal code review document.

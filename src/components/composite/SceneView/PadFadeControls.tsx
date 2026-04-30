@@ -10,7 +10,6 @@ import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { setPadVolume } from "@/lib/audio/padPlayer";
-import { padToConfig } from "@/lib/padDefaults";
 import { PadLabeledSlider } from "./PadLabeledSlider";
 
 export interface PadFadeControlsProps {
@@ -37,7 +36,6 @@ export const PadFadeControls = memo(function PadFadeControls({
   onReverse,
 }: PadFadeControlsProps) {
   const liveVolume = usePlaybackStore((s) => s.padVolumes[pad.id]);
-  const updatePad = useProjectStore((s) => s.updatePad);
   const fadeDuration = pad.fadeDurationMs ?? globalFadeDurationMs;
 
   const padVolumePct = pad.volume ?? 100;
@@ -49,6 +47,9 @@ export const PadFadeControls = memo(function PadFadeControls({
   const fadeTargetPct = pad.fadeTargetVol ?? 0;
   const [localFadeTarget, setLocalFadeTarget] = useState<number | null>(null);
   const fadeTargetSliderValue = localFadeTarget ?? fadeTargetPct;
+
+  const [localFadeDuration, setLocalFadeDuration] = useState<number | null>(null);
+  const fadeDurationSliderValue = localFadeDuration ?? fadeDuration;
 
   const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
   const isFadeOut = !isEqualVolume && isPlaying && fadeTargetPct < liveVolumePct;
@@ -102,17 +103,20 @@ export const PadFadeControls = memo(function PadFadeControls({
       />
       <PadLabeledSlider
         label="Duration"
-        value={fadeDuration}
+        value={fadeDurationSliderValue}
         min={100} max={10000} step={100}
         formatValue={(v) => `${(v / 1000).toFixed(1)}s`}
-        onValueChange={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
-        onValueCommit={(v) => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: v })}
+        onValueChange={(v) => setLocalFadeDuration(v)}
+        onValueCommit={(v) => {
+          setLocalFadeDuration(null);
+          useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v);
+        }}
       />
       {pad.fadeDurationMs !== undefined ? (
         <button
           type="button"
           className="text-muted-foreground underline self-start"
-          onClick={() => updatePad(sceneId, pad.id, { ...padToConfig(pad), fadeDurationMs: undefined })}
+          onClick={() => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, undefined)}
         >
           Reset to default
         </button>

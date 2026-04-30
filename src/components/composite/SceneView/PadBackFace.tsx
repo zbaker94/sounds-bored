@@ -36,6 +36,8 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const updatePad = useProjectStore((s) => s.updatePad);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
   const deletePad = useProjectStore((s) => s.deletePad);
+  const setPadName = useProjectStore((s) => s.setPadName);
+  const setPadColor = useProjectStore((s) => s.setPadColor);
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
@@ -53,7 +55,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
     const trimmed = localName.trim();
     if (!trimmed) { setLocalName(pad.name); return; }
     if (trimmed === pad.name) return;
-    updatePad(sceneId, pad.id, { ...padToConfig(pad), name: trimmed });
+    setPadName(sceneId, pad.id, trimmed);
   }
 
   const padRef = useRef(pad);
@@ -118,7 +120,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
           <input
             type="color"
             value={pad.color ?? "#1a1a2e"}
-            onChange={(e) => updatePad(sceneId, pad.id, { ...padToConfig(pad), color: e.target.value })}
+            onChange={(e) => setPadColor(sceneId, pad.id, e.target.value)}
             className="w-5 h-5 rounded cursor-pointer border border-border flex-shrink-0 p-0"
             aria-label="Pad color"
             title="Pad color"
