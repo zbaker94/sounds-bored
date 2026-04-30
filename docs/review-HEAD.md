@@ -484,11 +484,11 @@ None.
 - **Finding**: `const fadePopoverTarget = useUiStore((s) => s.fadePopoverTarget)` subscribed every pad instance to pointer-move-rate updates during popover drags, even though only the pad with an open popover reads the value.
 - **Fix applied**: Extracted the fade popover UI (amber indicator line + slider panel + commit handler) into a new `PadFadePopoverContent` component, following the same isolation pattern as `PadButtonProgress` and `PadButtonFadeOverlay`. `PadButton` now renders `{isPopoverOpen && <PadFadePopoverContent pad={pad} sceneId={sceneId} />}` — the subscription only exists while the popover is open and only for that one instance. The `isFadingOut` amber line uses `pad.fadeTargetVol ?? 0` directly (the popover commit already persists the target before starting the fade). `fadePopoverTarget` and `setFadePopoverTarget` subscriptions removed from `PadButton`; `handlePopoverCommit` moved into the sub-component. 3 tests added; TypeScript clean.
 
-#### [QUAL13] `LayerConfigSection.getRetriggerHelper` casts to `Exclude<RetriggerMode, "next">`
+#### ~~[QUAL13] `LayerConfigSection.getRetriggerHelper` casts to `Exclude<RetriggerMode, "next">`~~ ✅ FIXED
 - **File**: `src/components/composite/PadConfigDrawer/LayerConfigSection.tsx:218`
 - **Severity**: Low
 - **Finding**: After the `if (retriggerMode === "next")` early return, `helpers[retriggerMode as Exclude<RetriggerMode, "next">]` is cast. If a fifth mode is added and `helpers` doesn't have that key, the access returns `undefined` silently.
-- **Recommendation**: Use an exhaustive narrowed const or include `"next"` in `helpers` with its own record entry and eliminate the early-return.
+- **Fix applied**: Removed the redundant `as Exclude<RetriggerMode, "next">` cast. TypeScript already narrows `retriggerMode` to `Exclude<RetriggerMode, "next">` after the early-return guard, and `helpers` typed as `Record<Exclude<RetriggerMode, "next">, ...>` enforces exhaustiveness at the object literal — so adding a new mode would produce a compile error without any cast. TypeScript clean, all 2003 tests pass.
 
 #### [QUAL14] `PadBackFace` duplicates the `canRemove` guard and writes to a ref during render
 - **File**: `src/components/composite/SceneView/PadBackFace.tsx:371-372,435-439`

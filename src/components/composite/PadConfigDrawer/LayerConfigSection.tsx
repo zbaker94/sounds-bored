@@ -215,7 +215,7 @@ function getRetriggerHelper(
     },
   };
 
-  return helpers[retriggerMode as Exclude<RetriggerMode, "next">][playbackMode];
+  return helpers[retriggerMode][playbackMode];
 }
 
 // ─── Section label with info tooltip ───────────────────────────────────────

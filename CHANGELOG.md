@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Removed an unnecessary type cast in layer config code, improving type safety so adding new retrigger modes in the future will produce a compile error instead of silently failing at runtime.
 - Improved performance: the fade volume slider on pads now only updates the pad it belongs to instead of causing every pad on the scene to re-render during drag interactions.
 - Fixed a crash that could occur when deleting the last scene in a project — the app now safely falls back to `null` instead of throwing a runtime error
 - Fixed a potential crash in download timer logic where a mutable ref was read inside an interval callback; the value is now captured once when the interval starts, making the code safer against future refactors.
