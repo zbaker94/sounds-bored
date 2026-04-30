@@ -13,8 +13,8 @@
 | Critical | 0 |
 | High | 0 (5 fixed) |
 | Medium | 14 (19 fixed) |
-| Low | 26 (25 fixed) |
-| **Total** | **62** |
+| Low | 27 (26 fixed) |
+| **Total** | **63** |
 
 **Confirmed FIXED in this diff:** SEC12–SEC18 (shell spawn/kill removed, static fs grants replaced with runtime grants, extensive Unicode/UNC path validation, yt-dlp sidecar isolation, TOCTOU on export extras, HashMap unbounded growth, asset protocol over-broad scope hardened to match fs-scope runtime grant model), several performance issues (audioTick batching, `_padBestStreamingAudio` caches, `_padToLayerIds` reverse index, SceneView preload guard, PadBackFace delayed unmount), and architecture issues (dual TanStack→Zustand state ownership, `padPlayer` decomposed from god component).
 
@@ -323,7 +323,7 @@ None.
 
 ---
 
-### Performance (11)
+### Performance (12)
 
 #### ~~[PERF2] `audioTick` allocates two `Set<string>` per RAF frame unnecessarily~~ ✅ FIXED
 - **File**: `src/lib/audio/audioTick.ts:139-140`
@@ -384,6 +384,12 @@ None.
 - **Severity**: Low
 - **Finding**: `liveVolume` (subscribed at RAF rate in `PadBackFace`) is passed as a prop to memoized `PadFadeControls`, invalidating the memo on every tick during a fade and causing two Sliders, text, and AnimatePresence to re-reconcile at ~60fps.
 - **Fix applied**: Moved `usePlaybackStore((s) => s.padVolumes[pad.id])` subscription from `PadBackFace` into `PadFadeControls`. Removed `liveVolume` from `PadFadeControlsProps`. `PadBackFace` no longer triggers on tick-rate store updates; only the focused fade-controls subtree re-renders during fades. Further split into a static wrapper + live-volume child was evaluated and rejected — Low severity, single animated section already gated on `isPlaying`, no measurable cost from adjacent static sliders at 60fps. Added `PadFadeControls.test.tsx` (8 tests) covering: live volume display from `padVolumes`, fallback to `pad.volume` when entry absent, fade button label (Fade Out / Fade In / disabled) driven by live volume vs fade target, and Current volume section visibility. All tests pass; TypeScript clean.
+
+#### ~~[PERF-E] Hidden `PadBackFace` RAF subscriptions on non-editing pads~~ ✅ FIXED
+- **File**: `src/components/composite/SceneView/PadButton.tsx:143–171`; `src/components/composite/SceneView/BackFaceLayerRow.tsx:42,49–66`
+- **Severity**: Low
+- **Finding**: `PadButton` was mounting `PadBackFace` unconditionally inside the flip container. Each `BackFaceLayerRow` holds two playback subscriptions: a React hook on `activeLayerIds` (`usePlaybackStore((s) => s.activeLayerIds.has(layer.id))`) and a direct `usePlaybackStore.subscribe` on `layerVolumes[layer.id]`. Both stores are written by the RAF tick on every frame during playback. With 12 pads each having 1–3 layers, all layer rows across all pads subscribed to 60fps updates while their containing back face was invisible, incurring 12–36 active subscriptions firing at audio-tick rate and triggering re-renders for no visible output.
+- **Fix applied**: Added `showBackFace` state to `PadButton` (initialized to `isFlipped`) with a delayed-unmount timer. When a pad flips to front (`isFlipped` → false), `showBackFace` is set to false after `PAD_FLIP_DURATION_MS + 50ms` — enough for the CSS flip animation to complete. When a pad flips to back (`isFlipped` → true), `showBackFace` is set immediately. The `PadBackFace` mount is gated by `{showBackFace && <PadBackFace …/>}`, so all `BackFaceLayerRow` subscriptions are torn down as soon as the back face is no longer visible. Non-editing pads pay zero subscription cost. The delayed-unmount approach is intentionally more robust than a plain `editingPadId === pad.id` gate: it prevents the back face from disappearing mid-animation and avoids a flash when global edit mode is toggled on all pads simultaneously.
 
 #### ~~[PERF12] `stopAllPads` ramp timeout races with immediate re-trigger~~ ✅ FIXED
 - **File**: `src/lib/audio/padPlayer.ts:437-446`
