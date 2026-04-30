@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
-import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { discardTemporaryProject } from "@/lib/project";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useWindowCloseHandler } from "@/hooks/useWindowCloseHandler";
 import { WINDOW_CLOSE_DELAY } from "@/lib/constants";
-import { applyProjectSoundReconcile } from "@/lib/project.reconcile";
 
 /**
  * Manages the window close lifecycle for MainPage:
@@ -21,13 +19,7 @@ export function useProjectLifecycle() {
   const folderPath = useProjectStore((s) => s.folderPath);
   const isTemporary = useProjectStore((s) => s.isTemporary);
   const isDirty = useProjectStore((s) => s.isDirty);
-  // loadSessionId increments only on loadProject, not on markAsPermanent (Save As).
-  // Used as a stable per-session dedup key that doesn't rotate when folderPath changes.
-  const loadSessionId = useProjectStore((s) => s.loadSessionId);
   const navigate = useNavigate();
-
-  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
-  const lastNotifiedSessionId = useRef<number | null>(null);
 
   const { requestSaveAndThen } = useProjectActions();
 
@@ -88,44 +80,6 @@ export function useProjectLifecycle() {
   const handleCancelClose = () => {
     closeOverlay(OVERLAY_ID.CONFIRM_CLOSE_DIALOG);
   };
-
-  const cleanedSessionIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!project) return;
-    if (cleanedSessionIdRef.current === loadSessionId) return;
-    cleanedSessionIdRef.current = loadSessionId;
-
-    applyProjectSoundReconcile();
-  }, [project, loadSessionId]);
-
-  // Notify user if missing sounds are used in the loaded project.
-  // Fires at most once per project-load session — Save As (markAsPermanent) does
-  // not increment loadSessionId and therefore does not re-trigger this toast.
-  useEffect(() => {
-    if (!project || missingSoundIds.size === 0) return;
-    if (lastNotifiedSessionId.current === loadSessionId) return;
-    lastNotifiedSessionId.current = loadSessionId;
-
-    const usedSoundIds = new Set(
-      project.scenes.flatMap((scene) =>
-        scene.pads.flatMap((pad) =>
-          pad.layers.flatMap((layer) =>
-            layer.selection.type === "assigned"
-              ? layer.selection.instances.map((i) => i.soundId)
-              : [],
-          ),
-        ),
-      ),
-    );
-
-    const missingUsedCount = [...usedSoundIds].filter((id) => missingSoundIds.has(id)).length;
-    if (missingUsedCount > 0) {
-      toast.warning(
-        `${missingUsedCount} sound${missingUsedCount > 1 ? "s" : ""} used in this project are missing. Check the Sounds panel.`,
-      );
-    }
-  }, [project, missingSoundIds, loadSessionId]);
 
   // Guard: project unexpectedly null while MainPage is mounted.
   // Re-arm the flag when a new project loads so the guard works across

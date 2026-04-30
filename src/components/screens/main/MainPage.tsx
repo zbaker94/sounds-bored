@@ -9,6 +9,8 @@ import { SceneTabBar } from "@/components/composite/SceneTabBar/SceneTabBar";
 import { SceneView } from "@/components/composite/SceneView/SceneView";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useProjectLifecycle } from "@/hooks/useProjectLifecycle";
+import { useProjectSoundReconcileOnLoad } from "@/hooks/useProjectSoundReconcileOnLoad";
+import { useMissingSoundsNotification } from "@/hooks/useMissingSoundsNotification";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
@@ -39,6 +41,8 @@ export function MainPage() {
 function MainPageInner() {
   useAutoSave();
   useGlobalHotkeys();
+  useProjectSoundReconcileOnLoad();
+  useMissingSoundsNotification();
   useAudioErrorHandler();
   const downloadFolderId = useAppSettingsStore((s) => s.settings?.downloadFolderId);
   useDownloadEventListener(downloadFolderId);

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code quality improvements with no user-visible behavior changes: missing-sounds warning and sound library reconciliation on project load continue to work as before.
 - Master volume changes made before any sound plays are now correctly applied — the slider value is no longer silently dropped if adjusted before the first pad is triggered.
 - Moved the download event listener hook to its own dedicated file for better code organization (no user-facing behavior change)
 - Corrupted data files (sound library, project history, download history) are now recovered more reliably and consistently, with cleaner fallback behavior if a file can't be parsed.
