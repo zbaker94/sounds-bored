@@ -514,11 +514,11 @@ None.
 - **Finding**: All other sliders in the codebase use `onValueCommit` for persistence. `onPointerUp` does not fire when the slider thumb is committed via keyboard — keyboard users change the display value but never persist it.
 - **Fix applied**: Replaced `onPointerUp` with `onValueCommit={([v]) => useProjectStore.getState().setPadFadeDuration(sceneId, pad.id, v)}`. The committed value `v` is passed directly from Radix rather than closing over local `displayDuration` state. Test updated to verify keyboard commit persists the value.
 
-#### [QUAL18] `onValueChange` style inconsistency in `PadButtonFadeOverlay`
+#### ~~[QUAL18] `onValueChange` style inconsistency in `PadButtonFadeOverlay`~~ ✅ FIXED
 - **File**: `src/components/composite/SceneView/PadButtonFadeOverlay.tsx:97`
 - **Severity**: Low
 - **Finding**: `onValueChange={(v) => setDisplayDuration(v[0])}` while the two adjacent sliders use `onValueChange={([v]) => …}` destructure style.
-- **Recommendation**: Align: `onValueChange={([v]) => setDisplayDuration(v)}`.
+- **Fix applied**: Changed to `onValueChange={([v]) => setDisplayDuration(v)}` — functionally equivalent, now consistent with all other sliders in the component.
 
 #### [QUAL19] `audioState.ts` non-null asserts inside generator due to TS closure narrowing
 - **File**: `src/lib/audio/audioState.ts:143-151`
