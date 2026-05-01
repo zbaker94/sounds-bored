@@ -12,7 +12,7 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   executeFadeTap: vi.fn(),
 }));
 
-import { executeFadeTap } from "@/lib/audio/padPlayer";
+import { executeFadeTap } from "@/lib/audio";
 
 function setupStore({ active = true, selectedCount = 0, padIds }: { active?: boolean; selectedCount?: number; padIds?: string[] } = {}) {
   const selectedPads = new Map<string, SelectedPadFade>();

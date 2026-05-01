@@ -5,10 +5,16 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { createMockPad, createMockLayer, createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
 import { PadButtonFadeOverlay } from "./PadButtonFadeOverlay";
-import { setPadVolume } from "@/lib/audio/padPlayer";
+import { setPadVolume } from "@/lib/audio";
 
-vi.mock("@/lib/audio/padPlayer", () => ({
+vi.mock("@/lib/audio/padPlayer", () => ({}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
   setPadVolume: vi.fn(),
+  resetPadGain: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
+  setLayerVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
 }));
 
 const PAD_ID = "pad-1";

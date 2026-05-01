@@ -2,8 +2,7 @@ import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { SmileDizzyIcon } from "@hugeicons/core-free-icons";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { stopAllPads } from "@/lib/audio/padPlayer";
-import { stopPreview } from "@/lib/audio/preview";
+import { stopAllPads, stopPreview } from "@/lib/audio";
 
 export function PlaySection() {
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.size > 0 || s.isPreviewPlaying);

@@ -48,7 +48,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
+import { evictSoundCachesMany } from "@/lib/audio";
 import { useAddFolder } from "@/hooks/useAddFolder";
 import { useResolveFolderQueue } from "@/hooks/useResolveFolderQueue";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";

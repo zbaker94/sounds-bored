@@ -13,7 +13,7 @@ import {
   createMockSound,
   createMockSoundInstance,
 } from "@/test/factories";
-import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio/streamingCache";
+import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SceneView } from "./SceneView";
 
@@ -28,7 +28,7 @@ vi.mock("@/lib/audio/streamingCache", async () => {
 });
 
 // Imported after vi.mock so we get the mocked function reference.
-import { preloadStreamingAudio } from "@/lib/audio/streamingCache";
+import { preloadStreamingAudio } from "@/lib/audio";
 
 function renderSceneView() {
   return render(<TooltipProvider><SceneView /></TooltipProvider>);
@@ -36,9 +36,20 @@ function renderSceneView() {
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
   setPadVolume: vi.fn(),
   resetPadGain: vi.fn(),
+  setLayerVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
+}));
+
+vi.mock("@/lib/audio/audioState", () => ({
   getPadProgress: vi.fn().mockReturnValue(null),
+  isPadActive: vi.fn().mockReturnValue(false),
+  isPadFading: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({

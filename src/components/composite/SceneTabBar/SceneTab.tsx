@@ -7,7 +7,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { PencilEdit01Icon, Tick01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import type { Scene } from "@/lib/schemas";
 import { ConfirmDeleteSceneDialog } from "@/components/modals/ConfirmDeleteSceneDialog";
-import { stopScene } from "@/lib/audio/padPlayer";
+import { stopScene } from "@/lib/audio";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 

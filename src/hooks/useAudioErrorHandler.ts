@@ -6,7 +6,7 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { setAudioErrorHandler } from "@/lib/audio/audioEvents";
+import { setAudioErrorHandler } from "@/lib/audio";
 import { refreshMissingState } from "@/lib/library.reconcile";
 
 /**

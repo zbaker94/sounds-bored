@@ -7,7 +7,7 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSoundInstance } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
-import { setPadVolume } from "@/lib/audio/padPlayer";
+import { setPadVolume } from "@/lib/audio";
 
 vi.mock("./PadBackFace", () => ({
   PadBackFace: ({ pad }: { pad: { name: string } }) => (
@@ -17,13 +17,23 @@ vi.mock("./PadBackFace", () => ({
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
-  setPadVolume: vi.fn(),
-  resetPadGain: vi.fn(),
   releasePadHoldLayers: vi.fn(),
   stopPad: vi.fn(),
-  isPadFading: vi.fn().mockReturnValue(false),
-  freezePadAtCurrentVolume: vi.fn(),
   executeFadeTap: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
+  setPadVolume: vi.fn(),
+  resetPadGain: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
+  setLayerVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/fadeMixer", () => ({
+  freezePadAtCurrentVolume: vi.fn(),
+  fadePad: vi.fn(),
+  resolveFadeDuration: vi.fn(),
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
@@ -40,6 +50,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 
 vi.mock("@/lib/audio/audioState", () => ({
   isPadActive: vi.fn().mockReturnValue(false),
+  isPadFading: vi.fn().mockReturnValue(false),
 }));
 
 function loadPadInStore(padOverrides = {}) {

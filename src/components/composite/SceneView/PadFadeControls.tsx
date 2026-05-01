@@ -8,7 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { VolumeHighIcon } from "@hugeicons/core-free-icons";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { setPadVolume } from "@/lib/audio/padPlayer";
+import { setPadVolume } from "@/lib/audio";
 import { PadLabeledSlider } from "./PadLabeledSlider";
 
 export interface PadFadeControlsProps {

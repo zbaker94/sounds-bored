@@ -1,17 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { emitAudioError, setAudioErrorHandler } from "@/lib/audio/audioEvents";
+import { emitAudioError, setAudioErrorHandler } from "@/lib/audio";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const mockToastError = vi.fn();
+const { mockToastError, mockRefreshMissingState } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+  mockRefreshMissingState: vi.fn(),
+}));
+
 vi.mock("sonner", () => ({
   toast: { error: mockToastError },
 }));
 
-const mockRefreshMissingState = vi.fn();
 vi.mock("@/lib/library.reconcile", () => ({
   refreshMissingState: mockRefreshMissingState,
+  MissingFileError: class MissingFileError extends Error {},
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

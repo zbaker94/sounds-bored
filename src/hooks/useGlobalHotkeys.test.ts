@@ -70,7 +70,7 @@ vi.mock("@/state/multiFadeStore", () => ({
 }));
 
 vi.mock("@/state/playbackStore", () => ({
-  usePlaybackStore: { getState: vi.fn(() => ({})) },
+  usePlaybackStore: { getState: vi.fn(() => ({})), subscribe: vi.fn(() => () => {}) },
 }));
 
 vi.mock("@/lib/audio/audioState", () => ({

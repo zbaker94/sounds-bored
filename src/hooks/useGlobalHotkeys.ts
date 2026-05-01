@@ -3,7 +3,7 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { executeFadeTap } from "@/lib/audio/padPlayer";
+import { executeFadeTap } from "@/lib/audio";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { buildPadMap, createDefaultStoreLayer } from "@/lib/padDefaults";
 import type { PadConfig } from "@/lib/schemas";

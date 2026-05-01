@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictSoundCaches } from "@/lib/audio/cacheUtils";
+import { evictSoundCaches } from "@/lib/audio";
 import { pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { basename, nameFromFilename } from "@/lib/utils";

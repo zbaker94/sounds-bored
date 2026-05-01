@@ -17,9 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LayerConfigSection } from "./LayerConfigSection";
-import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
-import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
-import { filterSoundsByTags, filterSoundsBySet } from "@/lib/audio/resolveSounds";
+import { syncLayerVolume, syncLayerConfig, getLayerNormalizedVolume, filterSoundsByTags, filterSoundsBySet } from "@/lib/audio";
 
 const LAYER_DIALOG_SCHEMA = PadConfigSchema.extend({ name: z.string() });
 const LAYER_DIALOG_RESOLVER = zodResolver(LAYER_DIALOG_SCHEMA) as Resolver<PadConfigForm>;

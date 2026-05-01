@@ -9,28 +9,30 @@ const DRAG_RAMP_MS = 150;
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
-  setPadVolume: vi.fn(),
-  resetPadGain: vi.fn(),
   releasePadHoldLayers: vi.fn(),
   stopPad: vi.fn(),
-  isPadFading: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
+  setPadVolume: vi.fn(),
+  resetPadGain: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
+  setLayerVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/fadeMixer", () => ({
   freezePadAtCurrentVolume: vi.fn(),
+  fadePad: vi.fn(),
+  resolveFadeDuration: vi.fn(),
 }));
 
 vi.mock("@/lib/audio/audioState", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/audio/audioState")>();
-  return { ...actual, isLayerActive: vi.fn().mockReturnValue(false) };
+  return { ...actual, isLayerActive: vi.fn().mockReturnValue(false), isPadFading: vi.fn().mockReturnValue(false) };
 });
 
-import { isLayerActive } from "@/lib/audio/audioState";
-
-import {
-  triggerPad,
-  setPadVolume,
-  resetPadGain,
-  releasePadHoldLayers,
-  stopPad,
-} from "@/lib/audio/padPlayer";
+import { isLayerActive, triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio";
 
 // ─── Shared test fixtures ────────────────────────────────────────────────────
 
