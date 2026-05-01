@@ -8,8 +8,14 @@ import { PadFadeControls } from "./PadFadeControls";
 
 const setPadVolumeMock = vi.fn();
 
-vi.mock("@/lib/audio/padPlayer", () => ({
+vi.mock("@/lib/audio/padPlayer", () => ({}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
   setPadVolume: (...args: unknown[]) => setPadVolumeMock(...args),
+  resetPadGain: vi.fn(),
+  setLayerVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
 }));
 
 function renderControls(props: Partial<Parameters<typeof PadFadeControls>[0]> & { pad: Parameters<typeof PadFadeControls>[0]["pad"] }) {

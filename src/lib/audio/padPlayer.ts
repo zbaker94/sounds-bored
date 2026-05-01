@@ -60,47 +60,6 @@ import {
   triggerLayerOfPad,
 } from "./layerTrigger";
 
-// Re-export layer-scoped functions moved to layerTrigger.ts (#131)
-export {
-  selectionsEqual,
-  syncLayerPlaybackMode,
-  syncLayerArrangement,
-  syncLayerSelection,
-  syncLayerConfig,
-  stopLayerWithRamp,
-  skipLayerForward,
-  skipLayerBack,
-} from "./layerTrigger";
-
-// Re-export public query/clear functions for backward compatibility
-export {
-  clearAllFadeTracking,
-  clearAllPadGains,
-  clearAllLayerGains,
-  clearAllLayerChains,
-  clearAllLayerCycleIndexes,
-  isPadFadingOut,
-  isPadFading,
-  isPadStreaming,
-  getPadProgress,
-  getPadGain,
-  isLayerActive,
-  isPadActive,
-} from "./audioState";
-
-// Re-export functions moved to fadeMixer / gainManager
-export {
-  freezePadAtCurrentVolume,
-  resolveFadeDuration,
-  fadePad,
-} from "./fadeMixer";
-
-export {
-  setPadVolume,
-  resetPadGain,
-  syncLayerVolume,
-  setLayerVolume,
-} from "./gainManager";
 
 export async function triggerAndFade(pad: Pad, toVolume: number, durationMs: number): Promise<void> {
   return fadePadIn(pad, toVolume, durationMs, (p) => triggerPad(p, 0));

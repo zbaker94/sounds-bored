@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { playPreview, stopPreview } from "@/lib/audio/preview";
+import { playPreview, stopPreview } from "@/lib/audio";
 import { MissingFileError, refreshMissingState } from "@/lib/library.reconcile";
 import { toast } from "sonner";
 import type { Sound } from "@/lib/schemas";

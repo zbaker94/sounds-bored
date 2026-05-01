@@ -1,6 +1,6 @@
 import type { Project, Sound } from "@/lib/schemas";
 import { hasFilePath } from "@/lib/schemas";
-import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
+import { resolveLayerSounds } from "@/lib/audio";
 import { basename } from "@/lib/utils";
 
 function getReferencedIds(project: Project, sounds: Sound[]): Set<string> {

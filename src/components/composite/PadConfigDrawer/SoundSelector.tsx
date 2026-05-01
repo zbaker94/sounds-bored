@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import Fuse from "fuse.js";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { filterSoundsByTags } from "@/lib/audio/resolveSounds";
+import { filterSoundsByTags } from "@/lib/audio";
 import type { LayerSelection, Sound, SoundInstance } from "@/lib/schemas";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

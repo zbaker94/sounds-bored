@@ -18,10 +18,8 @@ import { useProjectStore } from "@/state/projectStore";
 import {
   triggerLayer, stopLayerWithRamp, setLayerVolume,
   skipLayerForward, skipLayerBack,
-} from "@/lib/audio/padPlayer";
-import { emitAudioError } from "@/lib/audio/audioEvents";
-import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
-import { getLayerNormalizedVolume } from "@/lib/audio/layerTrigger";
+  emitAudioError, resolveLayerSounds, getLayerNormalizedVolume,
+} from "@/lib/audio";
 import { summarizeLayerSelection } from "@/lib/layerHelpers";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 

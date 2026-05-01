@@ -42,7 +42,7 @@ vi.mock("sonner", () => ({
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
+import { evictSoundCachesMany } from "@/lib/audio";
 import { toast } from "sonner";
 
 const mockRefreshMissingState = refreshMissingState as ReturnType<typeof vi.fn>;

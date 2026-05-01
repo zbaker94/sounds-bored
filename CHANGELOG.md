@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal refactoring only: all audio engine functionality is now exported through a single entry point (`@/lib/audio`), with no changes to app behavior or features.
 - Fixed an issue where pad activity indicators could remain stuck in "playing" or "fading" state after a sound stopped naturally or was interrupted
 - Pad play/fade state is now reliably cleared when stopping, retriggering, or closing a project, preventing stale UI indicators from a previous session leaking into a new one
 - Fade-out state is now correctly removed when a pad is re-triggered mid-fade, stopping cleanup timers from incorrectly silencing newly-started sounds

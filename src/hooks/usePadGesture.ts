@@ -1,10 +1,7 @@
 import { useRef, useMemo, useState, useEffect } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
-import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume } from "@/lib/audio/padPlayer";
-import { clampGain01 } from "@/lib/audio/gainManager";
-import { isLayerActive } from "@/lib/audio/audioState";
-import { emitAudioError } from "@/lib/audio/audioEvents";
+import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, emitAudioError } from "@/lib/audio";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 // Gesture thresholds

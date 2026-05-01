@@ -14,13 +14,26 @@ vi.mock("@/lib/audio/padPlayer", () => ({
   reverseFade: vi.fn(),
   stopFade: vi.fn(),
   triggerLayer: vi.fn().mockResolvedValue(undefined),
-  stopLayerWithRamp: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
   setLayerVolume: vi.fn(),
   setPadVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
+  resetPadGain: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
+}));
+
+vi.mock("@/lib/audio/layerTrigger", () => ({
+  stopLayerWithRamp: vi.fn(),
   skipLayerForward: vi.fn(),
   skipLayerBack: vi.fn(),
   syncLayerConfig: vi.fn(),
-  syncLayerVolume: vi.fn(),
+  syncLayerArrangement: vi.fn(),
+  syncLayerPlaybackMode: vi.fn(),
+  syncLayerSelection: vi.fn(),
+  selectionsEqual: vi.fn(),
+  getLayerNormalizedVolume: vi.fn().mockReturnValue(1),
 }));
 
 vi.mock("../PadConfigDrawer/LayerConfigDialog", () => ({

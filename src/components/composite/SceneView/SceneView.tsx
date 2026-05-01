@@ -26,8 +26,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio/streamingCache";
-import { resolveLayerSounds } from "@/lib/audio/resolveSounds";
+import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES, resolveLayerSounds } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { cn, modKey } from "@/lib/utils";
 import {

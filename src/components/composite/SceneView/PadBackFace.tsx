@@ -17,9 +17,8 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import {
-  triggerPad, stopPad, executeFadeTap, reverseFade, stopFade,
-} from "@/lib/audio/padPlayer";
-import { emitAudioError } from "@/lib/audio/audioEvents";
+  triggerPad, stopPad, executeFadeTap, reverseFade, stopFade, emitAudioError,
+} from "@/lib/audio";
 import { createDefaultStoreLayer, padToConfig } from "@/lib/padDefaults";
 import { LayerConfigDialog } from "@/components/composite/PadConfigDrawer/LayerConfigDialog";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";

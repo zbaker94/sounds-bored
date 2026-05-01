@@ -11,8 +11,7 @@ vi.mock("@/lib/audio/preview", () => ({
   stopPreview: vi.fn(),
 }));
 
-import { stopAllPads } from "@/lib/audio/padPlayer";
-import { stopPreview } from "@/lib/audio/preview";
+import { stopAllPads, stopPreview } from "@/lib/audio";
 
 describe("PlaySection", () => {
   beforeEach(() => {

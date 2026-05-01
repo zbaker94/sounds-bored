@@ -7,17 +7,24 @@ import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LayerConfigDialog } from "./LayerConfigDialog";
-import { syncLayerVolume, syncLayerConfig } from "@/lib/audio/padPlayer";
+import { syncLayerVolume, syncLayerConfig } from "@/lib/audio";
 import type { Layer } from "@/lib/schemas";
 
 vi.mock("./SoundSelector", () => ({
   SoundSelector: () => <div data-testid="sound-selector" />,
 }));
 
-vi.mock("@/lib/audio/padPlayer", () => ({
-  syncLayerVolume: vi.fn(),
-  syncLayerConfig: vi.fn(),
-}));
+vi.mock("@/lib/audio/padPlayer", () => ({}));
+
+vi.mock("@/lib/audio/gainManager", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/gainManager")>();
+  return { ...actual, syncLayerVolume: vi.fn() };
+});
+
+vi.mock("@/lib/audio/layerTrigger", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/layerTrigger")>();
+  return { ...actual, syncLayerConfig: vi.fn() };
+});
 
 function renderDialog(props: {
   padId?: string;

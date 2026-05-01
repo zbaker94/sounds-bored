@@ -1,5 +1,5 @@
-import { evictBuffer } from "@/lib/audio/bufferCache";
-import { evictStreamingElement } from "@/lib/audio/streamingCache";
+import { evictBuffer } from "./bufferCache";
+import { evictStreamingElement } from "./streamingCache";
 
 export function evictSoundCaches(soundId: string): void {
   evictBuffer(soundId);

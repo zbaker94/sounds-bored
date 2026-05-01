@@ -7,7 +7,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState, addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
-import { evictSoundCaches } from "@/lib/audio/cacheUtils";
+import { evictSoundCaches } from "@/lib/audio";
 import { pickFolder, pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { basename, nameFromFilename } from "@/lib/utils";

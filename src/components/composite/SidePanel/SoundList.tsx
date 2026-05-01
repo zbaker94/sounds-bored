@@ -29,7 +29,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictSoundCaches } from "@/lib/audio/cacheUtils";
+import { evictSoundCaches } from "@/lib/audio";
 import { useSoundPreview } from "@/hooks/useSoundPreview";
 import { useResolveSoundQueue } from "@/hooks/useResolveSoundQueue";
 import { ResolveMissingDialog } from "@/components/modals/ResolveMissingDialog";

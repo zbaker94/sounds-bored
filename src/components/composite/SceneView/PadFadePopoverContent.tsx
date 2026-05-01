@@ -3,7 +3,7 @@ import type { Pad } from "@/lib/schemas";
 import { useUiStore } from "@/state/uiStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { executeFadeTap } from "@/lib/audio/padPlayer";
+import { executeFadeTap } from "@/lib/audio";
 import { Slider } from "@/components/ui/slider";
 
 interface Props {

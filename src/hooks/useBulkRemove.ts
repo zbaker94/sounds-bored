@@ -6,7 +6,7 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
-import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
+import { evictSoundCachesMany } from "@/lib/audio";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 
 /**

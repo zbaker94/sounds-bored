@@ -5,7 +5,7 @@ import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { setPadVolume } from "@/lib/audio/padPlayer";
+import { setPadVolume } from "@/lib/audio";
 import { PadOverlaySlider } from "./PadOverlaySlider";
 
 interface PadButtonFadeOverlayProps {

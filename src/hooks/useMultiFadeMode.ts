@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { executeFadeTap } from "@/lib/audio/padPlayer";
+import { executeFadeTap } from "@/lib/audio";
 import { buildPadMap } from "@/lib/padDefaults";
 
 export function executeMultiFadeNow(): void {

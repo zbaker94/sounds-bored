@@ -5,7 +5,7 @@ import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { SceneTabBar } from "./SceneTabBar";
 import { createMockProject, createMockHistoryEntry, createMockScene } from "@/test/factories";
-import { stopScene } from "@/lib/audio/padPlayer";
+import { stopScene } from "@/lib/audio";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   stopScene: vi.fn(),

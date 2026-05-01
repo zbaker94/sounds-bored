@@ -8,10 +8,26 @@ import { BackFaceLayerRow } from "./BackFaceLayerRow";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerLayer: vi.fn().mockResolvedValue(undefined),
-  stopLayerWithRamp: vi.fn(),
+}));
+
+vi.mock("@/lib/audio/gainManager", () => ({
   setLayerVolume: vi.fn(),
+  syncLayerVolume: vi.fn(),
+  setPadVolume: vi.fn(),
+  resetPadGain: vi.fn(),
+  clampGain01: (v: number) => Math.max(0, Math.min(1, v)),
+}));
+
+vi.mock("@/lib/audio/layerTrigger", () => ({
+  stopLayerWithRamp: vi.fn(),
   skipLayerForward: vi.fn(),
   skipLayerBack: vi.fn(),
+  syncLayerConfig: vi.fn(),
+  syncLayerArrangement: vi.fn(),
+  syncLayerPlaybackMode: vi.fn(),
+  syncLayerSelection: vi.fn(),
+  selectionsEqual: vi.fn(),
+  getLayerNormalizedVolume: vi.fn().mockReturnValue(1),
 }));
 
 const LAYER = createMockLayer({ id: "layer-1" });
