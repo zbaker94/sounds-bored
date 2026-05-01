@@ -1,6 +1,7 @@
 // src/lib/audio/gainManager.ts
 import { getAudioContext } from "./audioContext";
 import { getPadGain, getLayerGain, cancelPadFade, markGainRamp } from "./audioState";
+import { usePlaybackStore } from "@/state/playbackStore";
 
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
 const CLICK_FREE_RAMP_S = 0.016;
@@ -42,7 +43,10 @@ export function setPadVolume(padId: string, volume: number): void {
  * Called after a fade-out completes or when the pad is manually stopped.
  */
 export function resetPadGain(padId: string): void {
+  // Cannot use clearPadFadeTracking here — fadeMixer imports gainManager (circular dep).
   cancelPadFade(padId);
+  usePlaybackStore.getState().removeFadingPad(padId);
+  usePlaybackStore.getState().removeFadingOutPad(padId);
   const gain = getPadGain(padId);
   const ctx = getAudioContext();
   gain.gain.cancelScheduledValues(ctx.currentTime);

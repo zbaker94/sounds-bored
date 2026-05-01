@@ -102,7 +102,8 @@ interface PlaybackState {
   setAudioTick: (snapshot: AudioTickSnapshot) => void;
 
   /** Reset padVolumes and layerVolumes to empty objects.
-   *  Called by clearAllAudioState() on project close to ensure stale volumes
+   *  Called by MainPage's unmount effect on project close (alongside
+   *  clearAllAudioState and clearAllPlayingPads) to ensure stale volumes
    *  from one session do not leak into the next.
    *  Callers must ensure stopAudioTick() has been called first; if the RAF tick
    *  is still active it will repopulate these maps on the next frame. */

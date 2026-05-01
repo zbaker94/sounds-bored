@@ -87,6 +87,26 @@ describe("fadeMixer", () => {
       expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalledWith(0);
       expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, 0);
     });
+
+    it("clears playbackStore fadingPadIds and fadingOutPadIds", async () => {
+      const mockGain = makeMockGain();
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain } = await import("./audioState");
+      getPadGain("pad-freeze-store");
+      const { freezePadAtCurrentVolume } = await import("./fadeMixer");
+      const { usePlaybackStore } = await import("@/state/playbackStore");
+
+      // Seed both fade flags so we can verify they get cleared.
+      usePlaybackStore.getState().addFadingPad("pad-freeze-store");
+      usePlaybackStore.getState().addFadingOutPad("pad-freeze-store");
+      expect(usePlaybackStore.getState().fadingPadIds.has("pad-freeze-store")).toBe(true);
+      expect(usePlaybackStore.getState().fadingOutPadIds.has("pad-freeze-store")).toBe(true);
+
+      freezePadAtCurrentVolume("pad-freeze-store");
+
+      expect(usePlaybackStore.getState().fadingPadIds.has("pad-freeze-store")).toBe(false);
+      expect(usePlaybackStore.getState().fadingOutPadIds.has("pad-freeze-store")).toBe(false);
+    });
   });
 
   describe("fadePad — fading down", () => {

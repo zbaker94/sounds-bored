@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed an issue where pad activity indicators could remain stuck in "playing" or "fading" state after a sound stopped naturally or was interrupted
+- Pad play/fade state is now reliably cleared when stopping, retriggering, or closing a project, preventing stale UI indicators from a previous session leaking into a new one
+- Fade-out state is now correctly removed when a pad is re-triggered mid-fade, stopping cleanup timers from incorrectly silencing newly-started sounds
 - Internal audio engine refactoring: loop logic for sound layers is now consolidated into a single reusable function, improving code consistency with no change to playback behavior.
 - Fixed an internal code ordering issue in the audio engine (no behavior change for users)
 - Improved audio error reporting: errors that occurred while starting a sound in a layer are now properly surfaced instead of being silently ignored.

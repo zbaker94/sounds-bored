@@ -22,13 +22,39 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
 
 /**
+ * Cancel all fade tracking for a pad on both audioState (local) and
+ * playbackStore (reactive UI signals). Idempotent — safe to call when no fade is active.
+ *
+ * Clears: local fadePadTimeouts, fadingOutPadIds, padFadeFromVolumes (via cancelPadFade),
+ * and playbackStore fadingPadIds + fadingOutPadIds.
+ * Use this at every point where a pad's fade lifecycle ends or is pre-empted.
+ */
+export function clearPadFadeTracking(padId: string): void {
+  cancelPadFade(padId);
+  usePlaybackStore.getState().removeFadingPad(padId);
+  usePlaybackStore.getState().removeFadingOutPad(padId);
+}
+
+/**
+ * Mark a pad as fading out on both audioState (local) and playbackStore (reactive UI).
+ * Symmetric counterpart to the removal path in clearPadFadeTracking.
+ */
+function markPadFadingOut(padId: string): void {
+  addFadingOutPad(padId);
+  usePlaybackStore.getState().addFadingOutPad(padId);
+}
+
+/**
  * Freeze a pad's gain at its current value — cancels any in-progress ramp
  * so the pad stays at whatever volume it was at when called.
+ *
+ * Also clears fade tracking on both audioState and playbackStore — equivalent to
+ * clearPadFadeTracking for store purposes.
  */
 export function freezePadAtCurrentVolume(padId: string): void {
   const ctx = getAudioContext();
   const gain = getPadGain(padId);
-  cancelPadFade(padId);
+  clearPadFadeTracking(padId);
   // Cancel scheduled values BEFORE reading so the held value is the ramp's
   // current interpolated position, not the last setValueAtTime anchor.
   gain.gain.cancelScheduledValues(ctx.currentTime);
@@ -51,6 +77,7 @@ export function stopPadInternal(pad: Pad): void {
     deleteLayerPlayOrder(layer.id);
   }
   stopPadVoices(pad.id);
+  usePlaybackStore.getState().removePlayingPad(pad.id);
 }
 
 /**
@@ -67,9 +94,9 @@ export function stopPadInternal(pad: Pad): void {
  */
 export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number): void {
   usePlaybackStore.getState().removeReversingPad(pad.id);
-  // cancelPadFade atomically clears fadingOutPadIds on both audioState and
-  // playbackStore sides, so no explicit removeFadingOutPad call is needed here.
-  cancelPadFade(pad.id);
+  // Clear any in-progress fade state on both audioState and playbackStore
+  // before scheduling a new ramp.
+  clearPadFadeTracking(pad.id);
   removeFadingInPad(pad.id);
   usePlaybackStore.getState().addFadingPad(pad.id);
 
@@ -79,7 +106,7 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
   if (fadingDown) {
     // Null onended callbacks so chained voices don't restart at the faded-down level.
     nullPadOnEnded(pad.id);
-    addFadingOutPad(pad.id);
+    markPadFadingOut(pad.id);
   }
 
   rampGainTo(gain.gain, toVolume, durationMs / 1000, fromVolume);
@@ -89,8 +116,9 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
     deleteFadePadTimeout(pad.id);
     // Guard: if pad is no longer fading out (e.g. re-triggered), skip cleanup.
     if (fadingDown && !isPadFadingOut(pad.id)) return;
-    // cancelPadFade clears fadingOutPadIds + fadingPadIds on both sides atomically.
-    cancelPadFade(pad.id);
+    // Clear fade state on both audioState and playbackStore now that the
+    // ramp has completed.
+    clearPadFadeTracking(pad.id);
     if (fadingDown && toVolume === 0) {
       stopPadInternal(pad);
       resetPadGain(pad.id);
@@ -105,7 +133,7 @@ export async function fadePadIn(
   durationMs: number,
   startPad: (pad: Pad) => Promise<void>,
 ): Promise<void> {
-  cancelPadFade(pad.id);
+  clearPadFadeTracking(pad.id);
   addFadingInPad(pad.id);
 
   await startPad(pad);
@@ -121,7 +149,7 @@ export async function fadePadIn(
 
   const timeoutId = setTimeout(() => {
     deleteFadePadTimeout(pad.id);
-    cancelPadFade(pad.id);
+    clearPadFadeTracking(pad.id);
     if (toVolume === 0) stopPadInternal(pad);
   }, durationMs + 5);
   setFadePadTimeout(pad.id, timeoutId);

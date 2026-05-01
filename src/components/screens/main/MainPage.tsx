@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useProjectStore } from "@/state/projectStore";
+import { usePlaybackStore } from "@/state/playbackStore";
 import { clearAllAudioState } from "@/lib/audio/audioState";
 import { clearAllBuffers } from "@/lib/audio/bufferCache";
 import { clearAllStreamingElements, clearAllSizeCache } from "@/lib/audio/streamingCache";
@@ -64,6 +65,8 @@ function MainPageInner() {
     return () => {
       stopAudioTick();
       clearAllAudioState();
+      usePlaybackStore.getState().clearAllPlayingPads();
+      usePlaybackStore.getState().clearVolumes();
       // Stop any active sound preview. preview.ts manages its own module-level
       // state (currentSource, previewRafId) outside clearAllAudioState's scope,
       // so it must be torn down explicitly here.
