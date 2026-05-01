@@ -5,101 +5,96 @@ import { subscribeWithSelector } from "zustand/middleware";
 // streaming audio, chain queues, fade tracking) lives in src/lib/audio/audioState.ts.
 // This store contains only reactive Zustand state that drives UI re-renders.
 //
-// Tick-managed fields (padVolumes, layerVolumes, padProgress, activeLayerIds) are
-// written by the single global audioTick RAF loop in src/lib/audio/audioTick.ts.
-// Preview-managed fields (previewProgress) are written by preview.ts's own RAF loop.
-// All other writes to these fields are bugs.
+// Three ownership categories:
+//   TickManagedFields    — written exclusively by audioTick.ts via setAudioTick().
+//   EventDrivenFields    — written imperatively from padPlayer, layerTrigger, etc.
+//   PreviewManagedFields — written by preview.ts's own RAF loop and event handlers.
+// masterVolume is intentionally ungrouped — app-level UI configuration, not audio event state.
+//
+// Authorized exception: clearVolumes() resets padVolumes/layerVolumes on project unmount.
+// All other writes to TickManagedFields outside setAudioTick() are bugs.
 
-interface AudioTickSnapshot {
-  padVolumes?: Record<string, number>;
-  layerVolumes?: Record<string, number>;
-  padProgress?: Record<string, number>;
-  layerProgress?: Record<string, number>;
-  activeLayerIds?: Set<string>;
-  /** Per-layer ordered play order as sound IDs. Entry exists for layers whose
-   *  chained arrangement has computed a play order. Absence = no ordering yet. */
-  layerPlayOrder?: Record<string, string[]>;
-  /** Per-layer remaining chain queue as sound IDs (leading entry = currently playing).
-   *  Entry exists only for layers with an active chain queue. */
-  layerChain?: Record<string, string[]>;
+// Tick-managed fields — written exclusively by audioTick.ts via setAudioTick().
+// readonly prevents `state.padVolumes = x` reference reassignment at compile time.
+// Note: readonly does NOT prevent `setState({ padVolumes: x })` via Zustand. The enforced
+// invariant is that setAudioTick's Partial<TickManagedFields> signature rejects all non-tick
+// keys at compile time; direct setState bypasses are caught only by code review convention.
+export interface TickManagedFields {
+  /** Per-pad runtime volume (0–1). Absent = full volume. Drives PadButton fill bar. */
+  readonly padVolumes: Record<string, number>;
+
+  /** Per-layer runtime volume (0–1). Absent = inactive layer; use projectStore layer.volume instead. */
+  readonly layerVolumes: Record<string, number>;
+
+  /** Per-pad playback progress (0–1). Present only for pads with active progress info. */
+  readonly padProgress: Record<string, number>;
+
+  /** Per-layer playback progress (0–1). Present for each active layer. */
+  readonly layerProgress: Record<string, number>;
+
+  /** Layer IDs with active voices. Replaces per-component RAF polling. */
+  readonly activeLayerIds: Set<string>;
+
+  /** Per-layer ordered play order (sound IDs). Present for active chained-arrangement layers. */
+  readonly layerPlayOrder: Record<string, string[]>;
+
+  /** Per-layer remaining chain queue (sound IDs). Present for active layers with a chain queue. */
+  readonly layerChain: Record<string, string[]>;
 }
 
-interface PlaybackState {
+// Event-driven fields — written imperatively from padPlayer, layerTrigger, etc.
+// These are discrete state transitions, not derived from any RAF loop.
+interface EventDrivenFields {
+  /** Pad IDs with active voices. Toggled by padPlayer on trigger/stop. */
+  playingPadIds: Set<string>;
+
+  // Set when a fade-out ramp starts; cleared on completion or cancel.
+  fadingOutPadIds: Set<string>;
+
+  // Set when fadePad/triggerAndFade starts any ramp (up or down); cleared on completion or cancel.
+  fadingPadIds: Set<string>;
+
+  // Set after reverseFade calls fadePad; cleared at the start of any new fadePad call.
+  reversingPadIds: Set<string>;
+}
+
+// Preview-managed fields — written by preview.ts's own RAF loop and event handlers.
+// Independent of audioTick; preview.ts is not part of the padPlayer system.
+interface PreviewManagedFields {
+  /** Whether a sound preview is currently playing (for Stop All button state). */
+  isPreviewPlaying: boolean;
+
+  /** Playback progress of the currently previewing sound (0–1). null = not previewing. */
+  previewProgress: number | null;
+}
+
+interface PlaybackState extends TickManagedFields, EventDrivenFields, PreviewManagedFields {
+  // masterVolume is app-level UI configuration — intentionally not grouped with audio event state.
   masterVolume: number; // 0–100
   setMasterVolume: (volume: number) => void;
 
-  // Which pad IDs currently have active voices (for UI feedback)
-  // Push-based (discrete events), NOT tick-managed.
-  playingPadIds: Set<string>;
   addPlayingPad: (padId: string) => void;
   removePlayingPad: (padId: string) => void;
   clearAllPlayingPads: () => void;
 
-  // Which pad IDs are currently fading out (for label direction in UI)
-  // Push-based: set when a fade-out ramp starts, cleared on completion or cancel.
-  fadingOutPadIds: Set<string>;
   addFadingOutPad: (padId: string) => void;
   removeFadingOutPad: (padId: string) => void;
 
-  // Which pad IDs have any fade ramp in progress (up or down).
-  // Push-based: set when fadePad/triggerAndFade starts a ramp, cleared on completion or cancel.
-  fadingPadIds: Set<string>;
   addFadingPad: (padId: string) => void;
   removeFadingPad: (padId: string) => void;
 
-  // Which pad IDs are currently running a reversal ramp (reversed by the user mid-fade).
-  // Set after reverseFade calls fadePad; cleared at the start of any new fadePad call.
-  reversingPadIds: Set<string>;
   addReversingPad: (padId: string) => void;
   removeReversingPad: (padId: string) => void;
 
-  // Whether a sound preview is currently playing (for Stop All button state)
-  isPreviewPlaying: boolean;
   setIsPreviewPlaying: (v: boolean) => void;
 
-  // ---------------------------------------------------------------------------
-  // Preview-managed fields — written exclusively by preview.ts's own RAF loop.
-  // Independent of audioTick; preview.ts is not part of the padPlayer system.
-  // ---------------------------------------------------------------------------
-
-  /** Progress of the currently previewing sound (0–1). null = not previewing. */
-  previewProgress: number | null;
   setPreviewProgress: (v: number | null) => void;
 
-  // ---------------------------------------------------------------------------
-  // Tick-managed fields — written exclusively by audioTick.ts via setAudioTick()
-  // ---------------------------------------------------------------------------
-
-  /** Per-pad runtime volume (0–1). Entry exists only when gain < 0.999 (pad is fading/adjusted).
-   *  Absence of an entry means the pad is at full volume. Used to drive the fill bar in PadButton. */
-  padVolumes: Record<string, number>;
-
-  /** Per-layer runtime volume (0–1). Entry exists for playing layers with an active gain node.
-   *  Written exclusively by audioTick. Absence of an entry means the layer is inactive;
-   *  read `layer.volume` from `projectStore` via `getLayerNormalizedVolume` in that case. */
-  layerVolumes: Record<string, number>;
-
-  /** Per-pad playback progress (0–1). Entry exists for playing pads with progress info. */
-  padProgress: Record<string, number>;
-
-  /** Per-layer playback progress (0–1). Entry exists for each active layer. */
-  layerProgress: Record<string, number>;
-
-  /** Set of layer IDs currently playing (have active voices). Replaces per-component RAF polling. */
-  activeLayerIds: Set<string>;
-
-  /** Per-layer ordered play order (sound IDs). Tick-managed. Entry present only for
-   *  active layers with chained arrangements. Replaces the per-LayerRow RAF poll of
-   *  getLayerPlayOrder() in PadControlContent. */
-  layerPlayOrder: Record<string, string[]>;
-
-  /** Per-layer remaining chain queue (sound IDs). Tick-managed. Entry present only for
-   *  active layers with a chain queue. Replaces the per-LayerRow RAF poll of
-   *  getLayerChain() in PadControlContent. */
-  layerChain: Record<string, string[]>;
-
-  /** Batch-set any subset of tick-managed fields in a single Zustand mutation. */
-  setAudioTick: (snapshot: AudioTickSnapshot) => void;
+  /** Batch-set any subset of tick-managed fields in a single Zustand mutation.
+   *  Only TickManagedFields keys are accepted — passing EventDrivenFields or
+   *  PreviewManagedFields keys is a compile error.
+   *  When adding a new TickManagedFields key, also update the spread in the implementation below. */
+  setAudioTick: (snapshot: Partial<TickManagedFields>) => void;
 
   /** Reset padVolumes and layerVolumes to empty objects.
    *  Called by MainPage's unmount effect on project close (alongside
