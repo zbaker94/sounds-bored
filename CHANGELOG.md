@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stopping a sound (retrigger "stop" mode) could leave stale voice state, preventing the pad from showing as inactive after the stop ramp completes
+- Fixed sequential sound chains so that when one sound finishes, the next sound in the chain correctly starts playing
+- Fixed pad progress tracking to always reflect the longest-playing sound when multiple sounds play simultaneously
 - Internal refactoring only: all audio engine functionality is now exported through a single entry point (`@/lib/audio`), with no changes to app behavior or features.
 - Fixed an issue where pad activity indicators could remain stuck in "playing" or "fading" state after a sound stopped naturally or was interrupted
 - Pad play/fade state is now reliably cleared when stopping, retriggering, or closing a project, preventing stale UI indicators from a previous session leaking into a new one
