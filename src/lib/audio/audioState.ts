@@ -772,6 +772,10 @@ export function setLayerProgressInfo(layerId: string, info: { startedAt: number;
   layerProgressInfo.set(layerId, info);
 }
 
+export function getLayerProgressInfo(layerId: string): { startedAt: number; duration: number; isLooping: boolean } | undefined {
+  return layerProgressInfo.get(layerId);
+}
+
 export function clearLayerProgressInfo(layerId: string): void {
   layerProgressInfo.delete(layerId);
 }
