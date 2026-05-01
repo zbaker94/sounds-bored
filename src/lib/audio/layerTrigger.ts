@@ -16,6 +16,7 @@
 import { ensureResumed, getAudioContext } from "./audioContext";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { clampGain01 } from "./gainManager";
+import { clearPadFadeTracking } from "./fadeMixer";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
@@ -29,7 +30,6 @@ import { emitAudioError } from "./audioEvents";
 import { startAudioTick } from "./audioTick";
 import {
   addStopCleanupTimeout,
-  cancelPadFade,
   deleteStopCleanupTimeout,
   clearLayerVoice,
   clearLayerStreamingAudio,
@@ -146,6 +146,9 @@ export function rampStopLayerVoices(
   const timeoutId = setTimeout(() => {
     deleteStopCleanupTimeout(timeoutId);
     for (const v of voices) clearLayerVoice(padId, layer.id, v);
+    if (!isPadActive(padId)) {
+      usePlaybackStore.getState().removePlayingPad(padId);
+    }
     if (gain) {
       const ctx = getAudioContext();
       gain.gain.cancelScheduledValues(ctx.currentTime);
@@ -243,6 +246,9 @@ export async function startLayerSound(
       // ends naturally while a stopWithRamp timeout is pending.
       if (audio) unregisterStreamingAudio(pad.id, layer.id, audio);
       clearLayerVoice(pad.id, layer.id, voice);
+      if (!isPadActive(pad.id)) {
+        usePlaybackStore.getState().removePlayingPad(pad.id);
+      }
 
       // Chain to the next sound if one is queued (sequential/shuffled).
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
@@ -298,6 +304,7 @@ export async function startLayerSound(
 
     await voice.start();
     recordLayerVoice(pad.id, layer.id, voice);
+    usePlaybackStore.getState().addPlayingPad(pad.id);
     // Voice fully started and recorded — clear the consecutive-failure counter so
     // a future failure starts from zero. Placed after recordLayerVoice so we only
     // count it as a real success once the voice is actually tracked in state.
@@ -313,6 +320,12 @@ export async function startLayerSound(
     // starts fresh rather than resuming from an invalid position (#136).
     deleteLayerChain(layer.id);
     deleteLayerCycleIndex(layer.id);
+
+    // When a restart-mode retrigger stopped the current voice but failed to load
+    // the new one, the pad must be removed from playingPadIds (no voices remain).
+    if (!isPadActive(pad.id)) {
+      usePlaybackStore.getState().removePlayingPad(pad.id);
+    }
 
     // Circuit-breaker: a chain of consecutive load failures (e.g. entire library
     // missing on disk) would otherwise spawn one toast per sound. Tear the chain
@@ -353,8 +366,8 @@ export async function startLayerSound(
  * - "skip"           — don't start new playback (stop mode stopped; continue mode kept going)
  * - "proceed"        — clear progress and start new playback via startLayerPlayback
  * - "chain-advanced" — "next" mode advanced (or exhausted) the sound chain; addPlayingPad is
- *                      handled implicitly by recordVoice when a new voice starts — callers must
- *                      not call it explicitly
+ *                      called by startLayerSound after a successful voice start; applyRetriggerMode
+ *                      calls removePlayingPad if the chain exhausted with no replacement voice.
  */
 export type RetriggerAction = "skip" | "proceed" | "chain-advanced";
 
@@ -445,6 +458,10 @@ export async function applyRetriggerMode(
           }
         }
         // one-shot: queue exhausted — just stopped (already done above).
+        // If no new voice replaced the stopped one, the pad is no longer playing.
+        if (!isPadActive(pad.id)) {
+          usePlaybackStore.getState().removePlayingPad(pad.id);
+        }
         return "chain-advanced";
       }
       break;
@@ -732,7 +749,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
     deleteStopCleanupTimeout(stopCleanupId);
     if (!isPadActive(pad.id)) {
       usePlaybackStore.getState().removePlayingPad(pad.id);
-      cancelPadFade(pad.id);
+      clearPadFadeTracking(pad.id);
     }
   }, STOP_RAMP_S * 1000 + 10);
   addStopCleanupTimeout(stopCleanupId);
@@ -740,7 +757,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
 
 /** Shared preamble for skip functions: cancel fade, resume context, start a single sound, record pad as playing. */
 function startSoundInLayer(pad: Pad, layer: Layer, sound: Sound, resolved: Sound[]): void {
-  cancelPadFade(pad.id);
+  clearPadFadeTracking(pad.id);
   ensureResumed().then((ctx) => {
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);

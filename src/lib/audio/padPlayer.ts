@@ -10,7 +10,6 @@ import { stopAudioTick } from "./audioTick";
 import {
   addStopCleanupTimeout,
   deleteStopCleanupTimeout,
-  cancelPadFade,
   cancelGlobalStopTimeout,
   clearAllFadeTracking,
   clearAllLayerChains,
@@ -50,6 +49,7 @@ import {
   fadePad,
   fadePadIn,
   stopPadInternal,
+  clearPadFadeTracking,
 } from "./fadeMixer";
 
 import { rampGainTo } from "./gainManager";
@@ -186,7 +186,7 @@ export function stopFade(pad: Pad): void {
   const gain = getPadGain(pad.id);
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(currentVol, ctx.currentTime);
-  cancelPadFade(pad.id);
+  clearPadFadeTracking(pad.id);
 }
 
 /**
@@ -221,7 +221,7 @@ export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDuratio
 
 /** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
-  cancelPadFade(pad.id);
+  clearPadFadeTracking(pad.id);
   stopPadInternal(pad);
 }
 
@@ -272,7 +272,10 @@ export function stopAllPads(): void {
     clearAllLayerProgressInfo();
     clearLayerGainsForIds(getLayerIdsForPads(stoppedPadIds));
     clearPadGainsForIds(stoppedPadIds);
-    stopSpecificVoices(stoppedVoices, stoppedPadIds);
+    const fullyStopped = stopSpecificVoices(stoppedVoices, stoppedPadIds);
+    for (const padId of fullyStopped) {
+      usePlaybackStore.getState().removePlayingPad(padId);
+    }
   }, STOP_RAMP_S * 1000 + 5);
   setGlobalStopTimeout(stopTimeoutId);
 }
@@ -303,7 +306,7 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
   const padGain = getPadGain(pad.id);
   // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
   // that are about to be started below.
-  cancelPadFade(pad.id);
+  clearPadFadeTracking(pad.id);
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVol, ctx.currentTime);
   // Tick reads gain node value automatically — no store call needed.
@@ -361,7 +364,7 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
     const padGain = getPadGain(pad.id);
     // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
     // that are about to be started below (same fix as triggerPad).
-    cancelPadFade(pad.id);
+    clearPadFadeTracking(pad.id);
 
     await triggerLayerOfPad(pad, layer, ctx, padGain, resolved, {
       // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad
@@ -371,7 +374,9 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
           deleteStopCleanupTimeout(timeoutId);
           if (!isPadActive(pad.id)) {
             usePlaybackStore.getState().removePlayingPad(pad.id);
-            cancelPadFade(pad.id);
+            clearPadFadeTracking(pad.id);
+            // Safety net: rampStopLayerVoices already handles removePlayingPad at STOP_RAMP_S+5ms;
+            // this fires at +10ms and is idempotent if the ramp already cleaned up.
           }
         }, STOP_RAMP_S * 1000 + 10);
         addStopCleanupTimeout(timeoutId);

@@ -13,15 +13,21 @@
  * This module is the SINGLE owner of ALL non-serializable audio engine runtime state.
  * playbackStore (Zustand) holds reactive UI signals split into two categories:
  *
- *   Push-based (written here on discrete events): playingPadIds, fadingPadIds,
- *   fadingOutPadIds, reversingPadIds. These are updated synchronously when a pad
- *   starts or stops â€” routing them through the RAF tick would add ~16 ms latency
- *   to UI feedback with no correctness benefit.
+ *   Push-based (written by upstream callers on discrete events): playingPadIds,
+ *   fadingPadIds, fadingOutPadIds, reversingPadIds. These are updated
+ *   synchronously when a pad starts or stops â€” routing them through the RAF
+ *   tick would add ~16 ms latency to UI feedback with no correctness benefit.
+ *   This module DOES NOT write these fields directly; callers (padPlayer) read
+ *   the local state here and mirror it to playbackStore at the call site.
  *
  *   Tick-managed (written by audioTick.ts each RAF frame): padVolumes,
  *   layerVolumes, padProgress, layerProgress, activeLayerIds, layerPlayOrder,
  *   layerChain. This module MUST NOT write these fields â€” doing so bypasses the
  *   tick's diff logic and can create race conditions with the RAF loop.
+ *
+ * INVARIANT: This module does NOT import playbackStore. It is a pure local
+ *   state container; all coordination with the reactive store happens at the
+ *   caller (padPlayer / fadeMixer / layerTrigger / gainManager / audioTick).
  *
  * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
  *   fade tracking. Reason: voice.stop() fires onended synchronously, which reads
@@ -30,7 +36,8 @@
  *
  * INVARIANT: Always use padPlayer.stopAllPads() as the single stop entry point.
  *   It clears fade tracking and chain queues first, nulls onended callbacks,
- *   ramps gain nodes to zero, then calls stopAllVoices().
+ *   ramps gain nodes to zero, then calls stopSpecificVoices() on the snapshot
+ *   and mirrors the fully-stopped pads to playbackStore.playingPadIds.
  *
  * NOTE: padGainMap is a persistent lazy cache — getPadGain() creates entries on
  *   first trigger and they survive until clearAllPadGains() (called in the
@@ -38,9 +45,6 @@
  *   contains pads with currently-active voices; pads leave voiceMap when their
  *   last voice stops naturally. The two maps are NOT kept in sync between a
  *   natural voice stop and the next clearAllPadGains() call.
- *
- * INVARIANT: stopAllVoices() calls clearAllPlayingPads() on playbackStore to
- *   reset the reactive UI state after all voices are stopped.
  *
  * ============================================================================
  * STATE INVENTORY
@@ -61,11 +65,10 @@
  * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
  * layerConsecutiveFailureMap | layer ID | number                             | Consecutive chain load failures (circuit-break) | resetLayerConsecutiveFailures(), clearAllLayerConsecutiveFailures()
  * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
- * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), clearAllFadeTracking()
+ * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), removeFadingOutPad(), clearAllFadeTracking()
  */
 
 import { getAudioContext, getMasterGain } from "./audioContext";
-import { usePlaybackStore } from "@/state/playbackStore";
 import type { AudioVoice } from "./audioVoice";
 import type { Sound } from "@/lib/schemas";
 
@@ -500,15 +503,20 @@ export function clearLayerGainsForIds(layerIds: ReadonlySet<string>): void {
  * Stop only the voice objects in the snapshot, scoped to the given pad IDs.
  * Voices added to those pads after the snapshot was taken (new triggers during
  * the ramp window) are left intact in voiceMap and layerVoiceMap.
+ *
+ * @returns The subset of stoppedPadIds whose voiceMap entry reached zero.
+ *   Callers must mirror these to usePlaybackStore.getState().removePlayingPad() —
+ *   this function does not write to playbackStore (see module INVARIANT).
  */
-export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds: ReadonlySet<string>): void {
+export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds: ReadonlySet<string>): Set<string> {
+  const fullyStopped = new Set<string>();
   const voiceSet = new Set<AudioVoice>(voices);
   for (const padId of stoppedPadIds) {
     const padVoices = voiceMap.get(padId) ?? [];
     const remaining = padVoices.filter(v => !voiceSet.has(v));
     if (remaining.length === 0) {
       voiceMap.delete(padId);
-      usePlaybackStore.getState().removePlayingPad(padId);
+      fullyStopped.add(padId);
     } else {
       voiceMap.set(padId, remaining);
     }
@@ -531,6 +539,7 @@ export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds:
   for (const voice of voices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
+  return fullyStopped;
 }
 
 // ---------------------------------------------------------------------------
@@ -538,8 +547,8 @@ export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds:
 // ---------------------------------------------------------------------------
 
 /**
- * Cancel all fade-related resources for a pad: pending timeout, fadingOut tracking
- * (both audioState and playbackStore mirrors), fadingPad tracking, and fromVolume.
+ * Cancel all fade-related resources for a pad: pending timeout, fadingOut tracking,
+ * and fromVolume. Clears local fade state only.
  * Safe to call even if no fade is registered — all operations are idempotent.
  *
  * Note: fadingInPadIds is NOT cleared here — triggerPad calls cancelPadFade internally
@@ -554,17 +563,14 @@ export function cancelPadFade(padId: string): void {
   }
   fadingOutPadIds.delete(padId);
   padFadeFromVolumes.delete(padId);
-  usePlaybackStore.getState().removeFadingPad(padId);
-  usePlaybackStore.getState().removeFadingOutPad(padId);
 }
 
 /**
- * Mark a pad as fading out on both audioState and playbackStore sides atomically.
+ * Mark a pad as fading out in local audioState.
  * Symmetric counterpart to the removal path in cancelPadFade.
  */
 export function addFadingOutPad(padId: string): void {
   fadingOutPadIds.add(padId);
-  usePlaybackStore.getState().addFadingOutPad(padId);
 }
 
 /** Remove a pad from fading-out tracking. */
@@ -866,14 +872,12 @@ export function isLayerActive(layerId: string): boolean {
 
 export function recordVoice(padId: string, voice: AudioVoice): void {
   voiceMap.set(padId, [...(voiceMap.get(padId) ?? []), voice]);
-  usePlaybackStore.getState().addPlayingPad(padId);
 }
 
 export function clearVoice(padId: string, voice: AudioVoice): void {
   const updated = (voiceMap.get(padId) ?? []).filter((v) => v !== voice);
   if (updated.length === 0) {
     voiceMap.delete(padId);
-    usePlaybackStore.getState().removePlayingPad(padId);
   } else {
     voiceMap.set(padId, updated);
   }
@@ -883,7 +887,6 @@ export function stopPadVoices(padId: string): void {
   const voices = voiceMap.get(padId) ?? [];
   const stoppedSet = new Set(voices);
   voiceMap.delete(padId);
-  usePlaybackStore.getState().removePlayingPad(padId);
   // Use reverse index to touch only layers belonging to this pad â€” O(layers_in_pad).
   // Per invariant, every layer voice is also a pad voice, so stoppedSet covers all
   // voices in every tracked layer. The `remaining.length > 0` branch is dead under
@@ -917,7 +920,6 @@ export function stopAllVoices(): void {
   layerVoiceMap.clear();
   _padToLayerIds.clear();
   layerVoiceVersion++;
-  usePlaybackStore.getState().clearAllPlayingPads();
   for (const voice of allVoices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -967,7 +969,6 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
   if (padVoices.length === 0) {
     voiceMap.delete(padId);
-    usePlaybackStore.getState().removePlayingPad(padId);
   } else {
     voiceMap.set(padId, padVoices);
   }
@@ -1103,8 +1104,4 @@ export function clearAllAudioState(): void {
   // Note: audio buffer / streaming element caches are cleared by the caller
   // (MainPage) â€” audioState is a pure state container and does not import the
   // cache modules to keep the dependency graph clean.
-  // Defensive clear of tick-managed volume maps. Callers must call stopAudioTick() first
-  // (which clears these via _clearAllTickFields). This is a belt-and-suspenders reset
-  // in case clearAllAudioState() is called without a preceding stopAudioTick() (e.g. tests).
-  usePlaybackStore.getState().clearVolumes();
 }

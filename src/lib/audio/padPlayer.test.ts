@@ -3320,9 +3320,9 @@ describe("skipLayerForward", () => {
   // not included here because skipLayerForward is synchronous — its internal async
   // chain (ensureResumed → loadBuffer → createBufferSource) has multiple microtask
   // hops that cannot be awaited externally. The isPadFadingOut assertions above prove
-  // cancelPadFade() is called, which by definition clears the stale setTimeout via
-  // clearTimeout(). The cancelPadFade unit tests in audioState.test.ts verify that
-  // behaviour directly.
+  // clearPadFadeTracking() is called (which calls cancelPadFade internally, clearing the
+  // stale setTimeout via clearTimeout()). The cancelPadFade unit tests in audioState.test.ts
+  // verify that behaviour directly.
 
   it("reports an error via emitAudioError when ensureResumed rejects during skip (chained mode)", async () => {
     const { ensureResumed } = await import("./audioContext");
@@ -4148,6 +4148,10 @@ describe("stopLayerWithRamp", () => {
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
 
+    // Seed fade flags so we can verify the post-ramp cleanup clears them.
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+
     stopLayerWithRamp(pad, layer.id);
 
     // During the ramp, pad should still appear playing
@@ -4156,6 +4160,8 @@ describe("stopLayerWithRamp", () => {
     // After ramp completes
     vi.advanceTimersByTime(35);
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
   });
 
   it("does not remove pad from playingPadIds when another layer is still active", async () => {
@@ -4672,5 +4678,135 @@ describe("pending leak guards", () => {
     expect(isLayerPending(layer1.id)).toBe(false);
     // Layer 2 should still have been triggered (other layers proceed)
     expect(isLayerActive(layer2.id)).toBe(true);
+  });
+});
+
+// ─── playbackStore fade-flag clearing on clearPadFadeTracking call sites ─────────
+
+describe("playbackStore fade flags cleared from padPlayer call sites", () => {
+  it("stopFade clears fadingPadIds and fadingOutPadIds in playbackStore", async () => {
+    const { stopFade } = await import("./padPlayer");
+    const pad = createMockPad({ id: "stop-fade-flag-pad" });
+
+    // Seed the store as if the pad were mid-fade
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(true);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(true);
+
+    stopFade(pad);
+
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("stopPad clears fadingPadIds and fadingOutPadIds in playbackStore", async () => {
+    const { stopPad } = await import("./padPlayer");
+    const pad = createMockPad({ id: "stop-pad-flag-pad" });
+
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(true);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(true);
+
+    stopPad(pad);
+
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("triggerPad clears fadingPadIds and fadingOutPadIds in playbackStore", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ id: "trigger-pad-flag-pad", layers: [layer] });
+
+    // Seed store flags as if pad were fading out before re-trigger
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+
+    await triggerPad(pad);
+
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("triggerLayer clears fadingPadIds and fadingOutPadIds in playbackStore", async () => {
+    const { triggerLayer } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ id: "trigger-layer-flag-pad", layers: [layer] });
+
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+
+    await triggerLayer(pad, layer);
+
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("triggerLayer clears fade flags synchronously via clearPadFadeTracking before starting new sound", async () => {
+    vi.useFakeTimers();
+    mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      retriggerMode: "stop",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ id: "trigger-layer-after-stop-pad", layers: [layer] });
+
+    const { triggerLayer } = await import("./padPlayer");
+
+    // First trigger — starts playback
+    await triggerLayer(pad, layer);
+    await vi.runAllTimersAsync();
+
+    // Seed fade flags so we can verify the afterStopCleanup callback clears them
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+
+    // Second trigger (retriggerMode: "stop") — schedules afterStopCleanup timeout
+    await triggerLayer(pad, layer);
+
+    // Advance past the ramp + cleanup window
+    vi.advanceTimersByTime(35);
+
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("stopAllPads removes fully-stopped pads from playingPadIds after ramp", async () => {
+    vi.useFakeTimers();
+    const { triggerPad, stopAllPads } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ id: "stop-all-fully-stopped-pad", layers: [layer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    stopAllPads();
+    // Advance past the ramp + 5ms buffer
+    vi.advanceTimersByTime(35);
+
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+    vi.useRealTimers();
   });
 });

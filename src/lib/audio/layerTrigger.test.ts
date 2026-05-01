@@ -425,6 +425,7 @@ describe("layerTrigger", () => {
     it("'next' mode with exhausted one-shot queue returns 'chain-advanced' (stops only)", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
+      const { usePlaybackStore } = await import("@/state/playbackStore");
       const padGain = getPadGain("pad-next-exhaust");
       const layerGain = getOrCreateLayerGain("layer-next-exhaust", 1, padGain);
       const pad = createMockPad({ id: "pad-next-exhaust" });
@@ -440,12 +441,15 @@ describe("layerTrigger", () => {
       recordLayerVoice("pad-next-exhaust", "layer-next-exhaust", mockVoice as unknown as import("./audioVoice").AudioVoice);
       // Empty chain — queue exhausted
       setLayerChain("layer-next-exhaust", []);
+      // Seed the pad as playing so we can verify the chain-exhausted path removes it.
+      usePlaybackStore.getState().addPlayingPad(pad.id);
 
       const result = await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1]);
 
       expect(result).toBe("chain-advanced");
       expect(mockVoice.stop).toHaveBeenCalled(); // voice was stopped
       expect(isLayerActive("layer-next-exhaust")).toBe(false);
+      expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     });
 
     it("'next' mode with loop + exhausted queue loops back to beginning", async () => {
@@ -1455,5 +1459,180 @@ describe("triggerLayerOfPad", () => {
     expect(vi.mocked(loadBuffer)).not.toHaveBeenCalled();
     expect(isLayerPending(layer.id)).toBe(false);
     expect(isLayerActive(layer.id)).toBe(false);
+  });
+});
+
+// ── playbackStore integration (issue #133) ────────────────────────────────────
+//
+// audioState.ts no longer mutates playbackStore directly. layerTrigger.ts owns
+// these push-based UI signals (`playingPadIds`, `fadingPadIds`, `fadingOutPadIds`)
+// at the call sites where they conceptually change. These tests pin that contract.
+
+describe("layerTrigger playbackStore integration", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
+    });
+    const { clearAllPadGains, clearAllLayerGains, clearAllLayerChains, clearAllFadeTracking, clearAllVoices } = await import("./audioState");
+    clearAllPadGains();
+    clearAllLayerGains();
+    clearAllLayerChains();
+    clearAllFadeTracking();
+    clearAllVoices();
+    const { usePlaybackStore } = await import("@/state/playbackStore");
+    usePlaybackStore.setState({
+      playingPadIds: new Set<string>(),
+      fadingPadIds: new Set<string>(),
+      fadingOutPadIds: new Set<string>(),
+    });
+  });
+
+  it("startLayerSound adds the pad to playingPadIds when a voice starts successfully", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, isLayerActive } = await import("./audioState");
+    const { usePlaybackStore } = await import("@/state/playbackStore");
+    const pad = createMockPad({ id: "pp-pad-1" });
+    const layer = createMockLayer({ id: "pp-layer-1" });
+    const sound = createMockSound({ id: "s1", filePath: "s1.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    // Sanity: voice was recorded (precondition for addPlayingPad).
+    expect(isLayerActive(layer.id)).toBe(true);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+  });
+
+  it("onended removes the pad from playingPadIds when the last voice ends", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { usePlaybackStore } = await import("@/state/playbackStore");
+
+    const pad = createMockPad({ id: "pp-pad-end" });
+    const layer = createMockLayer({ id: "pp-layer-end" });
+    const sound = createMockSound({ id: "s1", filePath: "s1.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // Capture onended so we can fire it after the voice "ends" naturally.
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+    // Pad is now playing.
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+
+    // Fire onended — the only voice ends, so the pad is no longer active.
+    capturedOnEnded[0]();
+
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("rampStopLayerVoices removes the pad from playingPadIds after the cleanup timeout fires", async () => {
+    vi.useFakeTimers();
+    try {
+      const { rampStopLayerVoices } = await import("./layerTrigger");
+      const { getPadGain, getOrCreateLayerGain, recordLayerVoice } = await import("./audioState");
+      const { usePlaybackStore } = await import("@/state/playbackStore");
+
+      const pad = createMockPad({ id: "pp-pad-ramp" });
+      const layer = createMockLayer({ id: "pp-layer-ramp" });
+      const padGain = getPadGain(pad.id);
+      getOrCreateLayerGain(layer.id, 1, padGain);
+
+      // Pretend a voice is active and the pad is in the playing set.
+      const fakeVoice = makeMinimalVoice() as unknown as import("./audioVoice").AudioVoice;
+      recordLayerVoice(pad.id, layer.id, fakeVoice);
+      usePlaybackStore.getState().addPlayingPad(pad.id);
+      expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+      rampStopLayerVoices(pad.id, layer, [fakeVoice]);
+
+      // Advance past STOP_RAMP_S * 1000 + 5 to fire the cleanup timeout.
+      vi.advanceTimersByTime(2000);
+
+      expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("skipLayerForward clears fadingPadIds / fadingOutPadIds when starting the next sound", async () => {
+    const { skipLayerForward } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { usePlaybackStore } = await import("@/state/playbackStore");
+
+    const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
+    const s2 = createMockSound({ id: "s2", filePath: "s2.wav" });
+    const pad = createMockPad({ id: "pp-pad-skip", layers: [createMockLayer({
+      id: "pp-layer-skip",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: [
+        { id: "i1", soundId: "s1", volume: 100 },
+        { id: "i2", soundId: "s2", volume: 100 },
+      ]},
+    })] });
+    const layer = pad.layers[0];
+    const padGain = getPadGain(pad.id);
+    getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // Configure live library so resolveSounds inside skipLayerForward returns s1 + s2.
+    const { useLibraryStore } = await import("@/state/libraryStore");
+    vi.mocked(useLibraryStore.getState).mockReturnValue({ sounds: [s1, s2] } as ReturnType<typeof useLibraryStore.getState>);
+
+    // Pretend a fade-out was in progress for this pad.
+    usePlaybackStore.getState().addFadingPad(pad.id);
+    usePlaybackStore.getState().addFadingOutPad(pad.id);
+    setLayerChain(layer.id, [s2]);
+
+    skipLayerForward(pad, layer.id);
+
+    expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+  });
+
+  it("catch path removes pad from playingPadIds when load fails and no voices remain", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("load failed"));
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { usePlaybackStore } = await import("@/state/playbackStore");
+
+    const pad = createMockPad({ id: "catch-remove-pad" });
+    const layer = createMockLayer({ id: "catch-remove-layer" });
+    const sound = createMockSound({ id: "s-catch", filePath: "x.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // Simulate restart-retrigger state: prior voices were stopped by stopLayerVoices
+    // so isPadActive(pad.id) === false, but playingPadIds still has the pad.
+    usePlaybackStore.getState().addPlayingPad(pad.id);
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    // Catch path should clear the stale playingPadIds entry.
+    expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
   });
 });
