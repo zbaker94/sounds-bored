@@ -41,9 +41,8 @@ describe("fadeMixer", () => {
     vi.clearAllMocks();
     mockCtx.currentTime = 0;
     mockCtx.createGain.mockReset();
-    const { clearAllPadGains, clearAllFadeTracking } = await import("./audioState");
-    clearAllPadGains();
-    clearAllFadeTracking();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   afterEach(() => {

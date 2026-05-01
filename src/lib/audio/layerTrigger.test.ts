@@ -68,12 +68,8 @@ describe("layerTrigger", () => {
       stop: vi.fn(),
       addEventListener: vi.fn(),
     });
-    const { clearAllPadGains, clearAllLayerGains, clearAllLayerChains, clearAllFadeTracking, clearAllVoices } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   // ── resolveSounds ─────────────────────────────────────────────────────────
@@ -662,20 +658,8 @@ describe("startLayerSound circuit-breaker", () => {
       stop: vi.fn(),
       addEventListener: vi.fn(),
     });
-    const {
-      clearAllPadGains,
-      clearAllLayerGains,
-      clearAllLayerChains,
-      clearAllFadeTracking,
-      clearAllVoices,
-      clearAllLayerConsecutiveFailures,
-    } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
-    clearAllLayerConsecutiveFailures();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   it("increments the consecutive-failure counter on each failure (below threshold)", async () => {
@@ -1088,22 +1072,8 @@ describe("startLayerSound chain-state cleanup on error", () => {
       stop: vi.fn(),
       addEventListener: vi.fn(),
     });
-    const {
-      clearAllPadGains,
-      clearAllLayerGains,
-      clearAllLayerChains,
-      clearAllFadeTracking,
-      clearAllVoices,
-      clearAllLayerConsecutiveFailures,
-      clearAllLayerCycleIndexes,
-    } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
-    clearAllLayerConsecutiveFailures();
-    clearAllLayerCycleIndexes();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   it("clears layerChain after a single (below-threshold) decode failure so the next trigger starts fresh", async () => {
@@ -1272,12 +1242,8 @@ describe("triggerLayerOfPad", () => {
     mockCtx.createBufferSource.mockReset().mockReturnValue({
       buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
     });
-    const { clearAllPadGains, clearAllLayerGains, clearAllLayerChains, clearAllFadeTracking, clearAllVoices } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   async function setup(layerOpts?: Parameters<typeof createMockLayer>[0]) {
@@ -1477,12 +1443,8 @@ describe("layerTrigger playbackStore integration", () => {
     mockCtx.createBufferSource.mockReset().mockReturnValue({
       buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
     });
-    const { clearAllPadGains, clearAllLayerGains, clearAllLayerChains, clearAllFadeTracking, clearAllVoices } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
     const { usePlaybackStore } = await import("@/state/playbackStore");
     usePlaybackStore.setState({
       playingPadIds: new Set<string>(),
@@ -1653,17 +1615,8 @@ describe("afterStopCleanup with real active voices", () => {
     mockCtx.createBufferSource.mockReset().mockReturnValue({
       buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
     });
-    const {
-      clearAllPadGains, clearAllLayerGains, clearAllLayerChains,
-      clearAllFadeTracking, clearAllVoices, clearAllPadProgressInfo, clearAllLayerProgressInfo,
-    } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
-    clearAllPadProgressInfo();
-    clearAllLayerProgressInfo();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
     const { usePlaybackStore } = await import("@/state/playbackStore");
     usePlaybackStore.setState({
       playingPadIds: new Set<string>(),
@@ -1764,17 +1717,8 @@ describe("onended chain continuation — happy path", () => {
     mockCtx.createBufferSource.mockReset().mockReturnValue({
       buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
     });
-    const {
-      clearAllPadGains, clearAllLayerGains, clearAllLayerChains,
-      clearAllFadeTracking, clearAllVoices, clearAllPadProgressInfo, clearAllLayerProgressInfo,
-    } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
-    clearAllPadProgressInfo();
-    clearAllLayerProgressInfo();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
     const { usePlaybackStore } = await import("@/state/playbackStore");
     usePlaybackStore.setState({
       playingPadIds: new Set<string>(),
@@ -1915,17 +1859,8 @@ describe("startLayerSound progress info", () => {
     mockCtx.createBufferSource.mockReset().mockReturnValue({
       buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
     });
-    const {
-      clearAllPadGains, clearAllLayerGains, clearAllLayerChains,
-      clearAllFadeTracking, clearAllVoices, clearAllPadProgressInfo, clearAllLayerProgressInfo,
-    } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
-    clearAllLayerChains();
-    clearAllFadeTracking();
-    clearAllVoices();
-    clearAllPadProgressInfo();
-    clearAllLayerProgressInfo();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   it("sets layerProgressInfo after a successful buffer load", async () => {

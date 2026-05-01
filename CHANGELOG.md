@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; this is an internal test suite cleanup with no impact on app behavior.
+- Improved internal test reliability by consolidating audio state resets into a single `clearAllAudioState()` call, reducing the chance of missed cleanup between test runs
 - Fixed a bug where stale playback progress info could persist after a sound failed to load, potentially causing incorrect progress indicators.
 - Improved accuracy of playback timing tracking to reflect the precise moment audio starts playing.
 - Fixed a bug where stopping a sound (retrigger "stop" mode) could leave stale voice state, preventing the pad from showing as inactive after the stop ramp completes

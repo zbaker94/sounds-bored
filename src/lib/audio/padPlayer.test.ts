@@ -1,7 +1,7 @@
 ﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
-import { isLayerActive, isPadFading, isLayerPending, clearAllLayerChains, clearAllLayerGains, clearAllPadGains, clearAllFadeTracking, isPadStreaming, getPadProgress, getPadGain } from "./audioState";
+import { isLayerActive, isPadFading, isLayerPending, clearAllFadeTracking, isPadStreaming, getPadProgress, getPadGain, clearAllAudioState } from "./audioState";
 import { fadePad, resolveFadeDuration, freezePadAtCurrentVolume } from "./fadeMixer";
 import { resetPadGain, setLayerVolume } from "./gainManager";
 import { stopLayerWithRamp, skipLayerForward, skipLayerBack, syncLayerPlaybackMode, syncLayerArrangement, syncLayerSelection, syncLayerConfig, selectionsEqual } from "./layerTrigger";
@@ -174,16 +174,7 @@ const createdSources: MockSource[] = [];
 beforeEach(async () => {
   vi.clearAllMocks();
   createdSources.length = 0;
-  // Clear chain queue before stopAll so old onended callbacks don't chain
-  const { clearAllStreamingAudio, clearAllPadProgressInfo, clearAllLayerPending, clearAllVoices } = await import("./audioState");
-  clearAllLayerChains();
-  clearAllLayerGains();
-  clearAllPadGains();
-  clearAllFadeTracking();
-  clearAllStreamingAudio();
-  clearAllPadProgressInfo();
-  clearAllLayerPending();
-  clearAllVoices();
+  clearAllAudioState();
   usePlaybackStore.setState({
     masterVolume: 100,
     playingPadIds: new Set<string>(),
@@ -281,7 +272,7 @@ describe("simultaneous arrangement", () => {
 
   it("initializes layerGain from layer.volume / 100", async () => {
     const { triggerPad } = await import("./padPlayer");
-    clearAllPadGains();
+    clearAllAudioState();
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
 
@@ -4189,7 +4180,6 @@ describe("stopLayerWithRamp", () => {
     const pad = createMockPad({ layers: [layer] });
 
     const { triggerPad } = await import("./padPlayer");
-    const { clearAllAudioState } = await import("./audioState");
 
     await triggerPad(pad);
     await vi.runAllTimersAsync();
@@ -4343,7 +4333,6 @@ describe("triggerLayer", () => {
     setSounds([sound]);
 
     const { triggerLayer } = await import("./padPlayer");
-    const { clearAllAudioState } = await import("./audioState");
     const layer = createMockLayer({
       arrangement: "simultaneous",
       retriggerMode: "stop",
