@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stale playback progress info could persist after a sound failed to load, potentially causing incorrect progress indicators.
+- Improved accuracy of playback timing tracking to reflect the precise moment audio starts playing.
 - Fixed a bug where stopping a sound (retrigger "stop" mode) could leave stale voice state, preventing the pad from showing as inactive after the stop ramp completes
 - Fixed sequential sound chains so that when one sound finishes, the next sound in the chain correctly starts playing
 - Fixed pad progress tracking to always reflect the longest-playing sound when multiple sounds play simultaneously

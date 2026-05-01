@@ -1855,7 +1855,6 @@ describe("onended chain continuation — happy path", () => {
     // Empty chain — last sound in a one-shot sequence.
     setLayerChain(layer.id, []);
     await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
-    usePlaybackStore.getState().addPlayingPad(pad.id);
     expect(capturedOnEnded.length).toBeGreaterThan(0);
 
     capturedOnEnded[0]();
@@ -1941,12 +1940,13 @@ describe("startLayerSound progress info", () => {
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
+    mockCtx.currentTime = 5;
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
 
     const info = getLayerProgressInfo(layer.id);
     expect(info).toBeDefined();
     expect(info?.duration).toBe(2.5);
-    expect(info?.startedAt).toBe(mockCtx.currentTime);
+    expect(info?.startedAt).toBe(5);
     expect(info?.isLooping).toBe(false);
   });
 
@@ -1962,12 +1962,13 @@ describe("startLayerSound progress info", () => {
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
 
+    mockCtx.currentTime = 7;
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
 
     const info = getPadProgressInfo(pad.id);
     expect(info).toBeDefined();
     expect(info?.duration).toBe(3.0);
-    expect(info?.startedAt).toBe(mockCtx.currentTime);
+    expect(info?.startedAt).toBe(7);
     expect(info?.isLooping).toBe(false);
   });
 
@@ -2066,13 +2067,20 @@ describe("startLayerSound progress info", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("load error"));
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
+    const {
+      getPadGain, getOrCreateLayerGain, getPadProgressInfo, getLayerProgressInfo,
+      setPadProgressInfo, setLayerProgressInfo,
+    } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad-7" });
     const layer = createMockLayer({ id: "pi-layer-7" });
     const sound = createMockSound({ id: "s1", filePath: "s1.wav" });
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // Pre-seed stale progress so we verify the catch block actively clears it.
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 10, isLooping: false });
+    setLayerProgressInfo(layer.id, { startedAt: 0, duration: 10, isLooping: false });
 
     await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
 
