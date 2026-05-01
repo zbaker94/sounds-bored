@@ -28,11 +28,11 @@ function makeMockGain(initialValue = 1.0) {
 describe("gainManager", () => {
   beforeEach(async () => {
     vi.resetModules();
+    vi.clearAllMocks();
     mockCtx.currentTime = 0;
     mockCtx.createGain.mockReset();
-    const { clearAllPadGains, clearAllLayerGains } = await import("./audioState");
-    clearAllPadGains();
-    clearAllLayerGains();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
   });
 
   describe("setPadVolume", () => {
@@ -105,7 +105,12 @@ describe("gainManager", () => {
     it("ramps an active layer gain node to the new value (0–1 normalized scale)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
-      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const gainQueue = [mockPadGain, mockLayerGain];
+      mockCtx.createGain.mockImplementation(() => {
+        const next = gainQueue.shift();
+        if (!next) throw new Error("createGain called more times than expected");
+        return next;
+      });
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync");
       getOrCreateLayerGain("layer-sync", 0.8, padGain);
@@ -124,7 +129,12 @@ describe("gainManager", () => {
     it("clamps values above 1 to 1.0", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
-      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const gainQueue = [mockPadGain, mockLayerGain];
+      mockCtx.createGain.mockImplementation(() => {
+        const next = gainQueue.shift();
+        if (!next) throw new Error("createGain called more times than expected");
+        return next;
+      });
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync-hi");
       getOrCreateLayerGain("layer-sync-hi", 0.8, padGain);
@@ -138,7 +148,12 @@ describe("gainManager", () => {
     it("clamps values below 0 to 0", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
-      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const gainQueue = [mockPadGain, mockLayerGain];
+      mockCtx.createGain.mockImplementation(() => {
+        const next = gainQueue.shift();
+        if (!next) throw new Error("createGain called more times than expected");
+        return next;
+      });
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync-lo");
       getOrCreateLayerGain("layer-sync-lo", 0.8, padGain);
@@ -152,7 +167,12 @@ describe("gainManager", () => {
     it("clamps NaN to 0 (silence is the safe default)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
-      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const gainQueue = [mockPadGain, mockLayerGain];
+      mockCtx.createGain.mockImplementation(() => {
+        const next = gainQueue.shift();
+        if (!next) throw new Error("createGain called more times than expected");
+        return next;
+      });
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-sync-nan");
       getOrCreateLayerGain("layer-sync-nan", 0.8, padGain);
@@ -168,7 +188,12 @@ describe("gainManager", () => {
     it("updates gain node directly when the layer is active", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
-      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const gainQueue = [mockPadGain, mockLayerGain];
+      mockCtx.createGain.mockImplementation(() => {
+        const next = gainQueue.shift();
+        if (!next) throw new Error("createGain called more times than expected");
+        return next;
+      });
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-setlvol");
       getOrCreateLayerGain("layer-setlvol", 0.8, padGain);
@@ -192,7 +217,12 @@ describe("gainManager", () => {
     it("clamps out-of-range values when the layer is active (above 1.0 → 1.0, below 0 → 0)", async () => {
       const mockPadGain = makeMockGain();
       const mockLayerGain = makeMockGain();
-      mockCtx.createGain.mockReturnValueOnce(mockPadGain).mockReturnValueOnce(mockLayerGain);
+      const gainQueue = [mockPadGain, mockLayerGain];
+      mockCtx.createGain.mockImplementation(() => {
+        const next = gainQueue.shift();
+        if (!next) throw new Error("createGain called more times than expected");
+        return next;
+      });
       const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
       const padGain = getPadGain("pad-clamp");
       getOrCreateLayerGain("layer-clamp", 0.5, padGain);
