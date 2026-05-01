@@ -114,6 +114,33 @@ describe("layerTrigger", () => {
     });
   });
 
+  // ── shouldLayerLoopNatively ───────────────────────────────────────────────
+
+  describe("shouldLayerLoopNatively", () => {
+    it.each([
+      { playbackMode: "loop", arrangement: "simultaneous", cycleMode: false, expected: true },
+      { playbackMode: "hold", arrangement: "simultaneous", cycleMode: false, expected: true },
+      { playbackMode: "one-shot", arrangement: "simultaneous", cycleMode: false, expected: false },
+      // chained without cycleMode: native loop flag not used (chain drives looping)
+      { playbackMode: "loop", arrangement: "sequential", cycleMode: false, expected: false },
+      { playbackMode: "hold", arrangement: "sequential", cycleMode: false, expected: false },
+      // chained with cycleMode: plays one sound at a time, so native loop flag IS used
+      { playbackMode: "loop", arrangement: "sequential", cycleMode: true, expected: true },
+      { playbackMode: "hold", arrangement: "sequential", cycleMode: true, expected: true },
+      { playbackMode: "one-shot", arrangement: "sequential", cycleMode: true, expected: false },
+      // shuffled behaves like sequential (isChained)
+      { playbackMode: "loop", arrangement: "shuffled", cycleMode: false, expected: false },
+      { playbackMode: "loop", arrangement: "shuffled", cycleMode: true, expected: true },
+    ] as const)(
+      "playbackMode=$playbackMode arrangement=$arrangement cycleMode=$cycleMode → $expected",
+      async ({ playbackMode, arrangement, cycleMode, expected }) => {
+        const { shouldLayerLoopNatively } = await import("./layerTrigger");
+        const layer = createMockLayer({ playbackMode, arrangement, cycleMode });
+        expect(shouldLayerLoopNatively(layer)).toBe(expected);
+      },
+    );
+  });
+
   // ── getVoiceVolume ────────────────────────────────────────────────────────
 
   describe("getVoiceVolume", () => {

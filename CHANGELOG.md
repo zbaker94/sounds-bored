@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactoring: loop logic for sound layers is now consolidated into a single reusable function, improving code consistency with no change to playback behavior.
 - Fixed an internal code ordering issue in the audio engine (no behavior change for users)
 - Improved audio error reporting: errors that occurred while starting a sound in a layer are now properly surfaced instead of being silently ignored.
 - No user-facing changes — this release contains internal code cleanup only (type import consolidation and removal of stale comments).
