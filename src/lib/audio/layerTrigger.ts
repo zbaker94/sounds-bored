@@ -1,7 +1,7 @@
 // src/lib/audio/layerTrigger.ts
 //
 // Extracted layer trigger helpers used by padPlayer.ts:
-//   - resolveSounds / liveLayerField / getVoiceVolume — private utilities
+//   - resolveSounds / liveLayerField / getVoiceVolume / shouldLayerLoopNatively — private utilities
 //   - rampStopLayerVoices / stopLayerWithRampInternal — ramped layer stop primitives
 //   - loadLayerVoice — voice creation (streaming vs buffer), separated from lifecycle
 //   - startLayerSound — onended chain-continuation lifecycle (calls loadLayerVoice)
@@ -117,6 +117,14 @@ export function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
   return resolveLayerSounds(layer, sounds).filter((s) => !!s.filePath);
 }
 
+/** True when a layer's voices should use the native loop flag (source.loop / audio.loop).
+ *  Covers non-chained loop/hold modes and cycle mode (which plays one sound at a time,
+ *  so native looping is used even with a chained arrangement). */
+export function shouldLayerLoopNatively(layer: Layer): boolean {
+  return (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
+    (!isChained(layer.arrangement) || layer.cycleMode);
+}
+
 // ---------------------------------------------------------------------------
 // Ramped layer stop primitives (used by applyRetriggerMode + padPlayer stop fns)
 // ---------------------------------------------------------------------------
@@ -182,9 +190,7 @@ export async function loadLayerVoice(
     const { audio: cachedAudio, sourceNode } = getOrCreateStreamingElement(sound, ctx);
     sourceNode.disconnect();
     cachedAudio.currentTime = 0;
-    cachedAudio.loop =
-      (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
-      (!isChained(layer.arrangement) || layer.cycleMode);
+    cachedAudio.loop = shouldLayerLoopNatively(layer);
     const voice = wrapStreamingElement(cachedAudio, sourceNode, ctx, layerGain, voiceVolume);
     registerStreamingAudio(padId, layer.id, cachedAudio);
     return { voice, audio: cachedAudio };
@@ -193,10 +199,7 @@ export async function loadLayerVoice(
     const buffer = await loadBuffer(sound);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    if (
-      (layer.playbackMode === "loop" || layer.playbackMode === "hold") &&
-      (!isChained(layer.arrangement) || layer.cycleMode)
-    ) {
+    if (shouldLayerLoopNatively(layer)) {
       source.loop = true;
     }
     const voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
@@ -622,7 +625,7 @@ export function syncLayerPlaybackMode(layer: Layer): void {
   // Update the loop flag on non-chained voices and cycle-mode voices.
   // Cycle mode plays one sound at a time (like simultaneous), so source.loop
   // is used instead of chain-based looping.
-  const shouldLoop = isLoopMode && (!isChained(layer.arrangement) || layer.cycleMode);
+  const shouldLoop = shouldLayerLoopNatively(layer);
   for (const voice of voices) {
     voice.setLoop(shouldLoop);
   }
