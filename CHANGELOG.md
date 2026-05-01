@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code quality improvements to the audio engine's state management — no user-visible changes.
 - No user-facing changes; this is an internal test suite cleanup with no impact on app behavior.
 - Improved internal test reliability by consolidating audio state resets into a single `clearAllAudioState()` call, reducing the chance of missed cleanup between test runs
 - Fixed a bug where stale playback progress info could persist after a sound failed to load, potentially causing incorrect progress indicators.

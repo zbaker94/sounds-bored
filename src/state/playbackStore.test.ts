@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { usePlaybackStore, initialPlaybackState } from "./playbackStore";
+import { describe, it, expect, beforeEach, expectTypeOf } from "vitest";
+import { usePlaybackStore, initialPlaybackState, type TickManagedFields } from "./playbackStore";
 
 beforeEach(() => {
   usePlaybackStore.setState({ ...initialPlaybackState });
@@ -255,5 +255,41 @@ describe("clearVolumes", () => {
     usePlaybackStore.getState().clearVolumes();
     expect(usePlaybackStore.getState().playingPadIds.has("pad-1")).toBe(true);
     expect(usePlaybackStore.getState().padProgress["pad-1"]).toBe(0.5);
+  });
+});
+
+describe("TickManagedFields type boundary (compile-time only)", () => {
+  it("setAudioTick parameter is exactly Partial<TickManagedFields>", () => {
+    expectTypeOf(usePlaybackStore.getState().setAudioTick)
+      .parameter(0)
+      .toEqualTypeOf<Partial<TickManagedFields>>();
+  });
+
+  it("non-tick fields are rejected by setAudioTick at compile time", () => {
+    // EventDrivenFields are rejected:
+    // @ts-expect-error — playingPadIds is event-driven, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ playingPadIds: new Set() });
+    // @ts-expect-error — fadingOutPadIds is event-driven, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ fadingOutPadIds: new Set() });
+    // @ts-expect-error — fadingPadIds is event-driven, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ fadingPadIds: new Set() });
+    // @ts-expect-error — reversingPadIds is event-driven, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ reversingPadIds: new Set() });
+    // PreviewManagedFields are rejected:
+    // @ts-expect-error — isPreviewPlaying is preview-managed, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ isPreviewPlaying: false });
+    // @ts-expect-error — previewProgress is preview-managed, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ previewProgress: 0.5 });
+    // App-level config is rejected:
+    // @ts-expect-error — masterVolume is app-level config, not tick-managed
+    usePlaybackStore.getState().setAudioTick({ masterVolume: 50 });
+  });
+
+  it("TickManagedFields are readonly — direct assignment is rejected at compile time", () => {
+    const state = usePlaybackStore.getState();
+    // @ts-expect-error — padVolumes is readonly per TickManagedFields
+    state.padVolumes = {};
+    // @ts-expect-error — layerChain is readonly per TickManagedFields
+    state.layerChain = {};
   });
 });
