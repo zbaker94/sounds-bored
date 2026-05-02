@@ -12,7 +12,7 @@ const BREAKPOINTS: Record<string, string> = {
 };
 
 /** Returns true when the viewport is at or above the named Tailwind breakpoint. */
-export function useBreakpoint(name: keyof typeof BREAKPOINTS): boolean {
+function useBreakpoint(name: keyof typeof BREAKPOINTS): boolean {
   const query = `(min-width: ${BREAKPOINTS[name] ?? "48rem"})`;
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
 

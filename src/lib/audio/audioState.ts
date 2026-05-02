@@ -826,7 +826,7 @@ export function resetLayerConsecutiveFailures(layerId: string): void {
 }
 
 /** Clear all consecutive-failure state (called from clearAllAudioState). */
-export function clearAllLayerConsecutiveFailures(): void {
+function clearAllLayerConsecutiveFailures(): void {
   layerConsecutiveFailureMap.clear();
 }
 
@@ -1023,16 +1023,6 @@ export function clearAllLayerPlayOrders(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Layer volume accessor
-// ---------------------------------------------------------------------------
-
-/** Read the current gain value for a layer. Returns 1.0 if the layer has no active gain node. */
-export function getLayerVolume(layerId: string): number {
-  const gain = layerGainMap.get(layerId);
-  return gain ? gain.gain.value : 1.0;
-}
-
-// ---------------------------------------------------------------------------
 // Global stop timeout tracking (stopAllPads post-ramp cleanup)
 // ---------------------------------------------------------------------------
 
@@ -1066,7 +1056,7 @@ export function deleteStopCleanupTimeout(id: ReturnType<typeof setTimeout>): voi
 }
 
 /** Cancel all pending stop cleanup timeouts. Called by clearAllAudioState on project close. */
-export function clearAllStopCleanupTimeouts(): void {
+function clearAllStopCleanupTimeouts(): void {
   for (const id of pendingStopCleanupTimeouts) clearTimeout(id);
   pendingStopCleanupTimeouts.clear();
 }

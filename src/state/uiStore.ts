@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
-export type OverlayType = "drawer" | "dialog";
+type OverlayType = "drawer" | "dialog";
 
-export interface OverlayEntry {
+interface OverlayEntry {
   id: string;
   type: OverlayType;
 }

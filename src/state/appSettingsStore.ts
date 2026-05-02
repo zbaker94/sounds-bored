@@ -15,7 +15,7 @@ interface AppSettingsActions {
   setImportFolder: (folderId: string) => void;
 }
 
-export type AppSettingsStore = AppSettingsState & AppSettingsActions;
+type AppSettingsStore = AppSettingsState & AppSettingsActions;
 
 export const initialAppSettingsState: AppSettingsState = {
   settings: null,

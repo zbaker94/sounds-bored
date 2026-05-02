@@ -31,7 +31,7 @@ export function detectIsMac(): boolean {
 
 // Evaluated once at module load time. Tests that need to control this value
 // should mock detectIsMac() directly rather than stubbing navigator after import.
-export const isMac = detectIsMac();
+const isMac = detectIsMac();
 
 /** Returns "⌘" on Mac, "Ctrl" elsewhere. */
 export const modKey = isMac ? "⌘" : "Ctrl"

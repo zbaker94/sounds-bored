@@ -30,6 +30,70 @@ interface PadButtonProps {
 // RAF tail while preserving the smooth tilt feel.
 const TILT_SPRING = { stiffness: 1200, damping: 80 } as const;
 
+/** 3D tilt driven by mouse position. Snaps to zero when disabled. */
+function usePadTilt(enabled: boolean) {
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [4, -4]), TILT_SPRING);
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-4, 4]), TILT_SPRING);
+  useEffect(() => {
+    if (!enabled) {
+      mouseX.set(0);
+      mouseY.set(0);
+      rotateX.set(0);
+      rotateY.set(0);
+    }
+  }, [enabled, mouseX, mouseY, rotateX, rotateY]);
+  return { mouseX, mouseY, rotateX, rotateY };
+}
+
+/** Keeps the back face mounted until the flip-out animation finishes. */
+function usePadBackFaceMount(isFlipped: boolean): boolean {
+  const [showBackFace, setShowBackFace] = useState(isFlipped);
+  const unmountRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (unmountRef.current) {
+      clearTimeout(unmountRef.current);
+      unmountRef.current = null;
+    }
+    if (isFlipped) {
+      setShowBackFace(true);
+    } else {
+      unmountRef.current = setTimeout(() => {
+        setShowBackFace(false);
+        unmountRef.current = null;
+      }, PAD_FLIP_DURATION_MS + 50);
+    }
+    return () => {
+      if (unmountRef.current) {
+        clearTimeout(unmountRef.current);
+        unmountRef.current = null;
+      }
+    };
+  }, [isFlipped]);
+  return showBackFace;
+}
+
+/** Clears editingPadId when the user clicks outside the pad's container. */
+function useClickOutsideToDeselect(
+  padId: string,
+  editingPadId: string | null,
+  editMode: boolean,
+  containerRef: React.RefObject<HTMLDivElement | null>,
+) {
+  useEffect(() => {
+    if (editingPadId !== padId || editMode) return;
+    function handlePointerDown(e: PointerEvent) {
+      if (useUiStore.getState().hasOpenOverlay()) return;
+      if (!containerRef.current?.contains(e.target as Node)) {
+        useUiStore.getState().setEditingPadId(null);
+      }
+    }
+    document.addEventListener("pointerdown", handlePointerDown, { capture: true });
+    return () => document.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+  }, [editingPadId, padId, editMode, containerRef]);
+}
+
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: PadButtonProps) {
   // isPlaying drives styling (border, background, drop-shadow, pulse ring).
   // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
@@ -60,18 +124,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
 
   const padWrapperRef = useRef<HTMLDivElement | null>(null);
 
-  // Click-outside: when individually flipped (not global editMode), clicking outside clears editingPadId — unless an overlay is open.
-  useEffect(() => {
-    if (editingPadId !== pad.id || editMode) return;
-    function handlePointerDown(e: PointerEvent) {
-      if (useUiStore.getState().hasOpenOverlay()) return;
-      if (!padWrapperRef.current?.contains(e.target as Node)) {
-        useUiStore.getState().setEditingPadId(null);
-      }
-    }
-    document.addEventListener("pointerdown", handlePointerDown, { capture: true });
-    return () => document.removeEventListener("pointerdown", handlePointerDown, { capture: true });
-  }, [editingPadId, pad.id, editMode]);
+  useClickOutsideToDeselect(pad.id, editingPadId, editMode, padWrapperRef);
 
   // Clear hover state if this pad unmounts while it owns the hover slot.
   // editingPadId is intentionally NOT cleared here: React 19 StrictMode runs
@@ -108,10 +161,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
 
   // 3D tilt — disabled when flipped, during drag, and in multi-fade mode
   const tiltEnabled = !isFlipped && !isSortableDragging && !multiFadeActive;
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [4, -4]), TILT_SPRING);
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-4, 4]), TILT_SPRING);
+  const { mouseX, mouseY, rotateX, rotateY } = usePadTilt(tiltEnabled);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     if (!tiltEnabled) return;
@@ -131,48 +181,10 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     mouseY.set(0);
   }
 
-  // When tilt is disabled, snap both source values and spring outputs to 0.
-  // Sources must be zeroed first so useTransform derives target=0 before we
-  // call .set(0) on the springs; .set() bypasses physics and snaps immediately,
-  // eliminating the ~5-frame RAF settlement window.
-  useEffect(() => {
-    if (!tiltEnabled) {
-      mouseX.set(0);
-      mouseY.set(0);
-      rotateX.set(0);
-      rotateY.set(0);
-    }
-  }, [tiltEnabled, mouseX, mouseY, rotateX, rotateY]);
-
   // Gate PadBackFace mount behind a delayed-unmount state so the flip-out animation
   // can finish before the back face's store subscriptions (RAF-driven at 60fps)
   // are torn down. Avoids paying the subscription cost on front-facing pads.
-  const [showBackFace, setShowBackFace] = useState(isFlipped);
-  const backFaceUnmountRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (backFaceUnmountRef.current) {
-      clearTimeout(backFaceUnmountRef.current);
-      backFaceUnmountRef.current = null;
-    }
-    if (isFlipped) {
-      setShowBackFace(true);
-    } else {
-      backFaceUnmountRef.current = setTimeout(
-        () => {
-          setShowBackFace(false);
-          backFaceUnmountRef.current = null;
-        },
-        PAD_FLIP_DURATION_MS + 50,
-      );
-    }
-    return () => {
-      if (backFaceUnmountRef.current) {
-        clearTimeout(backFaceUnmountRef.current);
-        backFaceUnmountRef.current = null;
-      }
-    };
-  }, [isFlipped]);
+  const showBackFace = usePadBackFaceMount(isFlipped);
 
   const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const padSoundState = useMemo(

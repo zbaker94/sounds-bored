@@ -47,7 +47,7 @@ interface ProjectActions {
   setPadColor: (sceneId: string, padId: string, color: string | undefined) => void;
 }
 
-export type ProjectStore = ProjectState & ProjectActions;
+type ProjectStore = ProjectState & ProjectActions;
 
 export const initialProjectState: ProjectState = {
   project: null,

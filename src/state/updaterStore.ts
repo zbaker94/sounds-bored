@@ -3,7 +3,7 @@ import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { toast } from 'sonner';
 
-export type UpdaterStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
+type UpdaterStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
 
 const TOAST_ID = 'app-updater';
 

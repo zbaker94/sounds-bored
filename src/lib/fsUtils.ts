@@ -125,7 +125,7 @@ export async function loadJsonWithRecovery<T>(opts: LoadJsonWithRecoveryOptions<
  * The caller is responsible for writing a fresh default and notifying the user
  * after this helper returns.
  */
-export async function backupCorruptFile(filePath: string): Promise<void> {
+async function backupCorruptFile(filePath: string): Promise<void> {
   const backupPath = filePath.endsWith(".json")
     ? filePath.replace(/\.json$/, ".corrupt.json")
     : `${filePath}.corrupt.json`;

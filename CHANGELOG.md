@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code refactoring only — no user-facing features or behavior changes in this release.
 - Non-playing pads included in a synchronized fade now trigger playback instead of silently doing nothing when the fade target is 0.
 - The volume slider in the fade overlay is now hidden for pads that aren't currently playing, reducing clutter and preventing no-op adjustments.
 - Multi-fade mode correctly uses 0 as the starting volume for pads that aren't playing, so fade animations begin from the right value.

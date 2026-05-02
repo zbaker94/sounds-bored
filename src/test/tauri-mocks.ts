@@ -3,6 +3,7 @@ import { vi } from "vitest";
 /**
  * Mock implementation of Tauri's dialog plugin
  */
+// fallow-ignore-next-line unused-export
 export const mockDialog = {
   open: vi.fn(),
   save: vi.fn(),

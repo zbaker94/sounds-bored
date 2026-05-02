@@ -17,7 +17,7 @@ export type ProjectHistory = z.infer<typeof ProjectHistorySchema>;
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 export const PlaybackModeSchema = z.enum(["one-shot", "hold", "loop"]);
-export const ArrangementSchema = z.enum(["simultaneous", "sequential", "shuffled"]);
+const ArrangementSchema = z.enum(["simultaneous", "sequential", "shuffled"]);
 export const RetriggerModeSchema = z.enum(["restart", "continue", "stop", "next"]);
 
 export type PlaybackMode = z.infer<typeof PlaybackModeSchema>;
@@ -122,7 +122,7 @@ export const LayerSelectionSchema = z.discriminatedUnion("type", [
 export type LayerSelection = z.infer<typeof LayerSelectionSchema>;
 
 // Strict variant used only in form schemas — rejects empty selections.
-export const LayerSelectionFormSchema = z.discriminatedUnion("type", [
+const LayerSelectionFormSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("assigned"),
     instances: z.array(SoundInstanceSchema).min(1, "At least one sound is required"),
@@ -203,7 +203,7 @@ export type PadConfig = Omit<Pad, "id">;
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
-export const SceneSchema = z.object({
+const SceneSchema = z.object({
   id: z.string(),
   name: z.string(),
   pads: z.array(PadSchema),

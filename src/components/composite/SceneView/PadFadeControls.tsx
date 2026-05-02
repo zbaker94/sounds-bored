@@ -11,7 +11,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { setPadVolume } from "@/lib/audio";
 import { PadLabeledSlider } from "./PadLabeledSlider";
 
-export interface PadFadeControlsProps {
+interface PadFadeControlsProps {
   pad: Pad;
   sceneId: string;
   isPlaying: boolean;

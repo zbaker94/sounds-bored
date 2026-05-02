@@ -84,6 +84,113 @@ export const _stopMasterVolumeSync = usePlaybackStore.subscribe(
   (vol) => applyMasterVolume(vol),
 );
 
+/**
+ * Samples the current gain nodes and diffs against the previous tick.
+ * Returns new volume records and change flags. Skips all allocation in
+ * steady-state (no fade in flight) by reusing the previous records.
+ */
+function computeGainChanges(): {
+  nextPadVolumes: Record<string, number>;
+  nextLayerVolumes: Record<string, number>;
+  padVolumesChanged: boolean;
+  layerVolumesChanged: boolean;
+} {
+  if (!isAnyGainChanging()) {
+    return {
+      nextPadVolumes: prevPadVolumes,
+      nextLayerVolumes: prevLayerVolumes,
+      padVolumesChanged: false,
+      layerVolumesChanged: false,
+    };
+  }
+  const nextPadVolumes: Record<string, number> = {};
+  forEachActivePadGain((padId, gain) => {
+    const v = gain.gain.value;
+    if (v < 1 - VOLUME_EPSILON) nextPadVolumes[padId] = v;
+  });
+  const nextLayerVolumes: Record<string, number> = {};
+  forEachActiveLayerGain((layerId, gain) => {
+    nextLayerVolumes[layerId] = gain.gain.value;
+  });
+  const padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
+  const layerVolumesChanged = !volumesEqual(nextLayerVolumes, prevLayerVolumes);
+  if (padVolumesChanged) prevPadVolumes = nextPadVolumes;
+  if (layerVolumesChanged) prevLayerVolumes = nextLayerVolumes;
+  return { nextPadVolumes, nextLayerVolumes, padVolumesChanged, layerVolumesChanged };
+}
+
+/**
+ * Walks active layer IDs and builds reference-stable string[] records for
+ * layerPlayOrder and layerChain. Reuses the previous string[] when the source
+ * Sound[] reference or its contents are unchanged — keeps Zustand selectors
+ * stable across layers that haven't advanced their chain this tick.
+ */
+function collectLayerSoundLists(activeLayerIds: ReadonlySet<string>): {
+  nextLayerPlayOrder: Record<string, string[]>;
+  nextLayerChain: Record<string, string[]>;
+  layerPlayOrderChanged: boolean;
+  layerChainChanged: boolean;
+} {
+  const nextLayerPlayOrder: Record<string, string[]> = {};
+  const nextLayerChain: Record<string, string[]> = {};
+  let seenPlayOrderCount = 0;
+  let seenChainCount = 0;
+
+  for (const layerId of activeLayerIds) {
+    const playOrder = getLayerPlayOrder(layerId);
+    if (playOrder && playOrder.length > 0) {
+      seenPlayOrderCount++;
+      const prevSource = prevLayerPlayOrderSource.get(layerId);
+      const prevIds = prevLayerPlayOrder[layerId];
+      if (prevSource === playOrder && prevIds) {
+        nextLayerPlayOrder[layerId] = prevIds;
+      } else {
+        const ids = playOrder.map((s) => s.id);
+        nextLayerPlayOrder[layerId] =
+          prevIds && prevIds.length === ids.length && prevIds.every((v, i) => v === ids[i])
+            ? prevIds  // contents match — reuse prior array for selector stability
+            : ids;
+        prevLayerPlayOrderSource.set(layerId, playOrder);
+      }
+    }
+    const chain = getLayerChain(layerId);
+    if (chain && chain.length > 0) {
+      seenChainCount++;
+      const prevSource = prevLayerChainSource.get(layerId);
+      const prevIds = prevLayerChain[layerId];
+      if (prevSource === chain && prevIds) {
+        nextLayerChain[layerId] = prevIds;
+      } else {
+        const ids = chain.map((s) => s.id);
+        nextLayerChain[layerId] =
+          prevIds && prevIds.length === ids.length && prevIds.every((v, i) => v === ids[i])
+            ? prevIds
+            : ids;
+        prevLayerChainSource.set(layerId, chain);
+      }
+    }
+  }
+
+  // Drop source references for layers no longer in the active set so the
+  // tracker maps don't grow unbounded as layers churn.
+  if (prevLayerPlayOrderSource.size > seenPlayOrderCount) {
+    for (const layerId of prevLayerPlayOrderSource.keys()) {
+      if (!(layerId in nextLayerPlayOrder)) prevLayerPlayOrderSource.delete(layerId);
+    }
+  }
+  if (prevLayerChainSource.size > seenChainCount) {
+    for (const layerId of prevLayerChainSource.keys()) {
+      if (!(layerId in nextLayerChain)) prevLayerChainSource.delete(layerId);
+    }
+  }
+
+  const layerPlayOrderChanged = !stringArrayRecordsEqual(nextLayerPlayOrder, prevLayerPlayOrder);
+  const layerChainChanged = !stringArrayRecordsEqual(nextLayerChain, prevLayerChain);
+  if (layerPlayOrderChanged) prevLayerPlayOrder = nextLayerPlayOrder;
+  if (layerChainChanged) prevLayerChain = nextLayerChain;
+  return { nextLayerPlayOrder, nextLayerChain, layerPlayOrderChanged, layerChainChanged };
+}
+
 function tick(): void {
   // Self-terminate when no pads are active.
   if (getActivePadCount() === 0) {
@@ -93,36 +200,8 @@ function tick(): void {
     return;
   }
 
-  // --- Compute padVolumes and layerVolumes ---
-  // Skip both rebuilds in steady state (no fade or gain ramp in flight).
-  // When isAnyGainChanging() is false, gain node values are guaranteed stable
-  // this frame — reuse the previous records without allocating or iterating.
-  let nextPadVolumes: Record<string, number>;
-  let nextLayerVolumes: Record<string, number>;
-  let padVolumesChanged: boolean;
-  let layerVolumesChanged: boolean;
-  if (isAnyGainChanging()) {
-    nextPadVolumes = {};
-    forEachActivePadGain((padId, gain) => {
-      const v = gain.gain.value;
-      if (v < 1 - VOLUME_EPSILON) {
-        nextPadVolumes[padId] = v;
-      }
-    });
-    nextLayerVolumes = {};
-    forEachActiveLayerGain((layerId, gain) => {
-      nextLayerVolumes[layerId] = gain.gain.value;
-    });
-    padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
-    layerVolumesChanged = !volumesEqual(nextLayerVolumes, prevLayerVolumes);
-    if (padVolumesChanged) prevPadVolumes = nextPadVolumes;
-    if (layerVolumesChanged) prevLayerVolumes = nextLayerVolumes;
-  } else {
-    nextPadVolumes = prevPadVolumes;
-    nextLayerVolumes = prevLayerVolumes;
-    padVolumesChanged = false;
-    layerVolumesChanged = false;
-  }
+  const { nextPadVolumes, nextLayerVolumes, padVolumesChanged, layerVolumesChanged } =
+    computeGainChanges();
 
   // --- Compute padProgress — diff to skip no-op store updates ---
   const nextPadProgress = computeAllPadProgress();
@@ -144,92 +223,13 @@ function tick(): void {
   if (activeLayerIdsChanged) {
     nextActiveLayerIds = getActiveLayerIdSet();
     // Clone before storing as prev — Set has mutating methods (add/delete/clear) that
-    // make accidental consumer mutation more likely than for plain records. No current
-    // consumer mutates the Set, but the clone is cheap (allocates only on voice-version
-    // changes, not every frame) and enforces the invariant that tick-owned prev state
-    // never aliases published store state.
+    // make accidental consumer mutation more likely than for plain records.
     prevActiveLayerIds = new Set(nextActiveLayerIds);
     prevLayerVoiceVersion = currentLayerVoiceVersion;
   }
 
-  // --- Compute layerPlayOrder and layerChain (sound IDs only) ---
-  // Walk the active layer ID set and extract ID lists from audioState Maps.
-  // Stale entries for layers that are no longer active naturally drop out.
-  // When a layer's ID list is unchanged vs the previous tick, reuse the prior
-  // array reference so Zustand selectors like (s) => s.layerPlayOrder[layer.id]
-  // don't see a new reference (which would cause cross-layer re-render churn
-  // whenever any single layer's chain advances).
-  const nextLayerPlayOrder: Record<string, string[]> = {};
-  const nextLayerChain: Record<string, string[]> = {};
-  let seenPlayOrderCount = 0;
-  let seenChainCount = 0;
-  for (const layerId of nextActiveLayerIds) {
-    const playOrder = getLayerPlayOrder(layerId);
-    if (playOrder && playOrder.length > 0) {
-      seenPlayOrderCount++;
-      // Fast path: if the audioState Sound[] array reference hasn't changed
-      // since last tick, reuse the previous string[] snapshot and skip .map
-      // entirely. The source array only swaps on explicit writes in audioState.
-      const prevSource = prevLayerPlayOrderSource.get(layerId);
-      const prevIds = prevLayerPlayOrder[layerId];
-      if (prevSource === playOrder && prevIds) {
-        nextLayerPlayOrder[layerId] = prevIds;
-      } else {
-        const ids = playOrder.map((s) => s.id);
-        if (
-          prevIds &&
-          prevIds.length === ids.length &&
-          prevIds.every((v, i) => v === ids[i])
-        ) {
-          // Contents match even though the source reference differs — reuse
-          // the prior array so downstream selector identity stays stable.
-          nextLayerPlayOrder[layerId] = prevIds;
-        } else {
-          nextLayerPlayOrder[layerId] = ids;
-        }
-        prevLayerPlayOrderSource.set(layerId, playOrder);
-      }
-    }
-    const chain = getLayerChain(layerId);
-    if (chain && chain.length > 0) {
-      seenChainCount++;
-      const prevSource = prevLayerChainSource.get(layerId);
-      const prevIds = prevLayerChain[layerId];
-      if (prevSource === chain && prevIds) {
-        nextLayerChain[layerId] = prevIds;
-      } else {
-        const ids = chain.map((s) => s.id);
-        if (
-          prevIds &&
-          prevIds.length === ids.length &&
-          prevIds.every((v, i) => v === ids[i])
-        ) {
-          nextLayerChain[layerId] = prevIds;
-        } else {
-          nextLayerChain[layerId] = ids;
-        }
-        prevLayerChainSource.set(layerId, chain);
-      }
-    }
-  }
-  // Drop source references for layers that no longer contribute a play order /
-  // chain this tick so the tracker maps don't grow unbounded as layers churn.
-  // seenPlayOrderCount == Object.keys(nextLayerPlayOrder).length because the outer
-  // loop iterates nextActiveLayerIds, a Set — each layerId is unique per tick.
-  if (prevLayerPlayOrderSource.size > seenPlayOrderCount) {
-    for (const layerId of prevLayerPlayOrderSource.keys()) {
-      if (!(layerId in nextLayerPlayOrder)) prevLayerPlayOrderSource.delete(layerId);
-    }
-  }
-  if (prevLayerChainSource.size > seenChainCount) {
-    for (const layerId of prevLayerChainSource.keys()) {
-      if (!(layerId in nextLayerChain)) prevLayerChainSource.delete(layerId);
-    }
-  }
-  const layerPlayOrderChanged = !stringArrayRecordsEqual(nextLayerPlayOrder, prevLayerPlayOrder);
-  const layerChainChanged = !stringArrayRecordsEqual(nextLayerChain, prevLayerChain);
-  if (layerPlayOrderChanged) prevLayerPlayOrder = nextLayerPlayOrder;
-  if (layerChainChanged) prevLayerChain = nextLayerChain;
+  const { nextLayerPlayOrder, nextLayerChain, layerPlayOrderChanged, layerChainChanged } =
+    collectLayerSoundLists(nextActiveLayerIds);
 
   // Only call setAudioTick if at least one field actually changed.
   // When nothing changed, skip the Zustand update entirely — this prevents

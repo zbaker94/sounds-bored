@@ -4,7 +4,7 @@ import { loadProjectHistory, saveProjectHistory } from "./history";
 /**
  * Creates a project history entry with the current timestamp
  */
-export function createHistoryEntry(
+function createHistoryEntry(
   name: string,
   path: string
 ): ProjectHistoryEntry {

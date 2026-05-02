@@ -51,7 +51,7 @@ interface LibraryActions {
   ) => void;
 }
 
-export type LibraryStore = LibraryState & LibraryActions;
+type LibraryStore = LibraryState & LibraryActions;
 
 export const initialLibraryState: LibraryState = {
   sounds: [],

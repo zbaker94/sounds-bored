@@ -7,24 +7,17 @@
 export {
   triggerPad,
   triggerLayer,
-  triggerAndFade,
   stopPad,
   stopScene,
   stopAllPads,
   releasePadHoldLayers,
   executeFadeTap,
-  executeCrossfadeSelection,
   reverseFade,
   stopFade,
-  crossfadePads,
 } from "./padPlayer";
 
 // ── Layer control ─────────────────────────────────────────────────────────────
 export {
-  selectionsEqual,
-  syncLayerPlaybackMode,
-  syncLayerArrangement,
-  syncLayerSelection,
   syncLayerConfig,
   stopLayerWithRamp,
   skipLayerForward,
@@ -32,12 +25,25 @@ export {
   getLayerNormalizedVolume,
 } from "./layerTrigger";
 
+// Test mock targets — consumed only by vi.mock() in *.test.tsx files; must remain
+// in the public facade so module-level mocks can intercept them.
+// fallow-ignore-next-line unused-export
+export { selectionsEqual } from "./layerTrigger";
+// fallow-ignore-next-line unused-export
+export { syncLayerPlaybackMode } from "./layerTrigger";
+// fallow-ignore-next-line unused-export
+export { syncLayerArrangement } from "./layerTrigger";
+// fallow-ignore-next-line unused-export
+export { syncLayerSelection } from "./layerTrigger";
+
 // ── Fade and gain control ─────────────────────────────────────────────────────
-export {
-  freezePadAtCurrentVolume,
-  resolveFadeDuration,
-  fadePad,
-} from "./fadeMixer";
+export { freezePadAtCurrentVolume } from "./fadeMixer";
+
+// Test mock targets
+// fallow-ignore-next-line unused-export
+export { resolveFadeDuration } from "./fadeMixer";
+// fallow-ignore-next-line unused-export
+export { fadePad } from "./fadeMixer";
 
 export {
   setPadVolume,
@@ -49,20 +55,15 @@ export {
 
 // ── Audio state queries ───────────────────────────────────────────────────────
 export {
-  clearAllFadeTracking,
-  clearAllPadGains,
-  clearAllLayerGains,
-  clearAllLayerChains,
-  clearAllLayerCycleIndexes,
-  isPadFadingOut,
   isPadFading,
-  isPadStreaming,
-  getPadProgress,
-  getPadGain,
   isLayerActive,
   isPadActive,
   clearAllAudioState,
 } from "./audioState";
+
+// Test mock target
+// fallow-ignore-next-line unused-export
+export { getPadProgress } from "./audioState";
 
 // ── Streaming / buffer caches ─────────────────────────────────────────────────
 export {
@@ -84,7 +85,6 @@ export { playPreview, stopPreview } from "./preview";
 
 // ── Error events ──────────────────────────────────────────────────────────────
 export { emitAudioError, setAudioErrorHandler } from "./audioEvents";
-export type { AudioErrorContext, AudioErrorHandler } from "./audioEvents";
 
 // ── Sound resolution ──────────────────────────────────────────────────────────
 export { filterSoundsByTags, filterSoundsBySet, resolveLayerSounds } from "./resolveSounds";

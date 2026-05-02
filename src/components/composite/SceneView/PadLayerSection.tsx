@@ -4,7 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { BackFaceLayerRow } from "./BackFaceLayerRow";
 
-export interface PadLayerSectionProps {
+interface PadLayerSectionProps {
   pad: Pad;
   onAddLayer: () => void;
   onEditLayer: (index: number) => void;

@@ -5,7 +5,6 @@
 import type { GlobalFolder } from "@/lib/schemas";
 
 // Application identifiers
-export const APP_NAME = "SoundsBored";
 export const APP_FOLDER = "SoundsBored";
 
 // File names
@@ -34,7 +33,6 @@ export const CURRENT_LIBRARY_VERSION = "1.0.0";
 // Audio
 export const SOUNDS_SUBFOLDER = "sounds";
 export const AUDIO_EXTENSIONS = [".wav", ".mp3", ".ogg", ".flac", ".aiff", ".m4a"] as const;
-export type AudioExtension = typeof AUDIO_EXTENSIONS[number];
 
 // File dialog filter for audio file pickers. Shared by every "pick an audio file" call site.
 export const AUDIO_FILE_FILTERS = [

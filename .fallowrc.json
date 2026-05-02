@@ -1,0 +1,23 @@
+{
+  "entry": [
+    "scripts/changelog-entry.cjs",
+    "scripts/changelog-extract.cjs",
+    "scripts/changelog-release-notes.cjs",
+    "scripts/changelog-stamp.cjs"
+  ],
+  "ignorePatterns": [
+    "src/components/ui/**",
+    "**/*.css"
+  ],
+  "ignoreDependencies": [
+    "@base-ui/react",
+    "@fontsource-variable/figtree",
+    "@tailwindcss/vite",
+    "class-variance-authority",
+    "immer",
+    "radix-ui",
+    "shadcn",
+    "tw-animate-css",
+    "vaul"
+  ]
+}

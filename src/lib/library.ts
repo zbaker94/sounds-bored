@@ -6,13 +6,6 @@ import { APP_FOLDER, LIBRARY_FILE_NAME, CURRENT_LIBRARY_VERSION } from "./consta
 import { migrateLibrary } from "./migrations";
 import { useLibraryStore } from "@/state/libraryStore";
 
-export class LibraryValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LibraryValidationError";
-  }
-}
-
 interface LoadLibraryOptions {
   onCorruption?: (message: string) => void;
 }
@@ -64,7 +57,7 @@ export async function saveGlobalLibrary(library: GlobalLibrary): Promise<void> {
  * Use this instead of manually spreading `sounds`, `tags`, `sets` and hardcoding
  * `CURRENT_LIBRARY_VERSION` at every call site.
  */
-export function getCurrentLibraryPayload(): GlobalLibrary {
+function getCurrentLibraryPayload(): GlobalLibrary {
   const { sounds, tags, sets } = useLibraryStore.getState();
   return { version: CURRENT_LIBRARY_VERSION, sounds, tags, sets };
 }

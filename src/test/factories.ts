@@ -122,6 +122,7 @@ export function createHistoryJson(
 /**
  * Helper to wait for async operations
  */
+// fallow-ignore-next-line unused-export
 export function waitFor(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { loadAppSettings, saveAppSettings } from "./appSettings";
+import { saveAppSettings } from "./appSettings";
 import { AppSettings } from "./schemas";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 
@@ -19,6 +19,3 @@ export function useSaveAppSettings() {
   });
 }
 
-// Re-export the underlying loader for callers that need a one-shot read
-// without going through the query cache (e.g. migration tooling).
-export { loadAppSettings };

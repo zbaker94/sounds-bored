@@ -76,7 +76,7 @@ const CHAIN_FAILURE_THRESHOLD = 3;
 
 /** Read a field from the live project store for a layer. Falls back to `captured`
  *  if the pad/layer is not found (e.g. deleted mid-playback or project cleared). */
-export function liveLayerField<K extends keyof Layer>(
+function liveLayerField<K extends keyof Layer>(
   padId: string,
   layerId: string,
   field: K,
@@ -159,7 +159,7 @@ export function rampStopLayerVoices(
 }
 
 /** Stop all active voices for a layer with a short gain ramp. No-op if no voices. */
-export function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
+function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
   const voices = [...getLayerVoices(layer.id)];
   if (voices.length === 0) return;
   rampStopLayerVoices(pad.id, layer, voices);
@@ -178,7 +178,7 @@ export function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
  *
  * Throws on load failure — caller is responsible for catching.
  */
-export async function loadLayerVoice(
+async function loadLayerVoice(
   sound: Sound,
   layer: Layer,
   ctx: AudioContext,
@@ -378,6 +378,80 @@ export type RetriggerAction = "skip" | "proceed" | "chain-advanced";
  *   `triggerLayer` uses this to schedule a deferred `removePlayingPad` check;
  *   `triggerPad` omits it (the pad-level store state is managed globally).
  */
+function handleStopRetrigger(pad: Pad, layer: Layer, resolved: Sound[], afterStopCleanup?: () => void): RetriggerAction {
+  deleteLayerChain(layer.id);
+  // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
+  // callback won't fire — delete the layer's streaming entry explicitly.
+  clearLayerStreamingAudio(pad.id, layer.id);
+  stopLayerWithRampInternal(pad, layer);
+  afterStopCleanup?.();
+  // Cycle mode: advance cursor so next trigger plays the next sound.
+  if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+    const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
+    if (nextIndex >= resolved.length) {
+      deleteLayerCycleIndex(layer.id);
+    } else {
+      setLayerCycleIndex(layer.id, nextIndex);
+    }
+  }
+  return "skip";
+}
+
+function handleRestartRetrigger(pad: Pad, layer: Layer, resolved: Sound[]): void {
+  deleteLayerChain(layer.id);
+  stopLayerVoices(pad.id, layer.id);
+  // Cycle mode: back cursor up so the same sound replays.
+  if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
+    const cur = getLayerCycleIndex(layer.id) ?? 0;
+    setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
+  }
+}
+
+async function handleNextRetrigger(
+  pad: Pad,
+  layer: Layer,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  resolved: Sound[],
+): Promise<RetriggerAction> {
+  // Capture queue before clearing it.
+  const remaining = [...(getLayerChain(layer.id) ?? [])];
+  // Null onended BEFORE stopLayerVoices — stop() fires onended synchronously;
+  // nulling first prevents the chain-advance callback from re-firing.
+  for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
+  deleteLayerChain(layer.id);
+  clearLayerStreamingAudio(pad.id, layer.id);
+  stopLayerVoices(pad.id, layer.id);
+  // Clear progress immediately so the bar resets to 0 while the next buffer loads.
+  clearPadProgressInfo(pad.id);
+  clearLayerProgressInfo(layer.id);
+
+  if (layer.cycleMode && isChained(layer.arrangement)) {
+    // Cycle mode + next: fall through to start-playback (reads updated cycle cursor).
+    return "proceed";
+  }
+
+  if (remaining.length > 0) {
+    const [next, ...rest] = remaining;
+    setLayerChain(layer.id, rest);
+    await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+  } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
+    // Chain exhausted — loop back to beginning.
+    const newOrder = buildPlayOrder(layer.arrangement, resolved);
+    if (newOrder.length > 0) {
+      const [first, ...rest] = newOrder;
+      setLayerChain(layer.id, rest);
+      await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+    }
+  }
+  // one-shot: queue exhausted — just stopped (already done above).
+  // If no new voice replaced the stopped one, the pad is no longer playing.
+  if (!isPadActive(pad.id)) {
+    usePlaybackStore.getState().removePlayingPad(pad.id);
+  }
+  return "chain-advanced";
+}
+
 export async function applyRetriggerMode(
   pad: Pad,
   layer: Layer,
@@ -389,84 +463,18 @@ export async function applyRetriggerMode(
 ): Promise<RetriggerAction> {
   switch (layer.retriggerMode) {
     case "stop":
-      if (isLayerPlaying) {
-        deleteLayerChain(layer.id);
-        // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
-        // callback won't fire — delete the layer's streaming entry explicitly.
-        clearLayerStreamingAudio(pad.id, layer.id);
-        stopLayerWithRampInternal(pad, layer);
-        afterStopCleanup?.();
-        // Cycle mode: advance cursor so next trigger plays the next sound.
-        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-          const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
-          if (nextIndex >= resolved.length) {
-            deleteLayerCycleIndex(layer.id);
-          } else {
-            setLayerCycleIndex(layer.id, nextIndex);
-          }
-        }
-        return "skip";
-      }
+      if (isLayerPlaying) return handleStopRetrigger(pad, layer, resolved, afterStopCleanup);
       break;
-
     case "continue":
       if (isLayerPlaying) return "skip";
       break;
-
     case "restart":
-      if (isLayerPlaying) {
-        deleteLayerChain(layer.id);
-        stopLayerVoices(pad.id, layer.id);
-        // Cycle mode: back cursor up so the same sound replays.
-        if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-          const cur = getLayerCycleIndex(layer.id) ?? 0;
-          setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
-        }
-      }
+      if (isLayerPlaying) handleRestartRetrigger(pad, layer, resolved);
       break;
-
     case "next":
-      if (isLayerPlaying) {
-        // Capture queue before clearing it.
-        const remaining = [...(getLayerChain(layer.id) ?? [])];
-        // Null onended BEFORE stopLayerVoices — stop() fires onended synchronously;
-        // nulling first prevents the chain-advance callback from re-firing.
-        for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
-        deleteLayerChain(layer.id);
-        clearLayerStreamingAudio(pad.id, layer.id);
-        stopLayerVoices(pad.id, layer.id);
-        // Clear progress immediately so the bar resets to 0 while the next buffer loads.
-        clearPadProgressInfo(pad.id);
-        clearLayerProgressInfo(layer.id);
-
-        if (layer.cycleMode && isChained(layer.arrangement)) {
-          // Cycle mode + next: fall through to start-playback (reads updated cycle cursor).
-          return "proceed";
-        }
-
-        if (remaining.length > 0) {
-          const [next, ...rest] = remaining;
-          setLayerChain(layer.id, rest);
-          await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
-        } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
-          // Chain exhausted — loop back to beginning.
-          const newOrder = buildPlayOrder(layer.arrangement, resolved);
-          if (newOrder.length > 0) {
-            const [first, ...rest] = newOrder;
-            setLayerChain(layer.id, rest);
-            await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-          }
-        }
-        // one-shot: queue exhausted — just stopped (already done above).
-        // If no new voice replaced the stopped one, the pad is no longer playing.
-        if (!isPadActive(pad.id)) {
-          usePlaybackStore.getState().removePlayingPad(pad.id);
-        }
-        return "chain-advanced";
-      }
+      if (isLayerPlaying) return handleNextRetrigger(pad, layer, ctx, layerGain, resolved);
       break;
   }
-
   return "proceed";
 }
 
