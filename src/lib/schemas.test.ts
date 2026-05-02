@@ -299,6 +299,21 @@ describe("ProjectSchema — domain model fields", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts assigned selection with empty instances array (permissive for persistence)", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "assigned", instances: [] });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts tag selection with empty tagIds array (permissive for persistence)", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "tag", tagIds: [], defaultVolume: 100 });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts set selection with empty setId string (permissive for persistence)", () => {
+    const result = LayerSelectionSchema.safeParse({ type: "set", setId: "", defaultVolume: 100 });
+    expect(result.success).toBe(true);
+  });
+
   it("should reject invalid PlaybackMode value", () => {
     const result = PlaybackModeSchema.safeParse("invalid");
     expect(result.success).toBe(false);
@@ -820,6 +835,119 @@ describe("LayerConfigFormSchema", () => {
       volume: 101,
     });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects assigned selection with empty instances array", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-1",
+      selection: { type: "assigned", instances: [] },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects tag selection with empty tagIds array", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-2",
+      selection: { type: "tag", tagIds: [], defaultVolume: 100 },
+      arrangement: "sequential",
+      playbackMode: "loop",
+      retriggerMode: "continue",
+      volume: 80,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects set selection with empty setId string", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-3",
+      selection: { type: "set", setId: "", defaultVolume: 75 },
+      arrangement: "shuffled",
+      playbackMode: "hold",
+      retriggerMode: "stop",
+      volume: 50,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("inherits matchMode default of 'any' from base schema in tag selection", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-2",
+      selection: { type: "tag", tagIds: ["tag-1"], defaultVolume: 50 },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.selection).toHaveProperty("matchMode", "any");
+    }
+  });
+
+  it("accepts explicit matchMode 'all' in tag selection via form schema", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-2",
+      selection: { type: "tag", tagIds: ["tag-1"], matchMode: "all", defaultVolume: 50 },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid matchMode value in tag selection via form schema", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-2",
+      selection: { type: "tag", tagIds: ["tag-1"], matchMode: "none", defaultVolume: 50 },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects tag selection with defaultVolume out of range via form schema", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-2",
+      selection: { type: "tag", tagIds: ["tag-1"], defaultVolume: 101 },
+      arrangement: "simultaneous",
+      playbackMode: "one-shot",
+      retriggerMode: "restart",
+      volume: 100,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects set selection with defaultVolume out of range via form schema", () => {
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-3",
+      selection: { type: "set", setId: "set-1", defaultVolume: -1 },
+      arrangement: "shuffled",
+      playbackMode: "hold",
+      retriggerMode: "stop",
+      volume: 50,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts whitespace-only setId (min(1) checks length, not trimmed content)", () => {
+    // setId values come from store selections (UUIDs), not user text input,
+    // so whitespace-only is not a realistic concern — documenting current behavior.
+    const result = LayerConfigFormSchema.safeParse({
+      id: "layer-3",
+      selection: { type: "set", setId: "   ", defaultVolume: 75 },
+      arrangement: "shuffled",
+      playbackMode: "hold",
+      retriggerMode: "stop",
+      volume: 50,
+    });
+    expect(result.success).toBe(true);
   });
 });
 

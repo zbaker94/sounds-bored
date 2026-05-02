@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a schema validation bug where layer sound-selection rules (assigned, tag, set) could silently lose configuration when saving/loading projects with empty selections
+- Improved form validation to correctly reject incomplete layer configurations before saving, giving clearer error messages when no sounds, tags, or set are selected for a layer
 - Pad gesture handlers now remain stable when pad properties like name or color change, preventing unnecessary re-renders on pads that haven't changed in a meaningful way.
 - Added permissions for running Fallow static analysis and TypeScript file discovery commands in the developer tooling configuration.
 - Internal code refactoring across audio engine, download manager, and pad gesture handling — no behavior changes, improves long-term stability and maintainability
