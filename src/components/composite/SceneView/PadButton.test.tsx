@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
-import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useMultiFadeStore, initialMultiFadeState } from "@/state/multiFadeStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSoundInstance } from "@/test/factories";
 import { PadButton } from "./PadButton";
 import { fireEvent, act } from "@testing-library/react";
@@ -74,6 +74,7 @@ describe("PadButton", () => {
     useUiStore.setState({ ...initialUiState });
     useProjectStore.setState({ ...initialProjectState });
     usePlaybackStore.setState({ ...initialPlaybackState });
+    useMultiFadeStore.setState({ ...initialMultiFadeState });
     // Make setPadVolume mock update the store, matching real padPlayer behaviour
     vi.mocked(setPadVolume).mockImplementation((padId: string, volume: number) => {
       const clamped = Math.max(0, Math.min(1, volume));
@@ -94,6 +95,19 @@ describe("PadButton", () => {
       render(<PadButton pad={pad} sceneId="scene-1" />);
       // Back face is unmounted when not flipped to avoid hidden RAF subscriptions
       expect(screen.queryByTestId("pad-back-face")).toBeNull();
+    });
+
+    it("shows pulse ring when pad is playing", () => {
+      const pad = loadPadInStore();
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
+      render(<PadButton pad={pad} sceneId="scene-1" />);
+      expect(screen.getByTestId("pulse-ring")).toBeInTheDocument();
+    });
+
+    it("does not show pulse ring when pad is not playing", () => {
+      const pad = loadPadInStore();
+      render(<PadButton pad={pad} sceneId="scene-1" />);
+      expect(screen.queryByTestId("pulse-ring")).not.toBeInTheDocument();
     });
   });
 
