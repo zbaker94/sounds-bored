@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal development tooling updated to allow additional file read commands in the automated assistant configuration.
 - Pad buttons now visually pulse with a ring animation while a sound is actively playing, making it easier to see which pads are triggered at a glance.
 - Internal code quality improvements to the audio engine's state management — no user-visible changes.
 - No user-facing changes; this is an internal test suite cleanup with no impact on app behavior.
