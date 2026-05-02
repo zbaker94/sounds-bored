@@ -181,15 +181,25 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
   );
   const isUnplayable = padSoundState === "disabled";
 
+  // Exit whichever flip state is currently active without enabling the other.
+  // If global editMode is on, toggle it off; otherwise clear the individual editingPadId.
+  // Using toggleEditMode here when editMode=false would turn it ON, which triggers the
+  // useMultiFadeSideEffects cancel guard and immediately aborts multi-fade.
+  const handleMultiFade = useCallback(() => {
+    if (editMode) toggleEditMode();
+    else setEditingPadId(null);
+  }, [editMode, toggleEditMode, setEditingPadId]);
+
   // Multi-fade mode: left-click toggles pad selection instead of triggering playback.
   // Read liveVolume imperatively to avoid recomputing on every RAF frame during a fade.
   const multiFadeHandlers = useMemo(() => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
       e.preventDefault();
-      toggleMultiFadePad(pad.id, pad.volume ?? 100, pad.fadeTargetVol ?? 0);
+      const currentVol = isPlaying ? (pad.volume ?? 100) : 0;
+      toggleMultiFadePad(pad.id, currentVol, pad.fadeTargetVol ?? 0);
     },
-  }), [toggleMultiFadePad, pad.id, pad.volume, pad.fadeTargetVol]);
+  }), [toggleMultiFadePad, pad.id, pad.volume, pad.fadeTargetVol, isPlaying]);
 
   // Right-click flips the pad to its back face (individually).
   // isUnplayable is intentionally excluded — disabled pads should still be right-click-flippable
@@ -371,7 +381,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
             style={{ transform: 'rotateY(180deg)', backgroundColor: pad.color ?? undefined }}
             aria-hidden={!isFlipped || undefined}
           >
-            {showBackFace && <PadBackFace pad={pad} sceneId={sceneId} onMultiFade={toggleEditMode} />}
+            {showBackFace && <PadBackFace pad={pad} sceneId={sceneId} onMultiFade={handleMultiFade} />}
           </div>
         </div>
       </motion.div>

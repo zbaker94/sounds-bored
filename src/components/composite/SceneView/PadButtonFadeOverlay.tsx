@@ -55,20 +55,22 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
           transition={{ duration: 0.15 }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <PadOverlaySlider
-            label="volume"
-            value={multiFadeLevels[0]}
-            formatValue={(v) => `${v}%`}
-            onValueChange={(v) => {
-              if (isPlaying) setPadVolume(pad.id, v / 100);
-              setMultiFadeLevels(pad.id, [v, multiFadeLevels[1]]);
-            }}
-            onValueCommit={(v) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v)}
-            min={0}
-            max={100}
-            step={1}
-            sliderClassName="[&_[data-slot=slider-track]]:bg-white/20"
-          />
+          {isPlaying && (
+            <PadOverlaySlider
+              label="volume"
+              value={multiFadeLevels[0]}
+              formatValue={(v) => `${v}%`}
+              onValueChange={(v) => {
+                setPadVolume(pad.id, v / 100);
+                setMultiFadeLevels(pad.id, [v, multiFadeLevels[1]]);
+              }}
+              onValueCommit={(v) => useProjectStore.getState().setPadVolume(sceneId, pad.id, v)}
+              min={0}
+              max={100}
+              step={1}
+              sliderClassName="[&_[data-slot=slider-track]]:bg-white/20"
+            />
+          )}
           <PadOverlaySlider
             label="target"
             value={multiFadeLevels[1]}

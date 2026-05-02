@@ -77,10 +77,25 @@ describe("PadButtonFadeOverlay", () => {
     expect(screen.getByText("fade")).toBeInTheDocument();
   });
 
-  it("shows 'volume' and 'target' labels (two separate sliders)", () => {
+  it("shows 'target' but not 'volume' when pad is not playing", () => {
     const pad = makePad();
     loadPadInProjectStore(pad);
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set() });
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "other-pad",
+      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
+      reopenPadId: null,
+    });
+    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    expect(screen.queryByText("volume")).not.toBeInTheDocument();
+    expect(screen.getByText("target")).toBeInTheDocument();
+  });
+
+  it("shows both 'volume' and 'target' when pad is playing", () => {
+    const pad = makePad();
+    loadPadInProjectStore(pad);
+    usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([PAD_ID]) });
     useMultiFadeStore.setState({
       active: true,
       originPadId: "other-pad",
@@ -139,9 +154,10 @@ describe("PadButtonFadeOverlay", () => {
     expect(mockSetFadeDuration).toHaveBeenCalledWith(SCENE_ID, PAD_ID, expect.any(Number));
   });
 
-  it("calls setMultiFadeLevels when the volume slider changes", () => {
+  it("calls setMultiFadeLevels when the volume slider changes (playing pad)", () => {
     const pad = makePad();
     loadPadInProjectStore(pad);
+    usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([PAD_ID]) });
     const mockSetLevels = vi.fn();
     useMultiFadeStore.setState({
       active: true,
@@ -151,7 +167,7 @@ describe("PadButtonFadeOverlay", () => {
       setMultiFadeLevels: mockSetLevels,
     });
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // First slider is the volume slider (single thumb)
+    // First slider is the volume slider (only shown when playing)
     const sliders = screen.getAllByRole("slider");
     const volumeThumb = sliders[0];
     act(() => {
@@ -161,7 +177,7 @@ describe("PadButtonFadeOverlay", () => {
     expect(mockSetLevels).toHaveBeenCalledWith(PAD_ID, expect.any(Array));
   });
 
-  it("calls setMultiFadeLevels when the target slider changes", () => {
+  it("calls setMultiFadeLevels when the target slider changes (non-playing pad)", () => {
     const pad = makePad();
     loadPadInProjectStore(pad);
     const mockSetLevels = vi.fn();
@@ -173,9 +189,9 @@ describe("PadButtonFadeOverlay", () => {
       setMultiFadeLevels: mockSetLevels,
     });
     render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
-    // Second slider is the target slider (single thumb)
+    // Volume slider is hidden when not playing — target is first slider
     const sliders = screen.getAllByRole("slider");
-    const targetThumb = sliders[1];
+    const targetThumb = sliders[0];
     act(() => {
       targetThumb.focus();
       fireEvent.keyDown(targetThumb, { key: "ArrowRight" });

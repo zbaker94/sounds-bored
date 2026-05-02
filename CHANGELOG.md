@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Non-playing pads included in a synchronized fade now trigger playback instead of silently doing nothing when the fade target is 0.
+- The volume slider in the fade overlay is now hidden for pads that aren't currently playing, reducing clutter and preventing no-op adjustments.
+- Multi-fade mode correctly uses 0 as the starting volume for pads that aren't playing, so fade animations begin from the right value.
+- Press `X` while a pad's back face is open to enter synchronized-fade mode directly from that pad.
+- The layer volume slider on a pad's back face now displays a volume icon for clearer visual context.
 - Added permission to fetch content from GitHub in the developer configuration
 - Internal development tooling updated to allow additional file read commands in the automated assistant configuration.
 - Pad buttons now visually pulse with a ring animation while a sound is actively playing, making it easier to see which pads are triggered at a glance.

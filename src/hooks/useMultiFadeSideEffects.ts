@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useUiStore } from "@/state/uiStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { useProjectStore } from "@/state/projectStore";
+import { isPadActive } from "@/lib/audio";
 import { executeMultiFadeNow } from "./useMultiFadeMode";
 
 /**
@@ -24,6 +26,24 @@ export function useMultiFadeSideEffects(): void {
       executeMultiFadeNow();
     },
     { enableOnFormTags: true },
+  );
+
+  // Enter multi-fade from an individually-flipped pad's back face.
+  // Global editMode is excluded — no single origin pad can be inferred.
+  useHotkeys(
+    "x",
+    () => {
+      if (useMultiFadeStore.getState().active) return;
+      const { editingPadId } = useUiStore.getState();
+      if (!editingPadId) return;
+      const { project } = useProjectStore.getState();
+      const pad = project?.scenes.flatMap((s) => s.pads).find((p) => p.id === editingPadId);
+      if (!pad) return;
+      const currentVol = isPadActive(pad.id) ? (pad.volume ?? 100) : 0;
+      useMultiFadeStore.getState().enterMultiFade(pad.id, currentVol, pad.fadeTargetVol ?? 0);
+      useUiStore.getState().setEditingPadId(null);
+    },
+    { enableOnFormTags: false },
   );
 
   useHotkeys(

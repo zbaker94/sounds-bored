@@ -11,6 +11,7 @@ import {
   ListMusicIcon,
   PencilEdit01Icon,
   Cancel01Icon,
+  Volume1,
 } from "@hugeicons/core-free-icons";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -184,17 +185,21 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
       </div>
 
       <p className="text-xs text-muted-foreground truncate px-1">{selectionSummary}</p>
+        
 
-      <Slider
-        compact
-        tooltipLabel={(v) => `${v}%`}
-        value={[sliderVol]}
-        onValueChange={([v]) => { setLocalLayerVol(v); setLayerVolume(layer.id, v / 100); }}
-        onValueCommit={([v]) => { setLocalLayerVol(null); useProjectStore.getState().updateLayerVolume(layer.id, v / 100); }}
-        min={0}
-        max={100}
-        step={1}
-      />
+      <div className="flex flex-row items-center gap-2 px-1">
+        <HugeiconsIcon icon={Volume1} size={14} className="text-muted-foreground" />
+        <Slider
+          compact
+          tooltipLabel={(v) => `${v}%`}
+          value={[sliderVol]}
+          onValueChange={([v]) => { setLocalLayerVol(v); setLayerVolume(layer.id, v / 100); }}
+          onValueCommit={([v]) => { setLocalLayerVol(null); useProjectStore.getState().updateLayerVolume(layer.id, v / 100); }}
+          min={0}
+          max={100}
+          step={1}
+        />
+      </div>
 
       {layerActive && (
         <div className="h-0.5 rounded-full bg-muted overflow-hidden">

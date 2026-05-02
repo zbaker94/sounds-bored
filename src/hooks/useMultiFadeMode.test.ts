@@ -9,6 +9,7 @@ import { createMockProject, createMockScene, createMockPad, createMockHistoryEnt
 // Mock audio functions
 vi.mock("@/lib/audio/padPlayer", () => ({
   executeFadeTap: vi.fn(),
+  triggerPad: vi.fn().mockResolvedValue(undefined),
 }));
 
 
@@ -132,25 +133,17 @@ describe("useMultiFadeMode — cancel()", () => {
 
 
 describe("useMultiFadeMode — execute()", () => {
-  it("calls executeFadeTap for each selected pad", async () => {
-    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
+  it("calls triggerPad for each non-playing pad with target=0", async () => {
+    const { triggerPad } = await import("@/lib/audio/padPlayer");
     const pads = loadPadsInStore(2);
     const { result } = renderHook(() => useMultiFadeMode());
 
-    act(() => {
-      result.current.enter(pads[0].id);
-    });
-    // Toggle to add a second pad
-    act(() => {
-      result.current.togglePad(pads[1].id);
-    });
+    act(() => { result.current.enter(pads[0].id); });
+    act(() => { result.current.togglePad(pads[1].id); });
+    act(() => { result.current.execute(); });
 
-    act(() => {
-      result.current.execute();
-    });
-
-    // One call per selected pad (2 pads selected)
-    expect(executeFadeTap).toHaveBeenCalledTimes(2);
+    // Both pads: not playing + target=0 → triggerPad, not executeFadeTap
+    expect(triggerPad).toHaveBeenCalledTimes(2);
   });
 
   it("resets active to false after execute()", () => {
@@ -179,20 +172,24 @@ describe("useMultiFadeMode — execute()", () => {
     expect(executeFadeTap).not.toHaveBeenCalled();
   });
 
-  it("execute() uses pad.volume and pad.fadeTargetVol (not multiFadeStore levels)", async () => {
+  it("execute() passes entry.levels[1] as fadeTargetVol override to executeFadeTap", async () => {
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");
     const pads = loadPadsInStore(1);
     const pad = pads[0];
 
     act(() => {
       useMultiFadeStore.getState().enterMultiFade("some-origin", 100, 0);
+      // levels[1]=75 > 0 → executeFadeTap path (not triggerPad)
       useMultiFadeStore.getState().toggleMultiFadePad(pad.id, 100, 75);
     });
 
     const { result } = renderHook(() => useMultiFadeMode());
     act(() => { result.current.execute(); });
 
-    expect(executeFadeTap).toHaveBeenCalledWith(pad, undefined);
+    expect(executeFadeTap).toHaveBeenCalledWith(
+      expect.objectContaining({ id: pad.id, fadeTargetVol: 75 }),
+      undefined,
+    );
   });
 
   it("execute() calls executeFadeTap for both playing and non-playing pads", async () => {
@@ -220,6 +217,27 @@ describe("useMultiFadeMode — execute()", () => {
 
 
 describe("executeMultiFadeNow integration", () => {
+  it("calls triggerPad for a non-playing origin pad with target=0 (not a silent no-op)", async () => {
+    const { executeMultiFadeNow } = await import("./useMultiFadeMode");
+    const { triggerPad } = await import("@/lib/audio/padPlayer");
+
+    const pad = createMockPad({ id: "pad-origin" }); // no fadeTargetVol → target=0
+    const scene = createMockScene({ pads: [pad] });
+    useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: "pad-origin",
+      selectedPads: new Map([["pad-origin", { padId: "pad-origin", levels: [100, 0] }]]),
+      reopenPadId: null,
+    });
+
+    executeMultiFadeNow();
+
+    expect(triggerPad).toHaveBeenCalledWith(expect.objectContaining({ id: "pad-origin" }));
+    expect(useMultiFadeStore.getState().active).toBe(false);
+  });
+
   it("dispatches executeFadeTap for each selected pad and resets store", async () => {
     const { executeMultiFadeNow } = await import("./useMultiFadeMode");
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");

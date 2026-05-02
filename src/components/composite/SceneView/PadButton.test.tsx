@@ -10,8 +10,11 @@ import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio";
 
 vi.mock("./PadBackFace", () => ({
-  PadBackFace: ({ pad }: { pad: { name: string } }) => (
-    <div data-testid="pad-back-face">{pad.name}</div>
+  PadBackFace: ({ pad, onMultiFade }: { pad: { name: string }; onMultiFade?: () => void }) => (
+    <div data-testid="pad-back-face">
+      {pad.name}
+      <button data-testid="multi-fade-trigger" onClick={onMultiFade}>Synchronized Fades</button>
+    </div>
   ),
 }));
 
@@ -270,8 +273,8 @@ describe("multi-fade mode", () => {
     render(<PadButton pad={pad} sceneId="scene-1" />);
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.pointerDown(button, { button: 0, pointerId: 1 });
-    // New semantics: toggleMultiFadePad(padId, volumePct, fadeTargetPct) — defaults volume=100, fadeTarget=0
-    expect(mockToggle).toHaveBeenCalledWith("pad-1", 100, 0);
+    // Non-playing pad → currentVol=0; fadeTarget defaults to 0
+    expect(mockToggle).toHaveBeenCalledWith("pad-1", 0, 0);
   });
 
   it("does not show pulse ring when multi-fade mode is active even while playing", () => {
@@ -379,6 +382,33 @@ describe("fade popover", () => {
     const pad = loadPadInStore();
     render(<PadButton pad={pad} sceneId="scene-1" />);
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+  });
+});
+
+describe("onMultiFade callback (handleMultiFade)", () => {
+  beforeEach(() => {
+    useUiStore.setState({ ...initialUiState });
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useMultiFadeStore.setState({ ...initialMultiFadeState });
+  });
+
+  it("clears editingPadId (not toggles editMode) when pad is individually flipped", () => {
+    const pad = loadPadInStore();
+    useUiStore.setState({ ...initialUiState, editingPadId: "pad-1" });
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    fireEvent.click(screen.getByTestId("multi-fade-trigger"));
+    const { editMode, editingPadId } = useUiStore.getState();
+    expect(editingPadId).toBeNull();
+    expect(editMode).toBe(false);
+  });
+
+  it("turns off global editMode when pad is shown via global editMode", () => {
+    const pad = loadPadInStore();
+    useUiStore.setState({ ...initialUiState, editMode: true });
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    fireEvent.click(screen.getByTestId("multi-fade-trigger"));
+    expect(useUiStore.getState().editMode).toBe(false);
   });
 });
 

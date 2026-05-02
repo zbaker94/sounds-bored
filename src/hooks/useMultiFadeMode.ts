@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
-import { executeFadeTap } from "@/lib/audio";
+import { executeFadeTap, triggerPad, isPadActive, emitAudioError } from "@/lib/audio";
 import { buildPadMap } from "@/lib/padDefaults";
 
 export function executeMultiFadeNow(): void {
@@ -12,10 +12,18 @@ export function executeMultiFadeNow(): void {
   const padMap = buildPadMap(scenes);
   const globalFadeDurationMs = useAppSettingsStore.getState().settings?.globalFadeDurationMs;
 
-  for (const [padId] of selectedPads) {
+  for (const [padId, entry] of selectedPads) {
     const pad = padMap.get(padId);
     if (!pad) continue;
-    executeFadeTap(pad, globalFadeDurationMs);
+    const [, targetPct] = entry.levels;
+    if (!isPadActive(padId) && targetPct === 0) {
+      // Non-playing pad with no fade target — trigger it rather than silently no-op
+      triggerPad(pad).catch((err: unknown) => { emitAudioError(err); });
+    } else {
+      // Use the overlay's in-flight target (entry.levels[1]) so mid-drag slider
+      // values are captured even if onValueCommit hasn't fired yet.
+      executeFadeTap({ ...pad, fadeTargetVol: targetPct }, globalFadeDurationMs);
+    }
   }
   resetMultiFade();
 }
@@ -58,14 +66,16 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
     const scenes = useProjectStore.getState().project?.scenes ?? [];
     const padMap = buildPadMap(scenes);
     const pad = padMap.get(padId);
-    enterMultiFade(padId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
+    const currentVol = isPadActive(padId) ? (pad?.volume ?? 100) : 0;
+    enterMultiFade(padId, currentVol, pad?.fadeTargetVol ?? 0);
   }, [enterMultiFade]);
 
   const togglePad = useCallback((padId: string) => {
     const scenes = useProjectStore.getState().project?.scenes ?? [];
     const padMap = buildPadMap(scenes);
     const pad = padMap.get(padId);
-    toggleMultiFadePad(padId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
+    const currentVol = isPadActive(padId) ? (pad?.volume ?? 100) : 0;
+    toggleMultiFadePad(padId, currentVol, pad?.fadeTargetVol ?? 0);
   }, [toggleMultiFadePad]);
 
   const setFadeLevels = useCallback((padId: string, levels: [number, number]) => {
