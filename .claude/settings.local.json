@@ -52,7 +52,10 @@
       "mcp__shadcn__get_item_examples_from_registries",
       "Bash(Get-Content \"C:\\\\Users\\\\Zack\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Repos-sounds-bored\\\\516839f7-b506-4a96-bbcf-4e9885eb5220\\\\tasks\\\\b7dwfu06s.output\" -Wait)",
       "Bash(Get-Content *)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(npx fallow *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Repos\\\\sounds-bored\" -Recurse -Filter \"*.ts\" -o File)",
+      "Bash(Select-Object -First 20 FullName)"
     ]
   },
   "enableAllProjectMcpServers": true,

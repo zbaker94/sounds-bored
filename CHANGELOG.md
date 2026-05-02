@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added permissions for running Fallow static analysis and TypeScript file discovery commands in the developer tooling configuration.
 - Internal code refactoring across audio engine, download manager, and pad gesture handling — no behavior changes, improves long-term stability and maintainability
 - Reduced unnecessary memory allocations in the audio tick loop, which may improve performance during playback with many active pads
 - Test suite reorganized with shared helper utilities, reducing duplication and improving reliability of automated tests
