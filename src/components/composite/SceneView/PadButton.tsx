@@ -252,6 +252,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
           {isPlaying && !isFlipped && !multiFadeActive && (
             <motion.div
               key="pulse"
+              data-testid="pulse-ring"
               className="absolute -inset-1 rounded-xl pointer-events-none z-10"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
