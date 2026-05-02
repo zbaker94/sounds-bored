@@ -926,4 +926,21 @@ describe("usePadGesture — handler reference stability", () => {
     rerender();
     expect(result.current.gestureHandlers).not.toBe(first);
   });
+
+  it("returns stable gestureHandlers when non-gesture pad properties change (Immer-style mutation)", () => {
+    // Simulates an Immer mutation: new object identity but same id and layers.
+    // Handler identity must not change when only name/color/etc. mutate.
+    let pad = oneShotPad;
+    const { result, rerender } = renderHook(() => usePadGesture(pad));
+    const first = result.current.gestureHandlers;
+    const { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu } = first;
+    pad = { ...oneShotPad, name: "Mutated Name" };
+    rerender();
+    expect(result.current.gestureHandlers).toBe(first);
+    expect(result.current.gestureHandlers.onPointerDown).toBe(onPointerDown);
+    expect(result.current.gestureHandlers.onPointerMove).toBe(onPointerMove);
+    expect(result.current.gestureHandlers.onPointerUp).toBe(onPointerUp);
+    expect(result.current.gestureHandlers.onPointerCancel).toBe(onPointerCancel);
+    expect(result.current.gestureHandlers.onContextMenu).toBe(onContextMenu);
+  });
 });

@@ -38,6 +38,9 @@ export function usePadGesture(pad: Pad, now = Date.now) {
   // Exposed so PadButton can display the intended volume before audio latency resolves.
   const [dragVolume, setDragVolume] = useState<number | null>(null);
 
+  const padRef = useRef(pad);
+  useEffect(() => { padRef.current = pad; }, [pad]);
+
   const state = useRef<GestureState>({
     startY: 0,
     lastY: 0,
@@ -68,8 +71,11 @@ export function usePadGesture(pad: Pad, now = Date.now) {
   // All handlers and their helpers are co-located in a single useMemo so that:
   // 1. Helper functions share the same closure scope as the handlers that call them,
   //    eliminating stale closure risk from mismatched dependency arrays.
-  // 2. The returned gestureHandlers object is stable across renders when pad,
-  //    hasHoldLayer, and now are unchanged.
+  // 2. The returned gestureHandlers object is stable across renders when pad.id,
+  //    hasHoldLayer, and now are unchanged — pad-level property mutations (name,
+  //    color, volume) do not rebuild handlers. padRef holds the current pad after
+  //    each commit, so handlers read up-to-date data at call time in all practical
+  //    gesture scenarios despite the narrow dep list.
   // `now` is a stable function reference in practice (Date.now or an injected test clock),
   // but is listed as a dep for correctness since it is a parameter that could change.
   const gestureHandlers = useMemo(() => {
@@ -86,7 +92,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
      * fading one-shot voice must not make the hold layer inherit a stale padVolume.
      */
     function checkHoldLayerActive(): boolean {
-      return pad.layers.some(
+      return padRef.current.layers.some(
         (l) => l.playbackMode === "hold" && isLayerActive(l.id)
       );
     }
@@ -100,15 +106,15 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     function triggerVolume(): number {
       const store = usePlaybackStore.getState();
       if (hasHoldLayer) {
-        return checkHoldLayerActive() ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
+        return checkHoldLayerActive() ? (store.padVolumes[padRef.current.id] ?? 1.0) : 1.0;
       }
-      return store.playingPadIds.has(pad.id) ? (store.padVolumes[pad.id] ?? 1.0) : 1.0;
+      return store.playingPadIds.has(padRef.current.id) ? (store.padVolumes[padRef.current.id] ?? 1.0) : 1.0;
     }
 
     function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
       if (e.button !== 0) return;
-      const fadeCancelled = isPadFading(pad.id);
-      if (fadeCancelled) freezePadAtCurrentVolume(pad.id);
+      const fadeCancelled = isPadFading(padRef.current.id);
+      if (fadeCancelled) freezePadAtCurrentVolume(padRef.current.id);
 
       e.currentTarget.setPointerCapture(e.pointerId);
       clearHoldTimer();
@@ -122,11 +128,11 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       const store = usePlaybackStore.getState();
       s.wasPlayingAtStart = hasHoldLayer
         ? checkHoldLayerActive()
-        : store.playingPadIds.has(pad.id);
+        : store.playingPadIds.has(padRef.current.id);
 
       // Hold-mode pads trigger immediately on press — skip if we just cancelled a fade
       if (hasHoldLayer && !fadeCancelled) {
-        triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
+        triggerPad(padRef.current, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
       }
 
       holdTimer.current = setTimeout(() => {
@@ -142,7 +148,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         // For one-shot pads: resume at current volume if already playing, else start at 0.
         const timerStore = usePlaybackStore.getState();
         const vol = s.wasPlayingAtStart
-          ? (timerStore.padVolumes[pad.id] ?? 1.0)
+          ? (timerStore.padVolumes[padRef.current.id] ?? 1.0)
           : hasHoldLayer ? 1.0 : 0;
         s.startVolume = vol;
         s.currentVolume = vol;
@@ -153,7 +159,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       s.phase = "drag";
       setIsDragging(true);
       if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
-        triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
+        triggerPad(padRef.current, 0).catch((err: unknown) => { emitAudioError(err); });
         s.hasTriggeredDuringDrag = true;
       }
     }
@@ -174,12 +180,12 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         const newVolume = clampGain01(s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX);
         s.currentVolume = newVolume;
 
-        if (!s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
-          triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
+        if (!s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(padRef.current.id)) {
+          triggerPad(padRef.current, 0).catch((err: unknown) => { emitAudioError(err); });
           s.hasTriggeredDuringDrag = true;
         }
 
-        setPadVolume(pad.id, newVolume);
+        setPadVolume(padRef.current.id, newVolume);
         // Throttle the React display update to one setState per animation frame.
         pendingDragVolume.current = newVolume;
         if (dragRafRef.current === null) {
@@ -209,8 +215,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         pendingDragVolume.current = null;
       }
       if (hasHoldLayer) {
-        releasePadHoldLayers(pad);
-        resetPadGain(pad.id);
+        releasePadHoldLayers(padRef.current);
+        resetPadGain(padRef.current.id);
       }
       s.phase = "idle";
       s.cancelledFadeAtStart = false;
@@ -224,11 +230,11 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       if (s.phase === "down" || s.phase === "hold") {
         // Normal tap or short hold — trigger unless hold-mode pad or fade was just cancelled
         if (!hasHoldLayer && !s.cancelledFadeAtStart) {
-          triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
+          triggerPad(padRef.current, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
         }
       } else if (s.phase === "drag" && s.currentVolume < 0.01 && !hasHoldLayer) {
-        stopPad(pad);
-        resetPadGain(pad.id);
+        stopPad(padRef.current);
+        resetPadGain(padRef.current.id);
       }
 
       resetGesture();
@@ -239,8 +245,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       const s = state.current;
 
       if (s.phase === "drag" && s.currentVolume < 0.01 && !hasHoldLayer) {
-        stopPad(pad);
-        resetPadGain(pad.id);
+        stopPad(padRef.current);
+        resetPadGain(padRef.current.id);
       }
 
       resetGesture();
@@ -251,7 +257,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     }
 
     return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu };
-  }, [pad, hasHoldLayer, now]);
+  }, [pad.id, hasHoldLayer, now]);
 
   return { gestureHandlers, isDragging, dragVolume };
 }
