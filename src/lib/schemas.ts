@@ -98,45 +98,49 @@ export const SoundInstanceSchema = z.object({
 export type SoundInstance = z.infer<typeof SoundInstanceSchema>;
 
 // ─── Layer Selection ─────────────────────────────────────────────────────────
-// Permissive schema for persistence/loading — allows empty selections.
-// See LayerSelectionFormSchema below for the stricter form-validation variant.
+// Base variant shapes — used internally to derive two discriminated unions:
+//   LayerSelectionSchema      (permissive, for persisted data — allows empty)
+//   LayerSelectionFormSchema  (strict, for form validation — rejects empty)
+// Add a new variant to the bases and include it in both unions. Do not use
+// these base schemas directly; consume via the two unions above.
 
+const LayerSelectionAssignedBaseSchema = z.object({
+  type: z.literal("assigned"),
+  instances: z.array(SoundInstanceSchema),
+});
+
+const LayerSelectionTagBaseSchema = z.object({
+  type: z.literal("tag"),
+  tagIds: z.array(z.string()),
+  matchMode: z.enum(["any", "all"]).default("any"),
+  defaultVolume: z.number().min(0).max(100).finite(),
+});
+
+const LayerSelectionSetBaseSchema = z.object({
+  type: z.literal("set"),
+  setId: z.string(),
+  defaultVolume: z.number().min(0).max(100).finite(),
+});
+
+// Permissive schema for persistence/loading — allows empty selections.
 export const LayerSelectionSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("assigned"),
-    instances: z.array(SoundInstanceSchema),
-  }),
-  z.object({
-    type: z.literal("tag"),
-    tagIds: z.array(z.string()),
-    matchMode: z.enum(["any", "all"]).default("any"),
-    defaultVolume: z.number().min(0).max(100).finite(),
-  }),
-  z.object({
-    type: z.literal("set"),
-    setId: z.string(),
-    defaultVolume: z.number().min(0).max(100).finite(),
-  }),
+  LayerSelectionAssignedBaseSchema,
+  LayerSelectionTagBaseSchema,
+  LayerSelectionSetBaseSchema,
 ]);
 
 export type LayerSelection = z.infer<typeof LayerSelectionSchema>;
 
 // Strict variant used only in form schemas — rejects empty selections.
 const LayerSelectionFormSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("assigned"),
+  LayerSelectionAssignedBaseSchema.extend({
     instances: z.array(SoundInstanceSchema).min(1, "At least one sound is required"),
   }),
-  z.object({
-    type: z.literal("tag"),
+  LayerSelectionTagBaseSchema.extend({
     tagIds: z.array(z.string()).min(1, "At least one tag is required"),
-    matchMode: z.enum(["any", "all"]).default("any"),
-    defaultVolume: z.number().min(0).max(100).finite(),
   }),
-  z.object({
-    type: z.literal("set"),
+  LayerSelectionSetBaseSchema.extend({
     setId: z.string().min(1, "A set must be selected"),
-    defaultVolume: z.number().min(0).max(100).finite(),
   }),
 ]);
 
