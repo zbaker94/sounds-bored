@@ -196,18 +196,23 @@ describe("SoundSelector — assigned mode — search", () => {
 });
 
 describe("SoundSelector — tag mode", () => {
+  function renderBasicTagSelector(tagName = "Percussion") {
+    const tag = createMockTag({ name: tagName });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    renderSelector({
+      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
+      onChange: vi.fn(),
+    });
+    return tag;
+  }
+
   beforeEach(() => {
     useLibraryStore.setState({ ...initialLibraryState });
     useAppSettingsStore.setState({ settings: null });
   });
 
   it("renders a search input for tag mode", () => {
-    const tag = createMockTag({ name: "Percussion" });
-    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
-    renderSelector({
-      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
-      onChange: vi.fn(),
-    });
+    renderBasicTagSelector();
     expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
@@ -223,23 +228,13 @@ describe("SoundSelector — tag mode", () => {
   });
 
   it("renders AND/OR toggle in tag mode", () => {
-    const tag = createMockTag({ name: "Percussion" });
-    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
-    renderSelector({
-      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
-      onChange: vi.fn(),
-    });
+    renderBasicTagSelector();
     expect(screen.getByRole("tab", { name: /any/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /all/i })).toBeInTheDocument();
   });
 
   it("AND/OR toggle defaults to Any selected", () => {
-    const tag = createMockTag({ name: "Percussion" });
-    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
-    renderSelector({
-      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
-      onChange: vi.fn(),
-    });
+    renderBasicTagSelector();
     const anyTab = screen.getByRole("tab", { name: /any/i });
     expect(anyTab).toHaveAttribute("aria-selected", "true");
   });
@@ -259,23 +254,13 @@ describe("SoundSelector — tag mode", () => {
   });
 
   it("renders Match Mode label with info icon tooltip", () => {
-    const tag = createMockTag({ name: "Percussion" });
-    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
-    renderSelector({
-      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
-      onChange: vi.fn(),
-    });
+    renderBasicTagSelector();
     expect(screen.getByText("Match Mode")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "" })).toBeInTheDocument(); // info icon button
   });
 
   it("shows helper text prompting to select tags when none are selected", () => {
-    const tag = createMockTag({ id: "t1", name: "Percussion" });
-    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
-    renderSelector({
-      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
-      onChange: vi.fn(),
-    });
+    renderBasicTagSelector();
     expect(screen.getByText("Select tags above to filter which sounds are eligible.")).toBeInTheDocument();
   });
 

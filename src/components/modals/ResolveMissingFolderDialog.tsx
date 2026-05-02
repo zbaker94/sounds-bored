@@ -24,6 +24,41 @@ import {
 import { Button } from "@/components/ui/button";
 import { TruncatedPath } from "@/components/ui/truncated-path";
 
+import type { AppSettings } from "@/lib/schemas";
+
+async function applyFileCopyOrMove(
+  sourcePath: string,
+  destFolder: string,
+  filename: string,
+  placement: "copy" | "move",
+): Promise<string> {
+  const destPath = await join(destFolder, filename);
+  await (placement === "copy" ? copyFile(sourcePath, destPath) : rename(sourcePath, destPath));
+  return destPath;
+}
+
+async function resolveAddParentFolderId(
+  filePath: string,
+  currentFolderId: string | undefined,
+  settings: AppSettings | null,
+  saveSettings: (s: AppSettings) => Promise<unknown>,
+): Promise<string | undefined> {
+  if (!settings) return currentFolderId;
+  const parentDir = await dirname(filePath);
+  const existingFolder = settings.globalFolders.find((f) => f.path === parentDir);
+  if (existingFolder) return existingFolder.id;
+  const parentName = await tauriBasename(parentDir);
+  const newFolder: GlobalFolder = { id: crypto.randomUUID(), path: parentDir, name: parentName };
+  await addGlobalFolderAndReconcile(
+    newFolder,
+    settings,
+    useLibraryStore.getState().sounds,
+    saveSettings,
+    (newSounds) => useLibraryStore.getState().updateLibrary((draft) => { draft.sounds = newSounds; }),
+  );
+  return newFolder.id;
+}
+
 interface ResolveMissingFolderDialogProps {
   folder: GlobalFolder | null;
   onClose: () => void;
@@ -243,41 +278,13 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
       const nameDiffers = newName !== currentSound.name;
 
       let finalPath = pickedFilePath;
-
       if (selectedPlacement === "copy" || selectedPlacement === "move") {
-        const destPath = await join(newFolderPath, pickedFileBasename);
-        if (selectedPlacement === "copy") {
-          await copyFile(pickedFilePath, destPath);
-        } else {
-          await rename(pickedFilePath, destPath);
-        }
-        finalPath = destPath;
+        finalPath = await applyFileCopyOrMove(pickedFilePath, newFolderPath, pickedFileBasename, selectedPlacement);
       }
 
       let newFolderIdForSound = currentSound.folderId;
-
       if (selectedPlacement === "add-parent") {
-        const parentDir = await dirname(pickedFilePath);
-        const parentName = await tauriBasename(parentDir);
-        const existingFolder = settings?.globalFolders.find((f) => f.path === parentDir);
-
-        if (!existingFolder && settings) {
-          const newFolder: GlobalFolder = {
-            id: crypto.randomUUID(),
-            path: parentDir,
-            name: parentName,
-          };
-          await addGlobalFolderAndReconcile(
-            newFolder,
-            settings,
-            useLibraryStore.getState().sounds,
-            saveSettings,
-            (newSounds) => updateLibrary((draft) => { draft.sounds = newSounds; }),
-          );
-          newFolderIdForSound = newFolder.id;
-        } else if (existingFolder) {
-          newFolderIdForSound = existingFolder.id;
-        }
+        newFolderIdForSound = await resolveAddParentFolderId(pickedFilePath, currentSound.folderId, settings, saveSettings);
       }
 
       // Remove duplicate if needed

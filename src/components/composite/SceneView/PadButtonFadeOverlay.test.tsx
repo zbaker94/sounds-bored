@@ -30,6 +30,22 @@ function loadPadInProjectStore(pad: ReturnType<typeof makePad>) {
   useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
 }
 
+function renderMultiFadePad(
+  padOverrides: Parameters<typeof makePad>[0] = {},
+  levels: [number, number] = [0, 100],
+) {
+  const pad = makePad(padOverrides);
+  loadPadInProjectStore(pad);
+  useMultiFadeStore.setState({
+    active: true,
+    originPadId: "other-pad",
+    selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels }]]),
+    reopenPadId: null,
+  });
+  render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+  return pad;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   usePlaybackStore.setState({ ...initialPlaybackState });
@@ -64,45 +80,21 @@ describe("PadButtonFadeOverlay", () => {
   });
 
   it("renders the slider overlay when this pad is selected in multi-fade mode", () => {
-    const pad = makePad();
-    loadPadInProjectStore(pad);
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 100] }]]),
-      reopenPadId: null,
-    });
-    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    renderMultiFadePad();
     // "fade" label is always present in the overlay
     expect(screen.getByText("fade")).toBeInTheDocument();
   });
 
   it("shows 'target' but not 'volume' when pad is not playing", () => {
-    const pad = makePad();
-    loadPadInProjectStore(pad);
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set() });
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
-      reopenPadId: null,
-    });
-    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    renderMultiFadePad({}, [100, 0]);
     expect(screen.queryByText("volume")).not.toBeInTheDocument();
     expect(screen.getByText("target")).toBeInTheDocument();
   });
 
   it("shows both 'volume' and 'target' when pad is playing", () => {
-    const pad = makePad();
-    loadPadInProjectStore(pad);
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([PAD_ID]) });
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [100, 0] }]]),
-      reopenPadId: null,
-    });
-    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    renderMultiFadePad({}, [100, 0]);
     expect(screen.getByText("volume")).toBeInTheDocument();
     expect(screen.getByText("target")).toBeInTheDocument();
   });
@@ -200,16 +192,8 @@ describe("PadButtonFadeOverlay", () => {
   });
 
   it("calls setPadVolume when playing and the volume slider changes", () => {
-    const pad = makePad();
-    loadPadInProjectStore(pad);
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([PAD_ID]) });
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [80, 0] }]]),
-      reopenPadId: null,
-    });
-    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    renderMultiFadePad({}, [80, 0]);
     // Volume slider is the first slider; arrow keys change its value, which should trigger setPadVolume when playing.
     const sliders = screen.getAllByRole("slider");
     const volumeThumb = sliders[0];
@@ -221,15 +205,7 @@ describe("PadButtonFadeOverlay", () => {
   });
 
   it("displays the resolved fade duration from pad config", () => {
-    const pad = makePad({ fadeDurationMs: 3000 });
-    loadPadInProjectStore(pad);
-    useMultiFadeStore.setState({
-      active: true,
-      originPadId: "other-pad",
-      selectedPads: new Map([[PAD_ID, { padId: PAD_ID, levels: [0, 100] }]]),
-      reopenPadId: null,
-    });
-    render(<PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />);
+    renderMultiFadePad({ fadeDurationMs: 3000 });
     // 3000ms should display as "3.0s"
     expect(screen.getByText("3.0s")).toBeInTheDocument();
   });

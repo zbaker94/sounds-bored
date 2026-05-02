@@ -42,6 +42,23 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 
 const EMPTY_SCENES: Scene[] = [];
 
+function collectLargeSceneSounds(scene: Scene, librarySounds: Sound[]): Sound[] {
+  const isLarge = (s: Sound) => s.fileSizeBytes !== undefined && s.fileSizeBytes >= LARGE_FILE_THRESHOLD_BYTES;
+  const seen = new Set<string>();
+  const toPreload: Sound[] = [];
+  for (const pad of scene.pads) {
+    for (const layer of pad.layers) {
+      for (const sound of resolveLayerSounds(layer, librarySounds)) {
+        if (sound.filePath && isLarge(sound) && !seen.has(sound.id)) {
+          seen.add(sound.id);
+          toPreload.push(sound);
+        }
+      }
+    }
+  }
+  return toPreload;
+}
+
 const addPadButtonClass =
   "rounded-xl border-2 border-dashed border-foreground/40 bg-card/80 flex items-center justify-center hover:border-foreground/70 hover:bg-card transition-all cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,0.3)]";
 
@@ -64,52 +81,21 @@ export function SceneView() {
 
   // Pre-warm HTMLAudioElements for large sounds so the browser has already
   // buffered the file by the time the user triggers the pad.
-  // Uses fileSizeBytes (in schema) for a synchronous size check — no HEAD
-  // request. Tag/set selections are resolved against the current library.
+  // Uses fileSizeBytes (in schema) for a synchronous size check — no HEAD request.
+  // Tag/set selections are resolved against the current library.
   //
-  // Perf: Immer replaces the scenes array reference on every project write
-  // (e.g. volume tweaks, pad renames), so this effect fires for every mutation
-  // even when the set of large sounds to preload hasn't changed. We guard with
-  // a ref-based early-exit: compute the set of large sound IDs referenced by
-  // the active scene and bail out if it's identical to the previous run.
+  // Perf: Immer replaces the scenes array reference on every project write,
+  // so this effect fires for every mutation even when the large-sound set hasn't
+  // changed. We guard with a ref-based early-exit to avoid redundant preloads.
   const prevPreloadIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!activeScene) return;
-    const isLarge = (s: Sound) =>
-      s.fileSizeBytes !== undefined && s.fileSizeBytes >= LARGE_FILE_THRESHOLD_BYTES;
-
-    // First pass: collect IDs of large sounds that would be preloaded.
-    const newIds = new Set<string>();
-    const toPreload: Sound[] = [];
-    for (const pad of activeScene.pads) {
-      for (const layer of pad.layers) {
-        for (const sound of resolveLayerSounds(layer, librarySounds)) {
-          if (sound.filePath && isLarge(sound) && !newIds.has(sound.id)) {
-            newIds.add(sound.id);
-            toPreload.push(sound);
-          }
-        }
-      }
-    }
-
-    // Early-exit when the referenced large-sound set hasn't changed.
-    // Equal size + every newId in prev ⇒ sets are identical (both are deduplicated).
+    const toPreload = collectLargeSceneSounds(activeScene, librarySounds);
+    const newIds = new Set(toPreload.map((s) => s.id));
     const prev = prevPreloadIdsRef.current;
-    if (prev.size === newIds.size) {
-      let identical = true;
-      for (const id of newIds) {
-        if (!prev.has(id)) {
-          identical = false;
-          break;
-        }
-      }
-      if (identical) return;
-    }
-
+    if (prev.size === newIds.size && [...newIds].every((id) => prev.has(id))) return;
     prevPreloadIdsRef.current = newIds;
-    for (const sound of toPreload) {
-      preloadStreamingAudio(sound);
-    }
+    for (const sound of toPreload) preloadStreamingAudio(sound);
   }, [activeScene, librarySounds]);
 
   const pageByScene = useUiStore((s) => s.pageByScene);

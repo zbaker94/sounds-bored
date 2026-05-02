@@ -119,6 +119,13 @@ describe("SceneTabBar", () => {
       loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
     }
 
+    function openRenameInput() {
+      loadSingleScene();
+      renderWithTooltip(<SceneTabBar />);
+      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
+      return screen.getByLabelText("Scene name input");
+    }
+
     it("should have edit icon with opacity-0 by default", () => {
       loadSingleScene();
       renderWithTooltip(<SceneTabBar />);
@@ -128,22 +135,13 @@ describe("SceneTabBar", () => {
     });
 
     it("should show an input with the current scene name when edit icon is clicked", () => {
-      loadSingleScene();
-      renderWithTooltip(<SceneTabBar />);
-
-      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
-
-      const input = screen.getByLabelText("Scene name input");
+      const input = openRenameInput();
       expect(input).toBeInTheDocument();
       expect(input).toHaveValue("Scene 1");
     });
 
     it("should commit rename when Enter is pressed", () => {
-      loadSingleScene();
-      renderWithTooltip(<SceneTabBar />);
-
-      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
-      const input = screen.getByLabelText("Scene name input");
+      const input = openRenameInput();
 
       fireEvent.change(input, { target: { value: "Renamed Scene" } });
       fireEvent.keyDown(input, { key: "Enter" });
@@ -153,11 +151,7 @@ describe("SceneTabBar", () => {
     });
 
     it("should cancel rename when Escape is pressed without updating the store", () => {
-      loadSingleScene();
-      renderWithTooltip(<SceneTabBar />);
-
-      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
-      const input = screen.getByLabelText("Scene name input");
+      const input = openRenameInput();
 
       fireEvent.change(input, { target: { value: "Renamed Scene" } });
       fireEvent.keyDown(input, { key: "Escape" });
@@ -167,11 +161,7 @@ describe("SceneTabBar", () => {
     });
 
     it("should commit rename when checkmark button is clicked", () => {
-      loadSingleScene();
-      renderWithTooltip(<SceneTabBar />);
-
-      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
-      const input = screen.getByLabelText("Scene name input");
+      const input = openRenameInput();
 
       fireEvent.change(input, { target: { value: "Check Rename" } });
       fireEvent.mouseDown(screen.getByRole("button", { name: /confirm rename/i }));
@@ -180,11 +170,7 @@ describe("SceneTabBar", () => {
     });
 
     it("should commit rename on input blur", () => {
-      loadSingleScene();
-      renderWithTooltip(<SceneTabBar />);
-
-      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
-      const input = screen.getByLabelText("Scene name input");
+      const input = openRenameInput();
 
       fireEvent.change(input, { target: { value: "Blur Rename" } });
       fireEvent.blur(input);
@@ -193,11 +179,7 @@ describe("SceneTabBar", () => {
     });
 
     it("should revert to original name when blank name is submitted", () => {
-      loadSingleScene();
-      renderWithTooltip(<SceneTabBar />);
-
-      fireEvent.mouseDown(screen.getByRole("button", { name: /edit scene name/i }));
-      const input = screen.getByLabelText("Scene name input");
+      const input = openRenameInput();
 
       fireEvent.change(input, { target: { value: "   " } });
       fireEvent.keyDown(input, { key: "Enter" });

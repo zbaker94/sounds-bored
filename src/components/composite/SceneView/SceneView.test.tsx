@@ -81,6 +81,12 @@ vi.mock("@dnd-kit/utilities", () => ({
 }));
 
 describe("SceneView", () => {
+  function loadScene(pads: ReturnType<typeof createMockPad>[] = []) {
+    const scene = createMockScene({ id: "scene-1", pads });
+    const entry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+  }
+
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
     useUiStore.setState({ ...initialUiState });
@@ -113,9 +119,7 @@ describe("SceneView", () => {
   describe("activeScene derivation", () => {
     it("renders scene content when activeSceneId matches a scene", () => {
       const pad = createMockPad({ id: "pad-1", name: "Pad 1" });
-      const scene = createMockScene({ id: "scene-1", pads: [pad] });
-      const entry = createMockHistoryEntry();
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      loadScene([pad]);
       useProjectStore.setState({ activeSceneId: "scene-1" });
 
       renderSceneView();
@@ -124,9 +128,7 @@ describe("SceneView", () => {
     });
 
     it("renders empty state when activeSceneId does not match any scene", () => {
-      const scene = createMockScene({ id: "scene-1" });
-      const entry = createMockHistoryEntry();
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      loadScene();
       // Bypass setActiveSceneId validation to test the defensive fallback in SceneView
       useProjectStore.setState({ activeSceneId: "non-existent-id" });
 
@@ -141,9 +143,7 @@ describe("SceneView", () => {
       const padA = createMockPad({ id: "pad-a", name: "Pad A" });
       const padB = createMockPad({ id: "pad-b", name: "Pad B" });
       const padC = createMockPad({ id: "pad-c", name: "Pad C" });
-      const scene = createMockScene({ id: "scene-1", pads: [padA, padB, padC] });
-      const entry = createMockHistoryEntry();
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      loadScene([padA, padB, padC]);
 
       useProjectStore.getState().reorderPads("scene-1", 0, 2);
 
@@ -156,9 +156,7 @@ describe("SceneView", () => {
     it("marks the project as dirty after reorder", () => {
       const padA = createMockPad({ id: "pad-a", name: "Pad A" });
       const padB = createMockPad({ id: "pad-b", name: "Pad B" });
-      const scene = createMockScene({ id: "scene-1", pads: [padA, padB] });
-      const entry = createMockHistoryEntry();
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      loadScene([padA, padB]);
 
       // clearDirtyFlag to ensure we start clean
       useProjectStore.getState().clearDirtyFlag();
@@ -188,12 +186,17 @@ describe("SceneView", () => {
       return { largeSound, layer, pad };
     }
 
-    it("calls preloadStreamingAudio for large sounds on initial render", () => {
-      const { largeSound, pad } = buildSceneWithLargeSound();
+    function setupLargeSoundScene(soundId?: string) {
+      const { largeSound, pad } = buildSceneWithLargeSound(soundId);
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
       const entry = createMockHistoryEntry();
       useLibraryStore.setState({ ...initialLibraryState, sounds: [largeSound] });
       useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      return { largeSound, pad };
+    }
+
+    it("calls preloadStreamingAudio for large sounds on initial render", () => {
+      const { largeSound } = setupLargeSoundScene();
 
       renderSceneView();
 
@@ -227,11 +230,7 @@ describe("SceneView", () => {
     });
 
     it("does NOT re-call preloadStreamingAudio when a mutation doesn't change the large-sound set", () => {
-      const { largeSound, pad } = buildSceneWithLargeSound();
-      const scene = createMockScene({ id: "scene-1", pads: [pad] });
-      const entry = createMockHistoryEntry();
-      useLibraryStore.setState({ ...initialLibraryState, sounds: [largeSound] });
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      const { pad } = setupLargeSoundScene();
 
       const { rerender } = renderSceneView();
       expect(preloadStreamingAudio).toHaveBeenCalledTimes(1);
@@ -249,15 +248,12 @@ describe("SceneView", () => {
     });
 
     it("re-calls preloadStreamingAudio when a large sound is swapped (same count, different ID)", () => {
-      const { largeSound: largeA, pad: padA } = buildSceneWithLargeSound("large-a");
+      const { largeSound: largeA, pad: padA } = setupLargeSoundScene("large-a");
       const { largeSound: largeB, layer: layerB } = buildSceneWithLargeSound("large-b");
-      const scene = createMockScene({ id: "scene-1", pads: [padA] });
-      const entry = createMockHistoryEntry();
       useLibraryStore.setState({
         ...initialLibraryState,
         sounds: [largeA, largeB],
       });
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
 
       const { rerender } = renderSceneView();
       expect(preloadStreamingAudio).toHaveBeenCalledTimes(1);
@@ -287,11 +283,7 @@ describe("SceneView", () => {
     });
 
     it("re-calls preloadStreamingAudio when a new large sound is added to the scene", () => {
-      const { largeSound: largeA, pad: padA } = buildSceneWithLargeSound("large-a");
-      const scene = createMockScene({ id: "scene-1", pads: [padA] });
-      const entry = createMockHistoryEntry();
-      useLibraryStore.setState({ ...initialLibraryState, sounds: [largeA] });
-      useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      const { largeSound: largeA } = setupLargeSoundScene("large-a");
 
       const { rerender } = renderSceneView();
       expect(preloadStreamingAudio).toHaveBeenCalledTimes(1);

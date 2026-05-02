@@ -8,6 +8,51 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { SoundSchema } from "@/lib/schemas";
 import type { DownloadProgressEvent } from "@/lib/schemas";
 
+async function getSoundFileSize(filePath: string): Promise<number | undefined> {
+  try {
+    const result = await stat(filePath);
+    return result.size;
+  } catch {
+    return undefined;
+  }
+}
+
+async function finalizeDownload(
+  eventId: string,
+  outputPath: string,
+  downloadFolderIdRef: { current: string | undefined },
+  updateJob: (id: string, update: DownloadJobUpdate) => void,
+): Promise<void> {
+  const { jobs } = useDownloadStore.getState();
+  const job = jobs[eventId];
+  if (job?.soundId) return;
+
+  const soundId = crypto.randomUUID();
+  const fileSizeBytes = await getSoundFileSize(outputPath);
+  const candidateSound = {
+    id: soundId,
+    name: job?.outputName ?? "Downloaded Sound",
+    filePath: outputPath,
+    folderId: downloadFolderIdRef.current,
+    sourceUrl: job?.url,
+    tags: job?.tags ?? [],
+    sets: job?.sets ?? [],
+    ...(fileSizeBytes !== undefined && { fileSizeBytes }),
+  };
+  const parsed = SoundSchema.safeParse(candidateSound);
+  if (!parsed.success) {
+    toast.error("Download complete but file path was rejected", {
+      description: parsed.error.issues[0]?.message,
+    });
+    return;
+  }
+  useLibraryStore.getState().updateLibrary((draft) => {
+    draft.sounds.push(parsed.data);
+  });
+  updateJob(eventId, { soundId });
+  toast.success("Download complete", { description: job?.outputName });
+}
+
 /**
  * Converts a raw DownloadProgressEvent into a typed DownloadJobUpdate.
  * Each status variant maps to the exact fields that variant requires,
@@ -41,7 +86,6 @@ function buildJobUpdate(event: DownloadProgressEvent): DownloadJobUpdate {
 
 export function useDownloadEventListener(downloadFolderId?: string) {
   const updateJob = useDownloadStore((s) => s.updateJob);
-  const updateLibrary = useLibraryStore((s) => s.updateLibrary);
 
   // Keep a ref so the callback always reads the latest value without
   // needing to be in the effect dependency array (which would cause
@@ -60,46 +104,7 @@ export function useDownloadEventListener(downloadFolderId?: string) {
       updateJob(event.id, buildJobUpdate(event));
 
       if (event.status === "completed" && event.outputPath) {
-        const outputPath = event.outputPath;
-        const eventId = event.id;
-        (async () => {
-          const jobs = useDownloadStore.getState().jobs;
-          const job = jobs[eventId];
-          // Guard against duplicate completion events adding the sound twice
-          if (job?.soundId) return;
-          const soundId = crypto.randomUUID();
-
-          let fileSizeBytes: number | undefined;
-          try {
-            const statResult = await stat(outputPath);
-            fileSizeBytes = statResult.size;
-          } catch {
-            // file stat failed — proceed without size
-          }
-
-          const candidateSound = {
-            id: soundId,
-            name: job?.outputName ?? "Downloaded Sound",
-            filePath: outputPath,
-            folderId: downloadFolderIdRef.current,
-            sourceUrl: job?.url,
-            tags: job?.tags ?? [],
-            sets: job?.sets ?? [],
-            ...(fileSizeBytes !== undefined && { fileSizeBytes }),
-          };
-          const parsed = SoundSchema.safeParse(candidateSound);
-          if (!parsed.success) {
-            toast.error("Download complete but file path was rejected", {
-              description: parsed.error.issues[0]?.message,
-            });
-            return;
-          }
-          updateLibrary((draft) => {
-            draft.sounds.push(parsed.data);
-          });
-          updateJob(eventId, { soundId });
-          toast.success("Download complete", { description: job?.outputName });
-        })().catch((err: unknown) => {
+        finalizeDownload(event.id, event.outputPath, downloadFolderIdRef, updateJob).catch((err: unknown) => {
           toast.error("Failed to finalize download", {
             description: err instanceof Error ? err.message : String(err),
           });
@@ -129,5 +134,5 @@ export function useDownloadEventListener(downloadFolderId?: string) {
       cancelled = true;
       unlisten?.();
     };
-  }, [updateJob, updateLibrary]); // downloadFolderId intentionally omitted — read via ref
+  }, [updateJob]); // downloadFolderId intentionally omitted — read via ref
 }

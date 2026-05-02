@@ -17,6 +17,13 @@ interface ExportProgressDialogProps {
   onCancel: () => void;
 }
 
+function getExportDisplayFlags(status: ExportProgressDialogProps["status"]): { showSpinner: boolean; showCancel: boolean } {
+  return {
+    showSpinner: status === "idle" || status === "copying" || status === "zipping",
+    showCancel: status !== "done" && status !== "error",
+  };
+}
+
 const STATUS_MESSAGE: Record<ExportProgressDialogProps["status"], string> = {
   idle: "Preparing\u2026",
   copying: "Preparing sounds\u2026",
@@ -32,8 +39,7 @@ export function ExportProgressDialog({
 }: ExportProgressDialogProps) {
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
-  const showSpinner = status === "idle" || status === "copying" || status === "zipping";
-  const showCancel = status !== "done" && status !== "error";
+  const { showSpinner, showCancel } = getExportDisplayFlags(status);
 
   const handleRequestCancel = () => setConfirmingCancel(true);
   const handleConfirmCancel = () => { setConfirmingCancel(false); onCancel(); };

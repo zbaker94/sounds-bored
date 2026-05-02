@@ -51,6 +51,40 @@ interface ProjectActionsContextValue {
 
 const ProjectActionsContext = createContext<ProjectActionsContextValue | null>(null);
 
+type ExportPayload = { jobId: string; status: string; zipPath?: string; error?: string };
+
+function makeExportEventHandler(
+  jobId: string,
+  zipName: string,
+  setExportStatus: (s: ExportStatus) => void,
+  closeOverlay: (id: string) => void,
+  exportUnlisten: React.MutableRefObject<(() => void) | null>,
+  exportJobId: React.MutableRefObject<string | null>,
+): (event: { payload: ExportPayload }) => void {
+  const cleanup = () => {
+    exportUnlisten.current?.();
+    exportUnlisten.current = null;
+    exportJobId.current = null;
+  };
+  return ({ payload }) => {
+    if (payload.jobId !== jobId) return;
+    if (payload.status === "copying") { setExportStatus("copying"); return; }
+    if (payload.status === "zipping") { setExportStatus("zipping"); return; }
+    cleanup();
+    if (payload.status === "done") {
+      setExportStatus("done");
+      setTimeout(() => { closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG); setExportStatus("idle"); toast.success(`Exported: ${payload.zipPath ?? zipName}`); }, 1200);
+    } else if (payload.status === "cancelled") {
+      closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
+      setExportStatus("idle");
+    } else if (payload.status === "error") {
+      setExportStatus("error");
+      toast.error(`Export failed: ${payload.error ?? "unknown error"}`);
+      setTimeout(() => { closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG); setExportStatus("idle"); }, 2000);
+    }
+  };
+}
+
 export function ProjectActionsProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
@@ -174,44 +208,8 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     setExportStatus("copying");
 
     // 7. Start listening for progress events
-    const unlistenFn = await listen<{
-      jobId: string;
-      status: string;
-      zipPath?: string;
-      error?: string;
-    }>("export://progress", (event) => {
-      if (event.payload.jobId !== jobId) return;
-      const status = event.payload.status;
-      if (status === "copying") setExportStatus("copying");
-      else if (status === "zipping") setExportStatus("zipping");
-      else if (status === "done") {
-        setExportStatus("done");
-        unlistenFn();
-        exportUnlisten.current = null;
-        exportJobId.current = null;
-        setTimeout(() => {
-          closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
-          setExportStatus("idle");
-          toast.success(`Exported: ${event.payload.zipPath ?? zipName}`);
-        }, 1200);
-      } else if (status === "cancelled") {
-        unlistenFn();
-        exportUnlisten.current = null;
-        exportJobId.current = null;
-        closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
-        setExportStatus("idle");
-      } else if (status === "error") {
-        setExportStatus("error");
-        unlistenFn();
-        exportUnlisten.current = null;
-        exportJobId.current = null;
-        toast.error(`Export failed: ${event.payload.error ?? "unknown error"}`);
-        setTimeout(() => {
-          closeOverlay(OVERLAY_ID.EXPORT_PROGRESS_DIALOG);
-          setExportStatus("idle");
-        }, 2000);
-      }
-    });
+    const handler = makeExportEventHandler(jobId, zipName, setExportStatus, closeOverlay, exportUnlisten, exportJobId);
+    const unlistenFn = await listen<ExportPayload>("export://progress", handler);
     exportUnlisten.current = unlistenFn;
 
     // 8. Invoke the export command (returns immediately — progress via events)

@@ -94,6 +94,128 @@ function useClickOutsideToDeselect(
   }, [editingPadId, padId, editMode, containerRef]);
 }
 
+function getPadButtonClassName(
+  isUnplayable: boolean,
+  multiFadeActive: boolean,
+  multiFadeSelectionClass: string | null,
+  isPlaying: boolean,
+): string {
+  const base = cn(
+    "relative w-full h-full rounded-xl overflow-hidden",
+    "flex items-center justify-center p-2",
+    "bg-card text-card-foreground",
+    "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
+    "text-sm font-semibold text-center select-none",
+  );
+  if (isUnplayable && !multiFadeActive) {
+    return cn(base, "opacity-40 border-2 border-black/20 cursor-default");
+  }
+  if (multiFadeSelectionClass) {
+    return cn(base, "border-2 cursor-pointer", multiFadeSelectionClass);
+  }
+  return cn(
+    base,
+    "border-2 transition-all cursor-pointer hover:brightness-110",
+    isPlaying ? "border-yellow-400" : "border-black/20",
+  );
+}
+
+interface PadFrontFaceProps {
+  pad: Pad;
+  sceneId: string;
+  isPlaying: boolean;
+  isFadingOut: boolean;
+  isFlipped: boolean;
+  isUnplayable: boolean;
+  multiFadeActive: boolean;
+  multiFadeHandlers: { onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => void };
+  multiFadeSelectionClass: string | null;
+  gestureHandlers: ReturnType<typeof usePadGesture>["gestureHandlers"];
+  showVolumeDisplay: boolean;
+  volumeExiting: boolean;
+  displayVolume: number;
+  isPopoverOpen: boolean;
+  padSoundState: ReturnType<typeof getPadSoundState>;
+}
+
+function PadFrontFace({
+  pad, sceneId, isPlaying, isFadingOut, isFlipped, isUnplayable,
+  multiFadeActive, multiFadeHandlers, multiFadeSelectionClass, gestureHandlers,
+  showVolumeDisplay, volumeExiting, displayVolume, isPopoverOpen, padSoundState,
+}: PadFrontFaceProps) {
+  return (
+    <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
+      <button
+        aria-label={pad.name}
+        {...(multiFadeActive ? multiFadeHandlers : (isUnplayable ? {} : gestureHandlers))}
+        className={getPadButtonClassName(isUnplayable, multiFadeActive, multiFadeSelectionClass, isPlaying)}
+        style={{
+          backgroundColor: isPlaying ? "#000" : (pad.color ?? undefined),
+          transition: "background-color 0.7s ease",
+          color: isPlaying ? "#fff" : undefined,
+        }}
+      >
+        {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
+        {showVolumeDisplay && (
+          <motion.div
+            className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
+            style={{ height: `${displayVolume * 100}%` }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: volumeExiting ? 0 : 1 }}
+            transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
+          />
+        )}
+        {/* Playback progress — one bar per active layer, split vertically.
+            Isolated in PadButtonProgress so 60Hz RAF ticks do not re-render PadButton. */}
+        <PadButtonProgress padId={pad.id} layers={pad.layers} />
+        {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
+        <div className="relative z-10 flex flex-col items-center gap-0.5">
+          <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
+          {showVolumeDisplay && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{
+                opacity: volumeExiting ? 0 : 1,
+                height: volumeExiting ? 0 : "auto",
+              }}
+              transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
+              style={{ overflow: "hidden" }}
+              className="flex justify-center"
+            >
+              <span className="text-xs font-bold tabular-nums">
+                {Math.round(displayVolume * 100)}%
+              </span>
+            </motion.div>
+          )}
+        </div>
+        {/* Amber line during fade-out — uses persisted target, no live subscription needed */}
+        {isFadingOut && (
+          <div
+            className="absolute left-0 right-0 h-px bg-amber-400/80 pointer-events-none z-10"
+            style={{ bottom: `${pad.fadeTargetVol ?? 0}%` }}
+          />
+        )}
+        {/* Popover content isolated so pointer-move updates only re-render this subtree */}
+        {isPopoverOpen && <PadFadePopoverContent pad={pad} sceneId={sceneId} />}
+        {/* Multi-fade slider overlay — isolated in PadButtonFadeOverlay with its own store subscriptions */}
+        <PadButtonFadeOverlay pad={pad} sceneId={sceneId} />
+      </button>
+      {padSoundState === "partial" && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="absolute bottom-1 right-1 z-20 pointer-events-auto">
+              <HugeiconsIcon icon={Alert02Icon} size={16} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            Some assigned sounds are missing from the library. Open pad settings to review.
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
 export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: PadButtonProps) {
   // isPlaying drives styling (border, background, drop-shadow, pulse ring).
   // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
@@ -300,92 +422,23 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
           }}
         >
           {/* Front face — normal pad */}
-          <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
-            <button
-              aria-label={pad.name}
-              {...(multiFadeActive ? multiFadeHandlers : (isUnplayable ? {} : gestureHandlers))}
-              className={cn(
-                "relative w-full h-full rounded-xl overflow-hidden",
-                "flex items-center justify-center p-2",
-                "bg-card text-card-foreground",
-                "shadow-[3px_3px_0px_rgba(0,0,0,0.3)]",
-                "text-sm font-semibold text-center select-none",
-                isUnplayable && !multiFadeActive
-                  ? "opacity-40 border-2 border-black/20 cursor-default"
-                  : multiFadeSelectionClass
-                    ? cn("border-2 cursor-pointer", multiFadeSelectionClass)
-                    : cn(
-                        "border-2 transition-all cursor-pointer",
-                        "hover:brightness-110",
-                        isPlaying
-                          ? "border-yellow-400"
-                          : "border-black/20"
-                      )
-              )}
-              style={{
-                backgroundColor: isPlaying ? "#000" : (pad.color ?? undefined),
-                transition: "background-color 0.7s ease",
-                color: isPlaying ? "#fff" : undefined,
-              }}
-            >
-              {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
-              {showVolumeDisplay && (
-                <motion.div
-                  className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
-                  style={{ height: `${displayVolume * 100}%` }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: volumeExiting ? 0 : 1 }}
-                  transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
-                />
-              )}
-              {/* Playback progress — one bar per active layer, split vertically.
-                  Isolated in PadButtonProgress so 60Hz RAF ticks do not re-render PadButton. */}
-              <PadButtonProgress padId={pad.id} layers={pad.layers} />
-              {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
-              <div className="relative z-10 flex flex-col items-center gap-0.5">
-                <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-                {showVolumeDisplay && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{
-                      opacity: volumeExiting ? 0 : 1,
-                      height: volumeExiting ? 0 : "auto",
-                    }}
-                    transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
-                    style={{ overflow: "hidden" }}
-                    className="flex justify-center"
-                  >
-                    <span className="text-xs font-bold tabular-nums">
-                      {Math.round(displayVolume * 100)}%
-                    </span>
-                  </motion.div>
-                )}
-              </div>
-              {/* Amber line during fade-out — uses persisted target, no live subscription needed */}
-              {isFadingOut && (
-                <div
-                  className="absolute left-0 right-0 h-px bg-amber-400/80 pointer-events-none z-10"
-                  style={{ bottom: `${pad.fadeTargetVol ?? 0}%` }}
-                />
-              )}
-              {/* Popover content isolated so pointer-move updates only re-render this subtree */}
-              {isPopoverOpen && <PadFadePopoverContent pad={pad} sceneId={sceneId} />}
-              {/* Multi-fade slider overlay — isolated in PadButtonFadeOverlay with its own store subscriptions */}
-              <PadButtonFadeOverlay pad={pad} sceneId={sceneId} />
-            </button>
-            {padSoundState === "partial" && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="absolute bottom-1 right-1 z-20 pointer-events-auto">
-                    <HugeiconsIcon icon={Alert02Icon} size={16} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Some assigned sounds are missing from the library. Open pad settings to review.
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
+          <PadFrontFace
+            pad={pad}
+            sceneId={sceneId}
+            isPlaying={isPlaying}
+            isFadingOut={isFadingOut}
+            isFlipped={isFlipped}
+            isUnplayable={isUnplayable}
+            multiFadeActive={multiFadeActive}
+            multiFadeHandlers={multiFadeHandlers}
+            multiFadeSelectionClass={multiFadeSelectionClass}
+            gestureHandlers={gestureHandlers}
+            showVolumeDisplay={showVolumeDisplay}
+            volumeExiting={volumeExiting}
+            displayVolume={displayVolume}
+            isPopoverOpen={isPopoverOpen}
+            padSoundState={padSoundState}
+          />
 
           {/* Back face */}
           <div

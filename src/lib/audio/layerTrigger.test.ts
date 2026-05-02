@@ -838,25 +838,27 @@ describe("startLayerSound circuit-breaker", () => {
     );
   });
 
-  it("loop-restart .catch path: load failure in chain loop-restart is not silent", async () => {
-    // The onended handler rebuilds the chain when playbackMode=loop and the chain
-    // has exhausted naturally. If that startLayerSound call fails, the .catch logs
-    // to console rather than swallowing — and the failure reaches emitAudioError
-    // via startLayerSound's internal catch.
+  async function setupLoopRestartTest(
+    arrangement: "sequential" | "simultaneous",
+    padId: string,
+    layerId: string,
+  ) {
     const { loadBuffer } = await import("./bufferCache");
-    const { startLayerSound } = await import("./layerTrigger");
     const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
-    // Configure library store so resolveSounds returns s1 (needed for loop-restart live lookup).
+    const { startLayerSound } = await import("./layerTrigger");
     const { useLibraryStore } = await import("@/state/libraryStore");
 
-    const s1 = createMockSound({ id: "s1", name: "loopSound", filePath: "s1.wav" });
+    const s1 = createMockSound({
+      id: "s1",
+      name: arrangement === "sequential" ? "loopSound" : "simSound",
+      filePath: "s1.wav",
+    });
     vi.mocked(useLibraryStore.getState).mockReturnValue({ sounds: [s1] } as ReturnType<typeof useLibraryStore.getState>);
 
-    const pad = createMockPad({ id: "cb-loop-pad" });
-    // Layer selection must reference s1 so resolveSounds returns it from the live library.
+    const pad = createMockPad({ id: padId });
     const layer = createMockLayer({
-      id: "cb-loop-layer",
-      arrangement: "sequential",
+      id: layerId,
+      arrangement,
       playbackMode: "loop",
       selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
     });
@@ -875,13 +877,22 @@ describe("startLayerSound circuit-breaker", () => {
       voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
     );
 
-    // First load succeeds — onended is registered; chain is empty (exhausted naturally).
     vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
-    setLayerChain(layer.id, []);  // empty chain = natural exhaustion
+    setLayerChain(layer.id, []);
     await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
     expect(capturedOnEnded.length).toBeGreaterThan(0);
-
     mockEmitAudioError.mockClear();
+
+    return { s1, pad, layer, capturedOnEnded };
+  }
+
+  it("loop-restart .catch path: load failure in chain loop-restart is not silent", async () => {
+    // The onended handler rebuilds the chain when playbackMode=loop and the chain
+    // has exhausted naturally. If that startLayerSound call fails, the .catch logs
+    // to console rather than swallowing — and the failure reaches emitAudioError
+    // via startLayerSound's internal catch.
+    const { loadBuffer } = await import("./bufferCache");
+    const { capturedOnEnded } = await setupLoopRestartTest("sequential", "cb-loop-pad", "cb-loop-layer");
 
     // Loop-restart load fails. Should flow through emitAudioError, not be silently dropped.
     vi.mocked(loadBuffer).mockRejectedValue(new Error("loop-restart boom"));
@@ -901,44 +912,7 @@ describe("startLayerSound circuit-breaker", () => {
     // exhausts and arrangement is non-chained, the loop-restart fires all sounds
     // simultaneously via separate startLayerSound calls. Failures must not be silent.
     const { loadBuffer } = await import("./bufferCache");
-    const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
-    // Configure library store so resolveSounds returns s1 during the live loop-restart lookup.
-    const { useLibraryStore } = await import("@/state/libraryStore");
-
-    const s1 = createMockSound({ id: "s1", name: "simSound", filePath: "s1.wav" });
-    vi.mocked(useLibraryStore.getState).mockReturnValue({ sounds: [s1] } as ReturnType<typeof useLibraryStore.getState>);
-
-    const pad = createMockPad({ id: "cb-sim-pad" });
-    // simultaneous arrangement (isChained returns false); selection references s1.
-    const layer = createMockLayer({
-      id: "cb-sim-layer",
-      arrangement: "simultaneous",
-      playbackMode: "loop",
-      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
-    });
-    const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
-
-    const capturedOnEnded: Array<() => void> = [];
-    const voiceMock = {
-      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
-      start: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn(),
-      stopWithRamp: vi.fn(),
-    };
-    const voiceModule = await import("./audioVoice");
-    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
-      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
-    );
-
-    // First load succeeds with empty chain (simultaneous layers don't use chain queue).
-    vi.mocked(loadBuffer).mockResolvedValueOnce({ duration: 1.0 } as unknown as AudioBuffer);
-    setLayerChain(layer.id, []);  // empty chain triggers the "exhausted" → loop branch
-    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
-    expect(capturedOnEnded.length).toBeGreaterThan(0);
-
-    mockEmitAudioError.mockClear();
+    const { capturedOnEnded } = await setupLoopRestartTest("simultaneous", "cb-sim-pad", "cb-sim-layer");
 
     vi.mocked(loadBuffer).mockRejectedValue(new Error("sim-restart boom"));
     capturedOnEnded[0]();

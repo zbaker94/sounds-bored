@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Internal code refactoring across audio engine, download manager, and pad gesture handling — no behavior changes, improves long-term stability and maintainability
+- Reduced unnecessary memory allocations in the audio tick loop, which may improve performance during playback with many active pads
+- Test suite reorganized with shared helper utilities, reducing duplication and improving reliability of automated tests
 - Internal code refactoring only — no user-facing features or behavior changes in this release.
 - Non-playing pads included in a synchronized fade now trigger playback instead of silently doing nothing when the fade target is 0.
 - The volume slider in the fade overlay is now hidden for pads that aren't currently playing, reducing clutter and preventing no-op adjustments.

@@ -499,6 +499,22 @@ export function clearLayerGainsForIds(layerIds: ReadonlySet<string>): void {
   }
 }
 
+function removeVoicesFromLayers(padId: string, voiceSet: Set<AudioVoice>): void {
+  const padLayers = _padToLayerIds.get(padId);
+  if (!padLayers) return;
+  for (const layerId of [...padLayers]) {
+    const layerVoices = layerVoiceMap.get(layerId) ?? [];
+    const remaining = layerVoices.filter(v => !voiceSet.has(v));
+    if (remaining.length === 0) {
+      layerVoiceMap.delete(layerId);
+      padLayers.delete(layerId);
+    } else {
+      layerVoiceMap.set(layerId, remaining);
+    }
+  }
+  if (padLayers.size === 0) _padToLayerIds.delete(padId);
+}
+
 /**
  * Stop only the voice objects in the snapshot, scoped to the given pad IDs.
  * Voices added to those pads after the snapshot was taken (new triggers during
@@ -520,20 +536,7 @@ export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds:
     } else {
       voiceMap.set(padId, remaining);
     }
-    const padLayers = _padToLayerIds.get(padId);
-    if (padLayers) {
-      for (const layerId of [...padLayers]) {
-        const layerVoices = layerVoiceMap.get(layerId) ?? [];
-        const layerRemaining = layerVoices.filter(v => !voiceSet.has(v));
-        if (layerRemaining.length === 0) {
-          layerVoiceMap.delete(layerId);
-          padLayers.delete(layerId);
-        } else {
-          layerVoiceMap.set(layerId, layerRemaining);
-        }
-      }
-      if (padLayers.size === 0) _padToLayerIds.delete(padId);
-    }
+    removeVoicesFromLayers(padId, voiceSet);
   }
   layerVoiceVersion++;
   for (const voice of voices) {

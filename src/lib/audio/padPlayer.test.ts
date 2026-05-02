@@ -218,6 +218,74 @@ function setSounds(sounds: ReturnType<typeof createMockSound>[]) {
   } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 }
 
+/**
+ * Creates a layer with two assigned instances (A, B) plus a third sound (C) in
+ * the library, then triggers the pad once. Used by sequential/shuffled tests
+ * that need an active voice plus a stale queued sound before they swap the
+ * selection to [C].
+ */
+async function triggerTwoSoundLayer(arrangement: "sequential" | "shuffled") {
+  const { triggerPad } = await import("./padPlayer");
+  const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
+  const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
+  const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
+  setSounds([soundA, soundB, soundC]);
+  const layer = createMockLayer({
+    playbackMode: "one-shot",
+    arrangement,
+    selection: {
+      type: "assigned",
+      instances: [
+        { id: "inst-a", soundId: soundA.id, volume: 100 },
+        { id: "inst-b", soundId: soundB.id, volume: 100 },
+      ],
+    },
+  });
+  const pad = createMockPad({ layers: [layer] });
+  await triggerPad(pad);
+  await tick();
+  return { soundA, soundB, soundC, layer, pad };
+}
+
+/**
+ * Builds three sounds (a/b/c), registers them in the library, and creates a
+ * sequential loop layer with all three assigned. Used by skipLayerBack tests
+ * that pre-seed playOrder/chain manually.
+ */
+function makeThreeLoopSounds() {
+  const sounds = [
+    createMockSound({ filePath: "a.wav" }),
+    createMockSound({ filePath: "b.wav" }),
+    createMockSound({ filePath: "c.wav" }),
+  ];
+  setSounds(sounds);
+  const layer = createMockLayer({
+    arrangement: "sequential",
+    playbackMode: "loop",
+    selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+  });
+  const pad = createMockPad({ layers: [layer] });
+  return { sounds, layer, pad };
+}
+
+/** Same as `makeThreeLoopSounds` but with `cycleMode: true` on the layer. */
+function makeThreeLoopSoundsCycle() {
+  const sounds = [
+    createMockSound({ filePath: "a.wav" }),
+    createMockSound({ filePath: "b.wav" }),
+    createMockSound({ filePath: "c.wav" }),
+  ];
+  setSounds(sounds);
+  const layer = createMockLayer({
+    arrangement: "sequential",
+    playbackMode: "loop",
+    cycleMode: true,
+    selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
+  });
+  const pad = createMockPad({ layers: [layer] });
+  return { sounds, layer, pad };
+}
+
 // â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("simultaneous arrangement", () => {
@@ -1974,26 +2042,7 @@ describe("syncLayerSelection", () => {
   });
 
   it("sequential: rebuilds chain queue so new sounds play instead of stale queued sounds", async () => {
-    const { triggerPad } = await import("./padPlayer");
-    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
-    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
-    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
-    setSounds([soundA, soundB, soundC]);
-
-    const layer = createMockLayer({
-      playbackMode: "one-shot",
-      arrangement: "sequential",
-      selection: {
-        type: "assigned",
-        instances: [
-          { id: "inst-a", soundId: soundA.id, volume: 100 },
-          { id: "inst-b", soundId: soundB.id, volume: 100 },
-        ],
-      },
-    });
-    const pad = createMockPad({ layers: [layer] });
-    await triggerPad(pad);
-    await tick();
+    const { soundC, layer } = await triggerTwoSoundLayer("sequential");
 
     // A is playing; B is stale in queue. Replace selection with [C].
     const newLayer = {
@@ -2018,26 +2067,7 @@ describe("syncLayerSelection", () => {
   });
 
   it("shuffled: rebuilds chain queue with new sounds so stale queued sounds are replaced", async () => {
-    const { triggerPad } = await import("./padPlayer");
-    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
-    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
-    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
-    setSounds([soundA, soundB, soundC]);
-
-    const layer = createMockLayer({
-      playbackMode: "one-shot",
-      arrangement: "shuffled",
-      selection: {
-        type: "assigned",
-        instances: [
-          { id: "inst-a", soundId: soundA.id, volume: 100 },
-          { id: "inst-b", soundId: soundB.id, volume: 100 },
-        ],
-      },
-    });
-    const pad = createMockPad({ layers: [layer] });
-    await triggerPad(pad);
-    await tick();
+    const { soundC, layer } = await triggerTwoSoundLayer("shuffled");
 
     // One of A/B is playing; the other is in the stale queue. Replace selection with [C].
     const newLayer = {
@@ -2351,26 +2381,7 @@ describe("selectionsEqual", () => {
 
 describe("syncLayerConfig â€” selection-only change", () => {
   it("selection changes only: rebuilds queue with new sounds", async () => {
-    const { triggerPad } = await import("./padPlayer");
-    const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
-    const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
-    const soundC = createMockSound({ id: "sound-c", filePath: "c.wav" });
-    setSounds([soundA, soundB, soundC]);
-
-    const layer = createMockLayer({
-      playbackMode: "one-shot",
-      arrangement: "sequential",
-      selection: {
-        type: "assigned",
-        instances: [
-          { id: "inst-a", soundId: soundA.id, volume: 100 },
-          { id: "inst-b", soundId: soundB.id, volume: 100 },
-        ],
-      },
-    });
-    const pad = createMockPad({ layers: [layer] });
-    await triggerPad(pad);
-    await tick();
+    const { soundC, layer } = await triggerTwoSoundLayer("sequential");
 
     // Change only selection: [A, B] â†’ [C] â€” arrangement stays sequential
     const updated = {
@@ -3395,19 +3406,7 @@ describe("skipLayerBack", () => {
   it("goes back one position when in the middle of play order", async () => {
     const { getLayerCycleIndex, getLayerChain, setLayerChain, setLayerPlayOrder } = await import("./audioState");
 
-    const sounds = [
-      createMockSound({ filePath: "a.wav" }),
-      createMockSound({ filePath: "b.wav" }),
-      createMockSound({ filePath: "c.wav" }),
-    ];
-    setSounds(sounds);
-
-    const layer = createMockLayer({
-      arrangement: "sequential",
-      playbackMode: "loop",
-      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
-    });
-    const pad = createMockPad({ layers: [layer] });
+    const { sounds, layer, pad } = makeThreeLoopSounds();
 
     // Simulate state at position 1: soundB is playing, chain has [soundC] remaining
     // playOrder = [soundA, soundB, soundC], chain = [soundC]
@@ -3427,20 +3426,7 @@ describe("skipLayerBack", () => {
   it("uses cycleIndex (not chain) to determine position in cycle mode", async () => {
     const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./audioState");
 
-    const sounds = [
-      createMockSound({ filePath: "a.wav" }),
-      createMockSound({ filePath: "b.wav" }),
-      createMockSound({ filePath: "c.wav" }),
-    ];
-    setSounds(sounds);
-
-    const layer = createMockLayer({
-      arrangement: "sequential",
-      playbackMode: "loop",
-      cycleMode: true,
-      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
-    });
-    const pad = createMockPad({ layers: [layer] });
+    const { sounds, layer, pad } = makeThreeLoopSoundsCycle();
 
     // Simulate: soundB (index 1) is playing. After trigger, cycleIndex was advanced to 2.
     // No chain is set â€” cycle mode never uses it.
@@ -3563,15 +3549,7 @@ describe("skipLayerBack", () => {
 
     const { setLayerPlayOrder, setLayerChain } = await import("./audioState");
 
-    const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" }), createMockSound({ filePath: "c.wav" })];
-    setSounds(sounds);
-
-    const layer = createMockLayer({
-      arrangement: "sequential",
-      playbackMode: "loop",
-      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
-    });
-    const pad = createMockPad({ layers: [layer] });
+    const { sounds, layer, pad } = makeThreeLoopSounds();
     setLayerPlayOrder(layer.id, sounds);
     setLayerChain(layer.id, [sounds[2]]); // soundC remaining (soundB was playing)
 
@@ -3589,16 +3567,7 @@ describe("skipLayerBack", () => {
 
     const { setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
 
-    const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" }), createMockSound({ filePath: "c.wav" })];
-    setSounds(sounds);
-
-    const layer = createMockLayer({
-      arrangement: "sequential",
-      playbackMode: "loop",
-      cycleMode: true,
-      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 100 })) },
-    });
-    const pad = createMockPad({ layers: [layer] });
+    const { sounds, layer, pad } = makeThreeLoopSoundsCycle();
     setLayerPlayOrder(layer.id, sounds);
     setLayerCycleIndex(layer.id, 2); // cursor at C (B was playing, A is previous)
 

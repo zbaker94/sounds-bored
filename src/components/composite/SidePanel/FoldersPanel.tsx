@@ -62,6 +62,27 @@ import { cn } from "@/lib/utils";
 const panelClass =
   "backdrop-blur-sm hover:backdrop-blur-lg bg-black/50 rounded-lg";
 
+async function openFolderInExplorer(folderPath: string): Promise<void> {
+  const folderExists = await exists(folderPath);
+  if (!folderExists) {
+    toast.error("Folder no longer exists on disk");
+    return;
+  }
+  await openPath(folderPath);
+}
+
+function isAssignedFolder(
+  folderId: string,
+  settings: { downloadFolderId?: string | null; importFolderId?: string | null },
+): boolean {
+  return settings.downloadFolderId === folderId || settings.importFolderId === folderId;
+}
+
+async function removeFolderFromDisk(folderPath: string): Promise<void> {
+  const folderExists = await exists(folderPath);
+  if (folderExists) await remove(folderPath, { recursive: true });
+}
+
 interface FoldersPanelProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -141,12 +162,7 @@ export function FoldersPanel({
   async function handleOpenFolderInExplorer() {
     if (!selectedFolder) return;
     try {
-      const folderExists = await exists(selectedFolder.path);
-      if (!folderExists) {
-        toast.error("Folder no longer exists on disk");
-        return;
-      }
-      await openPath(selectedFolder.path);
+      await openFolderInExplorer(selectedFolder.path);
     } catch (err) {
       console.error("[FoldersPanel] openFolderInExplorer:", err);
       toast.error("Failed to open folder", {
@@ -159,39 +175,22 @@ export function FoldersPanel({
     if (!selectedFolder) return;
     const storeSettings = useAppSettingsStore.getState().settings;
     if (!storeSettings) return;
-    if (
-      storeSettings.downloadFolderId === selectedFolder.id ||
-      storeSettings.importFolderId === selectedFolder.id
-    ) {
-      toast.error(
-        "Cannot delete: folder is assigned as download or import destination",
-      );
+    if (isAssignedFolder(selectedFolder.id, storeSettings)) {
+      toast.error("Cannot delete: folder is assigned as download or import destination");
       setConfirmDeleteFolderOpen(false);
       return;
     }
-    const folderId = selectedFolder.id;
-    const folderName = selectedFolder.name;
-    const folderPath = selectedFolder.path;
+    const { id: folderId, name: folderName, path: folderPath } = selectedFolder;
     setIsDeletingFolder(true);
     try {
-      const folderSoundIds = sounds
-        .filter((s) => s.folderId === folderId)
-        .map((s) => s.id);
-      evictSoundCachesMany(folderSoundIds);
-      updateLibrary((draft) => {
-        draft.sounds = draft.sounds.filter((s) => s.folderId !== folderId);
-      });
+      evictSoundCachesMany(sounds.filter((s) => s.folderId === folderId).map((s) => s.id));
+      updateLibrary((draft) => { draft.sounds = draft.sounds.filter((s) => s.folderId !== folderId); });
       removeGlobalFolder(folderId);
       const settingsAfterRemove = useAppSettingsStore.getState().settings;
-      if (settingsAfterRemove) {
-        await saveSettings(settingsAfterRemove);
-      }
+      if (settingsAfterRemove) await saveSettings(settingsAfterRemove);
       await saveCurrentLibrary();
       await refreshMissingState();
-      const folderExists = await exists(folderPath);
-      if (folderExists) {
-        await remove(folderPath, { recursive: true });
-      }
+      await removeFolderFromDisk(folderPath);
       onSelect(null);
       toast.success(`Folder "${folderName}" deleted from disk`);
     } catch (err) {

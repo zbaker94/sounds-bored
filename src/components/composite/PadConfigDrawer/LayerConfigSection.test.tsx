@@ -61,6 +61,31 @@ describe("LayerConfigSection", () => {
     useLibraryStore.setState({ ...initialLibraryState });
   });
 
+  async function hoverInfoButtonAndAssert(index: number, expectedText: string | RegExp) {
+    const infoButtons = screen.getAllByRole("button", { hidden: true }).filter(
+      (btn) => btn.tabIndex === -1 && btn.getAttribute("data-slot") === "tooltip-trigger",
+    );
+    await userEvent.hover(infoButtons[index]);
+    const matches = await screen.findAllByText(expectedText);
+    expect(matches.length).toBeGreaterThan(0);
+  }
+
+  async function hoverTabTooltipAndAssert(tabName: RegExp, expectedText: string | RegExp) {
+    const tab = screen.getByRole("tab", { name: tabName });
+    // eslint-disable-next-line testing-library/no-node-access
+    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
+    const matches = await screen.findAllByText(expectedText);
+    expect(matches.length).toBeGreaterThan(0);
+  }
+
+  function renderWithLayer(overrides: Partial<PadConfigForm["layers"][0]>) {
+    render(<Wrapper values={makeValues(overrides)} />);
+  }
+
+  function expectTextInDocument(text: string | RegExp) {
+    expect(screen.getByText(text)).toBeInTheDocument();
+  }
+
   it("renders the selection type toggle with all three options", () => {
     render(<Wrapper />);
     expect(screen.getByRole("tab", { name: /assigned/i })).toBeInTheDocument();
@@ -150,108 +175,59 @@ describe("LayerConfigSection", () => {
 
   it("shows Sound Selection info tooltip on hover", async () => {
     render(<Wrapper />);
-    const infoButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (btn) => btn.tabIndex === -1 && btn.getAttribute("data-slot") === "tooltip-trigger",
-    );
-    await userEvent.hover(infoButtons[0]);
-    const matches = await screen.findAllByText("Determines which sounds this layer can use when the pad is triggered.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverInfoButtonAndAssert(0, "Determines which sounds this layer can use when the pad is triggered.");
   });
 
   it("shows Arrangement info tooltip on hover", async () => {
     render(<Wrapper />);
-    const infoButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (btn) => btn.tabIndex === -1 && btn.getAttribute("data-slot") === "tooltip-trigger",
-    );
-    await userEvent.hover(infoButtons[1]);
-    const matches = await screen.findAllByText("Controls whether eligible sounds play all at once, or one at a time in order or at random.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverInfoButtonAndAssert(1, "Controls whether eligible sounds play all at once, or one at a time in order or at random.");
   });
 
   it("shows Playback Mode info tooltip on hover", async () => {
     render(<Wrapper />);
-    const infoButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (btn) => btn.tabIndex === -1 && btn.getAttribute("data-slot") === "tooltip-trigger",
-    );
-    await userEvent.hover(infoButtons[2]);
-    const matches = await screen.findAllByText("Controls how long the sound plays after the pad is triggered.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverInfoButtonAndAssert(2, "Controls how long the sound plays after the pad is triggered.");
   });
 
   it("shows Retrigger Mode info tooltip on hover", async () => {
     render(<Wrapper />);
-    const infoButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (btn) => btn.tabIndex === -1 && btn.getAttribute("data-slot") === "tooltip-trigger",
-    );
-    await userEvent.hover(infoButtons[3]);
-    const matches = await screen.findAllByText("Controls what happens when the pad is triggered while this layer is already playing.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverInfoButtonAndAssert(3, "Controls what happens when the pad is triggered while this layer is already playing.");
   });
 
   it("shows Mode info tooltip when arrangement is sequential", async () => {
-    render(<Wrapper values={makeValues({ arrangement: "sequential" })} />);
-    const infoButtons = screen.getAllByRole("button", { hidden: true }).filter(
-      (btn) => btn.tabIndex === -1 && btn.getAttribute("data-slot") === "tooltip-trigger",
-    );
-    await userEvent.hover(infoButtons[2]);
-    const matches = await screen.findAllByText("Controls whether the whole sequence chains automatically, or each trigger advances one step at a time.");
-    expect(matches.length).toBeGreaterThan(0);
+    renderWithLayer({ arrangement: "sequential" });
+    await hoverInfoButtonAndAssert(2, "Controls whether the whole sequence chains automatically, or each trigger advances one step at a time.");
   });
 
   // ─── Tab tooltip tests ───────────────────────────────────────────────────
 
   it("shows Assigned tab tooltip on hover", async () => {
     render(<Wrapper />);
-    const tab = screen.getByRole("tab", { name: /assigned/i });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
-    const matches = await screen.findAllByText("Pick specific sounds from your library.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverTabTooltipAndAssert(/assigned/i, "Pick specific sounds from your library.");
   });
 
   it("shows Simultaneous tab tooltip on hover", async () => {
     render(<Wrapper />);
-    const tab = screen.getByRole("tab", { name: /simultaneous/i });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
-    const matches = await screen.findAllByText("All sounds start at the same time.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverTabTooltipAndAssert(/simultaneous/i, "All sounds start at the same time.");
   });
 
   it("shows One-shot tab tooltip on hover", async () => {
     render(<Wrapper />);
-    const tab = screen.getByRole("tab", { name: /one-shot/i });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
-    const matches = await screen.findAllByText("The sound plays once from start to finish, then stops.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverTabTooltipAndAssert(/one-shot/i, "The sound plays once from start to finish, then stops.");
   });
 
   it("shows Restart retrigger tab tooltip on hover", async () => {
     render(<Wrapper />);
-    const tab = screen.getByRole("tab", { name: /restart/i });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
-    const matches = await screen.findAllByText("Stops the current sound and starts it again from the beginning.");
-    expect(matches.length).toBeGreaterThan(0);
+    await hoverTabTooltipAndAssert(/restart/i, "Stops the current sound and starts it again from the beginning.");
   });
 
   it("shows Continuous tab tooltip on hover (sequential arrangement)", async () => {
-    render(<Wrapper values={makeValues({ arrangement: "sequential" })} />);
-    const tab = screen.getByRole("tab", { name: /continuous/i });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
-    const matches = await screen.findAllByText(/The full sequence plays through automatically/);
-    expect(matches.length).toBeGreaterThan(0);
+    renderWithLayer({ arrangement: "sequential" });
+    await hoverTabTooltipAndAssert(/continuous/i, /The full sequence plays through automatically/);
   });
 
   it("shows Cycle tab tooltip on hover (sequential arrangement)", async () => {
-    render(<Wrapper values={makeValues({ arrangement: "sequential" })} />);
-    const tab = screen.getByRole("tab", { name: /cycle/i });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
-    const matches = await screen.findAllByText(/Each trigger plays one sound, advancing/);
-    expect(matches.length).toBeGreaterThan(0);
+    renderWithLayer({ arrangement: "sequential" });
+    await hoverTabTooltipAndAssert(/cycle/i, /Each trigger plays one sound, advancing/);
   });
 
   // ─── Arrangement helper text tests ────────────────────────────────────────
@@ -263,64 +239,64 @@ describe("LayerConfigSection", () => {
   });
 
   it("shows arrangement helper for simultaneous with 1 assigned sound", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
-    })} />);
-    expect(screen.getByText("The assigned sound plays on each trigger.")).toBeInTheDocument();
+    });
+    expectTextInDocument("The assigned sound plays on each trigger.");
   });
 
   it("shows arrangement helper for simultaneous with 3 assigned sounds", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       selection: { type: "assigned", instances: [
         { id: "i1", soundId: "s1", volume: 100 },
         { id: "i2", soundId: "s2", volume: 100 },
         { id: "i3", soundId: "s3", volume: 100 },
       ] },
-    })} />);
-    expect(screen.getByText("All 3 assigned sounds play together on each trigger.")).toBeInTheDocument();
+    });
+    expectTextInDocument("All 3 assigned sounds play together on each trigger.");
   });
 
   it("shows arrangement helper for simultaneous with tag selection", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       selection: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 },
-    })} />);
-    expect(screen.getByText("All matched sounds play together at trigger time.")).toBeInTheDocument();
+    });
+    expectTextInDocument("All matched sounds play together at trigger time.");
   });
 
   it("shows arrangement helper for sequential with 1 assigned sound", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
-    })} />);
-    expect(screen.getByText("Only one sound assigned — arrangement has no effect with a single sound.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Only one sound assigned — arrangement has no effect with a single sound.");
   });
 
   it("shows arrangement helper for sequential + 2 assigned + continuous", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: false,
       selection: { type: "assigned", instances: [
         { id: "i1", soundId: "s1", volume: 100 },
         { id: "i2", soundId: "s2", volume: 100 },
       ] },
-    })} />);
-    expect(screen.getByText(/All 2 sounds chain automatically/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/All 2 sounds chain automatically/);
   });
 
   it("shows arrangement helper for sequential + 2 assigned + cycle", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: true,
       selection: { type: "assigned", instances: [
         { id: "i1", soundId: "s1", volume: 100 },
         { id: "i2", soundId: "s2", volume: 100 },
       ] },
-    })} />);
-    expect(screen.getByText("Each trigger plays the next sound in order.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Each trigger plays the next sound in order.");
   });
 
   it("shows arrangement helper for shuffled + 3 assigned + continuous", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "shuffled",
       cycleMode: false,
       selection: { type: "assigned", instances: [
@@ -328,213 +304,213 @@ describe("LayerConfigSection", () => {
         { id: "i2", soundId: "s2", volume: 100 },
         { id: "i3", soundId: "s3", volume: 100 },
       ] },
-    })} />);
-    expect(screen.getByText(/All 3 sounds chain automatically.*random order/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/All 3 sounds chain automatically.*random order/);
   });
 
   it("shows arrangement helper for shuffled + 2 assigned + cycle", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "shuffled",
       cycleMode: true,
       selection: { type: "assigned", instances: [
         { id: "i1", soundId: "s1", volume: 100 },
         { id: "i2", soundId: "s2", volume: 100 },
       ] },
-    })} />);
-    expect(screen.getByText("Each trigger plays a random sound from the 2 assigned.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Each trigger plays a random sound from the 2 assigned.");
   });
 
   it("shows arrangement helper for sequential + tag + cycle", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: true,
       selection: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 },
-    })} />);
-    expect(screen.getByText("Each trigger plays the next sound from the matched pool.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Each trigger plays the next sound from the matched pool.");
   });
 
   it("shows arrangement helper for shuffled + set + continuous", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "shuffled",
       cycleMode: false,
       selection: { type: "set", setId: "s1", defaultVolume: 100 },
-    })} />);
-    expect(screen.getByText("All matched sounds chain automatically on each trigger.")).toBeInTheDocument();
+    });
+    expectTextInDocument("All matched sounds chain automatically on each trigger.");
   });
 
   // ─── Cycle mode helper text tests ─────────────────────────────────────────
 
   it("shows cycle mode helper for sequential + continuous + one-shot", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: false,
       playbackMode: "one-shot",
-    })} />);
-    expect(screen.getByText(/The full sequence plays through once and stops/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/The full sequence plays through once and stops/);
   });
 
   it("shows cycle mode helper for sequential + continuous + loop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: false,
       playbackMode: "loop",
-    })} />);
-    expect(screen.getByText(/The sequence loops indefinitely/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/The sequence loops indefinitely/);
   });
 
   it("shows cycle mode helper for sequential + cycle + one-shot", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: true,
       playbackMode: "one-shot",
-    })} />);
-    expect(screen.getByText(/Each trigger plays the next sound in order. After the last/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Each trigger plays the next sound in order. After the last/);
   });
 
   it("shows cycle mode helper for sequential + cycle + loop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "sequential",
       cycleMode: true,
       playbackMode: "loop",
-    })} />);
-    expect(screen.getByText(/Each trigger advances to the next sound, which then loops/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Each trigger advances to the next sound, which then loops/);
   });
 
   it("shows cycle mode helper for shuffled + continuous + one-shot", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "shuffled",
       cycleMode: false,
       playbackMode: "one-shot",
-    })} />);
-    expect(screen.getByText(/A new random order is played through once/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/A new random order is played through once/);
   });
 
   it("shows cycle mode helper for shuffled + cycle + loop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       arrangement: "shuffled",
       cycleMode: true,
       playbackMode: "loop",
-    })} />);
-    expect(screen.getByText(/Each trigger plays a random sound, which loops until/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Each trigger plays a random sound, which loops until/);
   });
 
   // ─── Playback mode helper text tests ──────────────────────────────────────
 
   it("shows playback helper for one-shot + restart", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       playbackMode: "one-shot",
       retriggerMode: "restart",
-    })} />);
-    expect(screen.getByText(/Plays once. Triggering while it's playing restarts/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Plays once. Triggering while it's playing restarts/);
   });
 
   it("shows playback helper for one-shot + continue", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       playbackMode: "one-shot",
       retriggerMode: "continue",
-    })} />);
-    expect(screen.getByText(/Plays once. Triggering while it's playing is ignored/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Plays once. Triggering while it's playing is ignored/);
   });
 
   it("shows playback helper for one-shot + stop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       playbackMode: "one-shot",
       retriggerMode: "stop",
-    })} />);
-    expect(screen.getByText(/Plays once. Triggering while it's playing stops it/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Plays once. Triggering while it's playing stops it/);
   });
 
   it("shows playback helper for hold", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       playbackMode: "hold",
       retriggerMode: "restart",
-    })} />);
-    expect(screen.getByText("Plays while the pad is held. Releasing the pad stops the sound.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Plays while the pad is held. Releasing the pad stops the sound.");
   });
 
   it("shows playback helper for loop + stop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       playbackMode: "loop",
       retriggerMode: "stop",
-    })} />);
-    expect(screen.getByText(/Loops continuously. Triggering again stops it/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Loops continuously. Triggering again stops it/);
   });
 
   it("shows playback helper for loop + continue", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       playbackMode: "loop",
       retriggerMode: "continue",
-    })} />);
-    expect(screen.getByText(/Loops continuously. Retriggering while looping has no effect/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Loops continuously. Retriggering while looping has no effect/);
   });
 
   // ─── Retrigger mode helper text tests ─────────────────────────────────────
 
   it("shows retrigger helper for restart + one-shot", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "restart",
       playbackMode: "one-shot",
-    })} />);
-    expect(screen.getByText(/Each retrigger stops the current sound and plays it/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Each retrigger stops the current sound and plays it/);
   });
 
   it("shows retrigger helper for restart + hold", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "restart",
       playbackMode: "hold",
-    })} />);
-    expect(screen.getByText("Re-pressing the pad while held stops and restarts the sound.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Re-pressing the pad while held stops and restarts the sound.");
   });
 
   it("shows retrigger helper for continue + loop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "continue",
       playbackMode: "loop",
-    })} />);
-    expect(screen.getByText("Once looping, subsequent triggers have no effect.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Once looping, subsequent triggers have no effect.");
   });
 
   it("shows retrigger helper for stop + loop", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "stop",
       playbackMode: "loop",
-    })} />);
-    expect(screen.getByText(/Triggering while looping stops the loop/)).toBeInTheDocument();
+    });
+    expectTextInDocument(/Triggering while looping stops the loop/);
   });
 
   it("shows retrigger helper for next + sequential + continuous", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "next",
       arrangement: "sequential",
       cycleMode: false,
-    })} />);
-    expect(screen.getByText("Triggering while playing skips to the next queued sound in the chain.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Triggering while playing skips to the next queued sound in the chain.");
   });
 
   it("shows retrigger helper for next + sequential + cycle", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "next",
       arrangement: "sequential",
       cycleMode: true,
-    })} />);
-    expect(screen.getByText("Triggering while playing advances the cycle cursor to the next sound.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Triggering while playing advances the cycle cursor to the next sound.");
   });
 
   it("shows retrigger helper for next + shuffled + continuous", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "next",
       arrangement: "shuffled",
       cycleMode: false,
-    })} />);
-    expect(screen.getByText("Triggering while playing skips to the next randomly-ordered sound in the chain.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Triggering while playing skips to the next randomly-ordered sound in the chain.");
   });
 
   it("shows retrigger helper for next + shuffled + cycle", () => {
-    render(<Wrapper values={makeValues({
+    renderWithLayer({
       retriggerMode: "next",
       arrangement: "shuffled",
       cycleMode: true,
-    })} />);
-    expect(screen.getByText("Triggering while playing advances to the next random position in the cycle.")).toBeInTheDocument();
+    });
+    expectTextInDocument("Triggering while playing advances to the next random position in the cycle.");
   });
 });

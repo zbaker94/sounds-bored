@@ -1,4 +1,4 @@
-import { useState, useRef, memo } from "react";
+import { useState, useRef, memo, useCallback } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,36 @@ import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { setPadVolume } from "@/lib/audio";
 import { PadLabeledSlider } from "./PadLabeledSlider";
+
+function getFadeButtonLabel(isEqualVolume: boolean, isFadeOut: boolean): string {
+  if (isEqualVolume) return "Fade";
+  return isFadeOut ? "Fade Out" : "Fade In";
+}
+
+interface FadeActionButtonProps {
+  isFading: boolean;
+  isEqualVolume: boolean;
+  isFadeOut: boolean;
+  onFade: () => void;
+  onStopFade: () => void;
+}
+
+function FadeActionButton({ isFading, isEqualVolume, isFadeOut, onFade, onStopFade }: FadeActionButtonProps) {
+  if (isFading) {
+    return (
+      <Button size="sm" variant="secondary" onClick={onStopFade} className="flex-1">
+        <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+        Stop Fade
+      </Button>
+    );
+  }
+  return (
+    <Button size="sm" variant="secondary" onClick={onFade} disabled={isEqualVolume} className="flex-1">
+      <HugeiconsIcon icon={VolumeHighIcon} size={14} />
+      {getFadeButtonLabel(isEqualVolume, isFadeOut)}
+    </Button>
+  );
+}
 
 interface PadFadeControlsProps {
   pad: Pad;
@@ -53,6 +83,18 @@ export const PadFadeControls = memo(function PadFadeControls({
   const isEqualVolume = isPlaying ? liveVolumePct === fadeTargetPct : fadeTargetPct === 0;
   const isFadeOut = !isEqualVolume && isPlaying && fadeTargetPct < liveVolumePct;
 
+  const handleVolumeChange = useCallback((v: number) => {
+    setLocalVolume(v);
+    setPadVolume(pad.id, v / 100);
+  }, [pad.id]);
+
+  const handleVolumeCommit = useCallback((v: number) => {
+    const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
+    volumeDragStartRef.current = null;
+    setLocalVolume(null);
+    if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v);
+  }, [sceneId, pad.id]);
+
   return (
     <div className="flex flex-col gap-1.5 flex-shrink-0">
       <AnimatePresence initial={false}>
@@ -71,16 +113,8 @@ export const PadFadeControls = memo(function PadFadeControls({
               min={0} max={100} step={1}
               formatValue={(v) => `${v}%`}
               onThumbPointerDown={() => { volumeDragStartRef.current = volumeSliderValue; }}
-              onValueChange={(v) => {
-                setLocalVolume(v);
-                setPadVolume(pad.id, v / 100);
-              }}
-              onValueCommit={(v) => {
-                const moved = volumeDragStartRef.current === null || v !== volumeDragStartRef.current;
-                volumeDragStartRef.current = null;
-                setLocalVolume(null);
-                if (moved) useProjectStore.getState().setPadVolume(sceneId, pad.id, v);
-              }}
+              onValueChange={handleVolumeChange}
+              onValueCommit={handleVolumeCommit}
             />
           </motion.div>
         )}
@@ -121,17 +155,13 @@ export const PadFadeControls = memo(function PadFadeControls({
       <div className="flex items-center gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
-            {isFading ? (
-              <Button size="sm" variant="secondary" onClick={onStopFade} className="flex-1">
-                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-                Stop Fade
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={onFade} disabled={isEqualVolume} className="flex-1">
-                <HugeiconsIcon icon={VolumeHighIcon} size={14} />
-                {isEqualVolume ? "Fade" : isFadeOut ? "Fade Out" : "Fade In"}
-              </Button>
-            )}
+            <FadeActionButton
+              isFading={isFading}
+              isEqualVolume={isEqualVolume}
+              isFadeOut={isFadeOut}
+              onFade={onFade}
+              onStopFade={onStopFade}
+            />
           </TooltipTrigger>
           <TooltipContent><Kbd>F</Kbd></TooltipContent>
         </Tooltip>

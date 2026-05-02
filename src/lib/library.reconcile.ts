@@ -69,38 +69,25 @@ async function scanFolderForAudioFiles(folderPath: string): Promise<string[] | n
  * @param existingSounds - The current sounds array from the library store
  * @returns ReconcileResult with the updated sounds array and a changed flag
  */
-export async function reconcileGlobalLibrary(
-  globalFolders: GlobalFolder[],
-  existingSounds: Sound[],
-): Promise<ReconcileResult> {
-  // Build a lookup: filePath → Sound for quick matching
-  const soundsByPath = new Map<string, Sound>();
-  for (const s of existingSounds) {
-    if (s.filePath) soundsByPath.set(s.filePath, s);
-  }
+interface BackfillEntry { index: number; filePath: string; }
 
-  // Scan all folders: collect new sounds and build filePath → folderId map
+async function scanFoldersForNewSounds(
+  globalFolders: GlobalFolder[],
+  soundsByPath: Map<string, Sound>,
+): Promise<{ newSounds: Sound[]; pathToFolderId: Map<string, string>; inaccessibleFolderIds: string[] }> {
   const newSounds: Sound[] = [];
   const pathToFolderId = new Map<string, string>();
   const inaccessibleFolderIds: string[] = [];
 
   for (const folder of globalFolders) {
     const audioPaths = await scanFolderForAudioFiles(folder.path);
-
-    if (audioPaths === null) {
-      // Folder could not be read — record it but continue with other folders.
-      inaccessibleFolderIds.push(folder.id);
-      continue;
-    }
-
+    if (audioPaths === null) { inaccessibleFolderIds.push(folder.id); continue; }
     for (const filePath of audioPaths) {
       pathToFolderId.set(filePath, folder.id);
-
       if (!soundsByPath.has(filePath)) {
-        const filename = basename(filePath, filePath);
         const sound: Sound = {
           id: crypto.randomUUID(),
-          name: nameFromFilename(filename),
+          name: nameFromFilename(basename(filePath, filePath)),
           filePath,
           folderId: folder.id,
           tags: [],
@@ -111,86 +98,84 @@ export async function reconcileGlobalLibrary(
       }
     }
   }
+  return { newSounds, pathToFolderId, inaccessibleFolderIds };
+}
 
-  // Stat new sounds in parallel to populate fileSizeBytes
-  await Promise.all(
-    newSounds.map(async (sound) => {
-      if (!sound.filePath) return;
-      try {
-        const info = await stat(sound.filePath);
-        sound.fileSizeBytes = info.size;
-      } catch {
-        // stat failed — leave fileSizeBytes undefined
-      }
-    }),
-  );
+async function statSounds(sounds: Sound[]): Promise<void> {
+  await Promise.all(sounds.map(async (sound) => {
+    if (!sound.filePath) return;
+    try {
+      const info = await stat(sound.filePath);
+      sound.fileSizeBytes = info.size;
+    } catch {
+      // stat failed — leave fileSizeBytes undefined
+    }
+  }));
+}
 
-  // Backfill folderId and fileSizeBytes on existing sounds
+async function applyStatBackfill(
+  sounds: Sound[],
+  entries: BackfillEntry[],
+): Promise<boolean> {
+  if (entries.length === 0) return false;
+  const results = await Promise.all(entries.map(async (e) => {
+    try { const info = await stat(e.filePath); return { index: e.index, size: info.size }; }
+    catch { return { index: e.index, size: undefined }; }
+  }));
+  let anyUpdated = false;
+  for (const r of results) {
+    if (r.size != null) {
+      sounds[r.index] = { ...sounds[r.index], fileSizeBytes: r.size };
+      anyUpdated = true;
+    }
+  }
+  return anyUpdated;
+}
+
+async function backfillExistingSounds(
+  existingSounds: Sound[],
+  pathToFolderId: Map<string, string>,
+): Promise<{ reconciledSounds: Sound[]; anyFieldUpdated: boolean }> {
   const reconciledExisting: Sound[] = [];
   let anyFieldUpdated = false;
-
-  // Collect backfill stat promises for existing sounds missing fileSizeBytes
-  interface BackfillEntry {
-    index: number;
-    filePath: string;
-  }
   const backfillStatEntries: BackfillEntry[] = [];
 
   for (const sound of existingSounds) {
     let updated = { ...sound };
-    let wasUpdated = false;
-
     if (sound.filePath && !sound.folderId) {
       const discoveredFolderId = pathToFolderId.get(sound.filePath);
-      if (discoveredFolderId) {
-        updated = { ...updated, folderId: discoveredFolderId };
-        wasUpdated = true;
-      }
+      if (discoveredFolderId) { updated = { ...updated, folderId: discoveredFolderId }; anyFieldUpdated = true; }
     }
-
     reconciledExisting.push(updated);
-
     if (sound.filePath && sound.fileSizeBytes == null) {
-      backfillStatEntries.push({
-        index: reconciledExisting.length - 1,
-        filePath: sound.filePath,
-      });
-    }
-
-    if (wasUpdated) {
-      anyFieldUpdated = true;
+      backfillStatEntries.push({ index: reconciledExisting.length - 1, filePath: sound.filePath });
     }
   }
 
-  // Batch stat calls for existing sounds missing fileSizeBytes
-  if (backfillStatEntries.length > 0) {
-    const statResults = await Promise.all(
-      backfillStatEntries.map(async (entry) => {
-        try {
-          const info = await stat(entry.filePath);
-          return { index: entry.index, size: info.size };
-        } catch {
-          return { index: entry.index, size: undefined };
-        }
-      }),
-    );
+  if (await applyStatBackfill(reconciledExisting, backfillStatEntries)) anyFieldUpdated = true;
+  return { reconciledSounds: reconciledExisting, anyFieldUpdated };
+}
 
-    for (const result of statResults) {
-      if (result.size != null) {
-        reconciledExisting[result.index] = {
-          ...reconciledExisting[result.index],
-          fileSizeBytes: result.size,
-        };
-        anyFieldUpdated = true;
-      }
-    }
+export async function reconcileGlobalLibrary(
+  globalFolders: GlobalFolder[],
+  existingSounds: Sound[],
+): Promise<ReconcileResult> {
+  const soundsByPath = new Map<string, Sound>();
+  for (const s of existingSounds) {
+    if (s.filePath) soundsByPath.set(s.filePath, s);
   }
 
-  const changed = newSounds.length > 0 || anyFieldUpdated;
+  const { newSounds, pathToFolderId, inaccessibleFolderIds } =
+    await scanFoldersForNewSounds(globalFolders, soundsByPath);
+
+  await statSounds(newSounds);
+
+  const { reconciledSounds, anyFieldUpdated } =
+    await backfillExistingSounds(existingSounds, pathToFolderId);
 
   return {
-    sounds: [...reconciledExisting, ...newSounds],
-    changed,
+    sounds: [...reconciledSounds, ...newSounds],
+    changed: newSounds.length > 0 || anyFieldUpdated,
     inaccessibleFolderIds,
   };
 }

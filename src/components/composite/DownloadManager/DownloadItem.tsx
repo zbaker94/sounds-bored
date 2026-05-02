@@ -19,6 +19,15 @@ interface DownloadItemProps {
   job: DownloadJob;
 }
 
+const STATUS_ICON: Record<DownloadJob["status"], { icon: typeof Loading03Icon; className: string }> = {
+  queued:      { icon: Loading03Icon,         className: "text-white/50 animate-spin" },
+  downloading: { icon: Loading03Icon,         className: "text-primary animate-spin" },
+  processing:  { icon: Loading03Icon,         className: "text-primary animate-spin" },
+  completed:   { icon: CheckmarkCircle01Icon, className: "text-green-500" },
+  failed:      { icon: Alert02Icon,           className: "text-destructive" },
+  cancelled:   { icon: Cancel01Icon,          className: "text-white/30" },
+};
+
 function useElapsedTime(active: boolean): string {
   const startRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -45,19 +54,42 @@ function useElapsedTime(active: boolean): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+function StatusDetail({ job, elapsed }: { job: DownloadJob; elapsed: string }) {
+  if (job.status === "queued") return <span className="text-white/40">Queued</span>;
+  if (job.status === "downloading") return (
+    <div className="flex items-center gap-2">
+      <Progress value={job.percent} className="flex-1 h-1.5" />
+      <span className="text-white/40 shrink-0">
+        {Math.round(job.percent)}%
+        {job.speed ? ` · ${job.speed}` : ""}
+        {job.eta && job.eta !== "00:00" ? ` · ETA ${job.eta}` : ""}
+      </span>
+    </div>
+  );
+  if (job.status === "processing") return (
+    <span className="text-white/40">Converting to MP3{elapsed ? ` — ${elapsed}` : "..."}</span>
+  );
+  if (job.status === "failed" && job.error) return (
+    <span className="text-destructive/70 truncate">{job.error}</span>
+  );
+  if (job.status === "cancelled") return <span className="text-white/30">Cancelled</span>;
+  return null;
+}
+
 export function DownloadItem({ job }: DownloadItemProps) {
   const { mutate: cancelDownload, isPending: isCancelling } =
     useCancelDownload();
 
   const isActive = ACTIVE_STATUSES.has(job.status);
-
   const elapsed = useElapsedTime(job.status === "processing");
 
-  // A trailing separator means the path has no filename component — fall back to outputName.
   const displayName =
     job.outputPath && !/[\\/]$/.test(job.outputPath)
       ? basename(job.outputPath, job.outputName)
       : job.outputName;
+
+  const { icon, className: iconClass } = STATUS_ICON[job.status];
+  const isInactive = job.status === "cancelled" || job.status === "failed";
 
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
@@ -71,88 +103,16 @@ export function DownloadItem({ job }: DownloadItemProps) {
             transition={{ duration: 0.12 }}
             style={{ display: "inline-flex" }}
           >
-            {job.status === "queued" && (
-              <HugeiconsIcon
-                icon={Loading03Icon}
-                size={14}
-                className="text-white/50 animate-spin"
-              />
-            )}
-            {job.status === "downloading" && (
-              <HugeiconsIcon
-                icon={Loading03Icon}
-                size={14}
-                className="text-primary animate-spin"
-              />
-            )}
-            {job.status === "processing" && (
-              <HugeiconsIcon
-                icon={Loading03Icon}
-                size={14}
-                className="text-primary animate-spin"
-              />
-            )}
-            {job.status === "completed" && (
-              <HugeiconsIcon
-                icon={CheckmarkCircle01Icon}
-                size={14}
-                className="text-green-500"
-              />
-            )}
-            {job.status === "failed" && (
-              <HugeiconsIcon
-                icon={Alert02Icon}
-                size={14}
-                className="text-destructive"
-              />
-            )}
-            {job.status === "cancelled" && (
-              <HugeiconsIcon
-                icon={Cancel01Icon}
-                size={14}
-                className="text-white/30"
-              />
-            )}
+            <HugeiconsIcon icon={icon} size={14} className={iconClass} />
           </motion.span>
         </AnimatePresence>
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span
-          className={cn(
-            "truncate",
-            job.status === "cancelled" || job.status === "failed"
-              ? "text-white/40"
-              : "text-white/70"
-          )}
-        >
+        <span className={cn("truncate", isInactive ? "text-white/40" : "text-white/70")}>
           {displayName}
         </span>
-
-        {job.status === "queued" && (
-          <span className="text-white/40">Queued</span>
-        )}
-        {job.status === "downloading" && (
-          <div className="flex items-center gap-2">
-            <Progress value={job.percent} className="flex-1 h-1.5" />
-            <span className="text-white/40 shrink-0">
-              {Math.round(job.percent)}%
-              {job.speed ? ` · ${job.speed}` : ""}
-              {job.eta && job.eta !== "00:00" ? ` · ETA ${job.eta}` : ""}
-            </span>
-          </div>
-        )}
-        {job.status === "processing" && (
-          <span className="text-white/40">
-            Converting to MP3{elapsed ? ` — ${elapsed}` : "..."}
-          </span>
-        )}
-        {job.status === "failed" && job.error && (
-          <span className="text-destructive/70 truncate">{job.error}</span>
-        )}
-        {job.status === "cancelled" && (
-          <span className="text-white/30">Cancelled</span>
-        )}
+        <StatusDetail job={job} elapsed={elapsed} />
       </div>
 
       {isActive && (

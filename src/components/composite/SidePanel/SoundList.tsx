@@ -163,6 +163,16 @@ export function SoundList({
     onSelectionChange(next);
   }
 
+  function showDeleteToast(count: number, deletedFromDisk: number, failedCount: number) {
+    if (failedCount > 0) {
+      toast.warning(`${deletedFromDisk} of ${count} file${count > 1 ? "s" : ""} deleted; ${failedCount} could not be removed from disk`);
+    } else if (deletedFromDisk < count) {
+      toast.success(`${count} removed from library (${deletedFromDisk} deleted from disk)`);
+    } else {
+      toast.success(`${count} sound${count > 1 ? "s" : ""} deleted from disk`);
+    }
+  }
+
   async function handleDeleteSoundsFromDisk() {
     setIsDeletingSounds(true);
     try {
@@ -171,11 +181,7 @@ export function SoundList({
       let deletedFromDisk = 0;
       let failedCount = 0;
       for (const sound of soundsToDelete) {
-        if (
-          sound.filePath &&
-          sound.folderId &&
-          !missingSoundIds.has(sound.id)
-        ) {
+        if (sound.filePath && sound.folderId && !missingSoundIds.has(sound.id)) {
           try {
             await remove(sound.filePath);
             deletedFromDisk++;
@@ -191,19 +197,7 @@ export function SoundList({
       await saveCurrentLibrary();
       await refreshMissingState();
       onSelectionChange(new Set());
-      if (failedCount > 0) {
-        toast.warning(
-          `${deletedFromDisk} of ${count} file${count > 1 ? "s" : ""} deleted; ${failedCount} could not be removed from disk`,
-        );
-      } else if (deletedFromDisk < count) {
-        toast.success(
-          `${count} removed from library (${deletedFromDisk} deleted from disk)`,
-        );
-      } else {
-        toast.success(
-          `${count} sound${count > 1 ? "s" : ""} deleted from disk`,
-        );
-      }
+      showDeleteToast(count, deletedFromDisk, failedCount);
     } catch {
       toast.error("Failed to delete sounds from disk");
     } finally {

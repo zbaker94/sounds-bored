@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,11 +7,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useLibraryStore } from "@/state/libraryStore";
 import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useBulkRemove } from "@/hooks/useBulkRemove";
-import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
 
 /**
  * Renders the two "Remove All Missing" confirmation dialogs triggered by
@@ -21,39 +17,18 @@ import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
  * flags from useUiStore directly — no prop threading.
  */
 export function ConfirmRemoveMissingDialog() {
-  const sounds = useLibraryStore((s) => s.sounds);
-  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
-  const missingFolderIds = useLibraryStore((s) => s.missingFolderIds);
-
-  const settings = useAppSettingsStore((s) => s.settings);
-  const folders = settings?.globalFolders ?? EMPTY_GLOBAL_FOLDERS;
-
   const confirmRemoveSoundsOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS));
   const confirmRemoveFoldersOpen = useUiStore(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS));
   const closeOverlay = useUiStore((s) => s.closeOverlay);
 
   const {
     isBulkRemoving,
+    allMissingSounds,
+    allMissingFolders,
+    affectedSoundsCount,
     handleRemoveAllMissingSounds,
     handleRemoveAllMissingFolders,
   } = useBulkRemove();
-
-  const allMissingSounds = useMemo(
-    () => sounds.filter((s) => missingSoundIds.has(s.id)),
-    [sounds, missingSoundIds],
-  );
-
-  const allMissingFolders = useMemo(
-    () => folders.filter((f) => missingFolderIds.has(f.id)),
-    [folders, missingFolderIds],
-  );
-
-  const affectedSoundsCount = useMemo(
-    () =>
-      sounds.filter((s) => s.folderId && missingFolderIds.has(s.folderId))
-        .length,
-    [sounds, missingFolderIds],
-  );
 
   return (
     <>

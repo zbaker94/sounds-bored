@@ -98,6 +98,14 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
   );
 }
 
+function reverseActiveFade(pad: Pad, highVol: number, lowVol: number, duration: number): void {
+  const reverseTarget = getPadFadeFromVolume(pad.id);
+  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const currentVol = padVolumes[pad.id] ?? (reverseTarget ?? highVol);
+  const targetVol = reverseTarget ?? (isPadFadingOut(pad.id) ? highVol : lowVol);
+  fadePad(pad, currentVol, targetVol, duration);
+}
+
 /**
  * Central fade-toggle state machine — all fade trigger paths route through here.
  *
@@ -113,13 +121,8 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
 
   if (isPadActive(pad.id)) {
     if (isPadFadingOut(pad.id) || isPadFadingIn(pad.id) || isPadFading(pad.id)) {
-      const reverseTarget = getPadFadeFromVolume(pad.id);
-      const padVolumes = usePlaybackStore.getState().padVolumes;
-      const currentVol = padVolumes[pad.id] ?? (reverseTarget ?? highVol);
-      const targetVol = reverseTarget ?? (isPadFadingOut(pad.id) ? highVol : lowVol);
-      fadePad(pad, currentVol, targetVol, duration);
+      reverseActiveFade(pad, highVol, lowVol, duration);
     } else {
-      // Settled: no ramp running, gain.gain.value is the static current position.
       const currentVol = getPadGain(pad.id).gain.value;
       const atLow = Math.abs(currentVol - lowVol) <= 0.02;
       fadePad(pad, currentVol, atLow ? highVol : lowVol, duration);
@@ -127,7 +130,6 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
     return Promise.resolve();
   }
 
-  // Not active: if a trigger-and-fade is already in flight, ignore
   if (isPadFadingIn(pad.id) || isPadFading(pad.id)) return Promise.resolve();
 
   return triggerAndFade(pad, lowVol, duration);

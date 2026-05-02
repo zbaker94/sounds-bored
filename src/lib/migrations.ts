@@ -22,6 +22,22 @@ export class MigrationError extends Error {
 
 const UNVERSIONED_DEFAULT = "0.0.0";
 
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return !!val && typeof val === "object" && !Array.isArray(val);
+}
+
+function migrateTagSelectionLayer(layer: unknown): unknown {
+  if (!isPlainObject(layer)) return layer;
+  const sel = layer.selection;
+  if (!isPlainObject(sel)) return layer;
+  if (sel.type !== "tag") return layer;
+  if (typeof sel.tagId === "string" && !Array.isArray(sel.tagIds)) {
+    const { tagId, ...rest } = sel;
+    return { ...layer, selection: { ...rest, tagIds: tagId ? [tagId] : [] } };
+  }
+  return layer;
+}
+
 /** Compare two "X.Y.Z" version strings. Returns <0, 0, or >0. Throws MigrationError for malformed input. */
 function compareVersions(a: string, b: string): number {
   const parse = (v: string): [number, number, number] => {
@@ -86,32 +102,14 @@ const MIGRATIONS: Migration[] = [
       if (!Array.isArray(next.scenes)) return next;
 
       next.scenes = (next.scenes as unknown[]).map((scene) => {
-        if (!scene || typeof scene !== "object" || Array.isArray(scene)) return scene;
-        const s = scene as Record<string, unknown>;
-        if (!Array.isArray(s.pads)) return s;
+        if (!isPlainObject(scene)) return scene;
+        if (!Array.isArray(scene.pads)) return scene;
         return {
-          ...s,
-          pads: (s.pads as unknown[]).map((pad) => {
-            if (!pad || typeof pad !== "object" || Array.isArray(pad)) return pad;
-            const p = pad as Record<string, unknown>;
-            if (!Array.isArray(p.layers)) return p;
-            return {
-              ...p,
-              layers: (p.layers as unknown[]).map((layer) => {
-                if (!layer || typeof layer !== "object" || Array.isArray(layer)) return layer;
-                const l = layer as Record<string, unknown>;
-                const sel = l.selection;
-                if (!sel || typeof sel !== "object" || Array.isArray(sel)) return l;
-                const s2 = sel as Record<string, unknown>;
-                if (s2.type !== "tag") return l;
-                // Convert old single-tag format { tagId } to multi-tag { tagIds }
-                if (typeof s2.tagId === "string" && !Array.isArray(s2.tagIds)) {
-                  const { tagId, ...rest } = s2;
-                  return { ...l, selection: { ...rest, tagIds: tagId ? [tagId] : [] } };
-                }
-                return l;
-              }),
-            };
+          ...scene,
+          pads: (scene.pads as unknown[]).map((pad) => {
+            if (!isPlainObject(pad)) return pad;
+            if (!Array.isArray(pad.layers)) return pad;
+            return { ...pad, layers: (pad.layers as unknown[]).map(migrateTagSelectionLayer) };
           }),
         };
       });

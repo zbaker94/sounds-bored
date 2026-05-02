@@ -5,6 +5,7 @@ import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { createMockPad, createMockLayer, createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
+import type { Pad } from "@/lib/schemas";
 import { PadBackFace } from "./PadBackFace";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -54,6 +55,23 @@ function loadPad(padOverrides = {}) {
   return { pad, layer };
 }
 
+function renderBackFace(pad: Pad) {
+  render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+}
+
+function expectFadeButton(label: "in" | "out" | "disabled") {
+  if (label === "disabled") {
+    const btn = screen.getByRole("button", { name: /^fade$/i });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toBeDisabled();
+    return;
+  }
+  const present = label === "in" ? /fade in/i : /fade out/i;
+  const absent = label === "in" ? /fade out/i : /fade in/i;
+  expect(screen.getByRole("button", { name: present })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: absent })).not.toBeInTheDocument();
+}
+
 describe("PadBackFace", () => {
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
@@ -63,13 +81,13 @@ describe("PadBackFace", () => {
 
   it("renders pad name in an input", () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByDisplayValue("Kick")).toBeInTheDocument();
   });
 
   it("saves name on blur", async () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
 
     const input = screen.getByDisplayValue("Kick");
     await userEvent.clear(input);
@@ -84,7 +102,7 @@ describe("PadBackFace", () => {
 
   it("restores original name when blurred with empty value", async () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
 
     const input = screen.getByDisplayValue("Kick");
     await userEvent.clear(input);
@@ -97,13 +115,13 @@ describe("PadBackFace", () => {
 
   it("renders a layer row for each layer", () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByText("Layer 1")).toBeInTheDocument();
   });
 
   it("opens LayerConfigDialog when a layer's edit button is clicked", async () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
 
     await userEvent.click(screen.getByRole("button", { name: /edit layer 1/i }));
     expect(screen.getByTestId("layer-config-dialog")).toBeInTheDocument();
@@ -111,7 +129,7 @@ describe("PadBackFace", () => {
 
   it("adds a new layer when Add Layer is clicked", async () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
 
     await userEvent.click(screen.getByRole("button", { name: /add layer/i }));
 
@@ -125,7 +143,7 @@ describe("PadBackFace", () => {
     const layer1 = createMockLayer({ id: "layer-1" });
     const layer2 = createMockLayer({ id: "layer-2" });
     const { pad } = loadPad({ layers: [layer1, layer2] });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
 
     await userEvent.click(screen.getByRole("button", { name: /remove layer 1/i }));
 
@@ -138,13 +156,13 @@ describe("PadBackFace", () => {
 
   it("disables remove layer button when only 1 layer", () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByRole("button", { name: /remove layer 1/i })).toBeDisabled();
   });
 
   it("renders Fade target and Duration labels always; hides Current volume when not playing", () => {
     const { pad } = loadPad();
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.queryByText("Current volume")).not.toBeInTheDocument();
     expect(screen.getByText("Fade target")).toBeInTheDocument();
     expect(screen.getByText("Duration")).toBeInTheDocument();
@@ -153,7 +171,7 @@ describe("PadBackFace", () => {
   it("shows Current volume label and percentage when pad is playing", () => {
     const { pad } = loadPad();
     usePlaybackStore.getState().addPlayingPad(pad.id);
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByText("Current volume")).toBeInTheDocument();
     expect(screen.getByText("100%")).toBeInTheDocument();
   });
@@ -161,55 +179,48 @@ describe("PadBackFace", () => {
   it("displays explicit pad volume (when playing) and fadeTargetVol values", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getByText("20%")).toBeInTheDocument();
   });
 
   it("shows Fade In when pad is not playing and target > 0", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /fade out/i })).not.toBeInTheDocument();
+    renderBackFace(pad);
+    expectFadeButton("in");
   });
 
   it("shows disabled Fade when pad is not playing and target is 0", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 0 });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
-    const btn = screen.getByRole("button", { name: /^fade$/i });
-    expect(btn).toBeInTheDocument();
-    expect(btn).toBeDisabled();
+    renderBackFace(pad);
+    expectFadeButton("disabled");
   });
 
   it("shows Fade Out when pad is playing and target < current volume", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /fade out/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /fade in/i })).not.toBeInTheDocument();
+    renderBackFace(pad);
+    expectFadeButton("out");
   });
 
   it("shows Fade In when pad is playing and target >= current volume", () => {
     const { pad } = loadPad({ volume: 50, fadeTargetVol: 80 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /fade out/i })).not.toBeInTheDocument();
+    renderBackFace(pad);
+    expectFadeButton("in");
   });
 
   it("shows disabled Fade when pad is playing and live volume equals target", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 50 });
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.5 } });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
-    const btn = screen.getByRole("button", { name: /^fade$/i });
-    expect(btn).toBeInTheDocument();
-    expect(btn).toBeDisabled();
+    renderBackFace(pad);
+    expectFadeButton("disabled");
   });
 
   it("does not show Reverse button when pad is not fading", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
     usePlaybackStore.getState().addPlayingPad(pad.id);
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.queryByRole("button", { name: /reverse/i })).not.toBeInTheDocument();
   });
 
@@ -220,7 +231,7 @@ describe("PadBackFace", () => {
       playingPadIds: new Set([pad.id]),
       fadingPadIds: new Set([pad.id]),
     });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByRole("button", { name: /stop fade/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /fade out/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reverse/i })).toBeInTheDocument();
@@ -234,7 +245,7 @@ describe("PadBackFace", () => {
       fadingPadIds: new Set([pad.id]),
       reversingPadIds: new Set([pad.id]),
     });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     expect(screen.getByRole("button", { name: /stop fade/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /reverse/i })).not.toBeInTheDocument();
   });
@@ -247,7 +258,7 @@ describe("PadBackFace", () => {
       playingPadIds: new Set([pad.id]),
       fadingPadIds: new Set([pad.id]),
     });
-    render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+    renderBackFace(pad);
     await userEvent.click(screen.getByRole("button", { name: /reverse/i }));
     expect(reverseFade).toHaveBeenCalled();
   });

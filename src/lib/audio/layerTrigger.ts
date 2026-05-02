@@ -223,6 +223,33 @@ async function loadLayerVoice(
 // startLayerSound — voice lifecycle + onended chain continuation
 // ---------------------------------------------------------------------------
 
+function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: GainNode): void {
+  const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
+  const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
+  const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
+  const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
+  const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
+  clearLayerProgressInfo(layer.id);
+  clearPadProgressInfo(pad.id);
+  startAudioTick();
+  if (isChained(liveArr)) {
+    const newOrder = buildPlayOrder(liveArr, liveSounds);
+    if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
+    const [first, ...rest] = newOrder;
+    setLayerChain(layer.id, rest);
+    startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
+      (err) => { console.error("[layerTrigger] chain loop-restart failed:", err); },
+    );
+  } else {
+    deleteLayerChain(layer.id);
+    for (const snd of liveSounds) {
+      startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
+        (err) => { console.error("[layerTrigger] simultaneous loop-restart failed:", err); },
+      );
+    }
+  }
+}
+
 /**
  * Load and start a single sound for a layer. Sets up the onended callback that
  * auto-chains to the next sound in layerChainQueue (sequential/shuffled arrangement).
@@ -246,9 +273,7 @@ export async function startLayerSound(
       // ends naturally while a stopWithRamp timeout is pending.
       if (audio) unregisterStreamingAudio(pad.id, layer.id, audio);
       clearLayerVoice(pad.id, layer.id, voice);
-      if (!isPadActive(pad.id)) {
-        usePlaybackStore.getState().removePlayingPad(pad.id);
-      }
+      if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
 
       // Chain to the next sound if one is queued (sequential/shuffled).
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
@@ -256,50 +281,23 @@ export async function startLayerSound(
       const remaining = getLayerChain(layer.id);
       const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
 
-      if (remaining === undefined) {
-        // Queue cleared externally — do not chain.
-      } else if (remaining.length > 0) {
+      if (remaining !== undefined && remaining.length > 0) {
         const [next, ...rest] = remaining;
         setLayerChain(layer.id, rest);
-        // Clear stale progress so the bar resets during the async buffer load.
         clearLayerProgressInfo(layer.id);
         clearPadProgressInfo(pad.id);
-        startAudioTick(); // keep tick alive during the async gap
+        startAudioTick();
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds).catch(
-          // startLayerSound handles errors internally (emitAudioError + progress clear);
-          // the catch here prevents unhandled-rejection if it throws synchronously.
-          // Log to console so failures in the chain path are diagnosable instead of silent.
           (err) => { console.error("[layerTrigger] chain continuation failed:", err); },
         );
-      } else if (liveMode === "loop" || liveMode === "hold") {
+      } else if (remaining !== undefined && (liveMode === "loop" || liveMode === "hold")) {
         // Chain exhausted naturally — restart using live store values so mid-playback
         // config changes (arrangement, playback mode, selection) take effect.
-        const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
-        const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
-        const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
-        const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
-        clearLayerProgressInfo(layer.id);
-        clearPadProgressInfo(pad.id);
-        startAudioTick(); // keep tick alive during the async gap
-        if (isChained(liveArr)) {
-          const newOrder = buildPlayOrder(liveArr, liveSounds);
-          if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
-          const [first, ...rest] = newOrder;
-          setLayerChain(layer.id, rest);
-          startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
-            (err) => { console.error("[layerTrigger] chain loop-restart failed:", err); },
-          );
-        } else {
-          deleteLayerChain(layer.id);
-          for (const snd of liveSounds) {
-            startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
-              (err) => { console.error("[layerTrigger] simultaneous loop-restart failed:", err); },
-            );
-          }
-        }
-      } else {
+        restartLoopChain(pad, layer, ctx, layerGain);
+      } else if (remaining !== undefined) {
         deleteLayerChain(layer.id);
       }
+      // remaining === undefined: queue cleared externally — do not chain.
     });
 
     await voice.start();
@@ -407,6 +405,20 @@ function handleRestartRetrigger(pad: Pad, layer: Layer, resolved: Sound[]): void
   }
 }
 
+async function loopBackToBeginning(
+  pad: Pad,
+  layer: Layer,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  resolved: Sound[],
+): Promise<void> {
+  const newOrder = buildPlayOrder(layer.arrangement, resolved);
+  if (newOrder.length === 0) return;
+  const [first, ...rest] = newOrder;
+  setLayerChain(layer.id, rest);
+  await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
+}
+
 async function handleNextRetrigger(
   pad: Pad,
   layer: Layer,
@@ -422,12 +434,10 @@ async function handleNextRetrigger(
   deleteLayerChain(layer.id);
   clearLayerStreamingAudio(pad.id, layer.id);
   stopLayerVoices(pad.id, layer.id);
-  // Clear progress immediately so the bar resets to 0 while the next buffer loads.
   clearPadProgressInfo(pad.id);
   clearLayerProgressInfo(layer.id);
 
   if (layer.cycleMode && isChained(layer.arrangement)) {
-    // Cycle mode + next: fall through to start-playback (reads updated cycle cursor).
     return "proceed";
   }
 
@@ -436,16 +446,8 @@ async function handleNextRetrigger(
     setLayerChain(layer.id, rest);
     await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
   } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
-    // Chain exhausted — loop back to beginning.
-    const newOrder = buildPlayOrder(layer.arrangement, resolved);
-    if (newOrder.length > 0) {
-      const [first, ...rest] = newOrder;
-      setLayerChain(layer.id, rest);
-      await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
-    }
+    await loopBackToBeginning(pad, layer, ctx, layerGain, resolved);
   }
-  // one-shot: queue exhausted — just stopped (already done above).
-  // If no new voice replaced the stopped one, the pad is no longer playing.
   if (!isPadActive(pad.id)) {
     usePlaybackStore.getState().removePlayingPad(pad.id);
   }

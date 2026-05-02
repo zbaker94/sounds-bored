@@ -93,30 +93,25 @@ function getArrangementHelper(
   instanceCount: number,
 ): string | null {
   if (arrangement === "simultaneous") {
-    if (selectionType === "assigned") {
-      if (instanceCount === 1) return "The assigned sound plays on each trigger.";
-      if (instanceCount >= 2) return `All ${instanceCount} assigned sounds play together on each trigger.`;
-    }
-    return "All matched sounds play together at trigger time.";
+    if (selectionType !== "assigned") return "All matched sounds play together at trigger time.";
+    if (instanceCount === 1) return "The assigned sound plays on each trigger.";
+    return `All ${instanceCount} assigned sounds play together on each trigger.`;
   }
 
-  // sequential or shuffled
+  // sequential or shuffled, assigned
   if (selectionType === "assigned") {
-    if (instanceCount === 1)
-      return "Only one sound assigned — arrangement has no effect with a single sound.";
-
-    if (arrangement === "sequential") {
-      return cycleMode
+    if (instanceCount === 1) return "Only one sound assigned — arrangement has no effect with a single sound.";
+    if (cycleMode) {
+      return arrangement === "sequential"
         ? "Each trigger plays the next sound in order."
-        : `All ${instanceCount} sounds chain automatically on each trigger. The first plays immediately; the rest follow in sequence.`;
+        : `Each trigger plays a random sound from the ${instanceCount} assigned.`;
     }
-    // shuffled
-    return cycleMode
-      ? `Each trigger plays a random sound from the ${instanceCount} assigned.`
+    return arrangement === "sequential"
+      ? `All ${instanceCount} sounds chain automatically on each trigger. The first plays immediately; the rest follow in sequence.`
       : `All ${instanceCount} sounds chain automatically on each trigger in a new random order.`;
   }
 
-  // tag or set
+  // sequential or shuffled, tag or set
   if (cycleMode) {
     return arrangement === "sequential"
       ? "Each trigger plays the next sound from the matched pool."
@@ -244,16 +239,59 @@ function TabWithTooltip({ value, label, tooltip }: { value: string; label: strin
   );
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────
+// ─── Selection section sub-component ──────────────────────────────────────
 
-interface LayerConfigSectionProps {
-  index: number;
+function SelectionSection({ index }: { index: number }) {
+  const { control, watch, setValue, formState: { errors } } = useFormContext<PadConfigForm>();
+  const layers = watch("layers");
+  const layer = layers[index];
+  const selectionType = layer?.selection.type ?? "assigned";
+  const selPath = `layers.${index}.selection` as `layers.0.selection`;
+  const selectionErrors = errors.layers?.[index]?.selection as Record<string, { message?: string }> | undefined;
+
+  function handleSelectionTypeChange(type: LayerSelection["type"]) {
+    setValue(selPath, SELECTION_TYPE_DEFAULTS[type] as LayerSelection);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <SectionLabel
+        label="Sound Selection"
+        tooltip="Determines which sounds this layer can use when the pad is triggered."
+      />
+      <Tabs value={selectionType} onValueChange={(v) => {
+        if (v === "assigned" || v === "tag" || v === "set") handleSelectionTypeChange(v);
+      }}>
+        <TabsList stretch>
+          <TabWithTooltip value="assigned" label="Assigned" tooltip={SELECTION_TAB_TOOLTIPS.assigned} />
+          <TabWithTooltip value="tag" label="Tag" tooltip={SELECTION_TAB_TOOLTIPS.tag} />
+          <TabWithTooltip value="set" label="Set" tooltip={SELECTION_TAB_TOOLTIPS.set} />
+        </TabsList>
+      </Tabs>
+      <Controller
+        control={control}
+        name={selPath}
+        render={({ field }) => (
+          <SoundSelector value={field.value as LayerSelection} onChange={field.onChange} />
+        )}
+      />
+      {selectionType === "assigned" && selectionErrors?.instances?.message && (
+        <p className="text-sm text-destructive">{selectionErrors.instances.message}</p>
+      )}
+      {selectionType === "tag" && selectionErrors?.tagIds?.message && (
+        <p className="text-sm text-destructive">{selectionErrors.tagIds.message}</p>
+      )}
+      {selectionType === "set" && selectionErrors?.setId?.message && (
+        <p className="text-sm text-destructive">{selectionErrors.setId.message}</p>
+      )}
+    </div>
+  );
 }
 
-export function LayerConfigSection({ index }: LayerConfigSectionProps) {
-  const { control, watch, setValue, formState: { errors } } = useFormContext<PadConfigForm>();
+// ─── Arrangement + cycle mode sub-component ────────────────────────────────
 
-  // Read all layer values reactively via the top-level array watch.
+function ArrangementSection({ index }: { index: number }) {
+  const { control, watch, setValue } = useFormContext<PadConfigForm>();
   const layers = watch("layers");
   const layer = layers[index];
   const selectionType = layer?.selection.type ?? "assigned";
@@ -262,80 +300,27 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
   const playbackMode = layer?.playbackMode ?? "one-shot";
   const retriggerMode = layer?.retriggerMode ?? "restart";
   const instanceCount = selectionType === "assigned" && layer?.selection.type === "assigned"
-    ? layer.selection.instances.length
-    : 0;
+    ? layer.selection.instances.length : 0;
 
-  // Cast array element paths — react-hook-form requires path strings;
-  // we use fixed-index alias (0) for TypeScript inference.
-  const selPath = `layers.${index}.selection` as `layers.0.selection`;
   const arrPath = `layers.${index}.arrangement` as `layers.0.arrangement`;
   const cyclePath = `layers.${index}.cycleMode` as `layers.0.cycleMode`;
-  const pbPath  = `layers.${index}.playbackMode` as `layers.0.playbackMode`;
-  const rtPath  = `layers.${index}.retriggerMode` as `layers.0.retriggerMode`;
-  const volPath = `layers.${index}.volume` as `layers.0.volume`;
-
-  const selectionErrors = errors.layers?.[index]?.selection as Record<string, { message?: string }> | undefined;
-
-  function handleSelectionTypeChange(type: LayerSelection["type"]) {
-    setValue(selPath, SELECTION_TYPE_DEFAULTS[type] as LayerSelection);
-  }
+  const rtPath = `layers.${index}.retriggerMode` as `layers.0.retriggerMode`;
 
   function handleArrangementChange(v: Arrangement) {
     setValue(arrPath, v, { shouldDirty: true });
-    // "next" retrigger requires a chain — reset to "restart" when switching to simultaneous
     if (v === "simultaneous") {
       if (retriggerMode === "next") setValue(rtPath, "restart", { shouldDirty: true });
       setValue(cyclePath, false, { shouldDirty: true });
     }
   }
 
-  // Compute helper texts
   const arrangementHelper = getArrangementHelper(selectionType, arrangement, cycleMode, instanceCount);
   const cycleModeHelper = (arrangement === "sequential" || arrangement === "shuffled")
     ? getCycleModeHelper(arrangement, cycleMode, playbackMode)
     : null;
-  const playbackModeHelper = getPlaybackModeHelper(playbackMode, retriggerMode);
-  const retriggerHelper = getRetriggerHelper(retriggerMode, playbackMode, arrangement, cycleMode);
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Selection Type */}
-      <div className="flex flex-col gap-2">
-        <SectionLabel
-          label="Sound Selection"
-          tooltip="Determines which sounds this layer can use when the pad is triggered."
-        />
-        <Tabs value={selectionType} onValueChange={(v) => {
-          if (v === "assigned" || v === "tag" || v === "set")
-            handleSelectionTypeChange(v);
-        }}>
-          <TabsList stretch>
-            <TabWithTooltip value="assigned" label="Assigned" tooltip={SELECTION_TAB_TOOLTIPS.assigned} />
-            <TabWithTooltip value="tag" label="Tag" tooltip={SELECTION_TAB_TOOLTIPS.tag} />
-            <TabWithTooltip value="set" label="Set" tooltip={SELECTION_TAB_TOOLTIPS.set} />
-          </TabsList>
-        </Tabs>
-
-        <Controller
-          control={control}
-          name={selPath}
-          render={({ field }) => (
-            <SoundSelector value={field.value as LayerSelection} onChange={field.onChange} />
-          )}
-        />
-
-        {selectionType === "assigned" && selectionErrors?.instances?.message && (
-          <p className="text-sm text-destructive">{selectionErrors.instances.message}</p>
-        )}
-        {selectionType === "tag" && selectionErrors?.tagIds?.message && (
-          <p className="text-sm text-destructive">{selectionErrors.tagIds.message}</p>
-        )}
-        {selectionType === "set" && selectionErrors?.setId?.message && (
-          <p className="text-sm text-destructive">{selectionErrors.setId.message}</p>
-        )}
-      </div>
-
-      {/* Arrangement */}
+    <>
       <div className="flex flex-col gap-2">
         <SectionLabel
           label="Arrangement"
@@ -344,27 +329,18 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
         <Tabs
           value={arrangement}
           onValueChange={(v) => {
-            if (ARRANGEMENT_OPTIONS.some((o) => o.value === v))
-              handleArrangementChange(v as Arrangement);
+            if (ARRANGEMENT_OPTIONS.some((o) => o.value === v)) handleArrangementChange(v as Arrangement);
           }}
         >
           <TabsList stretch>
             {ARRANGEMENT_OPTIONS.map((opt) => (
-              <TabWithTooltip
-                key={opt.value}
-                value={opt.value}
-                label={opt.label}
-                tooltip={ARRANGEMENT_TAB_TOOLTIPS[opt.value]}
-              />
+              <TabWithTooltip key={opt.value} value={opt.value} label={opt.label} tooltip={ARRANGEMENT_TAB_TOOLTIPS[opt.value]} />
             ))}
           </TabsList>
         </Tabs>
-        {arrangementHelper && (
-          <p className="text-xs text-muted-foreground">{arrangementHelper}</p>
-        )}
+        {arrangementHelper && <p className="text-xs text-muted-foreground">{arrangementHelper}</p>}
       </div>
 
-      {/* Cycle Mode */}
       {(arrangement === "sequential" || arrangement === "shuffled") && (
         <div className="flex flex-col gap-2">
           <SectionLabel
@@ -375,10 +351,7 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
             control={control}
             name={cyclePath}
             render={({ field }) => (
-              <Tabs
-                value={field.value ? "cycle" : "continuous"}
-                onValueChange={(v) => field.onChange(v === "cycle")}
-              >
+              <Tabs value={field.value ? "cycle" : "continuous"} onValueChange={(v) => field.onChange(v === "cycle")}>
                 <TabsList stretch>
                   <TabWithTooltip value="continuous" label="Continuous" tooltip={CYCLE_MODE_TAB_TOOLTIPS.continuous} />
                   <TabWithTooltip value="cycle" label="Cycle" tooltip={CYCLE_MODE_TAB_TOOLTIPS.cycle} />
@@ -386,11 +359,39 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
               </Tabs>
             )}
           />
-          {cycleModeHelper && (
-            <p className="text-xs text-muted-foreground">{cycleModeHelper}</p>
-          )}
+          {cycleModeHelper && <p className="text-xs text-muted-foreground">{cycleModeHelper}</p>}
         </div>
       )}
+    </>
+  );
+}
+
+// ─── Component ─────────────────────────────────────────────────────────────
+
+interface LayerConfigSectionProps {
+  index: number;
+}
+
+export function LayerConfigSection({ index }: LayerConfigSectionProps) {
+  const { control, watch, setValue } = useFormContext<PadConfigForm>();
+  const layers = watch("layers");
+  const layer = layers[index];
+  const arrangement = layer?.arrangement ?? "simultaneous";
+  const cycleMode = layer?.cycleMode ?? false;
+  const playbackMode = layer?.playbackMode ?? "one-shot";
+  const retriggerMode = layer?.retriggerMode ?? "restart";
+
+  const pbPath  = `layers.${index}.playbackMode` as `layers.0.playbackMode`;
+  const rtPath  = `layers.${index}.retriggerMode` as `layers.0.retriggerMode`;
+  const volPath = `layers.${index}.volume` as `layers.0.volume`;
+
+  const playbackModeHelper = getPlaybackModeHelper(playbackMode, retriggerMode);
+  const retriggerHelper = getRetriggerHelper(retriggerMode, playbackMode, arrangement, cycleMode);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SelectionSection index={index} />
+      <ArrangementSection index={index} />
 
       {/* Playback Mode */}
       <div className="flex flex-col gap-2">
@@ -407,18 +408,11 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
         >
           <TabsList stretch>
             {PLAYBACK_MODE_OPTIONS.map((opt) => (
-              <TabWithTooltip
-                key={opt.value}
-                value={opt.value}
-                label={opt.label}
-                tooltip={PLAYBACK_MODE_TAB_TOOLTIPS[opt.value]}
-              />
+              <TabWithTooltip key={opt.value} value={opt.value} label={opt.label} tooltip={PLAYBACK_MODE_TAB_TOOLTIPS[opt.value]} />
             ))}
           </TabsList>
         </Tabs>
-        {playbackModeHelper && (
-          <p className="text-xs text-muted-foreground">{playbackModeHelper}</p>
-        )}
+        {playbackModeHelper && <p className="text-xs text-muted-foreground">{playbackModeHelper}</p>}
       </div>
 
       {/* Retrigger Mode */}
@@ -438,39 +432,24 @@ export function LayerConfigSection({ index }: LayerConfigSectionProps) {
             {RETRIGGER_MODE_OPTIONS
               .filter((opt) => !opt.arrangements || opt.arrangements.includes(arrangement))
               .map((opt) => (
-                <TabWithTooltip
-                  key={opt.value}
-                  value={opt.value}
-                  label={opt.label}
-                  tooltip={RETRIGGER_TAB_TOOLTIPS[opt.value]}
-                />
+                <TabWithTooltip key={opt.value} value={opt.value} label={opt.label} tooltip={RETRIGGER_TAB_TOOLTIPS[opt.value]} />
               ))}
           </TabsList>
         </Tabs>
-        {retriggerHelper && (
-          <p className="text-xs text-muted-foreground">{retriggerHelper}</p>
-        )}
+        {retriggerHelper && <p className="text-xs text-muted-foreground">{retriggerHelper}</p>}
       </div>
 
       {/* Volume */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <Label variant="section">Volume</Label>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {layer?.volume ?? 100}%
-          </span>
+          <span className="text-xs text-muted-foreground tabular-nums">{layer?.volume ?? 100}%</span>
         </div>
         <Controller
           control={control}
           name={volPath}
           render={({ field }) => (
-            <Slider
-              min={0}
-              max={100}
-              step={1}
-              value={[field.value as number]}
-              onValueChange={([v]) => field.onChange(v)}
-            />
+            <Slider min={0} max={100} step={1} value={[field.value as number]} onValueChange={([v]) => field.onChange(v)} />
           )}
         />
       </div>

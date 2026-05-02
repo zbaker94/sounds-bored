@@ -9,6 +9,39 @@ import { buildPadMap, createDefaultStoreLayer } from "@/lib/padDefaults";
 import type { PadConfig } from "@/lib/schemas";
 import { PADS_PER_PAGE } from "@/lib/constants";
 
+function enterMultiFadeFromHoverHotkey(): void {
+  const { editMode, hoveredPadId, editingPadId, fadePopoverPadId } = useUiStore.getState();
+  if (useMultiFadeStore.getState().active) return;
+  if (editMode) return;
+  if (!hoveredPadId || editingPadId || fadePopoverPadId) return;
+  const scenes = useProjectStore.getState().project?.scenes ?? [];
+  const pad = buildPadMap(scenes).get(hoveredPadId);
+  useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
+}
+
+function executeHoveredPadFade(
+  hoveredPadId: string,
+  fadePopoverPadId: string | null,
+  fadePopoverTarget: number | null,
+  setFadePopoverPadId: (id: string | null) => void,
+  globalFadeDurationMs?: number,
+): void {
+  if (fadePopoverPadId !== hoveredPadId) {
+    setFadePopoverPadId(hoveredPadId);
+    return;
+  }
+  const project = useProjectStore.getState().project;
+  const pad = buildPadMap(project?.scenes ?? []).get(hoveredPadId);
+  if (!pad) return;
+  if (fadePopoverTarget !== null) {
+    const scene = project?.scenes.find((s) => s.pads.some((p) => p.id === hoveredPadId));
+    if (scene) useProjectStore.getState().setPadFadeTarget(scene.id, hoveredPadId, fadePopoverTarget);
+  }
+  const effectivePad = fadePopoverTarget !== null ? { ...pad, fadeTargetVol: fadePopoverTarget } : pad;
+  executeFadeTap(effectivePad, globalFadeDurationMs);
+  setFadePopoverPadId(null);
+}
+
 /**
  * All keyboard shortcuts for the main editor in one place.
  * Must be called inside ProjectActionsProvider.
@@ -88,35 +121,16 @@ export function useGlobalHotkeys() {
 
     // Edit mode with a pad being edited: immediately execute that pad's configured fade.
     if (editMode && editingPadId) {
-      const scenes = useProjectStore.getState().project?.scenes ?? [];
-      const pad = buildPadMap(scenes).get(editingPadId);
-      if (!pad) return;
-      executeFadeTap(pad, globalFadeDurationMs);
+      const pad = buildPadMap(useProjectStore.getState().project?.scenes ?? []).get(editingPadId);
+      if (pad) executeFadeTap(pad, globalFadeDurationMs);
       return;
     }
 
-    if (editMode) return;
+    if (editMode || !hoveredPadId) return;
 
-    if (!hoveredPadId) return;
-
-    // Normal mode: popover already open for the hovered pad → execute fade + close popover.
-    // If user dragged the slider without committing, apply in-flight target and persist it.
-    if (fadePopoverPadId === hoveredPadId) {
-      const project = useProjectStore.getState().project;
-      const pad = buildPadMap(project?.scenes ?? []).get(hoveredPadId);
-      if (!pad) return;
-      if (fadePopoverTarget !== null) {
-        const scene = project?.scenes.find((s) => s.pads.some((p) => p.id === hoveredPadId));
-        if (scene) useProjectStore.getState().setPadFadeTarget(scene.id, hoveredPadId, fadePopoverTarget);
-      }
-      const effectivePad = fadePopoverTarget !== null ? { ...pad, fadeTargetVol: fadePopoverTarget } : pad;
-      executeFadeTap(effectivePad, globalFadeDurationMs);
-      setFadePopoverPadId(null);
-      return;
-    }
-
-    // Normal mode: no popover open → open the popover for the hovered pad (do not fade yet).
-    setFadePopoverPadId(hoveredPadId);
+    // Normal mode: popover already open → execute fade + close popover.
+    // Normal mode: no popover open → open popover for the hovered pad (no fade yet).
+    executeHoveredPadFade(hoveredPadId, fadePopoverPadId, fadePopoverTarget, setFadePopoverPadId, globalFadeDurationMs);
   }, { enableOnFormTags: true });
 
   // X: enter multi-fade mode pre-selecting the hovered pad (mirrors X in the context popover).
@@ -130,19 +144,7 @@ export function useGlobalHotkeys() {
   //
   // enableOnFormTags: same reasoning as F above — the fade-level <Slider> in the
   // multi-fade overlay should not swallow this hotkey.
-  useHotkeys("x", () => {
-    const { editMode, hoveredPadId, editingPadId, fadePopoverPadId } = useUiStore.getState();
-    if (useMultiFadeStore.getState().active) return;
-
-    if (editMode) return;
-
-    // Normal mode: enter multi-fade if hovering a pad and no context popover is open
-    if (hoveredPadId && !editingPadId && !fadePopoverPadId) {
-      const scenes = useProjectStore.getState().project?.scenes ?? [];
-      const pad = buildPadMap(scenes).get(hoveredPadId);
-      useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
-    }
-  }, { enableOnFormTags: true });
+  useHotkeys("x", () => enterMultiFadeFromHoverHotkey(), { enableOnFormTags: true });
 
   // Shift+Left: previous page of the active scene's pad grid (wraps to last page).
   useHotkeys("shift+left", () => {

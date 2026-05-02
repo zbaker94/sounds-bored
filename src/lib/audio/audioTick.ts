@@ -120,6 +120,48 @@ function computeGainChanges(): {
 }
 
 /**
+ * Assigns reference-stable string[] ids for a single layer. Reuses the previous
+ * string[] when the source array reference or its contents are unchanged — keeps
+ * Zustand selectors stable across ticks.
+ */
+function assignStableIds(
+  layerId: string,
+  sourceList: readonly { id: string }[],
+  sourceMap: Map<string, readonly unknown[]>,
+  prevRecord: Record<string, string[]>,
+  nextRecord: Record<string, string[]>,
+): void {
+  const prevSource = sourceMap.get(layerId);
+  const prevIds = prevRecord[layerId];
+  if (prevSource === sourceList && prevIds) {
+    nextRecord[layerId] = prevIds;
+  } else {
+    const ids = sourceList.map((s) => s.id);
+    nextRecord[layerId] =
+      prevIds && prevIds.length === ids.length && prevIds.every((v, i) => v === ids[i])
+        ? prevIds
+        : ids;
+    sourceMap.set(layerId, sourceList);
+  }
+}
+
+/**
+ * Drops source references for layers no longer present in nextRecord so the
+ * tracker map doesn't grow unbounded as layers churn.
+ */
+function pruneStaleKeys(
+  sourceMap: Map<string, readonly unknown[]>,
+  nextRecord: Record<string, string[]>,
+  seenCount: number,
+): void {
+  if (sourceMap.size > seenCount) {
+    for (const layerId of sourceMap.keys()) {
+      if (!(layerId in nextRecord)) sourceMap.delete(layerId);
+    }
+  }
+}
+
+/**
  * Walks active layer IDs and builds reference-stable string[] records for
  * layerPlayOrder and layerChain. Reuses the previous string[] when the source
  * Sound[] reference or its contents are unchanged — keeps Zustand selectors
@@ -140,55 +182,60 @@ function collectLayerSoundLists(activeLayerIds: ReadonlySet<string>): {
     const playOrder = getLayerPlayOrder(layerId);
     if (playOrder && playOrder.length > 0) {
       seenPlayOrderCount++;
-      const prevSource = prevLayerPlayOrderSource.get(layerId);
-      const prevIds = prevLayerPlayOrder[layerId];
-      if (prevSource === playOrder && prevIds) {
-        nextLayerPlayOrder[layerId] = prevIds;
-      } else {
-        const ids = playOrder.map((s) => s.id);
-        nextLayerPlayOrder[layerId] =
-          prevIds && prevIds.length === ids.length && prevIds.every((v, i) => v === ids[i])
-            ? prevIds  // contents match — reuse prior array for selector stability
-            : ids;
-        prevLayerPlayOrderSource.set(layerId, playOrder);
-      }
+      assignStableIds(layerId, playOrder, prevLayerPlayOrderSource, prevLayerPlayOrder, nextLayerPlayOrder);
     }
     const chain = getLayerChain(layerId);
     if (chain && chain.length > 0) {
       seenChainCount++;
-      const prevSource = prevLayerChainSource.get(layerId);
-      const prevIds = prevLayerChain[layerId];
-      if (prevSource === chain && prevIds) {
-        nextLayerChain[layerId] = prevIds;
-      } else {
-        const ids = chain.map((s) => s.id);
-        nextLayerChain[layerId] =
-          prevIds && prevIds.length === ids.length && prevIds.every((v, i) => v === ids[i])
-            ? prevIds
-            : ids;
-        prevLayerChainSource.set(layerId, chain);
-      }
+      assignStableIds(layerId, chain, prevLayerChainSource, prevLayerChain, nextLayerChain);
     }
   }
 
-  // Drop source references for layers no longer in the active set so the
-  // tracker maps don't grow unbounded as layers churn.
-  if (prevLayerPlayOrderSource.size > seenPlayOrderCount) {
-    for (const layerId of prevLayerPlayOrderSource.keys()) {
-      if (!(layerId in nextLayerPlayOrder)) prevLayerPlayOrderSource.delete(layerId);
-    }
-  }
-  if (prevLayerChainSource.size > seenChainCount) {
-    for (const layerId of prevLayerChainSource.keys()) {
-      if (!(layerId in nextLayerChain)) prevLayerChainSource.delete(layerId);
-    }
-  }
+  pruneStaleKeys(prevLayerPlayOrderSource, nextLayerPlayOrder, seenPlayOrderCount);
+  pruneStaleKeys(prevLayerChainSource, nextLayerChain, seenChainCount);
 
   const layerPlayOrderChanged = !stringArrayRecordsEqual(nextLayerPlayOrder, prevLayerPlayOrder);
   const layerChainChanged = !stringArrayRecordsEqual(nextLayerChain, prevLayerChain);
   if (layerPlayOrderChanged) prevLayerPlayOrder = nextLayerPlayOrder;
   if (layerChainChanged) prevLayerChain = nextLayerChain;
   return { nextLayerPlayOrder, nextLayerChain, layerPlayOrderChanged, layerChainChanged };
+}
+
+/**
+ * Computes padProgress, layerProgress, and the activeLayerIds set, diffing each
+ * against its previous value and updating the module-level prev* trackers.
+ * Extracted from tick() to reduce that function's cyclomatic complexity.
+ */
+function computeProgressChanges(): {
+  nextPadProgress: Record<string, number>;
+  nextLayerProgress: Record<string, number>;
+  nextActiveLayerIds: Set<string>;
+  padProgressChanged: boolean;
+  layerProgressChanged: boolean;
+  activeLayerIdsChanged: boolean;
+} {
+  const nextPadProgress = computeAllPadProgress();
+  const padProgressChanged = !progressEqual(nextPadProgress, prevPadProgress);
+  if (padProgressChanged) prevPadProgress = nextPadProgress;
+
+  const nextLayerProgress = computeAllLayerProgress();
+  const layerProgressChanged = !progressEqual(nextLayerProgress, prevLayerProgress);
+  if (layerProgressChanged) prevLayerProgress = nextLayerProgress;
+
+  // Version-gated: getActiveLayerIdSet() is skipped (no Set allocation) on frames
+  // where layerVoiceVersion hasn't changed — the common steady-state case.
+  const currentLayerVoiceVersion = getLayerVoiceVersion();
+  const activeLayerIdsChanged = currentLayerVoiceVersion !== prevLayerVoiceVersion;
+  let nextActiveLayerIds: Set<string> = prevActiveLayerIds;
+  if (activeLayerIdsChanged) {
+    nextActiveLayerIds = new Set(getActiveLayerIdSet());
+    // Clone before storing — Set has mutating methods that make accidental
+    // consumer mutation more likely than for plain records.
+    prevActiveLayerIds = nextActiveLayerIds;
+    prevLayerVoiceVersion = currentLayerVoiceVersion;
+  }
+
+  return { nextPadProgress, nextLayerProgress, nextActiveLayerIds, padProgressChanged, layerProgressChanged, activeLayerIdsChanged };
 }
 
 function tick(): void {
@@ -203,37 +250,12 @@ function tick(): void {
   const { nextPadVolumes, nextLayerVolumes, padVolumesChanged, layerVolumesChanged } =
     computeGainChanges();
 
-  // --- Compute padProgress — diff to skip no-op store updates ---
-  const nextPadProgress = computeAllPadProgress();
-  const padProgressChanged = !progressEqual(nextPadProgress, prevPadProgress);
-  if (padProgressChanged) prevPadProgress = nextPadProgress;
-
-  // --- Compute layerProgress — diff to skip no-op store updates ---
-  const nextLayerProgress = computeAllLayerProgress();
-  const layerProgressChanged = !progressEqual(nextLayerProgress, prevLayerProgress);
-  if (layerProgressChanged) prevLayerProgress = nextLayerProgress;
-
-  // --- Compute activeLayerIds — version-gated to avoid allocating a Set every frame ---
-  // layerVoiceVersion increments only when a voice is added or removed. On frames
-  // where the version is unchanged (the common steady-state case during playback),
-  // getActiveLayerIdSet() is never called and no Set is allocated.
-  const currentLayerVoiceVersion = getLayerVoiceVersion();
-  const activeLayerIdsChanged = currentLayerVoiceVersion !== prevLayerVoiceVersion;
-  let nextActiveLayerIds = prevActiveLayerIds;
-  if (activeLayerIdsChanged) {
-    nextActiveLayerIds = getActiveLayerIdSet();
-    // Clone before storing as prev — Set has mutating methods (add/delete/clear) that
-    // make accidental consumer mutation more likely than for plain records.
-    prevActiveLayerIds = new Set(nextActiveLayerIds);
-    prevLayerVoiceVersion = currentLayerVoiceVersion;
-  }
+  const { nextPadProgress, nextLayerProgress, nextActiveLayerIds, padProgressChanged, layerProgressChanged, activeLayerIdsChanged } =
+    computeProgressChanges();
 
   const { nextLayerPlayOrder, nextLayerChain, layerPlayOrderChanged, layerChainChanged } =
     collectLayerSoundLists(nextActiveLayerIds);
 
-  // Only call setAudioTick if at least one field actually changed.
-  // When nothing changed, skip the Zustand update entirely — this prevents
-  // all playbackStore subscribers from running their selector functions every frame.
   if (
     !padVolumesChanged &&
     !layerVolumesChanged &&

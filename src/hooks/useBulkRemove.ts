@@ -8,6 +8,7 @@ import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { refreshMissingState } from "@/lib/library.reconcile";
 import { evictSoundCachesMany } from "@/lib/audio";
 import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
+import type { Sound, GlobalFolder } from "@/lib/schemas";
 
 /**
  * Encapsulates bulk-remove flows for missing sounds and folders:
@@ -23,6 +24,9 @@ import { EMPTY_GLOBAL_FOLDERS } from "@/lib/constants";
  */
 export function useBulkRemove(): {
   isBulkRemoving: boolean;
+  allMissingSounds: Sound[];
+  allMissingFolders: GlobalFolder[];
+  affectedSoundsCount: number;
   handleRemoveAllMissingSounds: () => Promise<void>;
   handleRemoveAllMissingFolders: () => Promise<void>;
 } {
@@ -47,6 +51,13 @@ export function useBulkRemove(): {
   const allMissingFolders = useMemo(
     () => folders.filter((f) => missingFolderIds.has(f.id)),
     [folders, missingFolderIds],
+  );
+
+  const affectedSoundsCount = useMemo(
+    () =>
+      sounds.filter((s) => s.folderId && missingFolderIds.has(s.folderId))
+        .length,
+    [sounds, missingFolderIds],
   );
 
   const handleRemoveAllMissingSounds = useCallback(async () => {
@@ -80,53 +91,31 @@ export function useBulkRemove(): {
     try {
       const storeSettings = useAppSettingsStore.getState().settings;
       const assignedIds = new Set(
-        [
-          storeSettings?.downloadFolderId,
-          storeSettings?.importFolderId,
-        ].filter(Boolean) as string[],
+        [storeSettings?.downloadFolderId, storeSettings?.importFolderId].filter(Boolean) as string[],
       );
       const safeToRemove = allMissingFolders.filter((f) => !assignedIds.has(f.id));
       const skippedCount = allMissingFolders.length - safeToRemove.length;
       const folderIdsToRemove = new Set(safeToRemove.map((f) => f.id));
+
       if (folderIdsToRemove.size === 0) {
-        if (skippedCount > 0) {
-          toast.warning(
-            `${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`,
-          );
-        }
+        if (skippedCount > 0) toast.warning(`${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`);
         return;
       }
-      const updatedSettings = {
-        ...settings,
-        globalFolders: settings.globalFolders.filter(
-          (f) => !folderIdsToRemove.has(f.id),
-        ),
-      };
+
+      const updatedSettings = { ...settings, globalFolders: settings.globalFolders.filter((f) => !folderIdsToRemove.has(f.id)) };
       await saveSettings(updatedSettings);
-      const soundIdsToRemove = new Set(
-        sounds
-          .filter((s) => s.folderId && folderIdsToRemove.has(s.folderId))
-          .map((s) => s.id),
-      );
+
+      const soundIdsToRemove = new Set(sounds.filter((s) => s.folderId && folderIdsToRemove.has(s.folderId)).map((s) => s.id));
       evictSoundCachesMany(soundIdsToRemove);
-      updateLibrary((draft) => {
-        draft.sounds = draft.sounds.filter((s) => !soundIdsToRemove.has(s.id));
-      });
+      updateLibrary((draft) => { draft.sounds = draft.sounds.filter((s) => !soundIdsToRemove.has(s.id)); });
       await saveCurrentLibrary();
       await refreshMissingState(updatedSettings.globalFolders);
-      toast.success(
-        `${folderIdsToRemove.size} missing folder${folderIdsToRemove.size > 1 ? "s" : ""} and ${soundIdsToRemove.size} sound${soundIdsToRemove.size !== 1 ? "s" : ""} removed`,
-      );
-      if (skippedCount > 0) {
-        toast.warning(
-          `${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`,
-        );
-      }
+
+      toast.success(`${folderIdsToRemove.size} missing folder${folderIdsToRemove.size > 1 ? "s" : ""} and ${soundIdsToRemove.size} sound${soundIdsToRemove.size !== 1 ? "s" : ""} removed`);
+      if (skippedCount > 0) toast.warning(`${skippedCount} folder${skippedCount > 1 ? "s" : ""} skipped — assigned as download or import destination`);
     } catch (err) {
       console.error("[useBulkRemove] removeAllMissingFolders:", err);
-      toast.error("Failed to remove missing folders", {
-        description: err instanceof Error ? err.message : undefined,
-      });
+      toast.error("Failed to remove missing folders", { description: err instanceof Error ? err.message : undefined });
     } finally {
       setIsBulkRemoving(false);
       useUiStore.getState().closeOverlay(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS);
@@ -135,6 +124,9 @@ export function useBulkRemove(): {
 
   return {
     isBulkRemoving,
+    allMissingSounds,
+    allMissingFolders,
+    affectedSoundsCount,
     handleRemoveAllMissingSounds,
     handleRemoveAllMissingFolders,
   };

@@ -149,23 +149,24 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       }, HOLD_MS);
     }
 
+    function enterDragPhase(s: GestureState, deltaY: number): void {
+      s.phase = "drag";
+      setIsDragging(true);
+      if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
+        triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
+        s.hasTriggeredDuringDrag = true;
+      }
+    }
+
     function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
       const s = state.current;
       s.lastY = e.clientY;
       if (s.phase === "idle" || s.phase === "down") return;
 
       const deltaY = s.startY - e.clientY; // positive = dragged up
-      let justTriggered = false;
 
       if (s.phase === "hold" && Math.abs(deltaY) > DRAG_PX) {
-        s.phase = "drag";
-        setIsDragging(true);
-
-        if (deltaY > 0 && !hasHoldLayer && !s.wasPlayingAtStart) {
-          triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
-          justTriggered = true;
-          s.hasTriggeredDuringDrag = true;
-        }
+        enterDragPhase(s, deltaY);
       }
 
       if (s.phase === "drag") {
@@ -173,7 +174,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         const newVolume = clampGain01(s.startVolume + rampFactor * deltaY / DRAG_RANGE_PX);
         s.currentVolume = newVolume;
 
-        if (!justTriggered && !s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
+        if (!s.hasTriggeredDuringDrag && newVolume > 0.01 && !hasHoldLayer && !usePlaybackStore.getState().playingPadIds.has(pad.id)) {
           triggerPad(pad, 0).catch((err: unknown) => { emitAudioError(err); });
           s.hasTriggeredDuringDrag = true;
         }
@@ -220,20 +221,14 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       clearHoldTimer();
       const s = state.current;
 
-      if (s.phase === "down") {
-        // Normal tap — only trigger if not a hold-mode pad and fade wasn't just cancelled
+      if (s.phase === "down" || s.phase === "hold") {
+        // Normal tap or short hold — trigger unless hold-mode pad or fade was just cancelled
         if (!hasHoldLayer && !s.cancelledFadeAtStart) {
           triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
         }
-      } else if (s.phase === "hold") {
-        if (!hasHoldLayer && !s.cancelledFadeAtStart) {
-          triggerPad(pad, triggerVolume()).catch((err: unknown) => { emitAudioError(err); });
-        }
-      } else if (s.phase === "drag") {
-        if (s.currentVolume < 0.01 && !hasHoldLayer) {
-          stopPad(pad);
-          resetPadGain(pad.id);
-        }
+      } else if (s.phase === "drag" && s.currentVolume < 0.01 && !hasHoldLayer) {
+        stopPad(pad);
+        resetPadGain(pad.id);
       }
 
       resetGesture();

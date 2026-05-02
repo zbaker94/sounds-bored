@@ -40,6 +40,14 @@ beforeEach(() => {
   mockMutateAsync.mockClear();
 });
 
+function setupOnePartialTag() {
+  const tagA = createMockTag({ name: "drums" });
+  const sound1 = createMockSound({ tags: [tagA.id] });
+  const sound2 = createMockSound({ tags: [] });
+  useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+  return { tagA, sound1, sound2 };
+}
+
 describe("AddTagsDialog", () => {
   // 1. Full tags (shared by all selected sounds) appear as normal chips
   it("pre-populates chips with tags shared by all selected sounds", () => {
@@ -55,10 +63,7 @@ describe("AddTagsDialog", () => {
 
   // 2. Partial tags (on some sounds) appear as dimmed chips with "~" prefix
   it("shows partial tags as dimmed chips with ~ prefix when sounds have different tags", () => {
-    const tagA = createMockTag({ name: "drums" });
-    const sound1 = createMockSound({ tags: [tagA.id] });
-    const sound2 = createMockSound({ tags: [] });
-    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+    const { sound1, sound2 } = setupOnePartialTag();
 
     renderDialog({ selectedSoundIds: [sound1.id, sound2.id] });
 
@@ -86,10 +91,7 @@ describe("AddTagsDialog", () => {
 
   // 4. Clicking partial chip body promotes it to a full chip
   it("promotes a partial chip to full when the chip text is clicked", async () => {
-    const tagA = createMockTag({ name: "drums" });
-    const sound1 = createMockSound({ tags: [tagA.id] });
-    const sound2 = createMockSound({ tags: [] });
-    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+    const { sound1, sound2 } = setupOnePartialTag();
 
     renderDialog({ selectedSoundIds: [sound1.id, sound2.id] });
 
@@ -106,10 +108,7 @@ describe("AddTagsDialog", () => {
 
   // 5. Clicking the X on a partial chip removes it entirely from the dialog
   it("removes a partial chip entirely when its X button is clicked", async () => {
-    const tagA = createMockTag({ name: "drums" });
-    const sound1 = createMockSound({ tags: [tagA.id] });
-    const sound2 = createMockSound({ tags: [] });
-    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+    const { sound1, sound2 } = setupOnePartialTag();
 
     renderDialog({ selectedSoundIds: [sound1.id, sound2.id] });
 
@@ -123,10 +122,7 @@ describe("AddTagsDialog", () => {
 
   // 6. Confirm with no changes: no store mutations, dialog closes
   it("closes without calling store mutations when confirming with no changes", async () => {
-    const tagA = createMockTag({ name: "drums" });
-    const sound1 = createMockSound({ tags: [tagA.id] });
-    const sound2 = createMockSound({ tags: [] });
-    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+    const { sound1, sound2 } = setupOnePartialTag();
 
     const onOpenChange = vi.fn();
     renderDialog({ selectedSoundIds: [sound1.id, sound2.id], onOpenChange });
@@ -142,10 +138,7 @@ describe("AddTagsDialog", () => {
 
   // 7. Confirm after promoting partial: assigns tag to all selected sounds
   it("assigns a promoted partial tag to all selected sounds on confirm", async () => {
-    const tagA = createMockTag({ name: "drums" });
-    const sound1 = createMockSound({ tags: [tagA.id] });
-    const sound2 = createMockSound({ tags: [] });
-    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+    const { tagA, sound1, sound2 } = setupOnePartialTag();
 
     const assignSpy = vi.spyOn(useLibraryStore.getState(), "assignTagsToSounds");
 
@@ -170,10 +163,7 @@ describe("AddTagsDialog", () => {
 
   // 8. Confirm after removing partial: removes tag from all sounds that had it
   it("removes a stripped partial tag from all sounds that had it on confirm", async () => {
-    const tagA = createMockTag({ name: "drums" });
-    const sound1 = createMockSound({ tags: [tagA.id] });
-    const sound2 = createMockSound({ tags: [] });
-    useLibraryStore.setState({ ...initialLibraryState, tags: [tagA], sounds: [sound1, sound2] });
+    const { tagA, sound1, sound2 } = setupOnePartialTag();
 
     const removeSpy = vi.spyOn(useLibraryStore.getState(), "removeTagFromSounds");
 

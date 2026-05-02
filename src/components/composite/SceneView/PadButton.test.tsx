@@ -72,6 +72,18 @@ function loadPlayablePadInStore(padOverrides = {}) {
   return loadPadInStore({ layers: [layer], ...padOverrides });
 }
 
+function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}) {
+  const pad = loadPadInStore(padOverrides);
+  render(<PadButton pad={pad} sceneId="scene-1" />);
+  return pad;
+}
+
+function renderPlayableButton(padOverrides: Parameters<typeof loadPlayablePadInStore>[0] = {}) {
+  const pad = loadPlayablePadInStore(padOverrides);
+  render(<PadButton pad={pad} sceneId="scene-1" />);
+  return pad;
+}
+
 describe("PadButton", () => {
   beforeEach(() => {
     useUiStore.setState({ ...initialUiState });
@@ -88,14 +100,12 @@ describe("PadButton", () => {
 
   describe("normal mode (editMode false)", () => {
     it("renders the pad name", () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderButton();
       expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
     });
 
     it("does not show the back face", () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderButton();
       // Back face is unmounted when not flipped to avoid hidden RAF subscriptions
       expect(screen.queryByTestId("pad-back-face")).toBeNull();
     });
@@ -108,8 +118,7 @@ describe("PadButton", () => {
     });
 
     it("does not show pulse ring when pad is not playing", () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderButton();
       expect(screen.queryByTestId("pulse-ring")).not.toBeInTheDocument();
     });
   });
@@ -120,8 +129,7 @@ describe("PadButton", () => {
     });
 
     it("renders PadBackFace on the back face in edit mode", () => {
-      const pad = loadPadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderButton();
       expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
     });
   });
@@ -138,8 +146,7 @@ describe("PadButton", () => {
     });
 
     it("shows volume percentage instead of pad name while dragging", () => {
-      const pad = loadPlayablePadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderPlayableButton();
 
       const button = screen.getByRole("button", { name: "Kick" });
 
@@ -156,8 +163,7 @@ describe("PadButton", () => {
     });
 
     it("updates percentage as volume changes while dragging", () => {
-      const pad = loadPlayablePadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderPlayableButton();
 
       const button = screen.getByRole("button", { name: "Kick" });
 
@@ -180,8 +186,7 @@ describe("PadButton", () => {
     });
 
     it("shows volume transition bar while dragging", () => {
-      const pad = loadPlayablePadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderPlayableButton();
       const button = screen.getByRole("button", { name: "Kick" });
 
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
@@ -198,8 +203,7 @@ describe("PadButton", () => {
     });
 
     it("shows pad name alongside volume percentage while dragging", () => {
-      const pad = loadPlayablePadInStore();
-      render(<PadButton pad={pad} sceneId="scene-1" />);
+      renderPlayableButton();
 
       const button = screen.getByRole("button", { name: "Kick" });
 
@@ -301,10 +305,9 @@ describe("right-click / context menu", () => {
   });
 
   it("right-click sets editingPadId in uiStore", async () => {
-    const pad = loadPadInStore({
+    renderButton({
       layers: [createMockLayer({ selection: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 } })],
     });
-    render(<PadButton pad={pad} sceneId="scene-1" />);
     const padEl = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(padEl);
     expect(useUiStore.getState().editingPadId).toBe("pad-1");
@@ -312,8 +315,7 @@ describe("right-click / context menu", () => {
 
   it("right-clicking does not set editingPadId in edit mode", async () => {
     useUiStore.setState({ ...initialUiState, editMode: true });
-    const pad = loadPadInStore();
-    render(<PadButton pad={pad} sceneId="scene-1" />);
+    renderButton();
     fireEvent.contextMenu(screen.getByTestId("pad-name"));
     expect(useUiStore.getState().editingPadId).toBeNull();
   });
@@ -325,8 +327,7 @@ describe("right-click / context menu", () => {
       selectedPads: new Map(),
       reopenPadId: null,
     });
-    const pad = loadPadInStore();
-    render(<PadButton pad={pad} sceneId="scene-1" />);
+    renderButton();
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(button);
     expect(useUiStore.getState().editingPadId).toBeNull();
@@ -335,8 +336,7 @@ describe("right-click / context menu", () => {
   it("right-clicking sets editingPadId even when pad is unplayable", async () => {
     // Disabled pads must still be right-click-flippable so users can assign sounds.
     // createMockLayer defaults to empty instances → padSoundState === "disabled"
-    const pad = loadPadInStore();
-    render(<PadButton pad={pad} sceneId="scene-1" />);
+    renderButton();
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(button);
     expect(useUiStore.getState().editingPadId).toBe("pad-1");
@@ -379,8 +379,7 @@ describe("fade popover", () => {
   });
 
   it("does not render the fade slider when no popover is open", () => {
-    const pad = loadPadInStore();
-    render(<PadButton pad={pad} sceneId="scene-1" />);
+    renderButton();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   });
 });

@@ -42,6 +42,20 @@ export const initialDownloadState: DownloadStoreState = {
 export const selectActiveJobs = (state: DownloadStoreState): DownloadJob[] =>
   Object.values(state.jobs).filter((j) => ACTIVE_STATUSES.has(j.status));
 
+// Project each update variant explicitly so status transitions clear stale fields
+// instead of silently accumulating them via a shallow spread.
+function buildNextJob(existing: DownloadJob, update: DownloadJobUpdate): DownloadJob {
+  if (!("status" in update)) return { ...existing, soundId: update.soundId };
+  switch (update.status) {
+    case "queued":     return { ...existing, status: "queued", percent: 0, speed: undefined, eta: undefined, error: undefined };
+    case "downloading": return { ...existing, status: "downloading", percent: update.percent, speed: update.speed, eta: update.eta, error: undefined };
+    case "processing":  return { ...existing, status: "processing", percent: update.percent, speed: update.speed, eta: update.eta, error: undefined };
+    case "completed":   return { ...existing, status: "completed", percent: update.percent, outputPath: update.outputPath, speed: undefined, eta: undefined, error: undefined };
+    case "failed":      return { ...existing, status: "failed", error: update.error, speed: undefined, eta: undefined };
+    case "cancelled":   return { ...existing, status: "cancelled", speed: undefined, eta: undefined };
+  }
+}
+
 export const useDownloadStore = create<DownloadStoreState & DownloadStoreActions>((set) => ({
   ...initialDownloadState,
   loadJobs: (jobs) =>
@@ -59,42 +73,12 @@ export const useDownloadStore = create<DownloadStoreState & DownloadStoreActions
     set((state) => {
       const existing = state.jobs[id];
       if (!existing) return state;
-
       // Guard against late events resurrecting terminal jobs (e.g. a progress
       // event arriving after the user cancelled, or a duplicate completion).
       if ("status" in update && TERMINAL_STATUSES.has(existing.status) && update.status !== existing.status) {
         return state;
       }
-
-      // Project each variant explicitly so status transitions clear stale fields
-      // instead of silently accumulating them via a shallow spread.
-      let next: DownloadJob;
-      if (!("status" in update)) {
-        // soundId-only update — no status change
-        next = { ...existing, soundId: update.soundId };
-      } else {
-        switch (update.status) {
-          case "queued":
-            next = { ...existing, status: "queued", percent: 0, speed: undefined, eta: undefined, error: undefined };
-            break;
-          case "downloading":
-            next = { ...existing, status: "downloading", percent: update.percent, speed: update.speed, eta: update.eta, error: undefined };
-            break;
-          case "processing":
-            next = { ...existing, status: "processing", percent: update.percent, speed: update.speed, eta: update.eta, error: undefined };
-            break;
-          case "completed":
-            next = { ...existing, status: "completed", percent: update.percent, outputPath: update.outputPath, speed: undefined, eta: undefined, error: undefined };
-            break;
-          case "failed":
-            next = { ...existing, status: "failed", error: update.error, speed: undefined, eta: undefined };
-            break;
-          case "cancelled":
-            next = { ...existing, status: "cancelled", speed: undefined, eta: undefined };
-            break;
-        }
-      }
-      return { jobs: { ...state.jobs, [id]: next } };
+      return { jobs: { ...state.jobs, [id]: buildNextJob(existing, update) } };
     }),
   removeJob: (id) =>
     set((state) => {
