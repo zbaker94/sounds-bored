@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a UI issue where layer arrangement helper text could display incorrectly when no sounds are assigned to a layer.
 - Pad volume drag indicator now updates more smoothly, with React re-renders throttled to once per animation frame while audio adjustments remain immediate.
 - Improved internal audio engine reliability: the playback tracking loop now responds immediately to voice changes via event subscription rather than polling a version counter, reducing the chance of missed state updates during complex playback scenarios.
 - Improved audio playback UI performance by reducing unnecessary screen updates during sound fades and pad activity tracking.
