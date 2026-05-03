@@ -93,16 +93,27 @@ const layerVoiceMap = new Map<string, AudioVoice[]>();
  */
 export const _padToLayerIds = new Map<string, Set<string>>();
 
-/**
- * Incremented whenever a layer voice is added or removed. The audioTick loop
- * reads this to skip `new Set(layerVoiceMap.keys())` on frames where the active
- * layer set is unchanged â€” avoids one per-frame Set allocation during stable playback.
- */
-let layerVoiceVersion = 0;
+// Subscription model for active layer set changes. A single listener slot is used —
+// audioTick is the only subscriber. Mutation sites call notifyLayerVoiceSetChanged()
+// rather than manually incrementing a version counter, so future mutation paths
+// automatically notify the listener without requiring a manual bump.
+type LayerVoiceSetChangedListener = () => void;
+let layerVoiceSetChangeListener: LayerVoiceSetChangedListener | null = null;
 
-export function getLayerVoiceVersion(): number {
-  return layerVoiceVersion;
+/** Register a listener that fires whenever layerVoiceMap is mutated.
+ *  Returns an unsubscribe function. Only one listener slot exists; registering
+ *  a second listener replaces the first. */
+export function onLayerVoiceSetChanged(listener: LayerVoiceSetChangedListener): () => void {
+  layerVoiceSetChangeListener = listener;
+  return () => { layerVoiceSetChangeListener = null; };
 }
+
+function notifyLayerVoiceSetChanged(): void {
+  layerVoiceSetChangeListener?.();
+}
+
+/** Exposed for test introspection only — fires the voice-set-changed notification without a real map mutation. */
+export const _notifyLayerVoiceSetChangedForTest = (): void => notifyLayerVoiceSetChanged();
 
 /** Keyed by layer ID. One GainNode per active layer, connects to its padGain. */
 const layerGainMap = new Map<string, GainNode>();
@@ -427,7 +438,7 @@ export function clearAllVoices(): void {
   voiceMap.clear();
   layerVoiceMap.clear();
   _padToLayerIds.clear();
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
 }
 
 export function clearAllFadeTracking(): void {
@@ -538,7 +549,7 @@ export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds:
     }
     removeVoicesFromLayers(padId, voiceSet);
   }
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
   for (const voice of voices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -912,7 +923,7 @@ export function stopPadVoices(padId: string): void {
     }
     if (padLayers.size === 0) _padToLayerIds.delete(padId);
   }
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
   for (const voice of voices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -926,7 +937,7 @@ export function stopAllVoices(): void {
   voiceMap.clear();
   layerVoiceMap.clear();
   _padToLayerIds.clear();
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
   for (const voice of allVoices) {
     try { voice.stop(); } catch { /* already ended */ }
   }
@@ -940,7 +951,7 @@ export function recordLayerVoice(padId: string, layerId: string, voice: AudioVoi
     _padToLayerIds.set(padId, padLayers);
   }
   padLayers.add(layerId);
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
   recordVoice(padId, voice);
 }
 
@@ -956,7 +967,7 @@ export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoic
   } else {
     layerVoiceMap.set(layerId, updated);
   }
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
   clearVoice(padId, voice);
 }
 
@@ -972,7 +983,7 @@ export function stopLayerVoices(padId: string, layerId: string): void {
     padLayers.delete(layerId);
     if (padLayers.size === 0) _padToLayerIds.delete(padId);
   }
-  layerVoiceVersion++;
+  notifyLayerVoiceSetChanged();
   const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
   if (padVoices.length === 0) {
     voiceMap.delete(padId);

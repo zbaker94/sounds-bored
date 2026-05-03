@@ -50,6 +50,7 @@ vi.mock("@/lib/audio/audioState", () => ({
   getPadProgress: vi.fn().mockReturnValue(null),
   isPadActive: vi.fn().mockReturnValue(false),
   isPadFading: vi.fn().mockReturnValue(false),
+  onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}),
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({

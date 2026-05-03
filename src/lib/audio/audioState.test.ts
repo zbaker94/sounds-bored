@@ -56,6 +56,7 @@ import {
   stopPadVoices,
   stopAllVoices,
   stopLayerVoices,
+  stopSpecificVoices,
   getLayerVoices,
   nullAllOnEnded,
   isPadActive,
@@ -64,7 +65,8 @@ import {
   getActivePadCount,
   forEachActiveLayerGain,
   getActiveLayerIdSet,
-  getLayerVoiceVersion,
+  onLayerVoiceSetChanged,
+  _notifyLayerVoiceSetChangedForTest,
   computeAllPadProgress,
   computeAllLayerProgress,
   unregisterStreamingAudio,
@@ -517,36 +519,109 @@ describe("voice tracking", () => {
   });
 });
 
-// ── layerVoiceVersion ────────────────────────────────────────────────────────
+// ── onLayerVoiceSetChanged ───────────────────────────────────────────────────
 
-describe("getLayerVoiceVersion", () => {
-  it("increments when a layer voice is recorded", () => {
-    const before = getLayerVoiceVersion();
+describe("onLayerVoiceSetChanged", () => {
+  it("fires the listener when a layer voice is recorded", () => {
+    let calls = 0;
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
     recordLayerVoice("pad-1", "layer-1", makeVoice());
-    expect(getLayerVoiceVersion()).toBe(before + 1);
+    expect(calls).toBe(1);
+    unsub();
   });
 
-  it("increments when a layer voice is cleared", () => {
+  it("fires the listener when a layer voice is cleared", () => {
+    let calls = 0;
     const voice = makeVoice();
     recordLayerVoice("pad-1", "layer-1", voice);
-    const before = getLayerVoiceVersion();
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
     clearLayerVoice("pad-1", "layer-1", voice);
-    expect(getLayerVoiceVersion()).toBe(before + 1);
+    expect(calls).toBe(1);
+    unsub();
   });
 
-  it("increments when clearAllVoices is called", () => {
+  it("fires the listener when clearAllVoices is called", () => {
+    let calls = 0;
     recordLayerVoice("pad-1", "layer-1", makeVoice());
-    const before = getLayerVoiceVersion();
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
     clearAllVoices();
-    expect(getLayerVoiceVersion()).toBe(before + 1);
+    expect(calls).toBe(1);
+    unsub();
   });
 
-  it("increments once per recorded voice, not once per call", () => {
-    const before = getLayerVoiceVersion();
+  it("fires the listener when stopPadVoices is called", () => {
+    let calls = 0;
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
+    stopPadVoices("pad-1");
+    expect(calls).toBe(1);
+    unsub();
+  });
+
+  it("fires the listener when stopAllVoices is called", () => {
+    let calls = 0;
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
+    stopAllVoices();
+    expect(calls).toBe(1);
+    unsub();
+  });
+
+  it("fires the listener when stopLayerVoices is called", () => {
+    let calls = 0;
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
+    stopLayerVoices("pad-1", "layer-1");
+    expect(calls).toBe(1);
+    unsub();
+  });
+
+  it("fires the listener when stopSpecificVoices is called", () => {
+    let calls = 0;
+    const voice = makeVoice();
+    recordLayerVoice("pad-1", "layer-1", voice);
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
+    stopSpecificVoices([voice], new Set(["pad-1"]));
+    expect(calls).toBe(1);
+    unsub();
+  });
+
+  it("fires once per recorded voice, not once per call", () => {
+    let calls = 0;
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     recordLayerVoice("pad-1", "layer-2", makeVoice());
     recordLayerVoice("pad-2", "layer-3", makeVoice());
-    expect(getLayerVoiceVersion()).toBe(before + 3);
+    expect(calls).toBe(3);
+    unsub();
+  });
+
+  it("does not fire after the listener is unsubscribed", () => {
+    let calls = 0;
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    unsub();
+    clearAllVoices();
+    expect(calls).toBe(1);
+  });
+
+  it("registering a second listener replaces the first", () => {
+    let first = 0;
+    let second = 0;
+    onLayerVoiceSetChanged(() => { first++; });
+    const unsub = onLayerVoiceSetChanged(() => { second++; });
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    expect(first).toBe(0);
+    expect(second).toBe(1);
+    unsub();
+  });
+
+  it("_notifyLayerVoiceSetChangedForTest fires the listener without a map mutation", () => {
+    let calls = 0;
+    const unsub = onLayerVoiceSetChanged(() => { calls++; });
+    _notifyLayerVoiceSetChangedForTest();
+    expect(calls).toBe(1);
+    unsub();
   });
 });
 

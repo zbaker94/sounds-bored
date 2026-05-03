@@ -55,6 +55,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 vi.mock("@/lib/audio/audioState", () => ({
   isPadActive: vi.fn().mockReturnValue(false),
   isPadFading: vi.fn().mockReturnValue(false),
+  onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}),
 }));
 
 function loadPadInStore(padOverrides = {}) {
