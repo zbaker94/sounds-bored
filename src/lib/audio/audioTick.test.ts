@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _stopMasterVolumeSync } from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
+import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { applyMasterVolume } from "./audioContext";
 
 vi.mock("./audioContext", () => ({
@@ -44,6 +46,8 @@ describe("audioTick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePlaybackStore.setState({ ...initialPlaybackState });
+    usePadMetricsStore.setState({ ...initialPadMetricsState });
+    useLayerMetricsStore.setState({ ...initialLayerMetricsState });
     vi.mocked(getActivePadCount).mockReturnValue(0);
     vi.mocked(forEachActivePadGain).mockImplementation(() => {});
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
@@ -61,10 +65,12 @@ describe("audioTick", () => {
   });
 
   it("stopAudioTick clears all tick-managed store fields", () => {
-    usePlaybackStore.getState().setAudioTick({
+    usePadMetricsStore.getState().setPadMetrics({
       padVolumes: { "pad-1": 0.5 },
-      layerVolumes: { "layer-1": 0.7 },
       padProgress: { "pad-1": 0.3 },
+    });
+    useLayerMetricsStore.getState().setLayerMetrics({
+      layerVolumes: { "layer-1": 0.7 },
       activeLayerIds: new Set(["layer-1"]),
       layerPlayOrder: { "layer-1": ["s1", "s2"] },
       layerChain: { "layer-1": ["s2"] },
@@ -72,13 +78,12 @@ describe("audioTick", () => {
 
     stopAudioTick();
 
-    const state = usePlaybackStore.getState();
-    expect(state.padVolumes).toEqual({});
-    expect(state.layerVolumes).toEqual({});
-    expect(state.padProgress).toEqual({});
-    expect(state.activeLayerIds.size).toBe(0);
-    expect(state.layerPlayOrder).toEqual({});
-    expect(state.layerChain).toEqual({});
+    expect(usePadMetricsStore.getState().padVolumes).toEqual({});
+    expect(usePadMetricsStore.getState().padProgress).toEqual({});
+    expect(useLayerMetricsStore.getState().layerVolumes).toEqual({});
+    expect(useLayerMetricsStore.getState().activeLayerIds.size).toBe(0);
+    expect(useLayerMetricsStore.getState().layerPlayOrder).toEqual({});
+    expect(useLayerMetricsStore.getState().layerChain).toEqual({});
   });
 
   it("startAudioTick is idempotent — calling twice does not create two RAFs", () => {
@@ -104,10 +109,12 @@ describe("audioTick", () => {
   });
 
   it("self-terminates and clears store when no pads are active", () => {
-    // Seed the store with some values
-    usePlaybackStore.getState().setAudioTick({
+    // Seed the metric stores with some values
+    usePadMetricsStore.getState().setPadMetrics({
       padVolumes: { "pad-1": 0.5 },
       padProgress: { "pad-1": 0.3 },
+    });
+    useLayerMetricsStore.getState().setLayerMetrics({
       activeLayerIds: new Set(["layer-1"]),
     });
 
@@ -125,10 +132,9 @@ describe("audioTick", () => {
     // Invoke the tick callback manually — getActivePadCount returns 0, so it self-terminates
     capturedCallback!(performance.now());
 
-    const state = usePlaybackStore.getState();
-    expect(state.padVolumes).toEqual({});
-    expect(state.padProgress).toEqual({});
-    expect(state.activeLayerIds.size).toBe(0);
+    expect(usePadMetricsStore.getState().padVolumes).toEqual({});
+    expect(usePadMetricsStore.getState().padProgress).toEqual({});
+    expect(useLayerMetricsStore.getState().activeLayerIds.size).toBe(0);
 
     // No further RAF should have been scheduled (tick exited)
     expect(rafSpy).toHaveBeenCalledTimes(1); // only the initial startAudioTick call
@@ -182,7 +188,7 @@ describe("audioTick", () => {
     capturedCallback!(performance.now()); // second tick — version changed → must call getActiveLayerIdSet
 
     expect(getActiveLayerIdSet).toHaveBeenCalled();
-    expect(usePlaybackStore.getState().activeLayerIds).toBe(newActiveIds);
+    expect(useLayerMetricsStore.getState().activeLayerIds).toEqual(newActiveIds);
 
     rafSpy.mockRestore();
   });
@@ -209,9 +215,9 @@ describe("audioTick", () => {
     startAudioTick();
     capturedCallback!(performance.now()); // tick 1: version 1 vs prev -1 → changed
 
-    // Store receives nextActiveLayerIds (which is firstIds). prevActiveLayerIds must be
-    // a clone — a different object with the same contents.
-    const storedSet = usePlaybackStore.getState().activeLayerIds;
+    // Store receives nextActiveLayerIds. prevActiveLayerIds must be a clone — a
+    // different object with the same contents.
+    const storedSet = useLayerMetricsStore.getState().activeLayerIds;
     expect(storedSet).not.toBe(_getPrevActiveLayerIds()); // must be different objects
     expect(_getPrevActiveLayerIds().has("layer-a")).toBe(true);
 
@@ -245,9 +251,9 @@ describe("audioTick", () => {
     startAudioTick();
     capturedCallback!(performance.now());
 
-    const state = usePlaybackStore.getState();
-    expect(state.padVolumes["pad-1"]).toBe(0.5);
-    expect(state.padVolumes["pad-2"]).toBeUndefined(); // full volume excluded
+    const padState = usePadMetricsStore.getState();
+    expect(padState.padVolumes["pad-1"]).toBe(0.5);
+    expect(padState.padVolumes["pad-2"]).toBeUndefined(); // full volume excluded
 
     rafSpy.mockRestore();
   });
@@ -317,8 +323,8 @@ describe("audioTick", () => {
     startAudioTick();
     capturedCallback!(performance.now()); // tick 1: populates padVolumes/layerVolumes
 
-    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.5);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.7);
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBe(0.5);
+    expect(useLayerMetricsStore.getState().layerVolumes["layer-1"]).toBe(0.7);
 
     // Tick 2: isAnyGainChanging = false — should retain the values from tick 1
     vi.mocked(isAnyGainChanging).mockReturnValue(false);
@@ -327,8 +333,8 @@ describe("audioTick", () => {
 
     capturedCallback!(performance.now()); // tick 2: short-circuit
 
-    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBe(0.5);
-    expect(usePlaybackStore.getState().layerVolumes["layer-1"]).toBe(0.7);
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBe(0.5);
+    expect(useLayerMetricsStore.getState().layerVolumes["layer-1"]).toBe(0.7);
 
     rafSpy.mockRestore();
   });
@@ -358,9 +364,9 @@ describe("audioTick", () => {
       startAudioTick();
       capturedCallback!(performance.now());
 
-      const state = usePlaybackStore.getState();
-      expect(state.layerPlayOrder["layer-1"]).toEqual(["s1", "s2", "s3"]);
-      expect(state.layerChain["layer-1"]).toEqual(["s2", "s3"]);
+      const layerState = useLayerMetricsStore.getState();
+      expect(layerState.layerPlayOrder["layer-1"]).toEqual(["s1", "s2", "s3"]);
+      expect(layerState.layerChain["layer-1"]).toEqual(["s2", "s3"]);
 
       rafSpy.mockRestore();
     });
@@ -384,9 +390,9 @@ describe("audioTick", () => {
       startAudioTick();
       capturedCallback!(performance.now());
 
-      const state = usePlaybackStore.getState();
-      expect(state.layerPlayOrder["layer-1"]).toEqual(["s1"]);
-      expect(state.layerPlayOrder["layer-2"]).toBeUndefined();
+      const layerState = useLayerMetricsStore.getState();
+      expect(layerState.layerPlayOrder["layer-1"]).toEqual(["s1"]);
+      expect(layerState.layerPlayOrder["layer-2"]).toBeUndefined();
 
       rafSpy.mockRestore();
     });
@@ -411,17 +417,17 @@ describe("audioTick", () => {
 
       startAudioTick();
       capturedCallback!(performance.now());
-      expect(usePlaybackStore.getState().layerChain["layer-1"]).toEqual(["s2", "s3"]);
+      expect(useLayerMetricsStore.getState().layerChain["layer-1"]).toEqual(["s2", "s3"]);
 
       // Tick 2: chain advances to [s3] — s2 is now playing
       vi.mocked(getLayerChain).mockReturnValue([mkSound("s3")]);
       capturedCallback!(performance.now());
-      expect(usePlaybackStore.getState().layerChain["layer-1"]).toEqual(["s3"]);
+      expect(useLayerMetricsStore.getState().layerChain["layer-1"]).toEqual(["s3"]);
 
       rafSpy.mockRestore();
     });
 
-    it("does not re-emit setAudioTick when layerPlayOrder and layerChain are unchanged", () => {
+    it("does not re-emit metric updates when layerPlayOrder and layerChain are unchanged", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
       vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
@@ -438,12 +444,15 @@ describe("audioTick", () => {
       capturedCallback!(performance.now()); // first tick populates
 
       // Now freeze everything: layerVoiceVersion unchanged so activeLayerIds skipped;
-      // play order and chain identical → audioTick should NOT call setAudioTick.
-      const setAudioTickSpy = vi.spyOn(usePlaybackStore.getState(), "setAudioTick");
+      // play order and chain identical → audioTick should NOT call setPadMetrics or setLayerMetrics.
+      const setPadMetricsSpy = vi.spyOn(usePadMetricsStore.getState(), "setPadMetrics");
+      const setLayerMetricsSpy = vi.spyOn(useLayerMetricsStore.getState(), "setLayerMetrics");
       capturedCallback!(performance.now());
-      expect(setAudioTickSpy).not.toHaveBeenCalled();
+      expect(setPadMetricsSpy).not.toHaveBeenCalled();
+      expect(setLayerMetricsSpy).not.toHaveBeenCalled();
 
-      setAudioTickSpy.mockRestore();
+      setPadMetricsSpy.mockRestore();
+      setLayerMetricsSpy.mockRestore();
       rafSpy.mockRestore();
     });
 
@@ -463,9 +472,9 @@ describe("audioTick", () => {
       startAudioTick();
       capturedCallback!(performance.now());
 
-      const state = usePlaybackStore.getState();
-      expect(state.layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
-      expect(state.layerChain["layer-1"]).toBeUndefined();
+      const layerState = useLayerMetricsStore.getState();
+      expect(layerState.layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
+      expect(layerState.layerChain["layer-1"]).toBeUndefined();
 
       rafSpy.mockRestore();
     });
@@ -490,9 +499,9 @@ describe("audioTick", () => {
       startAudioTick();
       capturedCallback!(performance.now());
 
-      const state = usePlaybackStore.getState();
-      expect(state.layerPlayOrder["layer-1"]).toEqual(["a1", "a2"]);
-      expect(state.layerPlayOrder["layer-2"]).toEqual(["b1", "b2", "b3"]);
+      const layerState = useLayerMetricsStore.getState();
+      expect(layerState.layerPlayOrder["layer-1"]).toEqual(["a1", "a2"]);
+      expect(layerState.layerPlayOrder["layer-2"]).toEqual(["b1", "b2", "b3"]);
 
       rafSpy.mockRestore();
     });
@@ -513,8 +522,8 @@ describe("audioTick", () => {
       startAudioTick();
       capturedCallback!(performance.now());
 
-      const state = usePlaybackStore.getState();
-      expect(state.layerPlayOrder["layer-1"]).toBeUndefined();
+      const layerState = useLayerMetricsStore.getState();
+      expect(layerState.layerPlayOrder["layer-1"]).toBeUndefined();
 
       rafSpy.mockRestore();
     });
@@ -543,12 +552,12 @@ describe("audioTick", () => {
 
       startAudioTick();
       capturedCallback!(performance.now());
-      const firstRef = usePlaybackStore.getState().layerPlayOrder["layer-1"];
+      const firstRef = useLayerMetricsStore.getState().layerPlayOrder["layer-1"];
 
       // Tick 2: layer-2's chain advances to [] (empty → undefined)
       vi.mocked(getLayerChain).mockImplementation(() => undefined);
       capturedCallback!(performance.now());
-      const secondRef = usePlaybackStore.getState().layerPlayOrder["layer-1"];
+      const secondRef = useLayerMetricsStore.getState().layerPlayOrder["layer-1"];
 
       // layer-1's play order array reference must be preserved — selectors
       // like (s) => s.layerPlayOrder["layer-1"] should see the same reference.
@@ -575,15 +584,15 @@ describe("audioTick", () => {
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
       startAudioTick();
       capturedCallback!(performance.now());
-      expect(usePlaybackStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
-      expect(usePlaybackStore.getState().layerPlayOrder["layer-2"]).toBeDefined();
+      expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
+      expect(useLayerMetricsStore.getState().layerPlayOrder["layer-2"]).toBeDefined();
 
       // Tick 2: only layer-1 active — layer-2's stale entry should drop out
       vi.mocked(getLayerVoiceVersion).mockReturnValue(2);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       capturedCallback!(performance.now());
-      expect(usePlaybackStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
-      expect(usePlaybackStore.getState().layerPlayOrder["layer-2"]).toBeUndefined();
+      expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
+      expect(useLayerMetricsStore.getState().layerPlayOrder["layer-2"]).toBeUndefined();
 
       rafSpy.mockRestore();
     });
@@ -604,7 +613,7 @@ describe("audioTick", () => {
 
     it("subscription does not call applyMasterVolume for unrelated store field changes", () => {
       usePlaybackStore.getState().addPlayingPad("pad-x");
-      usePlaybackStore.getState().setAudioTick({ padVolumes: { "pad-x": 0.3 } });
+      usePadMetricsStore.getState().setPadMetrics({ padVolumes: { "pad-x": 0.3 } });
       expect(applyMasterVolume).not.toHaveBeenCalled();
     });
 

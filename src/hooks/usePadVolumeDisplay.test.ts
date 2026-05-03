@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { usePadVolumeDisplay } from "./usePadVolumeDisplay";
 
 const PAD_ID = "pad-1";
 
 beforeEach(() => {
   vi.useFakeTimers();
-  usePlaybackStore.setState({ ...initialPlaybackState });
+  usePadMetricsStore.setState({ ...initialPadMetricsState });
 });
 
 afterEach(() => {
@@ -40,8 +40,7 @@ describe("usePadVolumeDisplay", () => {
     });
 
     it("prefers dragVolume over liveVolume while dragging", () => {
-      usePlaybackStore.setState({
-        ...initialPlaybackState,
+      usePadMetricsStore.getState().setPadMetrics({
         padVolumes: { [PAD_ID]: 0.8 },
       });
       const { result } = renderHook(() =>
@@ -78,7 +77,7 @@ describe("usePadVolumeDisplay", () => {
         usePadVolumeDisplay(PAD_ID, false, null)
       );
       act(() => {
-        usePlaybackStore.getState().setAudioTick({
+        usePadMetricsStore.getState().setPadMetrics({
           padVolumes: { [PAD_ID]: 0.6 },
         });
       });
@@ -91,7 +90,7 @@ describe("usePadVolumeDisplay", () => {
         usePadVolumeDisplay(PAD_ID, false, null)
       );
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.7 } });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.7 } });
       });
       // Stability timer: 300ms without a new liveVolume value
       act(() => { vi.advanceTimersByTime(300); });
@@ -106,13 +105,13 @@ describe("usePadVolumeDisplay", () => {
         usePadVolumeDisplay(PAD_ID, false, null)
       );
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.5 } });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.5 } });
       });
       // Remove liveVolume (pad stopped / volume back to full).
       // When liveVolume goes undefined the stability timer is cleared immediately
       // (no 300ms wait), so isVolumeActive becomes false right away.
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: {} });
       });
       // 450ms linger → volumeExiting = true
       act(() => { vi.advanceTimersByTime(450); });
@@ -132,7 +131,7 @@ describe("usePadVolumeDisplay", () => {
       expect(result.current.showVolumeDisplay).toBe(false);
       // padVolumes clears (no-op — was never set)
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: {} });
       });
       act(() => { vi.advanceTimersByTime(450 + 220); });
       // Still hidden — no linger should fire
@@ -164,14 +163,14 @@ describe("usePadVolumeDisplay", () => {
         usePadVolumeDisplay(PAD_ID, false, null)
       );
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.4 } });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.4 } });
       });
       expect(result.current.showVolumeDisplay).toBe(true);
       // Mid-stability-timer window (150ms in, 150ms before it fires)
       act(() => { vi.advanceTimersByTime(150); });
       // Pad stops — padVolumes cleared synchronously by clearVoice
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: {} });
       });
       // liveVolumeChanging cleared immediately (stability timer cancelled, not rescheduled)
       // isVolumeActive → false → linger starts
@@ -210,19 +209,19 @@ describe("usePadVolumeDisplay", () => {
       );
       // First trigger: fade shows bar
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.5 } });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.5 } });
       });
       expect(result.current.showVolumeDisplay).toBe(true);
       // Pad stops → padVolumes cleared by engine (synchronous)
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: {} });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: {} });
       });
       // linger runs, bar eventually hides
       act(() => { vi.advanceTimersByTime(450 + 220); });
       expect(result.current.showVolumeDisplay).toBe(false);
       // Re-trigger: new fade
       act(() => {
-        usePlaybackStore.getState().setAudioTick({ padVolumes: { [PAD_ID]: 0.6 } });
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.6 } });
       });
       expect(result.current.showVolumeDisplay).toBe(true);
       expect(result.current.displayVolume).toBe(0.6);

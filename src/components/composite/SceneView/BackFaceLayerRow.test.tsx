@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render } from "@testing-library/react";
-import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { createMockPad, createMockLayer } from "@/test/factories";
@@ -46,7 +46,7 @@ function renderRow() {
 }
 
 beforeEach(() => {
-  usePlaybackStore.setState({ ...initialPlaybackState });
+  useLayerMetricsStore.setState({ ...initialLayerMetricsState });
   useProjectStore.setState({ ...initialProjectState });
   useLibraryStore.setState({ ...initialLibraryState });
 });
@@ -60,8 +60,8 @@ describe("BackFaceLayerRow progress bar", () => {
   });
 
   it("renders the progress bar at 50% when layer is active with progress 0.5", () => {
-    usePlaybackStore.setState({
-      ...initialPlaybackState,
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER.id]),
       layerProgress: { [LAYER.id]: 0.5 },
     });
@@ -73,8 +73,8 @@ describe("BackFaceLayerRow progress bar", () => {
   });
 
   it("defaults to 0% width when layer is active but has no progress entry", () => {
-    usePlaybackStore.setState({
-      ...initialPlaybackState,
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER.id]),
       layerProgress: {},
     });
@@ -86,8 +86,8 @@ describe("BackFaceLayerRow progress bar", () => {
   });
 
   it("renders the progress bar at 100% when progress is 1.0", () => {
-    usePlaybackStore.setState({
-      ...initialPlaybackState,
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER.id]),
       layerProgress: { [LAYER.id]: 1.0 },
     });

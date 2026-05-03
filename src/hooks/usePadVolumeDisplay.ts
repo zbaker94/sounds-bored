@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadMetricsStore } from "@/state/padMetricsStore";
 
 export interface PadVolumeDisplay {
   showVolumeDisplay: boolean;
@@ -27,7 +27,7 @@ export function usePadVolumeDisplay(
   dragVolume: number | null,
 ): PadVolumeDisplay {
   // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
-  const liveVolume = usePlaybackStore((s) => s.padVolumes[padId]);
+  const liveVolume = usePadMetricsStore((s) => s.padVolumes[padId]);
 
   // liveVolumeChanging: true while an audio fade is actively running (liveVolume changing each frame).
   // A stability timer fires 300ms after liveVolume stops changing — at that point the volume has

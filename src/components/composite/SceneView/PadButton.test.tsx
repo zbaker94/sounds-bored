@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { useMultiFadeStore, initialMultiFadeState } from "@/state/multiFadeStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSoundInstance } from "@/test/factories";
 import { PadButton } from "./PadButton";
@@ -91,10 +92,11 @@ describe("PadButton", () => {
     usePlaybackStore.setState({ ...initialPlaybackState });
     useMultiFadeStore.setState({ ...initialMultiFadeState });
     // Make setPadVolume mock update the store, matching real padPlayer behaviour
+    usePadMetricsStore.setState({ ...initialPadMetricsState });
     vi.mocked(setPadVolume).mockImplementation((padId: string, volume: number) => {
       const clamped = Math.max(0, Math.min(1, volume));
-      const current = usePlaybackStore.getState().padVolumes;
-      usePlaybackStore.getState().setAudioTick({ padVolumes: { ...current, [padId]: clamped } });
+      const current = usePadMetricsStore.getState().padVolumes;
+      usePadMetricsStore.getState().setPadMetrics({ padVolumes: { ...current, [padId]: clamped } });
     });
   });
 

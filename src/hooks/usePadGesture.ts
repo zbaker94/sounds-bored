@@ -3,6 +3,7 @@ import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, emitAudioError } from "@/lib/audio";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadMetricsStore } from "@/state/padMetricsStore";
 
 // Gesture thresholds
 const HOLD_MS = 150;        // time before a press becomes a "hold"
@@ -104,11 +105,11 @@ export function usePadGesture(pad: Pad, now = Date.now) {
      * phase display update and must not corrupt the trigger.
      */
     function triggerVolume(): number {
-      const store = usePlaybackStore.getState();
+      const padVolumes = usePadMetricsStore.getState().padVolumes;
       if (hasHoldLayer) {
-        return checkHoldLayerActive() ? (store.padVolumes[padRef.current.id] ?? 1.0) : 1.0;
+        return checkHoldLayerActive() ? (padVolumes[padRef.current.id] ?? 1.0) : 1.0;
       }
-      return store.playingPadIds.has(padRef.current.id) ? (store.padVolumes[padRef.current.id] ?? 1.0) : 1.0;
+      return usePlaybackStore.getState().playingPadIds.has(padRef.current.id) ? (padVolumes[padRef.current.id] ?? 1.0) : 1.0;
     }
 
     function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
@@ -146,9 +147,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         // For hold pads: resume at current volume if re-triggering while active,
         //   otherwise start at 1.0 (triggered at pointer-down, padVolumes may be stale).
         // For one-shot pads: resume at current volume if already playing, else start at 0.
-        const timerStore = usePlaybackStore.getState();
         const vol = s.wasPlayingAtStart
-          ? (timerStore.padVolumes[padRef.current.id] ?? 1.0)
+          ? (usePadMetricsStore.getState().padVolumes[padRef.current.id] ?? 1.0)
           : hasHoldLayer ? 1.0 : 0;
         s.startVolume = vol;
         s.currentVolume = vol;

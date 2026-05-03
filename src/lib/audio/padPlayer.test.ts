@@ -7,6 +7,8 @@ import { resetPadGain, setLayerVolume } from "./gainManager";
 import { stopLayerWithRamp, skipLayerForward, skipLayerBack, syncLayerPlaybackMode, syncLayerArrangement, syncLayerSelection, syncLayerConfig, selectionsEqual } from "./layerTrigger";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
+import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 
 // â”€â”€ Mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -178,8 +180,9 @@ beforeEach(async () => {
   usePlaybackStore.setState({
     masterVolume: 100,
     playingPadIds: new Set<string>(),
-    padVolumes: {},
   });
+  usePadMetricsStore.setState({ ...initialPadMetricsState });
+  useLayerMetricsStore.setState({ ...initialLayerMetricsState });
   useProjectStore.setState({ ...initialProjectState });
   useLibraryStore.setState({
     sounds: [],
@@ -1406,7 +1409,7 @@ describe("freezePadAtCurrentVolume", () => {
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
     // Tick reads the frozen gain value automatically â€” padVolumes not directly updated.
-    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBeUndefined();
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBeUndefined();
   });
 });
 
@@ -1420,7 +1423,7 @@ describe("resetPadGain", () => {
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
     // Tick reads the reset gain value automatically â€” padVolumes not directly updated.
-    expect(usePlaybackStore.getState().padVolumes["pad-1"]).toBeUndefined();
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBeUndefined();
   });
 });
 
@@ -3012,7 +3015,7 @@ describe("setLayerVolume", () => {
     // No pad triggered, so no gain node exists for this layer
     setLayerVolume("non-existent-layer", 0.5);
     // Inactive layer: tick owns layerVolumes â€” setLayerVolume does not write to store
-    expect(usePlaybackStore.getState().layerVolumes["non-existent-layer"]).toBeUndefined();
+    expect(useLayerMetricsStore.getState().layerVolumes["non-existent-layer"]).toBeUndefined();
   });
 
   it("updates the gain node (not layerVolumes) when the layer gain node exists", async () => {
@@ -3033,7 +3036,7 @@ describe("setLayerVolume", () => {
     setLayerVolume(layer.id, 0.5);
 
     // When layer is playing, tick manages layerVolumes â€” setLayerVolume only sets the gain node.
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeUndefined();
+    expect(useLayerMetricsStore.getState().layerVolumes[layer.id]).toBeUndefined();
     expect(getLayerGain(layer.id)?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
   });
 
@@ -3097,7 +3100,7 @@ describe("setLayerVolume", () => {
     expect(layerGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
 
     // Tick manages layerVolumes for playing layers â€” store is NOT directly updated
-    expect(usePlaybackStore.getState().layerVolumes[layer.id]).toBeUndefined();
+    expect(useLayerMetricsStore.getState().layerVolumes[layer.id]).toBeUndefined();
   });
 });
 
@@ -3883,7 +3886,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
 
     // Simulate mid-fade-in: gain is partway between 0 and 0.8.
     // Set the store value that reverseFade reads (audioTick writes this each RAF frame).
-    usePlaybackStore.getState().setAudioTick({ padVolumes: { [pad.id]: 0.4 } });
+    usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [pad.id]: 0.4 } });
     mockGain.gain.linearRampToValueAtTime.mockClear();
     mockGain.gain.setValueAtTime.mockClear();
 

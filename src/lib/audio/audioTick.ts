@@ -2,7 +2,9 @@
  * audioTick.ts — Single global RAF loop for audio engine → UI state synchronization.
  *
  * Reads from audioState.ts Maps (gain nodes, voice map, progress) each animation frame
- * and emits one batched setAudioTick() call to playbackStore. Replaces:
+ * and emits batched setPadMetrics() / setLayerMetrics() calls to padMetricsStore /
+ * layerMetricsStore. Splitting the writes across two stores keeps pad-scoped and
+ * layer-scoped subscribers from waking each other unnecessarily. Replaces:
  *   - Per-pad RAF loops (previously padFadeRafs / startFadeRaf, now removed from audioState.ts)
  *   - Per-PadButton RAF (progress polling)
  *   - Per-PadControlContent RAF (activeLayerIds polling)
@@ -13,13 +15,16 @@
  *   - stopAudioTick(): called by padPlayer.stopAllPads() to immediately clear bars.
  *     The tick also self-terminates when getActivePadCount() returns 0.
  *
- * Import graph: audioTick → audioState (reads), audioTick → playbackStore (writes),
- * audioTick → audioContext (audioTick subscribes to playbackStore.masterVolume and
- * forwards to audioContext.applyMasterVolume — audioContext itself has no store import).
+ * Import graph: audioTick → audioState (reads),
+ * audioTick → padMetricsStore / layerMetricsStore (writes),
+ * audioTick → playbackStore (subscribes to masterVolume; forwards to
+ * audioContext.applyMasterVolume — audioContext itself has no store import).
  * padPlayer → audioTick (calls start/stop). audioState does NOT import audioTick.
  */
 
 import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadMetricsStore } from "@/state/padMetricsStore";
+import { useLayerMetricsStore } from "@/state/layerMetricsStore";
 import {
   getActivePadCount,
   forEachActivePadGain,
@@ -229,9 +234,10 @@ function computeProgressChanges(): {
   let nextActiveLayerIds: Set<string> = prevActiveLayerIds;
   if (activeLayerIdsChanged) {
     nextActiveLayerIds = new Set(getActiveLayerIdSet());
-    // Clone before storing — Set has mutating methods that make accidental
-    // consumer mutation more likely than for plain records.
-    prevActiveLayerIds = nextActiveLayerIds;
+    // Clone again — Set has mutating methods, and consumers (the store) get
+    // nextActiveLayerIds; prevActiveLayerIds must be an independent copy so
+    // accidental consumer mutation cannot corrupt the next-tick diff.
+    prevActiveLayerIds = new Set(nextActiveLayerIds);
     prevLayerVoiceVersion = currentLayerVoiceVersion;
   }
 
@@ -243,7 +249,7 @@ function tick(): void {
   if (getActivePadCount() === 0) {
     rafId = null;
     resetTrackers();
-    _clearAllTickFields();
+    clearAllTickFields();
     return;
   }
 
@@ -269,15 +275,29 @@ function tick(): void {
     return;
   }
 
-  usePlaybackStore.getState().setAudioTick({
-    ...(padVolumesChanged ? { padVolumes: nextPadVolumes } : {}),
-    ...(layerVolumesChanged ? { layerVolumes: nextLayerVolumes } : {}),
-    ...(padProgressChanged ? { padProgress: nextPadProgress } : {}),
-    ...(layerProgressChanged ? { layerProgress: nextLayerProgress } : {}),
-    ...(activeLayerIdsChanged ? { activeLayerIds: nextActiveLayerIds } : {}),
-    ...(layerPlayOrderChanged ? { layerPlayOrder: nextLayerPlayOrder } : {}),
-    ...(layerChainChanged ? { layerChain: nextLayerChain } : {}),
-  });
+  const padChanged = padVolumesChanged || padProgressChanged;
+  const layerChanged =
+    layerVolumesChanged ||
+    layerProgressChanged ||
+    activeLayerIdsChanged ||
+    layerPlayOrderChanged ||
+    layerChainChanged;
+
+  if (padChanged) {
+    usePadMetricsStore.getState().setPadMetrics({
+      ...(padVolumesChanged ? { padVolumes: nextPadVolumes } : {}),
+      ...(padProgressChanged ? { padProgress: nextPadProgress } : {}),
+    });
+  }
+  if (layerChanged) {
+    useLayerMetricsStore.getState().setLayerMetrics({
+      ...(layerVolumesChanged ? { layerVolumes: nextLayerVolumes } : {}),
+      ...(layerProgressChanged ? { layerProgress: nextLayerProgress } : {}),
+      ...(activeLayerIdsChanged ? { activeLayerIds: nextActiveLayerIds } : {}),
+      ...(layerPlayOrderChanged ? { layerPlayOrder: nextLayerPlayOrder } : {}),
+      ...(layerChainChanged ? { layerChain: nextLayerChain } : {}),
+    });
+  }
 
   rafId = requestAnimationFrame(tick);
 }
@@ -294,20 +314,13 @@ export function stopAudioTick(): void {
     cancelAnimationFrame(rafId);
     rafId = null;
   }
-  _clearAllTickFields();
+  clearAllTickFields();
   resetTrackers();
 }
 
-function _clearAllTickFields(): void {
-  usePlaybackStore.getState().setAudioTick({
-    padVolumes: {},
-    layerVolumes: {},
-    padProgress: {},
-    layerProgress: {},
-    activeLayerIds: new Set(),
-    layerPlayOrder: {},
-    layerChain: {},
-  });
+function clearAllTickFields(): void {
+  usePadMetricsStore.getState().clearPadMetrics();
+  useLayerMetricsStore.getState().clearLayerMetrics();
 }
 
 /** True when two pad/layer volume records are equal within VOLUME_EPSILON. */

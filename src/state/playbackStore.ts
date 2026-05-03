@@ -5,42 +5,19 @@ import { subscribeWithSelector } from "zustand/middleware";
 // streaming audio, chain queues, fade tracking) lives in src/lib/audio/audioState.ts.
 // This store contains only reactive Zustand state that drives UI re-renders.
 //
-// Three ownership categories:
-//   TickManagedFields    — written exclusively by audioTick.ts via setAudioTick().
+// Tick-managed metrics (padVolumes, padProgress, layerVolumes, layerProgress,
+// activeLayerIds, layerPlayOrder, layerChain) have been split out into two
+// isolated stores so that pad-scoped and layer-scoped subscribers do not wake
+// each other unnecessarily:
+//   - src/state/padMetricsStore.ts   — padVolumes, padProgress
+//   - src/state/layerMetricsStore.ts — layerVolumes, layerProgress, activeLayerIds,
+//                                       layerPlayOrder, layerChain
+// Both metric stores are written exclusively by audioTick.ts.
+//
+// This store now contains two ownership categories:
 //   EventDrivenFields    — written imperatively from padPlayer, layerTrigger, etc.
 //   PreviewManagedFields — written by preview.ts's own RAF loop and event handlers.
 // masterVolume is intentionally ungrouped — app-level UI configuration, not audio event state.
-//
-// Authorized exception: clearVolumes() resets padVolumes/layerVolumes on project unmount.
-// All other writes to TickManagedFields outside setAudioTick() are bugs.
-
-// Tick-managed fields — written exclusively by audioTick.ts via setAudioTick().
-// readonly prevents `state.padVolumes = x` reference reassignment at compile time.
-// Note: readonly does NOT prevent `setState({ padVolumes: x })` via Zustand. The enforced
-// invariant is that setAudioTick's Partial<TickManagedFields> signature rejects all non-tick
-// keys at compile time; direct setState bypasses are caught only by code review convention.
-export interface TickManagedFields {
-  /** Per-pad runtime volume (0–1). Absent = full volume. Drives PadButton fill bar. */
-  readonly padVolumes: Record<string, number>;
-
-  /** Per-layer runtime volume (0–1). Absent = inactive layer; use projectStore layer.volume instead. */
-  readonly layerVolumes: Record<string, number>;
-
-  /** Per-pad playback progress (0–1). Present only for pads with active progress info. */
-  readonly padProgress: Record<string, number>;
-
-  /** Per-layer playback progress (0–1). Present for each active layer. */
-  readonly layerProgress: Record<string, number>;
-
-  /** Layer IDs with active voices. Replaces per-component RAF polling. */
-  readonly activeLayerIds: Set<string>;
-
-  /** Per-layer ordered play order (sound IDs). Present for active chained-arrangement layers. */
-  readonly layerPlayOrder: Record<string, string[]>;
-
-  /** Per-layer remaining chain queue (sound IDs). Present for active layers with a chain queue. */
-  readonly layerChain: Record<string, string[]>;
-}
 
 // Event-driven fields — written imperatively from padPlayer, layerTrigger, etc.
 // These are discrete state transitions, not derived from any RAF loop.
@@ -68,7 +45,7 @@ interface PreviewManagedFields {
   previewProgress: number | null;
 }
 
-interface PlaybackState extends TickManagedFields, EventDrivenFields, PreviewManagedFields {
+interface PlaybackState extends EventDrivenFields, PreviewManagedFields {
   // masterVolume is app-level UI configuration — intentionally not grouped with audio event state.
   masterVolume: number; // 0–100
   setMasterVolume: (volume: number) => void;
@@ -89,20 +66,6 @@ interface PlaybackState extends TickManagedFields, EventDrivenFields, PreviewMan
   setIsPreviewPlaying: (v: boolean) => void;
 
   setPreviewProgress: (v: number | null) => void;
-
-  /** Batch-set any subset of tick-managed fields in a single Zustand mutation.
-   *  Only TickManagedFields keys are accepted — passing EventDrivenFields or
-   *  PreviewManagedFields keys is a compile error.
-   *  When adding a new TickManagedFields key, also update the spread in the implementation below. */
-  setAudioTick: (snapshot: Partial<TickManagedFields>) => void;
-
-  /** Reset padVolumes and layerVolumes to empty objects.
-   *  Called by MainPage's unmount effect on project close (alongside
-   *  clearAllAudioState and clearAllPlayingPads) to ensure stale volumes
-   *  from one session do not leak into the next.
-   *  Callers must ensure stopAudioTick() has been called first; if the RAF tick
-   *  is still active it will repopulate these maps on the next frame. */
-  clearVolumes: () => void;
 }
 
 // Factory ensures each spread gets fresh Set/object instances — prevents tests from sharing mutable state.
@@ -112,13 +75,6 @@ export const initialPlaybackState = {
   get fadingOutPadIds() { return new Set<string>(); },
   get fadingPadIds() { return new Set<string>(); },
   get reversingPadIds() { return new Set<string>(); },
-  get padVolumes() { return {} as Record<string, number>; },
-  get layerVolumes() { return {} as Record<string, number>; },
-  get padProgress() { return {} as Record<string, number>; },
-  get layerProgress() { return {} as Record<string, number>; },
-  get activeLayerIds() { return new Set<string>(); },
-  get layerPlayOrder() { return {} as Record<string, string[]>; },
-  get layerChain() { return {} as Record<string, string[]>; },
   isPreviewPlaying: false,
   previewProgress: null,
 };
@@ -169,26 +125,5 @@ export const usePlaybackStore = create<PlaybackState>()(subscribeWithSelector((s
 
   previewProgress: null,
   setPreviewProgress: (v) => set({ previewProgress: v }),
-
-  padVolumes: {},
-  layerVolumes: {},
-  padProgress: {},
-  layerProgress: {},
-  activeLayerIds: new Set<string>(),
-  layerPlayOrder: {},
-  layerChain: {},
-
-  setAudioTick: (snapshot) =>
-    set(() => ({
-      ...(snapshot.padVolumes !== undefined ? { padVolumes: snapshot.padVolumes } : {}),
-      ...(snapshot.layerVolumes !== undefined ? { layerVolumes: snapshot.layerVolumes } : {}),
-      ...(snapshot.padProgress !== undefined ? { padProgress: snapshot.padProgress } : {}),
-      ...(snapshot.layerProgress !== undefined ? { layerProgress: snapshot.layerProgress } : {}),
-      ...(snapshot.activeLayerIds !== undefined ? { activeLayerIds: snapshot.activeLayerIds } : {}),
-      ...(snapshot.layerPlayOrder !== undefined ? { layerPlayOrder: snapshot.layerPlayOrder } : {}),
-      ...(snapshot.layerChain !== undefined ? { layerChain: snapshot.layerChain } : {}),
-    })),
-
-  clearVolumes: () => set({ padVolumes: {}, layerVolumes: {} }),
   };
 }));

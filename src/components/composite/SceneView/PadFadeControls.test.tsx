@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { createMockPad, createMockLayer, createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
 import { PadFadeControls } from "./PadFadeControls";
 
@@ -49,27 +50,31 @@ describe("PadFadeControls", () => {
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
     usePlaybackStore.setState({ ...initialPlaybackState });
+    usePadMetricsStore.setState({ ...initialPadMetricsState });
     setPadVolumeMock.mockClear();
   });
 
   describe("live volume display", () => {
     it("shows live volume from padVolumes when playing and entry is present", () => {
       const { pad } = loadPad({ volume: 80 });
-      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.42 } });
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+      usePadMetricsStore.setState({ ...initialPadMetricsState, padVolumes: { [pad.id]: 0.42 } });
       renderControls({ pad, isPlaying: true });
       expect(screen.getByText("42%")).toBeInTheDocument();
     });
 
     it("falls back to pad.volume when playing but padVolumes entry is absent", () => {
       const { pad } = loadPad({ volume: 75 });
-      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: {} });
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+      usePadMetricsStore.setState({ ...initialPadMetricsState, padVolumes: {} });
       renderControls({ pad, isPlaying: true });
       expect(screen.getByText("75%")).toBeInTheDocument();
     });
 
     it("falls back to 100% when pad.volume is unset and padVolumes entry is absent", () => {
       const { pad } = loadPad();
-      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: {} });
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+      usePadMetricsStore.setState({ ...initialPadMetricsState, padVolumes: {} });
       renderControls({ pad, isPlaying: true });
       expect(screen.getByText("100%")).toBeInTheDocument();
     });
@@ -84,21 +89,24 @@ describe("PadFadeControls", () => {
   describe("fade button label with live volume", () => {
     it("shows Fade Out when live volume is above fade target", () => {
       const { pad } = loadPad({ volume: 80, fadeTargetVol: 20 });
-      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.8 } });
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+      usePadMetricsStore.setState({ ...initialPadMetricsState, padVolumes: { [pad.id]: 0.8 } });
       renderControls({ pad, isPlaying: true });
       expect(screen.getByRole("button", { name: /fade out/i })).toBeInTheDocument();
     });
 
     it("shows Fade In when live volume is below fade target", () => {
       const { pad } = loadPad({ volume: 20, fadeTargetVol: 80 });
-      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.2 } });
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+      usePadMetricsStore.setState({ ...initialPadMetricsState, padVolumes: { [pad.id]: 0.2 } });
       renderControls({ pad, isPlaying: true });
       expect(screen.getByRole("button", { name: /fade in/i })).toBeInTheDocument();
     });
 
     it("shows disabled Fade when live volume equals fade target", () => {
       const { pad } = loadPad({ volume: 50, fadeTargetVol: 50 });
-      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.5 } });
+      usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+      usePadMetricsStore.setState({ ...initialPadMetricsState, padVolumes: { [pad.id]: 0.5 } });
       renderControls({ pad, isPlaying: true });
       const btn = screen.getByRole("button", { name: /^fade$/i });
       expect(btn).toBeDisabled();

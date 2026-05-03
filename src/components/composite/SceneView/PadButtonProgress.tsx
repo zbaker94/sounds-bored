@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { useLayerMetricsStore } from "@/state/layerMetricsStore";
 import type { Layer } from "@/lib/schemas";
 
 interface PadButtonProgressProps {
@@ -25,19 +26,22 @@ export const PadButtonProgress = memo(function PadButtonProgress({
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(padId));
 
   // Short-circuits to a stable reference for non-playing pads, avoiding a
-  // filter allocation on every RAF tick when this pad is idle.
-  const activeLayers = usePlaybackStore(
+  // filter allocation on every RAF tick when this pad is idle. The selector
+  // closes over `isPlaying` so when the pad is idle it returns a stable empty
+  // reference; useShallow keeps the array reference stable across ticks while
+  // playing.
+  const activeLayers = useLayerMetricsStore(
     useShallow((s) => {
-      if (!s.playingPadIds.has(padId)) return EMPTY_LAYERS;
+      if (!isPlaying) return EMPTY_LAYERS;
       return layers.filter((l) => s.activeLayerIds.has(l.id));
     }),
   );
 
   // Short-circuits to a stable reference for non-playing pads, avoiding a {}
   // allocation and layer iteration on every RAF tick when this pad is idle.
-  const layerProgress = usePlaybackStore(
+  const layerProgress = useLayerMetricsStore(
     useShallow((s) => {
-      if (!s.playingPadIds.has(padId)) return EMPTY_RECORD;
+      if (!isPlaying) return EMPTY_RECORD;
       const result: Record<string, number> = {};
       for (const l of layers) {
         const p = s.layerProgress[l.id];
