@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where the layer configuration dialog could display stale settings when switching between layers without closing and reopening it.
 - Fixed a bug where the sound library would unnecessarily re-scan for new files on every settings change (e.g., dragging the fade slider), improving performance and stability.
 - Fixed drag-and-drop sound import to correctly re-register when the import folder path changes.
 - Fixed sound import to properly detect folder path changes instead of only reacting to folder ID changes.
