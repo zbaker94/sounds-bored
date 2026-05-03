@@ -30,7 +30,7 @@ import {
   forEachActivePadGain,
   forEachActiveLayerGain,
   getActiveLayerIdSet,
-  getLayerVoiceVersion,
+  onLayerVoiceSetChanged,
   computeAllPadProgress,
   computeAllLayerProgress,
   getLayerPlayOrder,
@@ -51,7 +51,9 @@ let rafId: number | null = null;
 let prevPadVolumes: Record<string, number> = {};
 let prevLayerVolumes: Record<string, number> = {};
 let prevActiveLayerIds = new Set<string>();
-let prevLayerVoiceVersion = -1;
+// True on startup and after resetTrackers() so the first tick after start/resume
+// always captures the current active layer set — matches the old -1 sentinel behavior.
+let layerVoiceSetChanged = true;
 let prevPadProgress: Record<string, number> = {};
 let prevLayerProgress: Record<string, number> = {};
 let prevLayerPlayOrder: Record<string, string[]> = {};
@@ -72,7 +74,7 @@ function resetTrackers(): void {
   prevPadVolumes = {};
   prevLayerVolumes = {};
   prevActiveLayerIds = new Set();
-  prevLayerVoiceVersion = -1;
+  layerVoiceSetChanged = true; // ensure first tick after reset always refreshes activeLayerIds
   prevPadProgress = {};
   prevLayerProgress = {};
   prevLayerPlayOrder = {};
@@ -88,6 +90,13 @@ export const _stopMasterVolumeSync = usePlaybackStore.subscribe(
   (s) => s.masterVolume,
   (vol) => applyMasterVolume(vol),
 );
+
+// Register the layer-voice-set changed listener. audioState fires this whenever layerVoiceMap
+// mutates; the dirty flag gates getActiveLayerIdSet() allocation to frames where a change
+// actually occurred. The unsubscribe handle is exported for test teardown.
+export const _stopLayerVoiceSetListener = onLayerVoiceSetChanged(() => {
+  layerVoiceSetChanged = true;
+});
 
 /**
  * Samples the current gain nodes and diffs against the previous tick.
@@ -227,10 +236,12 @@ function computeProgressChanges(): {
   const layerProgressChanged = !progressEqual(nextLayerProgress, prevLayerProgress);
   if (layerProgressChanged) prevLayerProgress = nextLayerProgress;
 
-  // Version-gated: getActiveLayerIdSet() is skipped (no Set allocation) on frames
-  // where layerVoiceVersion hasn't changed — the common steady-state case.
-  const currentLayerVoiceVersion = getLayerVoiceVersion();
-  const activeLayerIdsChanged = currentLayerVoiceVersion !== prevLayerVoiceVersion;
+  // Subscription-gated: getActiveLayerIdSet() is skipped (no Set allocation) on frames
+  // where no layerVoiceMap mutation has fired since the last tick — the common steady-state case.
+  // layerVoiceSetChanged is set by the onLayerVoiceSetChanged listener registered at module load,
+  // and reset to true by resetTrackers() so the first tick after start/resume always refreshes.
+  const activeLayerIdsChanged = layerVoiceSetChanged;
+  layerVoiceSetChanged = false;
   let nextActiveLayerIds: Set<string> = prevActiveLayerIds;
   if (activeLayerIdsChanged) {
     nextActiveLayerIds = new Set(getActiveLayerIdSet());
@@ -238,7 +249,6 @@ function computeProgressChanges(): {
     // nextActiveLayerIds; prevActiveLayerIds must be an independent copy so
     // accidental consumer mutation cannot corrupt the next-tick diff.
     prevActiveLayerIds = new Set(nextActiveLayerIds);
-    prevLayerVoiceVersion = currentLayerVoiceVersion;
   }
 
   return { nextPadProgress, nextLayerProgress, nextActiveLayerIds, padProgressChanged, layerProgressChanged, activeLayerIdsChanged };

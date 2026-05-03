@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _stopMasterVolumeSync } from "./audioTick";
+import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _stopMasterVolumeSync, _stopLayerVoiceSetListener } from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
@@ -20,7 +20,6 @@ vi.mock("./audioState", async (importOriginal) => {
     forEachActivePadGain: vi.fn(),
     forEachActiveLayerGain: vi.fn(),
     getActiveLayerIdSet: vi.fn().mockReturnValue(new Set()),
-    getLayerVoiceVersion: vi.fn().mockReturnValue(0),
     computeAllPadProgress: vi.fn().mockReturnValue({}),
     computeAllLayerProgress: vi.fn().mockReturnValue({}),
     getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
@@ -34,7 +33,7 @@ import {
   forEachActivePadGain,
   forEachActiveLayerGain,
   getActiveLayerIdSet,
-  getLayerVoiceVersion,
+  _notifyLayerVoiceSetChangedForTest,
   computeAllPadProgress,
   computeAllLayerProgress,
   getLayerPlayOrder,
@@ -52,7 +51,6 @@ describe("audioTick", () => {
     vi.mocked(forEachActivePadGain).mockImplementation(() => {});
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
     vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set());
-    vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
     vi.mocked(computeAllPadProgress).mockReturnValue({});
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
     vi.mocked(getLayerPlayOrder).mockReturnValue(undefined);
@@ -142,12 +140,10 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
   });
 
-  it("does not call getActiveLayerIdSet when layerVoiceVersion is unchanged", () => {
+  it("does not call getActiveLayerIdSet when no layerVoiceMap mutation occurred", () => {
     vi.mocked(getActivePadCount).mockReturnValue(1);
     vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
-    // Version stays at 0 across both ticks
-    vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
 
     let capturedCallback: FrameRequestCallback | null = null;
     const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
@@ -156,20 +152,19 @@ describe("audioTick", () => {
     });
 
     startAudioTick();
-    capturedCallback!(performance.now()); // first tick — version seen for first time (version 0 vs prev -1 → changed)
+    capturedCallback!(performance.now()); // first tick — layerVoiceSetChanged=true (from resetTrackers) → changed
     vi.mocked(getActiveLayerIdSet).mockClear();
 
-    capturedCallback!(performance.now()); // second tick — same version → should skip
+    capturedCallback!(performance.now()); // second tick — no mutation fired → should skip
     expect(getActiveLayerIdSet).not.toHaveBeenCalled();
 
     rafSpy.mockRestore();
   });
 
-  it("calls getActiveLayerIdSet and updates store when layerVoiceVersion changes", () => {
+  it("calls getActiveLayerIdSet and updates store when a layerVoiceMap mutation fires", () => {
     vi.mocked(getActivePadCount).mockReturnValue(1);
     vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
-    vi.mocked(getLayerVoiceVersion).mockReturnValue(0);
 
     const newActiveIds = new Set(["layer-1"]);
     vi.mocked(getActiveLayerIdSet).mockReturnValue(newActiveIds);
@@ -181,11 +176,11 @@ describe("audioTick", () => {
     });
 
     startAudioTick();
-    capturedCallback!(performance.now()); // first tick — version 0 vs prev -1 → changed
+    capturedCallback!(performance.now()); // first tick — layerVoiceSetChanged=true (from resetTrackers) → changed
 
-    // Simulate a voice being added: version bumps to 1
-    vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
-    capturedCallback!(performance.now()); // second tick — version changed → must call getActiveLayerIdSet
+    // Simulate a voice being added: fire the notification listener
+    _notifyLayerVoiceSetChangedForTest();
+    capturedCallback!(performance.now()); // second tick — mutation fired → must call getActiveLayerIdSet
 
     expect(getActiveLayerIdSet).toHaveBeenCalled();
     expect(useLayerMetricsStore.getState().activeLayerIds).toEqual(newActiveIds);
@@ -204,7 +199,6 @@ describe("audioTick", () => {
 
     const firstIds = new Set(["layer-a"]);
     vi.mocked(getActiveLayerIdSet).mockReturnValue(firstIds);
-    vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
 
     let capturedCallback: FrameRequestCallback | null = null;
     const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
@@ -213,7 +207,7 @@ describe("audioTick", () => {
     });
 
     startAudioTick();
-    capturedCallback!(performance.now()); // tick 1: version 1 vs prev -1 → changed
+    capturedCallback!(performance.now()); // tick 1: layerVoiceSetChanged=true (from resetTrackers) → changed
 
     // Store receives nextActiveLayerIds. prevActiveLayerIds must be a clone — a
     // different object with the same contents.
@@ -346,7 +340,6 @@ describe("audioTick", () => {
 
     it("computes layerPlayOrder and layerChain as sound ID arrays for active layers", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       vi.mocked(getLayerPlayOrder).mockImplementation((layerId) =>
         layerId === "layer-1" ? [mkSound("s1"), mkSound("s2"), mkSound("s3")] : undefined,
@@ -373,7 +366,6 @@ describe("audioTick", () => {
 
     it("does not include layers that are not active", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       // Even though audioState has data for layer-2, it's not in the active set → excluded
       vi.mocked(getLayerPlayOrder).mockImplementation((layerId) =>
@@ -399,7 +391,6 @@ describe("audioTick", () => {
 
     it("updates store when layerChain changes between ticks", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       vi.mocked(getLayerPlayOrder).mockReturnValue([
         mkSound("s1"),
@@ -429,7 +420,6 @@ describe("audioTick", () => {
 
     it("does not re-emit metric updates when layerPlayOrder and layerChain are unchanged", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       vi.mocked(getLayerPlayOrder).mockReturnValue([mkSound("s1"), mkSound("s2")]);
       vi.mocked(getLayerChain).mockReturnValue([mkSound("s2")]);
@@ -443,7 +433,7 @@ describe("audioTick", () => {
       startAudioTick();
       capturedCallback!(performance.now()); // first tick populates
 
-      // Now freeze everything: layerVoiceVersion unchanged so activeLayerIds skipped;
+      // Now freeze everything: no mutation fired so activeLayerIds skipped;
       // play order and chain identical → audioTick should NOT call setPadMetrics or setLayerMetrics.
       const setPadMetricsSpy = vi.spyOn(usePadMetricsStore.getState(), "setPadMetrics");
       const setLayerMetricsSpy = vi.spyOn(useLayerMetricsStore.getState(), "setLayerMetrics");
@@ -458,7 +448,6 @@ describe("audioTick", () => {
 
     it("includes layerPlayOrder but omits layerChain when chain is undefined (end of chain)", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       vi.mocked(getLayerPlayOrder).mockReturnValue([mkSound("s1"), mkSound("s2")]);
       vi.mocked(getLayerChain).mockReturnValue(undefined);
@@ -481,7 +470,6 @@ describe("audioTick", () => {
 
     it("tracks multiple active layers independently in layerPlayOrder", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
       vi.mocked(getLayerPlayOrder).mockImplementation((layerId) => {
         if (layerId === "layer-1") return [mkSound("a1"), mkSound("a2")];
@@ -508,7 +496,6 @@ describe("audioTick", () => {
 
     it("omits active layers whose play order is undefined (e.g., simultaneous arrangement)", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       vi.mocked(getLayerPlayOrder).mockReturnValue(undefined);
       vi.mocked(getLayerChain).mockReturnValue(undefined);
@@ -530,7 +517,6 @@ describe("audioTick", () => {
 
     it("preserves array reference for a layer whose play order is unchanged when another layer's chain advances", () => {
       vi.mocked(getActivePadCount).mockReturnValue(1);
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
       // layer-1 has a stable play order across both ticks.
       // layer-2 has a chain that advances between ticks.
@@ -580,7 +566,6 @@ describe("audioTick", () => {
       });
 
       // Tick 1: both layers active
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(1);
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1", "layer-2"]));
       startAudioTick();
       capturedCallback!(performance.now());
@@ -588,7 +573,7 @@ describe("audioTick", () => {
       expect(useLayerMetricsStore.getState().layerPlayOrder["layer-2"]).toBeDefined();
 
       // Tick 2: only layer-1 active — layer-2's stale entry should drop out
-      vi.mocked(getLayerVoiceVersion).mockReturnValue(2);
+      _notifyLayerVoiceSetChangedForTest(); // simulate voice removal firing the subscription
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       capturedCallback!(performance.now());
       expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toBeDefined();

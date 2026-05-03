@@ -75,6 +75,7 @@ vi.mock("@/state/playbackStore", () => ({
 
 vi.mock("@/lib/audio/audioState", () => ({
   isPadActive: vi.fn(() => false),
+  onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}),
 }));
 
 vi.mock("@/lib/audio/padPlayer", () => ({
