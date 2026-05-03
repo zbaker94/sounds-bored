@@ -188,6 +188,19 @@ function PadFrontFace({
                 className="w-full flex flex-col items-center gap-0.5"
               >
                 <PadSoundMetadataDisplay padId={pad.id} isInteracting={isInteracting} />
+                {showVolumeDisplay && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: volumeExiting ? 0 : 1, height: volumeExiting ? 0 : "auto" }}
+                    transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
+                    style={{ overflow: "hidden" }}
+                    className="flex justify-center"
+                  >
+                    <span className="text-xs font-bold tabular-nums">
+                      {Math.round(displayVolume * 100)}%
+                    </span>
+                  </motion.div>
+                )}
               </motion.div>
             ) : (
               <motion.div
