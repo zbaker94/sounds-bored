@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When a sound starts playing, the pad now smoothly crossfades between the pad name and the sound metadata (name, layer, duration) instead of showing an overlay on top of the pad label.
 - When a sound starts playing on a pad, an animated overlay now appears showing the sound name, layer name, playback mode, and duration.
 - The overlay automatically fades out after ~2.5 seconds (or sooner if the sound is shorter), and immediately dismisses when you press the pad again.
 - For looping and hold-mode pads, the overlay stays visible until you interact with the pad or stop playback.

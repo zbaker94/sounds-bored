@@ -16,6 +16,7 @@ import { PadButtonProgress } from "./PadButtonProgress";
 import { PadButtonFadeOverlay } from "./PadButtonFadeOverlay";
 import { PadFadePopoverContent } from "./PadFadePopoverContent";
 import { PadSoundMetadataDisplay } from "./PadSoundMetadataDisplay";
+import { usePadDisplayStore } from "@/state/padDisplayStore";
 import { PAD_FLIP_DURATION_MS, PAD_FLIP_EASE, PAD_STAGGER_MS } from "./padAnimations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
@@ -146,6 +147,8 @@ function PadFrontFace({
   showVolumeDisplay, volumeExiting, displayVolume, isPopoverOpen, padSoundState,
   isInteracting,
 }: PadFrontFaceProps) {
+  const currentVoice = usePadDisplayStore((s) => s.currentVoice[pad.id] ?? null);
+
   return (
     <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
       <button
@@ -172,27 +175,46 @@ function PadFrontFace({
         {/* Playback progress — one bar per active layer, split vertically.
             Isolated in PadButtonProgress so 60Hz RAF ticks do not re-render PadButton. */}
         <PadButtonProgress padId={pad.id} layers={pad.layers} />
-        {/* Sound metadata overlay — fades in when a new sound starts, auto-fades after ~2.5s */}
-        <PadSoundMetadataDisplay padId={pad.id} isInteracting={isInteracting} />
-        {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
+        {/* Pad name / sound metadata — crossfade between them via AnimatePresence */}
         <div className="relative z-10 flex flex-col items-center gap-0.5">
-          <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-          {showVolumeDisplay && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{
-                opacity: volumeExiting ? 0 : 1,
-                height: volumeExiting ? 0 : "auto",
-              }}
-              transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
-              style={{ overflow: "hidden" }}
-              className="flex justify-center"
-            >
-              <span className="text-xs font-bold tabular-nums">
-                {Math.round(displayVolume * 100)}%
-              </span>
-            </motion.div>
-          )}
+          <AnimatePresence mode="wait">
+            {currentVoice != null ? (
+              <motion.div
+                key={`voice-${currentVoice.seq}`}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="w-full flex flex-col items-center gap-0.5"
+              >
+                <PadSoundMetadataDisplay padId={pad.id} isInteracting={isInteracting} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="pad-name"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="w-full flex flex-col items-center gap-0.5"
+              >
+                <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
+                {showVolumeDisplay && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: volumeExiting ? 0 : 1, height: volumeExiting ? 0 : "auto" }}
+                    transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
+                    style={{ overflow: "hidden" }}
+                    className="flex justify-center"
+                  >
+                    <span className="text-xs font-bold tabular-nums">
+                      {Math.round(displayVolume * 100)}%
+                    </span>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         {/* Amber line during fade-out — uses persisted target, no live subscription needed */}
         {isFadingOut && (

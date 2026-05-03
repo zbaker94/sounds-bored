@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { usePadDisplayStore } from "@/state/padDisplayStore";
 
 interface Props {
@@ -16,11 +15,13 @@ function formatDuration(ms: number): string {
 }
 
 /**
- * Animated overlay shown on the front face of a pad when a sound starts playing.
+ * Inline sound metadata shown in the pad name slot when a sound starts playing.
+ * Manages the auto-advance timer and fast-dismiss logic; visual animation is
+ * handled by the AnimatePresence wrapper in PadFrontFace.
  *
  * - Subscribes to padDisplayStore.currentVoice[padId]
  * - Auto-advances after min(2500ms, durationMs) for one-shot pads
- * - Skips auto-advance for loop/hold pads (overlay persists until interaction or pad stop)
+ * - Skips auto-advance for loop/hold pads (persists until interaction or pad stop)
  * - Fast-dismisses when isInteracting becomes true
  */
 export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
@@ -28,6 +29,12 @@ export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
   isInteracting,
 }: Props) {
   const currentVoice = usePadDisplayStore((s) => s.currentVoice[padId] ?? null);
+
+  // Preserve the last non-null voice so the parent AnimatePresence exit animation has content
+  // to fade out (currentVoice becomes null before the exit completes).
+  const lastVoiceRef = useRef(currentVoice);
+  if (currentVoice != null) lastVoiceRef.current = currentVoice;
+  const displayVoice = lastVoiceRef.current;
 
   // Single consolidated effect: handles auto-advance timer, fast-dismiss, and loop/hold skip.
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,7 +51,7 @@ export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
       return;
     }
 
-    // Loop/hold: don't auto-advance — overlay persists until interaction or pad stop
+    // Loop/hold: don't auto-advance — display persists until interaction or pad stop
     if (currentVoice.playbackMode === "loop" || currentVoice.playbackMode === "hold") {
       return;
     }
@@ -63,36 +70,22 @@ export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
     };
   }, [currentVoice, padId, isInteracting]);
 
+  if (displayVoice == null) return null;
+
   return (
-    <AnimatePresence>
-      {currentVoice != null && (
-        <motion.div
-          key={currentVoice.seq}
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="bg-black/70 rounded-lg px-2 py-1 max-w-full flex flex-col items-center">
-            <span
-              data-testid="sound-name"
-              className="text-xs font-semibold text-white truncate max-w-full"
-            >
-              {currentVoice.soundName}
-            </span>
-            <span data-testid="layer-info" className="text-[10px] text-white/70">
-              {currentVoice.layerName ? `${currentVoice.layerName} • ` : ""}
-              {currentVoice.playbackMode}
-            </span>
-            {currentVoice.durationMs !== undefined && (
-              <span data-testid="duration" className="text-[10px] text-white/50">
-                {formatDuration(currentVoice.durationMs)}
-              </span>
-            )}
-          </div>
-        </motion.div>
+    <>
+      <span data-testid="sound-name" className="line-clamp-1 break-words leading-tight text-center">
+        {displayVoice.soundName}
+      </span>
+      <span data-testid="layer-info" className="text-xs leading-tight text-center opacity-70">
+        {displayVoice.layerName ? `${displayVoice.layerName} • ` : ""}
+        {displayVoice.playbackMode}
+      </span>
+      {displayVoice.durationMs != null && displayVoice.durationMs > 0 && (
+        <span data-testid="duration" className="text-xs leading-tight text-center opacity-50">
+          {formatDuration(displayVoice.durationMs)}
+        </span>
       )}
-    </AnimatePresence>
+    </>
   );
 });
