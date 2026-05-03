@@ -72,7 +72,6 @@ function LayerConfigDialogInner({ pad, sceneId, layerIndex, onClose, layer }: La
       volume: pad.volume ?? 100,
       fadeTargetVol: pad.fadeTargetVol ?? 0,
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, layer.id]);
 
   function handleClose() {
