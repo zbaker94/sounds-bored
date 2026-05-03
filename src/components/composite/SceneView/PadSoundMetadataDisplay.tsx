@@ -3,7 +3,6 @@ import { usePadDisplayStore } from "@/state/padDisplayStore";
 
 interface Props {
   padId: string;
-  isInteracting: boolean;
 }
 
 const AUTO_ADVANCE_MAX_MS = 2500;
@@ -16,17 +15,15 @@ function formatDuration(ms: number): string {
 
 /**
  * Inline sound metadata shown in the pad name slot when a sound starts playing.
- * Manages the auto-advance timer and fast-dismiss logic; visual animation is
- * handled by the AnimatePresence wrapper in PadFrontFace.
+ * Manages the auto-advance timer; visual animation is handled by the AnimatePresence
+ * wrapper in PadFrontFace.
  *
  * - Subscribes to padDisplayStore.currentVoice[padId]
  * - Auto-advances after min(2500ms, durationMs) for one-shot pads
- * - Skips auto-advance for loop/hold pads (persists until interaction or pad stop)
- * - Fast-dismisses when isInteracting becomes true
+ * - Skips auto-advance for loop/hold pads (persists until pad stops)
  */
 export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
   padId,
-  isInteracting,
 }: Props) {
   const currentVoice = usePadDisplayStore((s) => s.currentVoice[padId] ?? null);
 
@@ -45,13 +42,7 @@ export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
     }
     if (currentVoice == null) return;
 
-    // Fast-dismiss takes priority — no need to start a timer
-    if (isInteracting) {
-      usePadDisplayStore.getState().shiftVoice(padId);
-      return;
-    }
-
-    // Loop/hold: don't auto-advance — display persists until interaction or pad stop
+    // Loop/hold: don't auto-advance — display persists until pad stops
     if (currentVoice.playbackMode === "loop" || currentVoice.playbackMode === "hold") {
       return;
     }
@@ -68,7 +59,7 @@ export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
         autoAdvanceTimerRef.current = null;
       }
     };
-  }, [currentVoice, padId, isInteracting]);
+  }, [currentVoice, padId]);
 
   if (displayVoice == null) return null;
 

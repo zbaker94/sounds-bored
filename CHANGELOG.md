@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Volume percentage display on pads now animates independently, so it no longer disappears when the sound name fades in or out
+- Sound metadata on pads no longer dismisses when you press a pad — it stays visible until the sound finishes or stops naturally
 - Pads now briefly display the volume percentage on-screen when you adjust a pad's volume, then fade away smoothly.
 - When a sound starts playing, the pad now smoothly crossfades between the pad name and the sound metadata (name, layer, duration) instead of showing an overlay on top of the pad label.
 - When a sound starts playing on a pad, an animated overlay now appears showing the sound name, layer name, playback mode, and duration.

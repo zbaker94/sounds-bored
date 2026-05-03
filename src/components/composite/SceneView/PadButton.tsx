@@ -138,14 +138,12 @@ interface PadFrontFaceProps {
   displayVolume: number;
   isPopoverOpen: boolean;
   padSoundState: ReturnType<typeof getPadSoundState>;
-  isInteracting: boolean;
 }
 
 function PadFrontFace({
   pad, sceneId, isPlaying, isFadingOut, isFlipped, isUnplayable,
   multiFadeActive, multiFadeHandlers, multiFadeSelectionClass, gestureHandlers,
   showVolumeDisplay, volumeExiting, displayVolume, isPopoverOpen, padSoundState,
-  isInteracting,
 }: PadFrontFaceProps) {
   const currentVoice = usePadDisplayStore((s) => s.currentVoice[pad.id] ?? null);
 
@@ -185,22 +183,9 @@ function PadFrontFace({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
-                className="w-full flex flex-col items-center gap-0.5"
+                className="w-full flex flex-col items-center"
               >
-                <PadSoundMetadataDisplay padId={pad.id} isInteracting={isInteracting} />
-                {showVolumeDisplay && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: volumeExiting ? 0 : 1, height: volumeExiting ? 0 : "auto" }}
-                    transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
-                    style={{ overflow: "hidden" }}
-                    className="flex justify-center"
-                  >
-                    <span className="text-xs font-bold tabular-nums">
-                      {Math.round(displayVolume * 100)}%
-                    </span>
-                  </motion.div>
-                )}
+                <PadSoundMetadataDisplay padId={pad.id} />
               </motion.div>
             ) : (
               <motion.div
@@ -209,25 +194,26 @@ function PadFrontFace({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="w-full flex flex-col items-center gap-0.5"
+                className="w-full flex flex-col items-center"
               >
                 <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
-                {showVolumeDisplay && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: volumeExiting ? 0 : 1, height: volumeExiting ? 0 : "auto" }}
-                    transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
-                    style={{ overflow: "hidden" }}
-                    className="flex justify-center"
-                  >
-                    <span className="text-xs font-bold tabular-nums">
-                      {Math.round(displayVolume * 100)}%
-                    </span>
-                  </motion.div>
-                )}
               </motion.div>
             )}
           </AnimatePresence>
+          {/* Volume display — independent of the pad name / metadata crossfade */}
+          {showVolumeDisplay && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: volumeExiting ? 0 : 1, height: volumeExiting ? 0 : "auto" }}
+              transition={{ duration: volumeExiting ? 0.22 : 0.2 }}
+              style={{ overflow: "hidden" }}
+              className="flex justify-center"
+            >
+              <span className="text-xs font-bold tabular-nums">
+                {Math.round(displayVolume * 100)}%
+              </span>
+            </motion.div>
+          )}
         </div>
         {/* Amber line during fade-out — uses persisted target, no live subscription needed */}
         {isFadingOut && (
@@ -269,7 +255,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
   const isPopoverOpen = useUiStore((s) => s.fadePopoverPadId === pad.id);
   const setFadePopoverPadId = useUiStore((s) => s.setFadePopoverPadId);
-  const { gestureHandlers, isDragging, dragVolume, isPressed } = usePadGesture(pad);
+  const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
 
   // Volume display state is fully managed by the hook — PadButton only consumes the result.
   const { showVolumeDisplay, volumeExiting, displayVolume } = usePadVolumeDisplay(
@@ -478,7 +464,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
             displayVolume={displayVolume}
             isPopoverOpen={isPopoverOpen}
             padSoundState={padSoundState}
-            isInteracting={isPressed}
           />
 
           {/* Back face */}
