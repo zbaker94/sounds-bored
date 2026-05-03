@@ -2,6 +2,7 @@ import { ensureResumed, getAudioContext } from "./audioContext";
 import { STOP_RAMP_S } from "./audioVoice";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadDisplayStore } from "@/state/padDisplayStore";
 import { usePadMetricsStore } from "@/state/padMetricsStore";
 import type { Pad, Scene } from "@/lib/schemas";
 import { isFadeablePad } from "@/lib/padUtils";
@@ -185,6 +186,9 @@ export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDuratio
 export function stopPad(pad: Pad): void {
   clearPadFadeTracking(pad.id);
   stopPadInternal(pad);
+  // stopPadInternal removes the pad from the playing-pads set; clear its
+  // metadata overlay in lockstep so a stopped pad never displays stale info.
+  usePadDisplayStore.getState().clearPadDisplay(pad.id);
 }
 
 /** Stop all pads in a scene, clearing their chain queues before stopping voices. */
@@ -237,6 +241,10 @@ export function stopAllPads(): void {
     const fullyStopped = stopSpecificVoices(stoppedVoices, stoppedPadIds);
     for (const padId of fullyStopped) {
       usePlaybackStore.getState().removePlayingPad(padId);
+      // Clear the metadata overlay in lockstep with the playing-pads removal so
+      // a stopped pad never displays stale info (scoped to fullyStopped so pads
+      // triggered during the ramp window are not affected).
+      usePadDisplayStore.getState().clearPadDisplay(padId);
     }
   }, STOP_RAMP_S * 1000 + 5);
   setGlobalStopTimeout(stopTimeoutId);

@@ -124,6 +124,11 @@ describe("PadButton", () => {
       renderButton();
       expect(screen.queryByTestId("pulse-ring")).not.toBeInTheDocument();
     });
+
+    it("does not show the sound metadata overlay when no voice is enqueued", () => {
+      renderButton();
+      expect(screen.queryByTestId("sound-name")).toBeNull();
+    });
   });
 
   describe("edit mode (editMode true)", () => {
