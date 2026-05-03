@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useForm, FormProvider, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -72,8 +72,7 @@ describe("LayerConfigSection", () => {
 
   async function hoverTabTooltipAndAssert(tabName: RegExp, expectedText: string | RegExp) {
     const tab = screen.getByRole("tab", { name: tabName });
-    // eslint-disable-next-line testing-library/no-node-access
-    await userEvent.hover(tab.querySelector('[data-slot="tooltip-trigger"]') as HTMLElement);
+    await userEvent.hover(within(tab).getByText(tabName));
     const matches = await screen.findAllByText(expectedText);
     expect(matches.length).toBeGreaterThan(0);
   }

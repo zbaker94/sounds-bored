@@ -67,7 +67,7 @@ vi.mock("sonner", () => ({
 const mockMutateAsync = vi.fn(() => Promise.resolve());
 
 vi.mock("@/lib/library.queries", () => ({
-  useSaveCurrentLibrary: vi.fn(() => ({ saveCurrentLibrary: mockMutateAsync })),
+  useSaveCurrentLibrary: vi.fn(() => ({ saveCurrentLibrary: mockMutateAsync, saveCurrentLibrarySync: vi.fn() })),
 }));
 
 vi.mock("@/lib/appSettings.queries", () => ({

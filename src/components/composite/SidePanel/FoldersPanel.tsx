@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { exists, remove } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
@@ -115,11 +115,18 @@ export function FoldersPanel({
   } = useResolveFolderQueue();
   const { reconcile, isReconciling } = useReconcileLibrary();
 
+  // Ref-wrap reconcile so the mount-only effect below always calls the latest
+  // version without needing reconcile in its deps (which would retrigger on
+  // every settings change — e.g. on each drag step of the fade slider).
+  const reconcileRef = useRef(reconcile);
+  useEffect(() => {
+    reconcileRef.current = reconcile;
+  }, [reconcile]);
+
   // Mount-time reconcile — co-located with the Refresh button's reconcile call.
   // The singleton guard in useReconcileLibrary prevents duplicate runs.
   useEffect(() => {
-    reconcile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    reconcileRef.current();
   }, []);
 
   const selectedFolder = useMemo(

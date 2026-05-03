@@ -195,14 +195,12 @@ describe("PadButton", () => {
       fireEvent.pointerDown(button, { button: 0, clientY: 200, pointerId: 1 });
       act(() => { vi.advanceTimersByTime(150); }); // hold phase — no bar yet
 
-      // eslint-disable-next-line testing-library/no-node-access
-      expect(button.querySelector(".bg-yellow-500")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("volume-drag-bar")).not.toBeInTheDocument();
 
       // Drag to enter drag phase — setPadVolume updates padVolumes → bar appears
       fireEvent.pointerMove(button, { clientY: 190, pointerId: 1 });
 
-      // eslint-disable-next-line testing-library/no-node-access
-      expect(button.querySelector(".bg-yellow-500")).toBeInTheDocument();
+      expect(screen.getByTestId("volume-drag-bar")).toBeInTheDocument();
     });
 
     it("shows pad name alongside volume percentage while dragging", () => {

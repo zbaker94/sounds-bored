@@ -48,6 +48,7 @@ export const PadButtonFadeOverlay = memo(function PadButtonFadeOverlay({
     <AnimatePresence>
       {isMultiFadeSelected && multiFadeLevels && (
         <motion.div
+          data-testid="fade-overlay"
           className="absolute bottom-0 left-0 right-0 z-20 px-2 pb-1.5 pt-0.5 bg-black/60 backdrop-blur-sm rounded-b-xl flex flex-col gap-1.5"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

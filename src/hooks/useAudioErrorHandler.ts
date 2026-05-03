@@ -50,6 +50,5 @@ export function useAudioErrorHandler(): void {
     });
   // Handler is registered once; no cleanup needed — the engine may emit errors
   // outside React's lifecycle (from Web Audio onended callbacks).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

@@ -50,8 +50,8 @@ export function useImportSounds(
 
       return copied.length;
     },
-    // importFolder.id is stable; allFolders ref is from settings (stable per render)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [importFolder?.id, allFolders, updateLibrary, saveCurrentLibrary],
+    // importFolder (full object) ensures any path change is captured; allFolders
+    // and the two store actions are stable across renders.
+    [importFolder, allFolders, updateLibrary, saveCurrentLibrary],
   );
 }

@@ -56,6 +56,13 @@ function MainPageInner() {
   }, [jobs]);
 
   const { reconcile } = useReconcileLibrary();
+  // Ref-wrap reconcile so the mount-only effect below always calls the latest
+  // version without needing reconcile in its deps (which would retrigger on
+  // every settings change — e.g. on each drag step of the fade slider).
+  const reconcileRef = useRef(reconcile);
+  useEffect(() => {
+    reconcileRef.current = reconcile;
+  }, [reconcile]);
 
   useEffect(() => {
     return () => {
@@ -76,9 +83,10 @@ function MainPageInner() {
     };
   }, []);
 
+  // Mount-time reconcile. The singleton guard in useReconcileLibrary prevents
+  // duplicate runs if reconcile fires more than once.
   useEffect(() => {
-    reconcile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    reconcileRef.current();
   }, []);
 
   const {
