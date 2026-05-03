@@ -158,6 +158,7 @@ function PadFrontFace({
         {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
         {showVolumeDisplay && (
           <motion.div
+            data-testid="volume-drag-bar"
             className="absolute bottom-0 left-0 right-0 pointer-events-none bg-yellow-500 border-t-2 border-black"
             style={{ height: `${displayVolume * 100}%` }}
             initial={{ opacity: 0 }}
@@ -260,7 +261,6 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
       const { hoveredPadId, setHoveredPadId } = useUiStore.getState();
       if (hoveredPadId === pad.id) setHoveredPadId(null);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pad.id]);
 
   const {

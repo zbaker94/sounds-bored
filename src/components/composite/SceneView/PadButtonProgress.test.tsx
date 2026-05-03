@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { createMockLayer } from "@/test/factories";
@@ -44,10 +44,9 @@ describe("PadButtonProgress", () => {
       activeLayerIds: new Set([LAYER_A.id, LAYER_B.id]),
       layerProgress: { [LAYER_A.id]: 0.25, [LAYER_B.id]: 0.75 },
     });
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
     // One progress bar div per active layer
-    // eslint-disable-next-line testing-library/no-node-access
-    const bars = container.querySelectorAll("[style*='width']");
+    const bars = screen.getAllByTestId("pad-layer-progress-bar");
     expect(bars).toHaveLength(2);
   });
 
@@ -61,9 +60,8 @@ describe("PadButtonProgress", () => {
       activeLayerIds: new Set([LAYER_A.id]),
       layerProgress: { [LAYER_A.id]: 0.5 },
     });
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
-    // eslint-disable-next-line testing-library/no-node-access
-    const bar = container.querySelector("[style*='width']") as HTMLElement;
+    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    const bar = screen.getByTestId("pad-layer-progress-bar") as HTMLElement;
     expect(bar.style.width).toBe("50%");
   });
 
@@ -77,9 +75,8 @@ describe("PadButtonProgress", () => {
       activeLayerIds: new Set([LAYER_A.id]),
       layerProgress: {},
     });
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
-    // eslint-disable-next-line testing-library/no-node-access
-    const bar = container.querySelector("[style*='width']") as HTMLElement;
+    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    const bar = screen.getByTestId("pad-layer-progress-bar") as HTMLElement;
     expect(bar.style.width).toBe("0%");
   });
 
@@ -94,9 +91,8 @@ describe("PadButtonProgress", () => {
       activeLayerIds: new Set([LAYER_A.id]),
       layerProgress: { [LAYER_A.id]: 0.3, [LAYER_B.id]: 0.6 },
     });
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
-    // eslint-disable-next-line testing-library/no-node-access
-    const bars = container.querySelectorAll("[style*='width']");
+    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    const bars = screen.getAllByTestId("pad-layer-progress-bar");
     expect(bars).toHaveLength(1);
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
@@ -53,10 +53,8 @@ beforeEach(() => {
 
 describe("BackFaceLayerRow progress bar", () => {
   it("does not render the progress bar when layer is inactive", () => {
-    const { container } = renderRow();
-    // eslint-disable-next-line testing-library/no-node-access
-    const bar = container.querySelector("[style*='width']");
-    expect(bar).toBeNull();
+    renderRow();
+    expect(screen.queryByTestId("back-face-layer-progress-bar")).not.toBeInTheDocument();
   });
 
   it("renders the progress bar at 50% when layer is active with progress 0.5", () => {
@@ -65,9 +63,8 @@ describe("BackFaceLayerRow progress bar", () => {
       activeLayerIds: new Set([LAYER.id]),
       layerProgress: { [LAYER.id]: 0.5 },
     });
-    const { container } = renderRow();
-    // eslint-disable-next-line testing-library/no-node-access
-    const bar = container.querySelector("[style*='width']") as HTMLElement;
+    renderRow();
+    const bar = screen.getByTestId("back-face-layer-progress-bar") as HTMLElement;
     expect(bar).not.toBeNull();
     expect(bar.style.width).toBe("50%");
   });
@@ -78,9 +75,8 @@ describe("BackFaceLayerRow progress bar", () => {
       activeLayerIds: new Set([LAYER.id]),
       layerProgress: {},
     });
-    const { container } = renderRow();
-    // eslint-disable-next-line testing-library/no-node-access
-    const bar = container.querySelector("[style*='width']") as HTMLElement;
+    renderRow();
+    const bar = screen.getByTestId("back-face-layer-progress-bar") as HTMLElement;
     expect(bar).not.toBeNull();
     expect(bar.style.width).toBe("0%");
   });
@@ -91,9 +87,8 @@ describe("BackFaceLayerRow progress bar", () => {
       activeLayerIds: new Set([LAYER.id]),
       layerProgress: { [LAYER.id]: 1.0 },
     });
-    const { container } = renderRow();
-    // eslint-disable-next-line testing-library/no-node-access
-    const bar = container.querySelector("[style*='width']") as HTMLElement;
+    renderRow();
+    const bar = screen.getByTestId("back-face-layer-progress-bar") as HTMLElement;
     expect(bar).not.toBeNull();
     expect(bar.style.width).toBe("100%");
   });

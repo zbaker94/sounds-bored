@@ -72,8 +72,8 @@ export function SoundsPanel() {
     }
   }
 
-  // handleDropImport is stable (useCallback with []), so the empty dep array
-  // is safe and registers the Tauri listener exactly once per mount.
+  // handleDropImport is stable (useCallback with []), so this effect
+  // registers the Tauri listener exactly once per mount.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -87,8 +87,7 @@ export function SoundsPanel() {
       })
       .then((fn) => { unlisten = fn; });
     return () => unlisten?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleDropImport]);
 
   const selectedSoundIdsArray = useMemo(() => [...selectedSoundIds], [selectedSoundIds]);
 

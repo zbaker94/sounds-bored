@@ -58,6 +58,7 @@ export const PadButtonProgress = memo(function PadButtonProgress({
       {activeLayers.map((layer) => (
         <div key={layer.id} className="relative overflow-hidden flex-1">
           <div
+            data-testid="pad-layer-progress-bar"
             className="absolute top-0 left-0 bottom-0 bg-white/20 border border-white rounded-r"
             style={{ width: `${(layerProgress[layer.id] ?? 0) * 100}%` }}
           />

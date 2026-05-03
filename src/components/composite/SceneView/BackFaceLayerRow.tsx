@@ -204,6 +204,7 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
       {layerActive && (
         <div className="h-0.5 rounded-full bg-muted overflow-hidden">
           <div
+            data-testid="back-face-layer-progress-bar"
             className="h-full bg-primary/60 rounded-full"
             style={{ width: `${layerProgress * 100}%` }}
           />

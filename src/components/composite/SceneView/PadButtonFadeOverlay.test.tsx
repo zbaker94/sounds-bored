@@ -114,11 +114,8 @@ describe("PadButtonFadeOverlay", () => {
         <PadButtonFadeOverlay pad={pad} sceneId={SCENE_ID} />
       </div>
     );
-    // The overlay div should stopPropagation on pointer-down — use the "fade" label
-    // as an anchor to find it (more robust than querying by Tailwind class name).
-    const fadeLabel = screen.getByText("fade");
-    // eslint-disable-next-line testing-library/no-node-access
-    const overlay = fadeLabel.closest("[class*='bg-black']") as HTMLElement;
+    // The overlay div should stopPropagation on pointer-down.
+    const overlay = screen.getByTestId("fade-overlay");
     fireEvent.pointerDown(overlay);
     expect(onPointerDown).not.toHaveBeenCalled();
   });

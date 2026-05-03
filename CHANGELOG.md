@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where the sound library would unnecessarily re-scan for new files on every settings change (e.g., dragging the fade slider), improving performance and stability.
+- Fixed drag-and-drop sound import to correctly re-register when the import folder path changes.
+- Fixed sound import to properly detect folder path changes instead of only reacting to folder ID changes.
 - Fixed a UI issue where layer arrangement helper text could display incorrectly when no sounds are assigned to a layer.
 - Pad volume drag indicator now updates more smoothly, with React re-renders throttled to once per animation frame while audio adjustments remain immediate.
 - Improved internal audio engine reliability: the playback tracking loop now responds immediately to voice changes via event subscription rather than polling a version counter, reducing the chance of missed state updates during complex playback scenarios.
