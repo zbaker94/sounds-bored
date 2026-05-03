@@ -94,6 +94,7 @@ function getArrangementHelper(
 ): string | null {
   if (arrangement === "simultaneous") {
     if (selectionType !== "assigned") return "All matched sounds play together at trigger time.";
+    if (instanceCount < 1) return null;
     if (instanceCount === 1) return "The assigned sound plays on each trigger.";
     return `All ${instanceCount} assigned sounds play together on each trigger.`;
   }
