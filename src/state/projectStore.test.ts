@@ -576,6 +576,166 @@ describe("projectStore", () => {
     });
   });
 
+  describe("movePadToScene", () => {
+    function loadTwoScenes() {
+      const entry = createMockHistoryEntry();
+      const pad = createMockPad({ id: "pad-1", name: "Kick" });
+      const scene1 = createMockScene({ id: "scene-1", pads: [pad] });
+      const scene2 = createMockScene({ id: "scene-2", pads: [] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene1, scene2] }), false);
+      return { pad, scene1, scene2 };
+    }
+
+    it("moves the pad to the target scene", () => {
+      loadTwoScenes();
+      getState().movePadToScene("scene-1", "pad-1", "scene-2");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(targetScene?.pads).toHaveLength(1);
+      expect(targetScene?.pads[0].id).toBe("pad-1");
+    });
+
+    it("removes the pad from the source scene", () => {
+      loadTwoScenes();
+      getState().movePadToScene("scene-1", "pad-1", "scene-2");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      expect(sourceScene?.pads).toHaveLength(0);
+    });
+
+    it("marks the project as dirty", () => {
+      loadTwoScenes();
+      expect(getState().isDirty).toBe(false);
+      getState().movePadToScene("scene-1", "pad-1", "scene-2");
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("is a no-op if no project is loaded", () => {
+      getState().movePadToScene("scene-1", "pad-1", "scene-2");
+      expect(getState().project).toBeNull();
+    });
+
+    it("is a no-op if fromSceneId does not exist", () => {
+      loadTwoScenes();
+      getState().movePadToScene("nonexistent", "pad-1", "scene-2");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(targetScene?.pads).toHaveLength(0);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if padId does not exist", () => {
+      loadTwoScenes();
+      getState().movePadToScene("scene-1", "nonexistent", "scene-2");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(targetScene?.pads).toHaveLength(0);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if toSceneId does not exist", () => {
+      loadTwoScenes();
+      getState().movePadToScene("scene-1", "pad-1", "nonexistent");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if fromSceneId and toSceneId are the same", () => {
+      loadTwoScenes();
+      getState().movePadToScene("scene-1", "pad-1", "scene-1");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
+  });
+
+  describe("copyPadToScene", () => {
+    function loadTwoScenes() {
+      const entry = createMockHistoryEntry();
+      const layer = createMockLayer({ id: "layer-1" });
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+      const scene1 = createMockScene({ id: "scene-1", pads: [pad] });
+      const scene2 = createMockScene({ id: "scene-2", pads: [] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene1, scene2] }), false);
+      return { pad, scene1, scene2, layer };
+    }
+
+    it("copies the pad to the target scene", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "pad-1", "scene-2");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(targetScene?.pads).toHaveLength(1);
+    });
+
+    it("keeps the pad in the source scene", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "pad-1", "scene-2");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(sourceScene?.pads[0].id).toBe("pad-1");
+    });
+
+    it("assigns a new unique id to the copied pad", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "pad-1", "scene-2");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(targetScene?.pads[0].id).not.toBe("pad-1");
+      expect(targetScene?.pads[0].id).toBeTruthy();
+    });
+
+    it("assigns new ids to all layers in the copied pad", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "pad-1", "scene-2");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(targetScene?.pads[0].layers[0].id).not.toBe("layer-1");
+    });
+
+    it("marks the project as dirty", () => {
+      loadTwoScenes();
+      expect(getState().isDirty).toBe(false);
+      getState().copyPadToScene("scene-1", "pad-1", "scene-2");
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("is a no-op if no project is loaded", () => {
+      getState().copyPadToScene("scene-1", "pad-1", "scene-2");
+      expect(getState().project).toBeNull();
+    });
+
+    it("is a no-op if fromSceneId does not exist", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("nonexistent", "pad-1", "scene-2");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(targetScene?.pads).toHaveLength(0);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if padId does not exist", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "nonexistent", "scene-2");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      const targetScene = getState().project!.scenes.find((s) => s.id === "scene-2");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(targetScene?.pads).toHaveLength(0);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if toSceneId does not exist", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "pad-1", "nonexistent");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("is a no-op if fromSceneId and toSceneId are the same", () => {
+      loadTwoScenes();
+      getState().copyPadToScene("scene-1", "pad-1", "scene-1");
+      const sourceScene = getState().project!.scenes.find((s) => s.id === "scene-1");
+      expect(sourceScene?.pads).toHaveLength(1);
+      expect(getState().isDirty).toBe(false);
+    });
+  });
+
   describe("reorderScenes", () => {
     function loadWithThreeScenes() {
       const entry = createMockHistoryEntry();

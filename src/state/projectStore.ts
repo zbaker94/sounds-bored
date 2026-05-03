@@ -37,6 +37,8 @@ interface ProjectActions {
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
   deletePad: (sceneId: string, padId: string) => void;
   duplicatePad: (sceneId: string, padId: string) => void;
+  movePadToScene: (fromSceneId: string, padId: string, toSceneId: string) => void;
+  copyPadToScene: (fromSceneId: string, padId: string, toSceneId: string) => void;
   reorderScenes: (fromIndex: number, toIndex: number) => void;
   reorderPads: (sceneId: string, fromIndex: number, toIndex: number) => void;
   updateLayerVolume: (layerId: string, volumePct: number) => void;
@@ -213,6 +215,40 @@ export const useProjectStore = create<ProjectStore>()(
           layers: source.layers.map((l) => ({ ...l, id: crypto.randomUUID() })),
         };
         scene.pads.splice(idx + 1, 0, duplicate);
+        draft.isDirty = true;
+      }),
+
+    movePadToScene: (fromSceneId, padId, toSceneId) =>
+      set((draft) => {
+        if (!draft.project) return;
+        if (fromSceneId === toSceneId) return;
+        const fromScene = draft.project.scenes.find((s) => s.id === fromSceneId);
+        if (!fromScene) return;
+        const toScene = draft.project.scenes.find((s) => s.id === toSceneId);
+        if (!toScene) return;
+        const idx = fromScene.pads.findIndex((p) => p.id === padId);
+        if (idx === -1) return;
+        const [moved] = fromScene.pads.splice(idx, 1);
+        toScene.pads.push(moved);
+        draft.isDirty = true;
+      }),
+
+    copyPadToScene: (fromSceneId, padId, toSceneId) =>
+      set((draft) => {
+        if (!draft.project) return;
+        if (fromSceneId === toSceneId) return;
+        const fromScene = draft.project.scenes.find((s) => s.id === fromSceneId);
+        if (!fromScene) return;
+        const toScene = draft.project.scenes.find((s) => s.id === toSceneId);
+        if (!toScene) return;
+        const source = fromScene.pads.find((p) => p.id === padId);
+        if (!source) return;
+        const copy: Pad = {
+          ...source,
+          id: crypto.randomUUID(),
+          layers: source.layers.map((l) => ({ ...l, id: crypto.randomUUID() })),
+        };
+        toScene.pads.push(copy);
         draft.isDirty = true;
       }),
 

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- You can now move a pad to a different scene directly from the pad's back face, removing it from the current scene.
+- You can copy a pad to another scene, keeping the original in place with all its layers duplicated as independent copies.
+- A scene selector appears on the pad back face when multiple scenes exist, letting you choose the destination before moving or copying.
 - Fixed a bug where the layer configuration dialog could display stale settings when switching between layers without closing and reopening it.
 - Fixed a bug where the sound library would unnecessarily re-scan for new files on every settings change (e.g., dragging the fade slider), improving performance and stability.
 - Fixed drag-and-drop sound import to correctly re-register when the import folder path changes.
