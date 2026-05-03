@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { createMockPad, createMockLayer, createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
 import type { Pad } from "@/lib/schemas";
 import { PadBackFace } from "./PadBackFace";
@@ -77,6 +78,7 @@ describe("PadBackFace", () => {
     useProjectStore.setState({ ...initialProjectState });
     useUiStore.setState({ ...initialUiState });
     usePlaybackStore.setState({ ...initialPlaybackState });
+    usePadMetricsStore.setState({ ...initialPadMetricsState });
   });
 
   it("renders pad name in an input", () => {
@@ -212,7 +214,8 @@ describe("PadBackFace", () => {
 
   it("shows disabled Fade when pad is playing and live volume equals target", () => {
     const { pad } = loadPad({ volume: 80, fadeTargetVol: 50 });
-    usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]), padVolumes: { [pad.id]: 0.5 } });
+    usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set([pad.id]) });
+    usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [pad.id]: 0.5 } });
     renderBackFace(pad);
     expectFadeButton("disabled");
   });

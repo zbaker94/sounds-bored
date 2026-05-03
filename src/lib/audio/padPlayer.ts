@@ -2,6 +2,7 @@ import { ensureResumed, getAudioContext } from "./audioContext";
 import { STOP_RAMP_S } from "./audioVoice";
 import { useLibraryStore } from "@/state/libraryStore";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadMetricsStore } from "@/state/padMetricsStore";
 import type { Pad, Scene } from "@/lib/schemas";
 import { isFadeablePad } from "@/lib/padUtils";
 import { emitAudioError } from "./audioEvents";
@@ -78,7 +79,7 @@ export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
   const reverseTarget = getPadFadeFromVolume(pad.id);
   if (reverseTarget === undefined) return;
 
-  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const padVolumes = usePadMetricsStore.getState().padVolumes;
   const currentVol = padVolumes[pad.id] ?? reverseTarget;
 
   fadePad(pad, currentVol, reverseTarget, duration);
@@ -86,7 +87,7 @@ export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
 }
 
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
-  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const padVolumes = usePadMetricsStore.getState().padVolumes;
   fadingOut.forEach((pad) => {
     const currentVol = padVolumes[pad.id] ?? ((pad.volume ?? 100) / 100);
     fadePad(pad, currentVol, (pad.fadeTargetVol ?? 0) / 100, resolveFadeDuration(pad, globalFadeDurationMs));
@@ -100,7 +101,7 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
 
 function reverseActiveFade(pad: Pad, highVol: number, lowVol: number, duration: number): void {
   const reverseTarget = getPadFadeFromVolume(pad.id);
-  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const padVolumes = usePadMetricsStore.getState().padVolumes;
   const currentVol = padVolumes[pad.id] ?? (reverseTarget ?? highVol);
   const targetVol = reverseTarget ?? (isPadFadingOut(pad.id) ? highVol : lowVol);
   fadePad(pad, currentVol, targetVol, duration);
@@ -141,7 +142,7 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
  * to avoid anchoring back to the ramp's start point.
  */
 export function stopFade(pad: Pad): void {
-  const padVolumes = usePlaybackStore.getState().padVolumes;
+  const padVolumes = usePadMetricsStore.getState().padVolumes;
   const currentVol = padVolumes[pad.id] ?? ((pad.volume ?? 100) / 100);
   const ctx = getAudioContext();
   const gain = getPadGain(pad.id);

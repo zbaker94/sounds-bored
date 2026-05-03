@@ -62,7 +62,6 @@ function MainPageInner() {
       stopAudioTick();
       clearAllAudioState();
       usePlaybackStore.getState().clearAllPlayingPads();
-      usePlaybackStore.getState().clearVolumes();
       // Stop any active sound preview. preview.ts manages its own module-level
       // state (currentSource, previewRafId) outside clearAllAudioState's scope,
       // so it must be torn down explicitly here.

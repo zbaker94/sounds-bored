@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
+import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { createMockLayer } from "@/test/factories";
 import { PadButtonProgress } from "./PadButtonProgress";
 
@@ -11,6 +12,7 @@ const LAYERS = [LAYER_A, LAYER_B];
 
 beforeEach(() => {
   usePlaybackStore.setState({ ...initialPlaybackState });
+  useLayerMetricsStore.setState({ ...initialLayerMetricsState });
 });
 
 describe("PadButtonProgress", () => {
@@ -23,6 +25,9 @@ describe("PadButtonProgress", () => {
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([PAD_ID]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set(),
     });
     const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
@@ -33,6 +38,9 @@ describe("PadButtonProgress", () => {
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([PAD_ID]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER_A.id, LAYER_B.id]),
       layerProgress: { [LAYER_A.id]: 0.25, [LAYER_B.id]: 0.75 },
     });
@@ -47,6 +55,9 @@ describe("PadButtonProgress", () => {
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([PAD_ID]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER_A.id]),
       layerProgress: { [LAYER_A.id]: 0.5 },
     });
@@ -60,6 +71,9 @@ describe("PadButtonProgress", () => {
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([PAD_ID]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER_A.id]),
       layerProgress: {},
     });
@@ -74,6 +88,9 @@ describe("PadButtonProgress", () => {
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([PAD_ID]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER_A.id]),
       layerProgress: { [LAYER_A.id]: 0.3, [LAYER_B.id]: 0.6 },
     });
@@ -87,6 +104,9 @@ describe("PadButtonProgress", () => {
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set(["other-pad"]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
       activeLayerIds: new Set([LAYER_A.id]),
     });
     const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);

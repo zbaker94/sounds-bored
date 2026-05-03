@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved audio playback UI performance by reducing unnecessary screen updates during sound fades and pad activity tracking.
 - Fixed a schema validation bug where layer sound-selection rules (assigned, tag, set) could silently lose configuration when saving/loading projects with empty selections
 - Improved form validation to correctly reject incomplete layer configurations before saving, giving clearer error messages when no sounds, tags, or set are selected for a layer
 - Pad gesture handlers now remain stable when pad properties like name or color change, preventing unnecessary re-renders on pads that haven't changed in a meaningful way.

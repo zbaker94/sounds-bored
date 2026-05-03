@@ -13,7 +13,7 @@ import {
   Cancel01Icon,
   Volume1,
 } from "@hugeicons/core-free-icons";
-import { usePlaybackStore } from "@/state/playbackStore";
+import { useLayerMetricsStore } from "@/state/layerMetricsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectStore } from "@/state/projectStore";
 import {
@@ -38,14 +38,14 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
   onRemoveLayer: () => void;
 }) {
   const canRemove = pad.layers.length > 1;
-  const layerActive = usePlaybackStore((s) => s.activeLayerIds.has(layer.id));
+  const layerActive = useLayerMetricsStore((s) => s.activeLayerIds.has(layer.id));
   // Gate on activeLayerIds to short-circuit the layerProgress lookup for idle layers,
   // avoiding selector work on every audioTick frame when the bar isn't visible.
-  const layerProgress = usePlaybackStore((s) =>
+  const layerProgress = useLayerMetricsStore((s) =>
     s.activeLayerIds.has(layer.id) ? (s.layerProgress[layer.id] ?? 0) : 0
   );
   const [liveLayerVol, setLiveLayerVol] = useState<number | null>(() => {
-    const stored = usePlaybackStore.getState().layerVolumes[layer.id];
+    const stored = useLayerMetricsStore.getState().layerVolumes[layer.id];
     return stored !== undefined ? Math.round(stored * 100) : null;
   });
   const [localLayerVol, setLocalLayerVol] = useState<number | null>(null);
@@ -55,9 +55,9 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
     let lastUpdate = 0;
     // Sync to current state when layer.id changes so there's no stale value between
     // unsubscribing the old selector and receiving the first notification on the new one.
-    const snap = usePlaybackStore.getState().layerVolumes[layer.id];
+    const snap = useLayerMetricsStore.getState().layerVolumes[layer.id];
     setLiveLayerVol(snap !== undefined ? Math.round(snap * 100) : null);
-    return usePlaybackStore.subscribe(
+    return useLayerMetricsStore.subscribe(
       (state) => state.layerVolumes[layer.id],
       (vol) => {
         if (vol === undefined) { setLiveLayerVol(null); return; }
