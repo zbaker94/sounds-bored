@@ -4,6 +4,7 @@ import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, emitAudioError } from "@/lib/audio";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { usePadMetricsStore } from "@/state/padMetricsStore";
+import { useRafThrottledState } from "./useRafThrottledState";
 
 // Gesture thresholds
 const HOLD_MS = 150;        // time before a press becomes a "hold"
@@ -37,7 +38,9 @@ export function usePadGesture(pad: Pad, now = Date.now) {
   const [isDragging, setIsDragging] = useState(false);
   // dragVolume: the volume being set by the current gesture drag (null when not dragging).
   // Exposed so PadButton can display the intended volume before audio latency resolves.
-  const [dragVolume, setDragVolume] = useState<number | null>(null);
+  // Throttled to one React setState per animation frame via useRafThrottledState;
+  // setPadVolume (Web Audio) still fires immediately on every pointermove for glitch-free audio.
+  const { value: dragVolume, schedule: scheduleDragVolume, reset: resetDragVolume } = useRafThrottledState<number | null>(null);
 
   const padRef = useRef(pad);
   useEffect(() => { padRef.current = pad; }, [pad]);
@@ -54,20 +57,6 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     hasTriggeredDuringDrag: false,
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Throttle dragVolume display updates to one React setState per animation frame.
-  // setPadVolume (Web Audio) still fires immediately on every pointermove for glitch-free audio.
-  const dragRafRef = useRef<number | null>(null);
-  const pendingDragVolume = useRef<number | null>(null);
-
-  // Cancel any pending drag-volume RAF on unmount so setState is never called on
-  // an unmounted component (e.g. when the scene changes mid-drag).
-  useEffect(() => {
-    return () => {
-      if (dragRafRef.current !== null) {
-        cancelAnimationFrame(dragRafRef.current);
-      }
-    };
-  }, []);
 
   // All handlers and their helpers are co-located in a single useMemo so that:
   // 1. Helper functions share the same closure scope as the handlers that call them,
@@ -186,20 +175,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         }
 
         setPadVolume(padRef.current.id, newVolume);
-        // Throttle the React display update to one setState per animation frame.
-        pendingDragVolume.current = newVolume;
-        if (dragRafRef.current === null) {
-          dragRafRef.current = requestAnimationFrame(() => {
-            // Read the ref inside the callback so multiple pointermove events that
-            // arrived within the same frame use the latest value, not the one at
-            // scheduling time. resetGesture cancels this RAF before nulling the ref,
-            // so the null branch is a safety net rather than the expected path.
-            if (pendingDragVolume.current !== null) {
-              setDragVolume(pendingDragVolume.current);
-            }
-            dragRafRef.current = null;
-          });
-        }
+        scheduleDragVolume(newVolume);
       }
     }
 
@@ -207,13 +183,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       const s = state.current;
       if (s.phase === "drag") {
         setIsDragging(false);
-        setDragVolume(null);
-        if (dragRafRef.current !== null) {
-          cancelAnimationFrame(dragRafRef.current);
-          dragRafRef.current = null;
-        }
-        pendingDragVolume.current = null;
       }
+      resetDragVolume();
       if (hasHoldLayer) {
         releasePadHoldLayers(padRef.current);
         resetPadGain(padRef.current.id);

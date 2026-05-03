@@ -820,6 +820,9 @@ describe("usePadGesture — onPointerCancel", () => {
         result.current.gestureHandlers.onPointerCancel(makePointerEvent({ clientY: 290 }));
       });
     }).not.toThrow();
+
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.dragVolume).toBe(null);
   });
 
   it("stops pad and resets gain when cancelled during drag at near-zero volume", () => {
@@ -925,6 +928,36 @@ describe("usePadGesture — handler reference stability", () => {
     pad = { ...oneShotPad, id: "pad-other" };
     rerender();
     expect(result.current.gestureHandlers).not.toBe(first);
+  });
+
+  it("dragVolume is null before drag, reflects volume during drag, null after pointer up", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    expect(result.current.dragVolume).toBe(null);
+    expect(result.current.isDragging).toBe(false);
+
+    // Enter hold phase.
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+      vi.advanceTimersByTime(150);
+    });
+    // Move 10px up to enter drag phase, then flush the scheduled RAF.
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
+    });
+
+    expect(result.current.isDragging).toBe(true);
+    expect(result.current.dragVolume).not.toBe(null);
+    expect(result.current.dragVolume).toBeGreaterThan(0);
+
+    // Release resets dragVolume to null synchronously via resetDragVolume().
+    act(() => {
+      result.current.gestureHandlers.onPointerUp(makePointerEvent({ clientY: 290 }));
+    });
+
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.dragVolume).toBe(null);
   });
 
   it("returns stable gestureHandlers when non-gesture pad properties change (Immer-style mutation)", () => {
