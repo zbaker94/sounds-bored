@@ -36,6 +36,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
   );
 
   const [isDragging, setIsDragging] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
   // dragVolume: the volume being set by the current gesture drag (null when not dragging).
   // Exposed so PadButton can display the intended volume before audio latency resolves.
   // Throttled to one React setState per animation frame via useRafThrottledState;
@@ -108,6 +109,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
       e.currentTarget.setPointerCapture(e.pointerId);
       clearHoldTimer();
+      setIsPressed(true);
 
       const s = state.current;
       s.startY = e.clientY;
@@ -184,6 +186,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       if (s.phase === "drag") {
         setIsDragging(false);
       }
+      setIsPressed(false);
       resetDragVolume();
       if (hasHoldLayer) {
         releasePadHoldLayers(padRef.current);
@@ -230,5 +233,5 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu };
   }, [pad.id, hasHoldLayer, now]);
 
-  return { gestureHandlers, isDragging, dragVolume };
+  return { gestureHandlers, isDragging, dragVolume, isPressed };
 }

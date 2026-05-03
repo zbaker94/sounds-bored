@@ -15,6 +15,7 @@
 
 import { ensureResumed, getAudioContext } from "./audioContext";
 import { usePlaybackStore } from "@/state/playbackStore";
+import { usePadDisplayStore } from "@/state/padDisplayStore";
 import { clampGain01 } from "./gainManager";
 import { clearPadFadeTracking } from "./fadeMixer";
 import { loadBuffer, MissingFileError } from "./bufferCache";
@@ -302,6 +303,18 @@ export async function startLayerSound(
 
     await voice.start();
     recordLayerVoice(pad.id, layer.id, voice);
+    // Only show metadata overlay if the pad is still active. Guards against the
+    // narrow race where stopPad fires between voice.start() resolving and
+    // enqueueVoice being called — after the stop cleanup runs, isPadActive
+    // returns false and we skip the now-stale overlay enqueue.
+    if (isPadActive(pad.id)) {
+      usePadDisplayStore.getState().enqueueVoice(pad.id, {
+        soundName: sound.name,
+        layerName: layer.name,
+        playbackMode: layer.playbackMode,
+        durationMs: sound.durationMs,
+      });
+    }
     usePlaybackStore.getState().addPlayingPad(pad.id);
     // Voice fully started and recorded — clear the consecutive-failure counter so
     // a future failure starts from zero. Placed after recordLayerVoice so we only

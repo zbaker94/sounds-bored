@@ -15,6 +15,7 @@ import { PadBackFace } from "./PadBackFace";
 import { PadButtonProgress } from "./PadButtonProgress";
 import { PadButtonFadeOverlay } from "./PadButtonFadeOverlay";
 import { PadFadePopoverContent } from "./PadFadePopoverContent";
+import { PadSoundMetadataDisplay } from "./PadSoundMetadataDisplay";
 import { PAD_FLIP_DURATION_MS, PAD_FLIP_EASE, PAD_STAGGER_MS } from "./padAnimations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
@@ -136,12 +137,14 @@ interface PadFrontFaceProps {
   displayVolume: number;
   isPopoverOpen: boolean;
   padSoundState: ReturnType<typeof getPadSoundState>;
+  isInteracting: boolean;
 }
 
 function PadFrontFace({
   pad, sceneId, isPlaying, isFadingOut, isFlipped, isUnplayable,
   multiFadeActive, multiFadeHandlers, multiFadeSelectionClass, gestureHandlers,
   showVolumeDisplay, volumeExiting, displayVolume, isPopoverOpen, padSoundState,
+  isInteracting,
 }: PadFrontFaceProps) {
   return (
     <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
@@ -169,6 +172,8 @@ function PadFrontFace({
         {/* Playback progress — one bar per active layer, split vertically.
             Isolated in PadButtonProgress so 60Hz RAF ticks do not re-render PadButton. */}
         <PadButtonProgress padId={pad.id} layers={pad.layers} />
+        {/* Sound metadata overlay — fades in when a new sound starts, auto-fades after ~2.5s */}
+        <PadSoundMetadataDisplay padId={pad.id} isInteracting={isInteracting} />
         {/* Pad name + optional volume — height animates open on mount for smooth name shift */}
         <div className="relative z-10 flex flex-col items-center gap-0.5">
           <span data-testid="pad-name" className="line-clamp-2 break-words leading-tight text-center">{pad.name}</span>
@@ -229,7 +234,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
   const isPopoverOpen = useUiStore((s) => s.fadePopoverPadId === pad.id);
   const setFadePopoverPadId = useUiStore((s) => s.setFadePopoverPadId);
-  const { gestureHandlers, isDragging, dragVolume } = usePadGesture(pad);
+  const { gestureHandlers, isDragging, dragVolume, isPressed } = usePadGesture(pad);
 
   // Volume display state is fully managed by the hook — PadButton only consumes the result.
   const { showVolumeDisplay, volumeExiting, displayVolume } = usePadVolumeDisplay(
@@ -438,6 +443,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
             displayVolume={displayVolume}
             isPopoverOpen={isPopoverOpen}
             padSoundState={padSoundState}
+            isInteracting={isPressed}
           />
 
           {/* Back face */}

@@ -602,6 +602,70 @@ describe("layerTrigger", () => {
 
 // ── startLayerSound — error bus ───────────────────────────────────────────────
 
+// ── startLayerSound — padDisplayStore integration (issue #218) ────────────────
+
+describe("startLayerSound padDisplayStore integration", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
+    });
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
+    const { usePadDisplayStore, initialPadDisplayState, _resetVoiceSeq } = await import("@/state/padDisplayStore");
+    usePadDisplayStore.setState({ ...initialPadDisplayState });
+    _resetVoiceSeq();
+  });
+
+  it("populates currentVoice with sound/layer metadata after a successful start", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.5 } as unknown as AudioBuffer);
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "pd-pad-1" });
+    const layer = createMockLayer({ id: "pd-layer-1", name: "lead", playbackMode: "loop" });
+    const sound = createMockSound({ id: "s1", name: "kick", filePath: "kick.wav", durationMs: 1500 });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    const current = usePadDisplayStore.getState().currentVoice[pad.id];
+    expect(current).toBeDefined();
+    expect(current).toMatchObject({
+      soundName: "kick",
+      layerName: "lead",
+      playbackMode: "loop",
+      durationMs: 1500,
+    });
+    expect(current?.seq).toBeGreaterThan(0);
+  });
+
+  it("does not enqueue a voice on load failure (currentVoice stays absent)", async () => {
+    const { loadBuffer, MissingFileError } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("not found"));
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "pd-pad-2" });
+    const layer = createMockLayer({ id: "pd-layer-2" });
+    const sound = createMockSound({ id: "s1", name: "missing", filePath: "missing.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    const current = usePadDisplayStore.getState().currentVoice[pad.id];
+    expect(current ?? null).toBeNull();
+  });
+});
+
 describe("startLayerSound error bus", () => {
   it("emits isMissingFile:true via audioEvents on MissingFileError", async () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");

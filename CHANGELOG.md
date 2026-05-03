@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- When a sound starts playing on a pad, an animated overlay now appears showing the sound name, layer name, playback mode, and duration.
+- The overlay automatically fades out after ~2.5 seconds (or sooner if the sound is shorter), and immediately dismisses when you press the pad again.
+- For looping and hold-mode pads, the overlay stays visible until you interact with the pad or stop playback.
+- The sound metadata display clears correctly when a pad is stopped or the project is closed, preventing stale info from appearing.
 - You can now move a pad to a different scene directly from the pad's back face, removing it from the current scene.
 - You can copy a pad to another scene, keeping the original in place with all its layers duplicated as independent copies.
 - A scene selector appears on the pad back face when multiple scenes exist, letting you choose the destination before moving or copying.
