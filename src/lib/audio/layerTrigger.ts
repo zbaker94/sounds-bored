@@ -233,9 +233,14 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
   startAudioTick();
+  usePadDisplayStore.getState().shiftVoice(pad.id);
   if (isChained(liveArr)) {
     const newOrder = buildPlayOrder(liveArr, liveSounds);
-    if (newOrder.length === 0) { deleteLayerChain(layer.id); return; }
+    if (newOrder.length === 0) {
+      deleteLayerChain(layer.id);
+      if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
+      return;
+    }
     const [first, ...rest] = newOrder;
     setLayerChain(layer.id, rest);
     startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
@@ -243,6 +248,10 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
     );
   } else {
     deleteLayerChain(layer.id);
+    if (liveSounds.length === 0) {
+      if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
+      return;
+    }
     for (const snd of liveSounds) {
       startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
         (err) => { console.error("[layerTrigger] simultaneous loop-restart failed:", err); },
@@ -270,11 +279,8 @@ export async function startLayerSound(
     const { voice, audio } = await loadLayerVoice(sound, layer, ctx, layerGain, voiceVolume, pad.id);
 
     voice.setOnEnded(() => {
-      // endedCb is nulled on first fire — prevents double-call if the source
-      // ends naturally while a stopWithRamp timeout is pending.
       if (audio) unregisterStreamingAudio(pad.id, layer.id, audio);
       clearLayerVoice(pad.id, layer.id, voice);
-      if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
 
       // Chain to the next sound if one is queued (sequential/shuffled).
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
@@ -283,22 +289,27 @@ export async function startLayerSound(
       const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
 
       if (remaining !== undefined && remaining.length > 0) {
+        // Chain continues — defer removePlayingPad until the next voice starts so
+        // the pad doesn't briefly flash as "not playing" between chained sounds.
         const [next, ...rest] = remaining;
         setLayerChain(layer.id, rest);
         clearLayerProgressInfo(layer.id);
         clearPadProgressInfo(pad.id);
         startAudioTick();
+        usePadDisplayStore.getState().shiftVoice(pad.id);
         startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds).catch(
           (err) => { console.error("[layerTrigger] chain continuation failed:", err); },
         );
       } else if (remaining !== undefined && (liveMode === "loop" || liveMode === "hold")) {
         // Chain exhausted naturally — restart using live store values so mid-playback
         // config changes (arrangement, playback mode, selection) take effect.
+        // removePlayingPad is deferred to restartLoopChain (handles failure edges).
         restartLoopChain(pad, layer, ctx, layerGain);
-      } else if (remaining !== undefined) {
-        deleteLayerChain(layer.id);
+      } else {
+        // Chain exhausted (one-shot) or cleared externally (stop/reset).
+        if (remaining !== undefined) deleteLayerChain(layer.id);
+        if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
       }
-      // remaining === undefined: queue cleared externally — do not chain.
     });
 
     await voice.start();

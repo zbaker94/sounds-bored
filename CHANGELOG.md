@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed pads briefly flashing as inactive between chained sounds during sequential/shuffled playback
+- Fixed pads remaining stuck in "playing" state when a loop or hold chain has no sounds to restart with
+- Improved pad display updates when a looping chain restarts
 - Album artwork embedded in audio files is now automatically extracted and displayed on pad buttons while they're playing
 - Pads show a blurred cover art background instead of a solid black overlay when triggered
 - A cover art thumbnail appears in the sound name overlay on active pads
