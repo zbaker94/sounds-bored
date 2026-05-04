@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useDownloadStore } from "@/state/downloadStore";
-import { reconcileGlobalLibrary, refreshMissingState } from "@/lib/library.reconcile";
+import { reconcileGlobalLibrary, refreshMissingState, scheduleAnalysisForUnanalyzed } from "@/lib/library.reconcile";
 import { loadGlobalLibrary } from "@/lib/library";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { loadAppSettings } from "@/lib/appSettings";
@@ -129,6 +129,11 @@ export function useBootLoader(): { ready: boolean } {
               toast.error("Failed to save sound library");
             },
           });
+        }
+
+        // Schedule background loudness/genre/mood analysis for unanalyzed sounds.
+        if (settings.autoAnalysis) {
+          void scheduleAnalysisForUnanalyzed(useLibraryStore.getState().sounds);
         }
       })
       .catch((err) => {

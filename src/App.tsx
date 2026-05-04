@@ -7,12 +7,16 @@ import { AppErrorBoundary, RouteErrorElement } from "@/components/ErrorBoundary"
 import { useBootLoader } from "@/hooks/useBootLoader";
 import { useUpdater } from "@/hooks/useUpdater";
 import { usePreloadImages } from "@/hooks/usePreloadImages";
+import { useAudioAnalysis } from "@/hooks/useAudioAnalysis";
+import { useAutoAnalysis } from "@/hooks/useAutoAnalysis";
 import { LoadingScreen } from "@/components/screens/LoadingScreen";
 import { SettingsDialog } from "@/components/modals/SettingsDialog";
 
 function App() {
   const { ready: bootReady } = useBootLoader();
   useUpdater();
+  useAudioAnalysis();
+  useAutoAnalysis();
   const { ready: imagesReady } = usePreloadImages();
 
   return (

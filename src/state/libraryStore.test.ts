@@ -421,4 +421,49 @@ describe("libraryStore", () => {
       expect(getState().unknownFolderIds.size).toBe(0);
     });
   });
+
+  describe("updateSoundAnalysis", () => {
+    it("sets loudnessLufs, genre, and mood on an existing sound", () => {
+      const sound = createMockSound({ id: "s1" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      getState().updateSoundAnalysis("s1", { loudnessLufs: -14.5, genre: "Rock", mood: "Energetic" });
+
+      const updated = getState().sounds.find((s) => s.id === "s1");
+      expect(updated?.loudnessLufs).toBe(-14.5);
+      expect(updated?.genre).toBe("Rock");
+      expect(updated?.mood).toBe("Energetic");
+    });
+
+    it("marks isDirty when updating an existing sound", () => {
+      const sound = createMockSound({ id: "s1" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound], isDirty: false });
+
+      getState().updateSoundAnalysis("s1", { loudnessLufs: -18 });
+
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("only updates provided fields, leaving others unchanged", () => {
+      const sound = createMockSound({ id: "s1", genre: "Jazz", mood: "Calm", loudnessLufs: -12 });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      getState().updateSoundAnalysis("s1", { loudnessLufs: -16 });
+
+      const updated = getState().sounds.find((s) => s.id === "s1");
+      expect(updated?.loudnessLufs).toBe(-16);
+      expect(updated?.genre).toBe("Jazz");
+      expect(updated?.mood).toBe("Calm");
+    });
+
+    it("is a no-op for an unknown soundId", () => {
+      const sound = createMockSound({ id: "s1" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound], isDirty: false });
+
+      getState().updateSoundAnalysis("nonexistent", { loudnessLufs: -14 });
+
+      expect(getState().isDirty).toBe(false);
+      expect(getState().sounds[0].loudnessLufs).toBeUndefined();
+    });
+  });
 });

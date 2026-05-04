@@ -1042,6 +1042,172 @@ pub fn extract_cover_art(path: String) -> Result<Option<String>, String> {
     Ok(None)
 }
 
+// ─── Audio Analysis ──────────────────────────────────────────────────────────
+
+const ANALYSIS_EVENT: &str = "audio::analysis::complete";
+const ANALYSIS_STARTED_EVENT: &str = "audio::analysis::started";
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisStartedEvent {
+    pub sound_id: String,
+}
+
+#[derive(serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisEntry {
+    pub id: String,
+    pub path: String,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisCompleteEvent {
+    pub sound_id: String,
+    pub loudness_lufs: Option<f64>,
+    pub genre: Option<String>,
+    pub mood: Option<String>,
+    pub error: Option<String>,
+}
+
+fn decode_audio_to_f32(abs_path: &str) -> Result<(Vec<f32>, u32, usize), String> {
+    use symphonia::core::audio::SampleBuffer;
+    use symphonia::core::codecs::{DecoderOptions, CODEC_TYPE_NULL};
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    let file = std::fs::File::open(abs_path).map_err(|e| format!("open: {e}"))?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(ext) = std::path::Path::new(abs_path).extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+
+    let probed = symphonia::default::get_probe()
+        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .map_err(|e| format!("probe: {e}"))?;
+
+    let mut format = probed.format;
+
+    let track = format
+        .tracks()
+        .iter()
+        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+        .ok_or_else(|| "no audio track".to_string())?;
+
+    let track_id = track.id;
+    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
+    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
+
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|e| format!("decoder: {e}"))?;
+
+    let mut all_samples: Vec<f32> = Vec::new();
+    let mut sample_buf: Option<SampleBuffer<f32>> = None;
+
+    loop {
+        let packet = match format.next_packet() {
+            Ok(p) => p,
+            Err(symphonia::core::errors::Error::IoError(e))
+                if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+            {
+                break
+            }
+            Err(e) => return Err(format!("packet: {e}")),
+        };
+
+        if packet.track_id() != track_id {
+            continue;
+        }
+
+        match decoder.decode(&packet) {
+            Ok(audio_buf) => {
+                if sample_buf.is_none() {
+                    let spec = *audio_buf.spec();
+                    let duration = audio_buf.capacity() as u64;
+                    sample_buf = Some(SampleBuffer::<f32>::new(duration, spec));
+                }
+                if let Some(ref mut buf) = sample_buf {
+                    buf.copy_interleaved_ref(audio_buf);
+                    all_samples.extend_from_slice(buf.samples());
+                }
+            }
+            Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
+            Err(e) => return Err(format!("decode: {e}")),
+        }
+    }
+
+    Ok((all_samples, sample_rate, channels))
+}
+
+fn measure_loudness(samples: &[f32], sample_rate: u32, channels: usize) -> Result<f64, String> {
+    use oximedia_metering::Standard;
+    use oximedia_normalize::LoudnessAnalyzer;
+    let mut analyzer = LoudnessAnalyzer::new(Standard::EbuR128, sample_rate as f64, channels)
+        .map_err(|e| format!("loudness init: {e}"))?;
+    analyzer.process_f32(samples);
+    Ok(analyzer.result().integrated_lufs)
+}
+
+fn extract_mir(samples: &[f32], sample_rate: u32) -> Result<(Option<String>, Option<String>), String> {
+    use oximedia_mir::{MirAnalyzer, MirConfig};
+    let analyzer = MirAnalyzer::new(MirConfig::default());
+    let result = analyzer
+        .analyze(samples, sample_rate as f32)
+        .map_err(|e| format!("mir: {e}"))?;
+
+    let genre = result.genre.map(|g| g.top_genre_name);
+    let mood = result.mood.and_then(|m| {
+        m.moods
+            .into_iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(label, _)| label)
+    });
+
+    Ok((genre, mood))
+}
+
+#[tauri::command]
+pub async fn start_audio_analysis(app: AppHandle, entries: Vec<AnalysisEntry>) -> Result<(), String> {
+    tauri::async_runtime::spawn(async move {
+        for entry in entries {
+            validate_grant_path(&entry.path).unwrap_or_default();
+            let _ = app.emit(ANALYSIS_STARTED_EVENT, AnalysisStartedEvent { sound_id: entry.id.clone() });
+
+            let analysis = (|| -> Result<(f64, Option<String>, Option<String>), String> {
+                let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
+                let lufs = measure_loudness(&samples, sample_rate, channels)?;
+                let (genre, mood) = extract_mir(&samples, sample_rate).unwrap_or((None, None));
+                Ok((lufs, genre, mood))
+            })();
+
+            let event = match analysis {
+                Ok((lufs, genre, mood)) => AnalysisCompleteEvent {
+                    sound_id: entry.id.clone(),
+                    loudness_lufs: Some(lufs),
+                    genre,
+                    mood,
+                    error: None,
+                },
+                Err(e) => AnalysisCompleteEvent {
+                    sound_id: entry.id.clone(),
+                    loudness_lufs: None,
+                    genre: None,
+                    mood: None,
+                    error: Some(e),
+                },
+            };
+
+            let _ = app.emit(ANALYSIS_EVENT, event);
+        }
+    });
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

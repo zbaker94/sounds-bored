@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Sounds are now automatically analyzed for loudness, genre, and mood when added to your library (enable in Settings → Playback → Auto-analyze sounds)
+- Playback volumes are automatically normalized to a consistent loudness level (-14 LUFS) so sounds play back at balanced volumes
+- Genre and mood labels appear under each sound in the library panel and are searchable via the search bar
+- A new analysis status button in the sounds panel shows real-time progress while sounds are being analyzed, including a count of remaining files and any errors
 - No user-facing changes in this diff — both modifications are internal developer tooling only.
 - Added a `fallow_health.json` code quality report showing 240 files analyzed with an average maintainability score of 90.0 and zero dead code or circular dependencies.
 - Expanded allowed developer tool commands in local Claude Code settings (ESLint, Cargo check/doc).

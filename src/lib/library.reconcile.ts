@@ -6,6 +6,7 @@ import { AUDIO_EXTENSIONS } from "./constants";
 import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
+import { useAnalysisStore } from "@/state/analysisStore";
 
 /**
  * Result of reconciling the global library against the file system.
@@ -361,6 +362,40 @@ export async function checkMissingStatus(
  *   the updated data (e.g. immediately after `saveSettings`). Defaults to
  *   `useAppSettingsStore.getState().settings?.globalFolders`.
  */
+/**
+ * Dispatch the next queued sound for analysis. Called once per completed file
+ * to keep exactly one file in-flight in Rust at a time.
+ */
+export async function dispatchNextFromQueue(): Promise<void> {
+  const next = useAnalysisStore.getState().dequeueNext();
+  if (!next) return;
+  try {
+    await invoke<void>("start_audio_analysis", { entries: [next] });
+  } catch {
+    useAnalysisStore.getState().recordError(next.id, "Failed to start analysis");
+    await dispatchNextFromQueue();
+  }
+}
+
+/**
+ * Queue loudness + genre/mood analysis for all sounds that have a filePath but
+ * have not yet been analyzed (loudnessLufs === undefined). Dispatches one file
+ * at a time, smallest first, to bound memory usage. Fire-and-forget: the Rust
+ * backend emits one `audio::analysis::complete` event per file and
+ * `useAudioAnalysis` hook drives the next dispatch.
+ *
+ * No-op if all sounds are already analyzed or no sounds have a filePath.
+ */
+export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<void> {
+  const queue = sounds
+    .filter((s) => s.filePath && s.loudnessLufs === undefined)
+    .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
+    .map((s) => ({ id: s.id, path: s.filePath! }));
+  if (queue.length === 0) return;
+  useAnalysisStore.getState().startAnalysis(queue);
+  await dispatchNextFromQueue();
+}
+
 export async function refreshMissingState(globalFolders?: GlobalFolder[]): Promise<void> {
   const settings = useAppSettingsStore.getState().settings;
   const folders = globalFolders ?? settings?.globalFolders;

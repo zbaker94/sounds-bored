@@ -46,15 +46,35 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     });
   }, []);
 
+  const notifyAutoSaveFailure = () => {
+    const now = Date.now();
+    if (now - lastAutoSaveErrorRef.current < AUTO_SAVE_ERROR_DEBOUNCE_MS) return;
+    lastAutoSaveErrorRef.current = now;
+    toast.error("Auto-save failed — your changes may not be saved to disk.");
+  };
+
+  // Library auto-save runs unconditionally — the library is a global resource
+  // independent of which project (if any) is currently open.
+  useEffect(() => {
+    const saveLibrary = () => {
+      const { isDirty } = useLibraryStore.getState();
+      if (!isDirty) return;
+      if (isLibrarySavePendingRef.current) return;
+
+      isLibrarySavePendingRef.current = true;
+      saveCurrentLibraryAndClearDirty()
+        .catch(notifyAutoSaveFailure)
+        .finally(() => { isLibrarySavePendingRef.current = false; });
+    };
+
+    saveLibrary();
+    const intervalId = setInterval(saveLibrary, interval);
+    return () => clearInterval(intervalId);
+  }, [interval]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Project auto-save only runs when a saved project is open.
   useEffect(() => {
     if (!folderPath || isTemporary) return;
-
-    const notifyAutoSaveFailure = () => {
-      const now = Date.now();
-      if (now - lastAutoSaveErrorRef.current < AUTO_SAVE_ERROR_DEBOUNCE_MS) return;
-      lastAutoSaveErrorRef.current = now;
-      toast.error("Auto-save failed — your changes may not be saved to disk.");
-    };
 
     const saveCurrentProject = () => {
       const project = projectRef.current;
@@ -64,39 +84,13 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
 
       isProjectSavePendingRef.current = true;
       saveProject(folderPath, project)
-        .then(() => {
-          useProjectStore.getState().clearDirtyFlag();
-        })
-        .catch(() => {
-          notifyAutoSaveFailure();
-        })
-        .finally(() => {
-          isProjectSavePendingRef.current = false;
-        });
-    };
-
-    const saveLibrary = () => {
-      const { isDirty } = useLibraryStore.getState();
-      if (!isDirty) return;
-      if (isLibrarySavePendingRef.current) return;
-
-      isLibrarySavePendingRef.current = true;
-      saveCurrentLibraryAndClearDirty()
-        .catch(() => {
-          notifyAutoSaveFailure();
-        })
-        .finally(() => {
-          isLibrarySavePendingRef.current = false;
-        });
+        .then(() => { useProjectStore.getState().clearDirtyFlag(); })
+        .catch(notifyAutoSaveFailure)
+        .finally(() => { isProjectSavePendingRef.current = false; });
     };
 
     saveCurrentProject();
-    saveLibrary();
-
-    const intervalId = setInterval(() => {
-      saveCurrentProject();
-      saveLibrary();
-    }, interval);
+    const intervalId = setInterval(saveCurrentProject, interval);
     return () => clearInterval(intervalId);
-  }, [folderPath, isTemporary, interval]);
+  }, [folderPath, isTemporary, interval]); // eslint-disable-line react-hooks/exhaustive-deps
 }

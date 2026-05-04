@@ -24,6 +24,7 @@ pub fn run() {
             commands::pick_files_and_grant,
             commands::restore_path_scope,
             commands::extract_cover_art,
+            commands::start_audio_analysis,
         ]);
 
     #[cfg(debug_assertions)]

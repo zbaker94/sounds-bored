@@ -4,7 +4,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
-import { addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
+import { addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed } from "@/lib/library.reconcile";
 import { pickFolder } from "@/lib/scope";
 import { basename } from "@/lib/utils";
 import type { GlobalFolder } from "@/lib/schemas";
@@ -56,6 +56,9 @@ export function useAddFolder(): {
       );
       if (changed) {
         await saveCurrentLibrary();
+      }
+      if (settings.autoAnalysis) {
+        void scheduleAnalysisForUnanalyzed(useLibraryStore.getState().sounds);
       }
       toast.success(`Folder "${name}" added`);
     } catch (err) {

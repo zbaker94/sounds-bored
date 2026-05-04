@@ -9,6 +9,7 @@ import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories"
 
 vi.mock("@/lib/library.reconcile", () => ({
   addGlobalFolderAndReconcile: vi.fn(),
+  scheduleAnalysisForUnanalyzed: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockSaveLibrary = vi.fn();

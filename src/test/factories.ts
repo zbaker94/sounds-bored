@@ -83,6 +83,7 @@ export function createMockAppSettings(overrides?: Partial<AppSettings>): AppSett
     downloadFolderId: downloadFolder.id,
     importFolderId: importFolder.id,
     globalFadeDurationMs: 2000,
+    autoAnalysis: false,
     ...overrides,
   };
 }

@@ -13,6 +13,7 @@ interface AppSettingsActions {
   removeGlobalFolder: (folderId: string) => void;
   setDownloadFolder: (folderId: string) => void;
   setImportFolder: (folderId: string) => void;
+  setAutoAnalysis: (enabled: boolean) => void;
 }
 
 type AppSettingsStore = AppSettingsState & AppSettingsActions;
@@ -72,6 +73,12 @@ export const useAppSettingsStore = create<AppSettingsStore>()(
       set((draft) => {
         if (!draft.settings) return;
         draft.settings.importFolderId = folderId;
+      }),
+
+    setAutoAnalysis: (enabled) =>
+      set((draft) => {
+        if (!draft.settings) return;
+        draft.settings.autoAnalysis = enabled;
       }),
   }))
 );

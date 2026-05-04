@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -201,6 +202,7 @@ function FoldersTab() {
 function PlaybackTab() {
   const settings = useAppSettingsStore((s) => s.settings);
   const updateSettings = useAppSettingsStore((s) => s.updateSettings);
+  const setAutoAnalysis = useAppSettingsStore((s) => s.setAutoAnalysis);
   const { mutate: saveSettings } = useSaveAppSettings();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -228,6 +230,11 @@ function PlaybackTab() {
     }, 300);
   }
 
+  function handleAutoAnalysisChange(enabled: boolean) {
+    setAutoAnalysis(enabled);
+    saveSettings(useAppSettingsStore.getState().settings!);
+  }
+
   return (
     <div className="space-y-4 py-2">
       <div className="flex flex-col gap-2">
@@ -247,6 +254,23 @@ function PlaybackTab() {
         <p className="text-xs text-muted-foreground">
           Applied to all pads that do not have a custom fade duration set.
         </p>
+      </div>
+      <Separator />
+      <div className="flex items-start gap-3">
+        <Checkbox
+          id="auto-analysis"
+          checked={settings.autoAnalysis}
+          onCheckedChange={(checked) => handleAutoAnalysisChange(checked === true)}
+          className="mt-0.5"
+        />
+        <div className="flex flex-col gap-0.5">
+          <Label htmlFor="auto-analysis" className="cursor-pointer leading-none">
+            Auto-analyze sounds
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Automatically measure loudness and extract genre/mood for new sounds.
+          </p>
+        </div>
       </div>
     </div>
   );

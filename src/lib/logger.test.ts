@@ -1,27 +1,31 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockFs } from "@/test/tauri-mocks";
 
-const mockAppLogDir = vi.fn();
+const mockAppDataDir = vi.fn();
 const mockJoin = vi.fn((...paths: string[]) => paths.join("/"));
 
 vi.mock("@tauri-apps/api/path", () => ({
-  appLogDir: mockAppLogDir,
+  appDataDir: mockAppDataDir,
   join: mockJoin,
+}));
+
+vi.mock("@/lib/constants", () => ({
+  APP_FOLDER: "SoundsBored",
 }));
 
 describe("logger", () => {
   beforeEach(async () => {
     vi.resetModules();
-    mockAppLogDir.mockResolvedValue("/mock/logs");
+    mockAppDataDir.mockResolvedValue("/mock/appdata");
     mockFs.mkdir.mockResolvedValue(undefined);
     mockFs.writeTextFile.mockResolvedValue(undefined);
   });
 
-  it("creates the logs directory returned by appLogDir() on init", async () => {
+  it("creates the logs directory under the app data folder on init", async () => {
     const { initLogger } = await import("./logger");
     await initLogger();
 
-    expect(mockFs.mkdir).toHaveBeenCalledWith("/mock/logs", { recursive: true });
+    expect(mockFs.mkdir).toHaveBeenCalledWith("/mock/appdata/SoundsBored/logs", { recursive: true });
   });
 
   it("writes a line containing [INFO] and the message", async () => {
@@ -113,7 +117,7 @@ describe("logger", () => {
 
     const path = mockFs.writeTextFile.mock.calls[0][0] as string;
     expect(path).toMatch(
-      /^\/mock\/logs\/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.log$/
+      /^\/mock\/appdata\/SoundsBored\/logs\/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.log$/
     );
   });
 

@@ -118,6 +118,8 @@ export function SoundList({
       const q = searchQuery.toLowerCase();
       return sounds.filter((s) => {
         if (s.name.toLowerCase().includes(q)) return true;
+        if (s.genre?.toLowerCase().includes(q)) return true;
+        if (s.mood?.toLowerCase().includes(q)) return true;
         return tags
           .filter((t) => s.tags.includes(t.id))
           .some((t) => t.name.toLowerCase().includes(q));
@@ -358,6 +360,11 @@ export function SoundList({
                   {sound.name}
                 </ItemTitle>
                 <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
+                {!isSoundMissing && (sound.genre || sound.mood) && (
+                  <p className="text-xs text-white/40 truncate">
+                    {[sound.genre, sound.mood].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 {previewingId === sound.id && <PreviewProgressBar />}
               </ItemContent>
               <ItemActions>

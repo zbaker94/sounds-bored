@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed } from "./library.reconcile";
 import { mockFs, mockPath, mockCore } from "@/test/tauri-mocks";
 import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { useAnalysisStore, initialAnalysisState } from "@/state/analysisStore";
 
 // Extend mockFs with stat (not in the shared mock yet)
 const mockStat = vi.fn();
@@ -995,5 +996,84 @@ describe("refreshMissingState", () => {
     // No folders to check against, so nothing is flagged missing
     expect(missingFolderIds.size).toBe(0);
     expect(missingSoundIds.size).toBe(0);
+  });
+});
+
+describe("scheduleAnalysisForUnanalyzed", () => {
+  beforeEach(() => {
+    useAnalysisStore.setState({ ...initialAnalysisState });
+    mockCore.invoke.mockResolvedValue(undefined);
+  });
+
+  it("is a no-op when all sounds are already analyzed", async () => {
+    const sounds = [
+      createMockSound({ id: "s1", filePath: "/music/a.wav", loudnessLufs: -14 }),
+      createMockSound({ id: "s2", filePath: "/music/b.wav", loudnessLufs: -18 }),
+    ];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("start_audio_analysis", expect.anything());
+    expect(useAnalysisStore.getState().status).toBe("idle");
+  });
+
+  it("is a no-op when no sounds have a filePath", async () => {
+    const sounds = [createMockSound({ id: "s1" })];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("start_audio_analysis", expect.anything());
+  });
+
+  it("is a no-op for an empty array", async () => {
+    await scheduleAnalysisForUnanalyzed([]);
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+  });
+
+  it("dispatches only the first (smallest) unanalyzed sound and queues the rest", async () => {
+    const sounds = [
+      createMockSound({ id: "s1", filePath: "/music/a.wav", fileSizeBytes: 5_000_000 }),
+      createMockSound({ id: "s2", filePath: "/music/b.wav", fileSizeBytes: 1_000_000 }),
+      createMockSound({ id: "s3", filePath: "/music/c.wav", fileSizeBytes: 3_000_000 }),
+    ];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(mockCore.invoke).toHaveBeenCalledTimes(1);
+    expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
+      entries: [{ id: "s2", path: "/music/b.wav" }],
+    });
+    expect(useAnalysisStore.getState().pendingQueue).toEqual([
+      { id: "s3", path: "/music/c.wav" },
+      { id: "s1", path: "/music/a.wav" },
+    ]);
+    expect(useAnalysisStore.getState().queueLength).toBe(3);
+    expect(useAnalysisStore.getState().status).toBe("running");
+  });
+
+  it("dispatches the only unanalyzed sound when others are already analyzed", async () => {
+    const sounds = [
+      createMockSound({ id: "s1", filePath: "/music/a.wav" }),
+      createMockSound({ id: "s2", filePath: "/music/b.wav", loudnessLufs: -14 }),
+    ];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
+      entries: [{ id: "s1", path: "/music/a.wav" }],
+    });
+    expect(useAnalysisStore.getState().status).toBe("running");
+    expect(useAnalysisStore.getState().queueLength).toBe(1);
+    expect(useAnalysisStore.getState().pendingQueue).toEqual([]);
+  });
+
+  it("records an error and completes analysis when invoke throws for the only sound", async () => {
+    mockCore.invoke.mockRejectedValue(new Error("backend error"));
+    const sounds = [createMockSound({ id: "s1", filePath: "/music/a.wav" })];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(useAnalysisStore.getState().status).toBe("completed");
+    expect(useAnalysisStore.getState().errors).toEqual({ s1: "Failed to start analysis" });
   });
 });

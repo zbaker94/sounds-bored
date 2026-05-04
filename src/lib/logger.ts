@@ -1,4 +1,5 @@
-import { appLogDir, join } from "@tauri-apps/api/path";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { APP_FOLDER } from "./constants";
 import { mkdir, writeTextFile } from "@tauri-apps/plugin-fs";
 
 type LogLevel = "INFO" | "WARN" | "ERROR";
@@ -9,7 +10,7 @@ let initPromise: Promise<void> | null = null;
 export function initLogger(): Promise<void> {
   if (initPromise !== null) return initPromise;
   initPromise = (async () => {
-    const logsDir = await appLogDir();
+    const logsDir = await join(await appDataDir(), APP_FOLDER, "logs");
     await mkdir(logsDir, { recursive: true });
     // Replace colons so the filename is valid on Windows.
     const filename = `${new Date().toISOString().replace(/:/g, "-")}.log`;
