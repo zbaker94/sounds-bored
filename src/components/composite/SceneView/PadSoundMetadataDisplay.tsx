@@ -65,6 +65,14 @@ export const PadSoundMetadataDisplay = memo(function PadSoundMetadataDisplay({
 
   return (
     <>
+      {displayVoice.coverArtDataUrl && (
+        <img
+          data-testid="cover-art-thumbnail"
+          src={displayVoice.coverArtDataUrl}
+          className="w-10 h-10 rounded-sm object-cover mb-1 flex-shrink-0 shadow-md"
+          alt=""
+        />
+      )}
       <span data-testid="sound-name" className="line-clamp-1 break-words leading-tight text-center">
         {displayVoice.soundName}
       </span>

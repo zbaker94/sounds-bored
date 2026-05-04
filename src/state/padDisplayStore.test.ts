@@ -22,6 +22,17 @@ beforeEach(() => {
 });
 
 describe("enqueueVoice", () => {
+  it("propagates coverArtDataUrl into currentVoice", () => {
+    const info = makeInfo({ coverArtDataUrl: "data:image/jpeg;base64,abc123" });
+    usePadDisplayStore.getState().enqueueVoice("pad-1", info);
+    expect(usePadDisplayStore.getState().currentVoice["pad-1"]?.coverArtDataUrl).toBe("data:image/jpeg;base64,abc123");
+  });
+
+  it("leaves coverArtDataUrl absent in currentVoice when not provided", () => {
+    usePadDisplayStore.getState().enqueueVoice("pad-1", makeInfo());
+    expect(usePadDisplayStore.getState().currentVoice["pad-1"]?.coverArtDataUrl).toBeUndefined();
+  });
+
   it("sets current when currentVoice[padId] is null/absent (queue stays empty)", () => {
     const info = makeInfo({ soundName: "first" });
     usePadDisplayStore.getState().enqueueVoice("pad-1", info);

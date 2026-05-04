@@ -381,4 +381,52 @@ describe("SoundList", () => {
       expect(fill.style.width).toBe("0%");
     });
   });
+
+  describe("cover art thumbnail", () => {
+    it("shows cover art thumbnail and blurred background when sound has coverArtDataUrl", () => {
+      const sound = createMockSound({
+        id: "s1",
+        name: "Kick",
+        filePath: "/music/kick.wav",
+        folderId: "f1",
+        coverArtDataUrl: "data:image/jpeg;base64,abc123",
+      });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      renderList();
+
+      const img = screen.getByTestId("sound-cover-art");
+      expect(img).toBeInTheDocument();
+      expect(img).toHaveAttribute("src", "data:image/jpeg;base64,abc123");
+    });
+
+    it("shows music icon fallback when sound has no coverArtDataUrl", () => {
+      const sound = createMockSound({ id: "s1", name: "Kick", filePath: "/music/kick.wav", folderId: "f1" });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+      renderList();
+
+      expect(screen.queryByTestId("sound-cover-art")).not.toBeInTheDocument();
+    });
+
+    it("shows music icon for missing sounds even if they have coverArtDataUrl", () => {
+      const sound = createMockSound({
+        id: "s1",
+        name: "Ghost",
+        filePath: "/music/ghost.wav",
+        folderId: "f1",
+        coverArtDataUrl: "data:image/jpeg;base64,abc123",
+      });
+      useLibraryStore.setState({
+        ...initialLibraryState,
+        sounds: [sound],
+        missingSoundIds: new Set(["s1"]),
+      });
+
+      renderList();
+
+      // Missing sounds should not show cover art
+      expect(screen.queryByTestId("sound-cover-art")).not.toBeInTheDocument();
+    });
+  });
 });

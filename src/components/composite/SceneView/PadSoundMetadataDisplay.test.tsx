@@ -141,4 +141,18 @@ describe("PadSoundMetadataDisplay", () => {
     act(() => { vi.advanceTimersByTime(5000); });
     expect(shiftSpy).not.toHaveBeenCalled();
   });
+
+  it("renders cover art thumbnail when voice has coverArtDataUrl", () => {
+    render(<PadSoundMetadataDisplay padId={PAD_ID} />);
+    makeVoice({ coverArtDataUrl: "data:image/jpeg;base64,abc123" });
+    const img = screen.getByTestId("cover-art-thumbnail");
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute("src", "data:image/jpeg;base64,abc123");
+  });
+
+  it("does not render cover art thumbnail when voice has no coverArtDataUrl", () => {
+    render(<PadSoundMetadataDisplay padId={PAD_ID} />);
+    makeVoice({ coverArtDataUrl: undefined });
+    expect(screen.queryByTestId("cover-art-thumbnail")).not.toBeInTheDocument();
+  });
 });

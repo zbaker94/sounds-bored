@@ -49,6 +49,7 @@ export const SoundSchema = z.object({
   sets: z.array(z.string()),               // Set IDs — resolve against global library
   durationMs: z.number().min(0).finite().optional(),
   fileSizeBytes: z.number().min(0).finite().optional(),   // file size in bytes — populated at reconcile/download time
+  coverArtDataUrl: z.string().optional(),                  // base64 data URL of embedded cover art — populated at reconcile/download time
 });
 
 export type Sound = z.infer<typeof SoundSchema>;

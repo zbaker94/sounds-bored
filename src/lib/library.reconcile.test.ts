@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile } from "./library.reconcile";
-import { mockFs, mockPath } from "@/test/tauri-mocks";
+import { mockFs, mockPath, mockCore } from "@/test/tauri-mocks";
 import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
@@ -47,6 +47,9 @@ describe("reconcileGlobalLibrary", () => {
     // Default: stat returns a size of 1024 bytes
     mockStat.mockReset();
     mockStat.mockResolvedValue({ size: 1024, isFile: true, isDirectory: false, isSymlink: false });
+
+    // Default: cover art extraction returns null (no art found)
+    mockCore.invoke.mockResolvedValue(null);
   });
 
   describe("discovering new sounds", () => {
@@ -253,6 +256,7 @@ describe("reconcileGlobalLibrary", () => {
         filePath: "/music/samples/kick.wav",
         folderId: "folder-original",
         fileSizeBytes: 1024,
+        coverArtDataUrl: "",  // sentinel: already checked
       });
 
       mockReadDir({
@@ -321,6 +325,7 @@ describe("reconcileGlobalLibrary", () => {
         filePath: "/music/kick.wav",
         folderId: "f1",
         fileSizeBytes: 1024,
+        coverArtDataUrl: "",  // sentinel: already checked
       });
 
       mockReadDir({ "/music": [fileEntry("kick.wav")] });
@@ -661,11 +666,138 @@ describe("reconcileGlobalLibrary", () => {
   });
 });
 
+describe("coverArtDataUrl extraction", () => {
+  beforeEach(() => {
+    mockPath.join.mockImplementation((...paths: string[]) => Promise.resolve(paths.join("/")) as unknown as string);
+    mockFs.exists.mockResolvedValue(true);
+    mockStat.mockResolvedValue({ size: 1024 });
+    mockCore.invoke.mockResolvedValue(null);
+  });
+
+  it("populates coverArtDataUrl on new sounds when extraction succeeds", async () => {
+    const folder = createMockGlobalFolder({ path: "/music" });
+    mockReadDir({ "/music": [fileEntry("kick.mp3")] });
+    mockCore.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "extract_cover_art") return Promise.resolve("data:image/jpeg;base64,abc123");
+      return Promise.resolve(null);
+    });
+
+    const result = await reconcileGlobalLibrary([folder], []);
+
+    expect(result.sounds[0].coverArtDataUrl).toBe("data:image/jpeg;base64,abc123");
+  });
+
+  it("sets empty string sentinel on new sounds when no art is embedded", async () => {
+    const folder = createMockGlobalFolder({ path: "/music" });
+    mockReadDir({ "/music": [fileEntry("kick.mp3")] });
+    mockCore.invoke.mockResolvedValue(null);  // no art
+
+    const result = await reconcileGlobalLibrary([folder], []);
+
+    expect(result.sounds[0].coverArtDataUrl).toBe("");
+  });
+
+  it("leaves coverArtDataUrl undefined on new sounds when extraction throws", async () => {
+    const folder = createMockGlobalFolder({ path: "/music" });
+    mockReadDir({ "/music": [fileEntry("kick.mp3")] });
+    mockCore.invoke.mockRejectedValue(new Error("extraction failed"));
+
+    const result = await reconcileGlobalLibrary([folder], []);
+
+    expect(result.sounds[0].coverArtDataUrl).toBeUndefined();
+  });
+
+  it("backfills coverArtDataUrl on existing sounds that have undefined", async () => {
+    const existingSound = createSound({
+      id: "s1",
+      name: "kick",
+      filePath: "/music/kick.mp3",
+      folderId: "f1",
+      fileSizeBytes: 1024,
+    });
+    mockCore.invoke.mockImplementation((cmd: string) => {
+      if (cmd === "extract_cover_art") return Promise.resolve("data:image/png;base64,xyz");
+      return Promise.resolve(null);
+    });
+
+    const result = await reconcileGlobalLibrary([], [existingSound]);
+
+    expect(result.changed).toBe(true);
+    expect(result.sounds[0].coverArtDataUrl).toBe("data:image/png;base64,xyz");
+  });
+
+  it("stores empty string sentinel on existing sounds when no art found", async () => {
+    const existingSound = createSound({ id: "s1", name: "kick", filePath: "/music/kick.mp3", folderId: "f1", fileSizeBytes: 1024 });
+    mockCore.invoke.mockResolvedValue(null);
+
+    const result = await reconcileGlobalLibrary([], [existingSound]);
+
+    expect(result.changed).toBe(true);
+    expect(result.sounds[0].coverArtDataUrl).toBe("");
+  });
+
+  it("does not re-extract for sounds with empty string sentinel", async () => {
+    const existingSound = createSound({
+      id: "s1",
+      name: "kick",
+      filePath: "/music/kick.mp3",
+      folderId: "f1",
+      fileSizeBytes: 1024,
+      coverArtDataUrl: "",  // already checked — no art
+    });
+
+    const result = await reconcileGlobalLibrary([], [existingSound]);
+
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
+    expect(result.sounds[0].coverArtDataUrl).toBe("");
+  });
+
+  it("does not re-extract for sounds that already have cover art", async () => {
+    const existingSound = createSound({
+      id: "s1",
+      name: "kick",
+      filePath: "/music/kick.mp3",
+      folderId: "f1",
+      fileSizeBytes: 1024,
+      coverArtDataUrl: "data:image/jpeg;base64,existing",
+    });
+
+    const result = await reconcileGlobalLibrary([], [existingSound]);
+
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
+    expect(result.sounds[0].coverArtDataUrl).toBe("data:image/jpeg;base64,existing");
+  });
+
+  it("skips extraction for sounds without filePath", async () => {
+    const noPathSound = createSound({ id: "s1", name: "web-sound", sourceUrl: "https://example.com/s.mp3" });
+
+    const result = await reconcileGlobalLibrary([], [noPathSound]);
+
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
+    expect(result.sounds[0].coverArtDataUrl).toBeUndefined();
+  });
+
+  it("processes sounds in batches — all sounds get processed even with many entries", async () => {
+    // Create 20 sounds to exercise the batch-size-8 loop
+    const sounds = Array.from({ length: 20 }, (_, i) =>
+      createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.mp3`, folderId: "f1", fileSizeBytes: 1024 }),
+    );
+    mockCore.invoke.mockResolvedValue(null);  // no art for any
+
+    const result = await reconcileGlobalLibrary([], sounds);
+
+    expect(result.sounds).toHaveLength(20);
+    // All 20 sounds should have been checked (sentinel stored)
+    expect(result.sounds.every((s) => s.coverArtDataUrl === "")).toBe(true);
+  });
+});
+
 describe("addGlobalFolderAndReconcile", () => {
   beforeEach(() => {
     mockPath.join.mockImplementation((...paths: string[]) => Promise.resolve(paths.join("/")) as unknown as string);
     mockFs.exists.mockResolvedValue(true);
     mockStat.mockResolvedValue({ size: 1024 });
+    mockCore.invoke.mockResolvedValue(null);
   });
 
   it("appends the folder to settings and calls saveSettings before reconciling", async () => {
@@ -745,6 +877,7 @@ describe("refreshMissingState", () => {
     useAppSettingsStore.setState({ ...initialAppSettingsState });
     useLibraryStore.setState({ ...initialLibraryState });
     mockFs.exists.mockResolvedValue(true);
+    mockCore.invoke.mockResolvedValue(null);
   });
 
   it("does nothing when no settings are loaded", async () => {

@@ -10,6 +10,7 @@ export interface PadVoiceInfo {
   layerName: string | undefined;
   playbackMode: PlaybackMode;
   durationMs: number | undefined;
+  coverArtDataUrl?: string;
   /** Monotonically increasing sequence number assigned by the store on enqueue. */
   seq: number;
 }

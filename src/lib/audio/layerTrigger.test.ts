@@ -646,6 +646,44 @@ describe("startLayerSound padDisplayStore integration", () => {
     expect(current?.seq).toBeGreaterThan(0);
   });
 
+  it("propagates coverArtDataUrl from sound into currentVoice", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "ca-pad-1" });
+    const layer = createMockLayer({ id: "ca-layer-1" });
+    const sound = createMockSound({ id: "ca-s1", name: "kick", filePath: "kick.wav", coverArtDataUrl: "data:image/jpeg;base64,abc" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    const current = usePadDisplayStore.getState().currentVoice[pad.id];
+    expect(current?.coverArtDataUrl).toBe("data:image/jpeg;base64,abc");
+  });
+
+  it("leaves coverArtDataUrl absent in currentVoice when sound has none", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "ca-pad-2" });
+    const layer = createMockLayer({ id: "ca-layer-2" });
+    const sound = createMockSound({ id: "ca-s2", name: "snare", filePath: "snare.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await startLayerSound(pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, 1.0, [sound]);
+
+    const current = usePadDisplayStore.getState().currentVoice[pad.id];
+    expect(current?.coverArtDataUrl).toBeUndefined();
+  });
+
   it("does not enqueue a voice on load failure (currentVoice stays absent)", async () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("not found"));

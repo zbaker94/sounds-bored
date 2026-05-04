@@ -1,5 +1,6 @@
 import { readDir, exists, stat } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
+import { invoke } from "@tauri-apps/api/core";
 import { Sound, GlobalFolder, AppSettings } from "./schemas";
 import { AUDIO_EXTENSIONS } from "./constants";
 import { basename, nameFromFilename } from "@/lib/utils";
@@ -113,6 +114,21 @@ async function statSounds(sounds: Sound[]): Promise<void> {
   }));
 }
 
+async function extractCoverArts(sounds: Sound[]): Promise<void> {
+  const BATCH = 8;
+  for (let i = 0; i < sounds.length; i += BATCH) {
+    await Promise.all(sounds.slice(i, i + BATCH).map(async (sound) => {
+      if (!sound.filePath || sound.coverArtDataUrl !== undefined) return;
+      try {
+        const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
+        sound.coverArtDataUrl = dataUrl ?? "";  // "" = checked, no art found (prevents perpetual re-extraction)
+      } catch {
+        // extraction failed — leave coverArtDataUrl undefined to retry next boot
+      }
+    }));
+  }
+}
+
 async function applyStatBackfill(
   sounds: Sound[],
   entries: BackfillEntry[],
@@ -132,6 +148,32 @@ async function applyStatBackfill(
   return anyUpdated;
 }
 
+async function applyCoverArtBackfill(
+  sounds: Sound[],
+  entries: BackfillEntry[],
+): Promise<boolean> {
+  if (entries.length === 0) return false;
+  const BATCH = 8;
+  let anyUpdated = false;
+  for (let i = 0; i < entries.length; i += BATCH) {
+    const results = await Promise.all(entries.slice(i, i + BATCH).map(async (e) => {
+      try {
+        const dataUrl = await invoke<string | null>("extract_cover_art", { path: e.filePath });
+        return { index: e.index, dataUrl: dataUrl ?? "" };  // "" = checked, no art found
+      } catch {
+        return { index: e.index, dataUrl: null };  // null = error, retry next boot
+      }
+    }));
+    for (const r of results) {
+      if (r.dataUrl !== null) {
+        sounds[r.index] = { ...sounds[r.index], coverArtDataUrl: r.dataUrl };
+        anyUpdated = true;
+      }
+    }
+  }
+  return anyUpdated;
+}
+
 async function backfillExistingSounds(
   existingSounds: Sound[],
   pathToFolderId: Map<string, string>,
@@ -139,6 +181,7 @@ async function backfillExistingSounds(
   const reconciledExisting: Sound[] = [];
   let anyFieldUpdated = false;
   const backfillStatEntries: BackfillEntry[] = [];
+  const backfillCoverArtEntries: BackfillEntry[] = [];
 
   for (const sound of existingSounds) {
     let updated = { ...sound };
@@ -150,9 +193,16 @@ async function backfillExistingSounds(
     if (sound.filePath && sound.fileSizeBytes == null) {
       backfillStatEntries.push({ index: reconciledExisting.length - 1, filePath: sound.filePath });
     }
+    if (sound.filePath && sound.coverArtDataUrl === undefined) {
+      backfillCoverArtEntries.push({ index: reconciledExisting.length - 1, filePath: sound.filePath });
+    }
   }
 
-  if (await applyStatBackfill(reconciledExisting, backfillStatEntries)) anyFieldUpdated = true;
+  const [statUpdated, coverArtUpdated] = await Promise.all([
+    applyStatBackfill(reconciledExisting, backfillStatEntries),
+    applyCoverArtBackfill(reconciledExisting, backfillCoverArtEntries),
+  ]);
+  if (statUpdated || coverArtUpdated) anyFieldUpdated = true;
   return { reconciledSounds: reconciledExisting, anyFieldUpdated };
 }
 
@@ -169,6 +219,7 @@ export async function reconcileGlobalLibrary(
     await scanFoldersForNewSounds(globalFolders, soundsByPath);
 
   await statSounds(newSounds);
+  await extractCoverArts(newSounds);
 
   const { reconciledSounds, anyFieldUpdated } =
     await backfillExistingSounds(existingSounds, pathToFolderId);
