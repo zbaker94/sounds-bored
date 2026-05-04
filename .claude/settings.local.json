@@ -55,7 +55,12 @@
       "WebFetch(domain:github.com)",
       "Bash(npx fallow *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Repos\\\\sounds-bored\" -Recurse -Filter \"*.ts\" -o File)",
-      "Bash(Select-Object -First 20 FullName)"
+      "Bash(Select-Object -First 20 FullName)",
+      "Bash(npx eslint *)",
+      "Bash(Get-ChildItem -Path C:\\\\Repos\\\\sounds-bored -Recurse -Filter \"MainPage.tsx\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(cargo check *)",
+      "Bash(cargo doc *)"
     ]
   },
   "enableAllProjectMcpServers": true,

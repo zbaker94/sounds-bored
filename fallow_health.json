@@ -1,0 +1,4777 @@
+{
+  "schema_version": 4,
+  "version": "2.62.0",
+  "elapsed_ms": 51,
+  "findings": [],
+  "summary": {
+    "files_analyzed": 240,
+    "functions_analyzed": 6186,
+    "functions_above_threshold": 16,
+    "max_cyclomatic_threshold": 20,
+    "max_cognitive_threshold": 15,
+    "max_crap_threshold": 30.0,
+    "files_scored": 230,
+    "average_maintainability": 90.0,
+    "coverage_model": "static_estimated",
+    "severity_critical_count": 0,
+    "severity_high_count": 4,
+    "severity_moderate_count": 12
+  },
+  "vital_signs": {
+    "dead_file_pct": 0.0,
+    "dead_export_pct": 0.0,
+    "avg_cyclomatic": 1.4,
+    "p90_cyclomatic": 2,
+    "maintainability_avg": 90.0,
+    "unused_dep_count": 0,
+    "circular_dep_count": 0,
+    "counts": {
+      "total_files": 240,
+      "total_exports": 535,
+      "dead_files": 0,
+      "dead_exports": 0,
+      "total_lines": 52493,
+      "files_scored": 230,
+      "total_deps": 0
+    },
+    "unit_size_profile": {
+      "low_risk": 80.0,
+      "medium_risk": 11.7,
+      "high_risk": 4.3,
+      "very_high_risk": 4.0
+    },
+    "unit_interfacing_profile": {
+      "low_risk": 98.8,
+      "medium_risk": 1.0,
+      "high_risk": 0.2,
+      "very_high_risk": 0.0
+    },
+    "p95_fan_in": 15,
+    "coupling_high_pct": 4.3,
+    "total_loc": 52493
+  },
+  "file_scores": [
+    {
+      "path": "src/hooks/useGlobalHotkeys.ts",
+      "fan_in": 2,
+      "fan_out": 9,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.37,
+      "maintainability_index": 79.7,
+      "total_cyclomatic": 85,
+      "total_cognitive": 51,
+      "function_count": 26,
+      "lines": 230,
+      "crap_max": 43.1,
+      "crap_above_threshold": 2
+    },
+    {
+      "path": "src/hooks/useBulkRemove.ts",
+      "fan_in": 2,
+      "fan_out": 9,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.33,
+      "maintainability_index": 80.9,
+      "total_cyclomatic": 44,
+      "total_cognitive": 23,
+      "function_count": 24,
+      "lines": 134,
+      "crap_max": 49.5,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/hooks/useMultiFadeMode.ts",
+      "fan_in": 3,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.38,
+      "maintainability_index": 81.4,
+      "total_cyclomatic": 42,
+      "total_cognitive": 19,
+      "function_count": 18,
+      "lines": 112,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.tsx",
+      "fan_in": 2,
+      "fan_out": 14,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 82.3,
+      "total_cyclomatic": 106,
+      "total_cognitive": 64,
+      "function_count": 41,
+      "lines": 456,
+      "crap_max": 88.0,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/hooks/useBootLoader.ts",
+      "fan_in": 2,
+      "fan_out": 11,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.26,
+      "maintainability_index": 82.3,
+      "total_cyclomatic": 38,
+      "total_cognitive": 15,
+      "function_count": 21,
+      "lines": 146,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundsPanel.tsx",
+      "fan_in": 2,
+      "fan_out": 13,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 82.5,
+      "total_cyclomatic": 39,
+      "total_cognitive": 13,
+      "function_count": 20,
+      "lines": 166,
+      "crap_max": 8.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/SceneView.tsx",
+      "fan_in": 2,
+      "fan_out": 13,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 82.8,
+      "total_cyclomatic": 70,
+      "total_cognitive": 37,
+      "function_count": 33,
+      "lines": 317,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.ts",
+      "fan_in": 4,
+      "fan_out": 15,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 82.9,
+      "total_cyclomatic": 173,
+      "total_cognitive": 146,
+      "function_count": 43,
+      "lines": 878,
+      "crap_max": 31.6,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/hooks/useResolveQueue.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.47,
+      "maintainability_index": 83.1,
+      "total_cyclomatic": 34,
+      "total_cognitive": 0,
+      "function_count": 34,
+      "lines": 72,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadBackFace.tsx",
+      "fan_in": 2,
+      "fan_out": 12,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 83.7,
+      "total_cyclomatic": 46,
+      "total_cognitive": 12,
+      "function_count": 34,
+      "lines": 226,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/FoldersPanel.tsx",
+      "fan_in": 1,
+      "fan_out": 15,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 83.8,
+      "total_cyclomatic": 78,
+      "total_cognitive": 44,
+      "function_count": 33,
+      "lines": 453,
+      "crap_max": 22.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonFadeOverlay.tsx",
+      "fan_in": 2,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.26,
+      "maintainability_index": 83.9,
+      "total_cyclomatic": 26,
+      "total_cognitive": 6,
+      "function_count": 17,
+      "lines": 101,
+      "crap_max": 6.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/screens/main/MainPage.tsx",
+      "fan_in": 1,
+      "fan_out": 20,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 83.9,
+      "total_cyclomatic": 14,
+      "total_cognitive": 2,
+      "function_count": 11,
+      "lines": 110,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useDownloadEventListener.ts",
+      "fan_in": 2,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.32,
+      "maintainability_index": 84.0,
+      "total_cyclomatic": 44,
+      "total_cognitive": 19,
+      "function_count": 13,
+      "lines": 139,
+      "crap_max": 56.3,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundList.tsx",
+      "fan_in": 2,
+      "fan_out": 14,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 84.1,
+      "total_cyclomatic": 70,
+      "total_cognitive": 43,
+      "function_count": 38,
+      "lines": 401,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ResolveMissingFolderDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 11,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 84.1,
+      "total_cyclomatic": 108,
+      "total_cognitive": 62,
+      "function_count": 42,
+      "lines": 544,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useMultiFadeSideEffects.test.ts",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.27,
+      "maintainability_index": 84.1,
+      "total_cyclomatic": 43,
+      "total_cognitive": 0,
+      "function_count": 39,
+      "lines": 160,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useMultiFadeSideEffects.ts",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.29,
+      "maintainability_index": 84.1,
+      "total_cyclomatic": 20,
+      "total_cognitive": 12,
+      "function_count": 8,
+      "lines": 70,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/padPlayer.ts",
+      "fan_in": 6,
+      "fan_out": 12,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 84.3,
+      "total_cyclomatic": 65,
+      "total_cognitive": 42,
+      "function_count": 26,
+      "lines": 356,
+      "crap_max": 31.6,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/components/modals/ResolveMissingDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 9,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 84.8,
+      "total_cyclomatic": 46,
+      "total_cognitive": 24,
+      "function_count": 19,
+      "lines": 235,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/contexts/ProjectActionsContext.tsx",
+      "fan_in": 5,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 84.8,
+      "total_cyclomatic": 82,
+      "total_cognitive": 50,
+      "function_count": 35,
+      "lines": 351,
+      "crap_max": 49.5,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.test.tsx",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 85.1,
+      "total_cyclomatic": 100,
+      "total_cognitive": 6,
+      "function_count": 87,
+      "lines": 449,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useAddFolder.ts",
+      "fan_in": 2,
+      "fan_out": 8,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 85.2,
+      "total_cyclomatic": 14,
+      "total_cognitive": 7,
+      "function_count": 8,
+      "lines": 70,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useMultiFadeMode.test.ts",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 85.3,
+      "total_cyclomatic": 65,
+      "total_cognitive": 0,
+      "function_count": 65,
+      "lines": 278,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.tsx",
+      "fan_in": 2,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 85.4,
+      "total_cyclomatic": 65,
+      "total_cognitive": 39,
+      "function_count": 36,
+      "lines": 308,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/projectStore.ts",
+      "fan_in": 46,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.39,
+      "maintainability_index": 85.5,
+      "total_cyclomatic": 107,
+      "total_cognitive": 47,
+      "function_count": 60,
+      "lines": 277,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadFadePopoverContent.tsx",
+      "fan_in": 1,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.24,
+      "maintainability_index": 85.6,
+      "total_cyclomatic": 13,
+      "total_cognitive": 2,
+      "function_count": 8,
+      "lines": 54,
+      "crap_max": 5.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useAutoSave.ts",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.24,
+      "maintainability_index": 85.6,
+      "total_cyclomatic": 25,
+      "total_cognitive": 9,
+      "function_count": 16,
+      "lines": 103,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useReconcileLibrary.ts",
+      "fan_in": 3,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 85.9,
+      "total_cyclomatic": 22,
+      "total_cognitive": 9,
+      "function_count": 14,
+      "lines": 97,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useMissingSoundsNotification.ts",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.38,
+      "maintainability_index": 86.0,
+      "total_cyclomatic": 16,
+      "total_cognitive": 7,
+      "function_count": 10,
+      "lines": 42,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useProjectLifecycle.ts",
+      "fan_in": 2,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 86.2,
+      "total_cyclomatic": 21,
+      "total_cognitive": 8,
+      "function_count": 14,
+      "lines": 107,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/arrangement.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.31,
+      "maintainability_index": 86.3,
+      "total_cyclomatic": 21,
+      "total_cognitive": 0,
+      "function_count": 21,
+      "lines": 68,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/AddTagsDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.27,
+      "maintainability_index": 86.4,
+      "total_cyclomatic": 61,
+      "total_cognitive": 16,
+      "function_count": 45,
+      "lines": 229,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useBootLoader.test.tsx",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.24,
+      "maintainability_index": 86.4,
+      "total_cyclomatic": 91,
+      "total_cognitive": 0,
+      "function_count": 89,
+      "lines": 374,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/screens/start/StartScreen.tsx",
+      "fan_in": 2,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 86.5,
+      "total_cyclomatic": 44,
+      "total_cognitive": 22,
+      "function_count": 20,
+      "lines": 227,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useAddFolder.test.ts",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 86.5,
+      "total_cyclomatic": 43,
+      "total_cognitive": 0,
+      "function_count": 43,
+      "lines": 232,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useReconcileLibrary.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 86.5,
+      "total_cyclomatic": 31,
+      "total_cognitive": 0,
+      "function_count": 31,
+      "lines": 146,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/project.queries.ts",
+      "fan_in": 2,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 86.5,
+      "total_cyclomatic": 34,
+      "total_cognitive": 30,
+      "function_count": 18,
+      "lines": 177,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/usePadGesture.ts",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.26,
+      "maintainability_index": 86.7,
+      "total_cyclomatic": 68,
+      "total_cognitive": 45,
+      "function_count": 24,
+      "lines": 264,
+      "crap_max": 37.1,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.tsx",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 86.8,
+      "total_cyclomatic": 23,
+      "total_cognitive": 7,
+      "function_count": 15,
+      "lines": 116,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/BackFaceLayerRow.tsx",
+      "fan_in": 2,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 86.8,
+      "total_cyclomatic": 38,
+      "total_cognitive": 15,
+      "function_count": 23,
+      "lines": 215,
+      "crap_max": 10.3,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useAutoSave.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 86.8,
+      "total_cyclomatic": 90,
+      "total_cognitive": 0,
+      "function_count": 90,
+      "lines": 444,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useGlobalHotkeys.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 86.8,
+      "total_cyclomatic": 131,
+      "total_cognitive": 2,
+      "function_count": 122,
+      "lines": 656,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/preview.ts",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 86.8,
+      "total_cyclomatic": 28,
+      "total_cognitive": 26,
+      "function_count": 8,
+      "lines": 138,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/library.reconcile.ts",
+      "fan_in": 18,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 86.8,
+      "total_cyclomatic": 64,
+      "total_cognitive": 55,
+      "function_count": 22,
+      "lines": 328,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 86.9,
+      "total_cyclomatic": 80,
+      "total_cognitive": 33,
+      "function_count": 51,
+      "lines": 485,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 87.0,
+      "total_cyclomatic": 207,
+      "total_cognitive": 1,
+      "function_count": 206,
+      "lines": 947,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useSoundPreview.ts",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.25,
+      "maintainability_index": 87.0,
+      "total_cyclomatic": 13,
+      "total_cognitive": 10,
+      "function_count": 7,
+      "lines": 52,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/FolderBrowser.test.tsx",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 87.1,
+      "total_cyclomatic": 51,
+      "total_cognitive": 4,
+      "function_count": 44,
+      "lines": 293,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigDialog.test.tsx",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 87.2,
+      "total_cyclomatic": 30,
+      "total_cognitive": 6,
+      "function_count": 24,
+      "lines": 197,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 87.2,
+      "total_cyclomatic": 24,
+      "total_cognitive": 20,
+      "function_count": 9,
+      "lines": 161,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.test.tsx",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 87.2,
+      "total_cyclomatic": 64,
+      "total_cognitive": 0,
+      "function_count": 64,
+      "lines": 424,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundList.test.tsx",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 87.2,
+      "total_cyclomatic": 57,
+      "total_cognitive": 7,
+      "function_count": 44,
+      "lines": 385,
+      "crap_max": 49.5,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/hooks/useBulkRemove.test.ts",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 87.2,
+      "total_cyclomatic": 51,
+      "total_cognitive": 0,
+      "function_count": 51,
+      "lines": 347,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useResolveSoundQueue.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.28,
+      "maintainability_index": 87.2,
+      "total_cyclomatic": 35,
+      "total_cognitive": 0,
+      "function_count": 35,
+      "lines": 124,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "fan_in": 0,
+      "fan_out": 12,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 87.3,
+      "total_cyclomatic": 390,
+      "total_cognitive": 8,
+      "function_count": 371,
+      "lines": 4726,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadFadeControls.tsx",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 87.4,
+      "total_cyclomatic": 34,
+      "total_cognitive": 17,
+      "function_count": 15,
+      "lines": 188,
+      "crap_max": 15.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadBackFace.test.tsx",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 87.5,
+      "total_cyclomatic": 37,
+      "total_cognitive": 3,
+      "function_count": 34,
+      "lines": 266,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useResolveFolderQueue.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.27,
+      "maintainability_index": 87.5,
+      "total_cyclomatic": 35,
+      "total_cognitive": 0,
+      "function_count": 35,
+      "lines": 130,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/appSettingsStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.27,
+      "maintainability_index": 87.5,
+      "total_cyclomatic": 34,
+      "total_cognitive": 1,
+      "function_count": 30,
+      "lines": 127,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTab.tsx",
+      "fan_in": 1,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 87.7,
+      "total_cyclomatic": 28,
+      "total_cognitive": 11,
+      "function_count": 17,
+      "lines": 188,
+      "crap_max": 7.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useImportSounds.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 87.7,
+      "total_cyclomatic": 19,
+      "total_cognitive": 0,
+      "function_count": 19,
+      "lines": 110,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadItem.tsx",
+      "fan_in": 2,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 87.9,
+      "total_cyclomatic": 26,
+      "total_cognitive": 22,
+      "function_count": 7,
+      "lines": 137,
+      "crap_max": 37.1,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/soundTreeUtils.ts",
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.31,
+      "maintainability_index": 87.9,
+      "total_cyclomatic": 27,
+      "total_cognitive": 34,
+      "function_count": 7,
+      "lines": 88,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useAudioErrorHandler.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.25,
+      "maintainability_index": 88.1,
+      "total_cyclomatic": 34,
+      "total_cognitive": 0,
+      "function_count": 34,
+      "lines": 137,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/project.test.ts",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 88.1,
+      "total_cyclomatic": 104,
+      "total_cognitive": 3,
+      "function_count": 95,
+      "lines": 840,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useMissingSoundsNotification.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 88.2,
+      "total_cyclomatic": 23,
+      "total_cognitive": 0,
+      "function_count": 23,
+      "lines": 130,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioTick.ts",
+      "fan_in": 4,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 88.2,
+      "total_cyclomatic": 75,
+      "total_cognitive": 62,
+      "function_count": 20,
+      "lines": 354,
+      "crap_max": 71.3,
+      "crap_above_threshold": 1
+    },
+    {
+      "path": "src/lib/export.ts",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 88.2,
+      "total_cyclomatic": 14,
+      "total_cognitive": 16,
+      "function_count": 6,
+      "lines": 66,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/project.reconcile.ts",
+      "fan_in": 7,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 88.2,
+      "total_cyclomatic": 27,
+      "total_cognitive": 25,
+      "function_count": 11,
+      "lines": 128,
+      "crap_max": 8.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/projectStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 88.2,
+      "total_cyclomatic": 160,
+      "total_cognitive": 0,
+      "function_count": 141,
+      "lines": 869,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/MultiFadePill.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 88.3,
+      "total_cyclomatic": 14,
+      "total_cognitive": 2,
+      "function_count": 12,
+      "lines": 91,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/DownloadDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 88.3,
+      "total_cyclomatic": 36,
+      "total_cognitive": 27,
+      "function_count": 13,
+      "lines": 234,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ResolveMissingFolderDialog.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 88.3,
+      "total_cyclomatic": 25,
+      "total_cognitive": 2,
+      "function_count": 23,
+      "lines": 170,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/usePadVolumeDisplay.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.24,
+      "maintainability_index": 88.4,
+      "total_cyclomatic": 60,
+      "total_cognitive": 0,
+      "function_count": 60,
+      "lines": 250,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useSoundPreview.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.24,
+      "maintainability_index": 88.4,
+      "total_cyclomatic": 31,
+      "total_cognitive": 0,
+      "function_count": 31,
+      "lines": 131,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioState.ts",
+      "fan_in": 12,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 88.5,
+      "total_cyclomatic": 225,
+      "total_cognitive": 183,
+      "function_count": 99,
+      "lines": 1105,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/ytdlp.queries.ts",
+      "fan_in": 4,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 88.5,
+      "total_cyclomatic": 11,
+      "total_cognitive": 0,
+      "function_count": 11,
+      "lines": 56,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/appSettingsStore.ts",
+      "fan_in": 33,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.29,
+      "maintainability_index": 88.5,
+      "total_cyclomatic": 23,
+      "total_cognitive": 6,
+      "function_count": 14,
+      "lines": 78,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/SceneView.test.tsx",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 88.6,
+      "total_cyclomatic": 38,
+      "total_cognitive": 0,
+      "function_count": 38,
+      "lines": 318,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useImportSounds.ts",
+      "fan_in": 2,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 88.6,
+      "total_cyclomatic": 8,
+      "total_cognitive": 3,
+      "function_count": 4,
+      "lines": 58,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/downloads.ts",
+      "fan_in": 3,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 88.7,
+      "total_cyclomatic": 8,
+      "total_cognitive": 2,
+      "function_count": 5,
+      "lines": 43,
+      "crap_max": 3.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadFadeControls.test.tsx",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 88.8,
+      "total_cyclomatic": 19,
+      "total_cognitive": 0,
+      "function_count": 19,
+      "lines": 119,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useProjectLifecycle.test.ts",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 88.8,
+      "total_cyclomatic": 34,
+      "total_cognitive": 0,
+      "function_count": 34,
+      "lines": 175,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/resolveSounds.test.ts",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 88.8,
+      "total_cyclomatic": 79,
+      "total_cognitive": 0,
+      "function_count": 78,
+      "lines": 408,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/layerHelpers.ts",
+      "fan_in": 1,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.44,
+      "maintainability_index": 88.8,
+      "total_cyclomatic": 14,
+      "total_cognitive": 6,
+      "function_count": 5,
+      "lines": 32,
+      "crap_max": 8.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/migrations.ts",
+      "fan_in": 4,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.28,
+      "maintainability_index": 88.8,
+      "total_cyclomatic": 104,
+      "total_cognitive": 77,
+      "function_count": 25,
+      "lines": 368,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 88.9,
+      "total_cyclomatic": 46,
+      "total_cognitive": 0,
+      "function_count": 40,
+      "lines": 348,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonFadeOverlay.test.tsx",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 88.9,
+      "total_cyclomatic": 24,
+      "total_cognitive": 0,
+      "function_count": 24,
+      "lines": 213,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundsPanel.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 88.9,
+      "total_cyclomatic": 90,
+      "total_cognitive": 3,
+      "function_count": 87,
+      "lines": 682,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "fan_in": 0,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 88.9,
+      "total_cyclomatic": 92,
+      "total_cognitive": 14,
+      "function_count": 78,
+      "lines": 867,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/project.ts",
+      "fan_in": 5,
+      "fan_out": 6,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 88.9,
+      "total_cyclomatic": 43,
+      "total_cognitive": 30,
+      "function_count": 19,
+      "lines": 396,
+      "crap_max": 11.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigSection.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 89.0,
+      "total_cyclomatic": 101,
+      "total_cognitive": 74,
+      "function_count": 28,
+      "lines": 459,
+      "crap_max": 88.0,
+      "crap_above_threshold": 3
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundFolderTree.tsx",
+      "fan_in": 2,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 89.1,
+      "total_cyclomatic": 21,
+      "total_cognitive": 8,
+      "function_count": 12,
+      "lines": 139,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/EditSection.tsx",
+      "fan_in": 1,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 89.1,
+      "total_cyclomatic": 11,
+      "total_cognitive": 3,
+      "function_count": 8,
+      "lines": 75,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ResolveMissingDialog.test.tsx",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 89.1,
+      "total_cyclomatic": 14,
+      "total_cognitive": 1,
+      "function_count": 13,
+      "lines": 94,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useProjectSoundReconcileOnLoad.test.ts",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 89.1,
+      "total_cyclomatic": 14,
+      "total_cognitive": 0,
+      "function_count": 14,
+      "lines": 78,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/downloadStore.ts",
+      "fan_in": 13,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.27,
+      "maintainability_index": 89.1,
+      "total_cyclomatic": 24,
+      "total_cognitive": 5,
+      "function_count": 13,
+      "lines": 89,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/fadeMixer.ts",
+      "fan_in": 5,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 89.2,
+      "total_cyclomatic": 19,
+      "total_cognitive": 9,
+      "function_count": 9,
+      "lines": 157,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "fan_in": 0,
+      "fan_out": 7,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 89.3,
+      "total_cyclomatic": 158,
+      "total_cognitive": 8,
+      "function_count": 137,
+      "lines": 2000,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/App.tsx",
+      "fan_in": 1,
+      "fan_out": 8,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.09,
+      "maintainability_index": 89.4,
+      "total_cyclomatic": 3,
+      "total_cognitive": 2,
+      "function_count": 1,
+      "lines": 34,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadItem.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 89.4,
+      "total_cyclomatic": 24,
+      "total_cognitive": 0,
+      "function_count": 24,
+      "lines": 138,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadManager.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 89.4,
+      "total_cyclomatic": 10,
+      "total_cognitive": 0,
+      "function_count": 10,
+      "lines": 60,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/PlaySection.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 89.4,
+      "total_cyclomatic": 11,
+      "total_cognitive": 0,
+      "function_count": 11,
+      "lines": 66,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/preview.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 89.4,
+      "total_cyclomatic": 33,
+      "total_cognitive": 0,
+      "function_count": 31,
+      "lines": 236,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/ytdlp.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 89.4,
+      "total_cyclomatic": 20,
+      "total_cognitive": 1,
+      "function_count": 19,
+      "lines": 146,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/BackFaceLayerRow.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 89.5,
+      "total_cyclomatic": 11,
+      "total_cognitive": 0,
+      "function_count": 11,
+      "lines": 101,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/soundTreeUtils.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 89.6,
+      "total_cyclomatic": 31,
+      "total_cognitive": 7,
+      "function_count": 25,
+      "lines": 154,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonProgress.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 89.6,
+      "total_cyclomatic": 13,
+      "total_cognitive": 8,
+      "function_count": 6,
+      "lines": 65,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useDownloadEventListener.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 89.6,
+      "total_cyclomatic": 62,
+      "total_cognitive": 0,
+      "function_count": 62,
+      "lines": 308,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/history.ts",
+      "fan_in": 3,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 89.6,
+      "total_cyclomatic": 8,
+      "total_cognitive": 2,
+      "function_count": 5,
+      "lines": 45,
+      "crap_max": 3.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/VolumeSection.tsx",
+      "fan_in": 1,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 89.7,
+      "total_cyclomatic": 12,
+      "total_cognitive": 7,
+      "function_count": 7,
+      "lines": 73,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/libraryStore.ts",
+      "fan_in": 57,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.25,
+      "maintainability_index": 89.7,
+      "total_cyclomatic": 62,
+      "total_cognitive": 39,
+      "function_count": 37,
+      "lines": 246,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 89.8,
+      "total_cyclomatic": 36,
+      "total_cognitive": 2,
+      "function_count": 34,
+      "lines": 346,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/appSettings.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 89.8,
+      "total_cyclomatic": 14,
+      "total_cognitive": 0,
+      "function_count": 14,
+      "lines": 138,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/fadeMixer.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 89.8,
+      "total_cyclomatic": 33,
+      "total_cognitive": 0,
+      "function_count": 33,
+      "lines": 343,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/library.ts",
+      "fan_in": 4,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 89.8,
+      "total_cyclomatic": 8,
+      "total_cognitive": 1,
+      "function_count": 6,
+      "lines": 78,
+      "crap_max": 3.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioTick.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 90.0,
+      "total_cyclomatic": 75,
+      "total_cognitive": 11,
+      "function_count": 65,
+      "lines": 616,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/DownloadDialog.test.tsx",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.09,
+      "maintainability_index": 90.1,
+      "total_cyclomatic": 47,
+      "total_cognitive": 0,
+      "function_count": 47,
+      "lines": 516,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/libraryStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 90.2,
+      "total_cyclomatic": 77,
+      "total_cognitive": 1,
+      "function_count": 71,
+      "lines": 425,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/SetsPanel.tsx",
+      "fan_in": 1,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 90.3,
+      "total_cyclomatic": 31,
+      "total_cognitive": 13,
+      "function_count": 15,
+      "lines": 219,
+      "crap_max": 9.3,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/resolveSounds.ts",
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 90.3,
+      "total_cyclomatic": 30,
+      "total_cognitive": 19,
+      "function_count": 15,
+      "lines": 131,
+      "crap_max": 10.3,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/downloads.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 90.3,
+      "total_cyclomatic": 15,
+      "total_cognitive": 0,
+      "function_count": 15,
+      "lines": 138,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/bufferCache.ts",
+      "fan_in": 8,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 90.4,
+      "total_cyclomatic": 7,
+      "total_cognitive": 4,
+      "function_count": 3,
+      "lines": 38,
+      "crap_max": 5.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/history.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 90.4,
+      "total_cyclomatic": 34,
+      "total_cognitive": 0,
+      "function_count": 34,
+      "lines": 429,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/bufferCache.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 90.5,
+      "total_cyclomatic": 24,
+      "total_cognitive": 0,
+      "function_count": 24,
+      "lines": 143,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadStatusButton.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 90.6,
+      "total_cyclomatic": 16,
+      "total_cognitive": 1,
+      "function_count": 15,
+      "lines": 119,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundListItemTags.tsx",
+      "fan_in": 1,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 90.6,
+      "total_cyclomatic": 11,
+      "total_cognitive": 2,
+      "function_count": 9,
+      "lines": 51,
+      "crap_max": 3.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/history.queries.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 90.6,
+      "total_cyclomatic": 16,
+      "total_cognitive": 0,
+      "function_count": 15,
+      "lines": 73,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/library.test.ts",
+      "fan_in": 0,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.07,
+      "maintainability_index": 90.7,
+      "total_cyclomatic": 17,
+      "total_cognitive": 0,
+      "function_count": 17,
+      "lines": 234,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/MultiFadePill.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 90.8,
+      "total_cyclomatic": 8,
+      "total_cognitive": 2,
+      "function_count": 6,
+      "lines": 51,
+      "crap_max": 3.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useAudioErrorHandler.ts",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 90.8,
+      "total_cyclomatic": 9,
+      "total_cognitive": 9,
+      "function_count": 4,
+      "lines": 56,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/downloadStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 90.8,
+      "total_cyclomatic": 42,
+      "total_cognitive": 0,
+      "function_count": 42,
+      "lines": 258,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/TagPicker.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 9,
+      "total_cognitive": 0,
+      "function_count": 9,
+      "lines": 78,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigSection.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 64,
+      "total_cognitive": 2,
+      "function_count": 62,
+      "lines": 517,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/AddTagsDialog.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 33,
+      "total_cognitive": 2,
+      "function_count": 32,
+      "lines": 279,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/usePadVolumeDisplay.ts",
+      "fan_in": 2,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 28,
+      "total_cognitive": 25,
+      "function_count": 9,
+      "lines": 131,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/appSettings.ts",
+      "fan_in": 3,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 8,
+      "total_cognitive": 5,
+      "function_count": 4,
+      "lines": 69,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/history.queries.ts",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 6,
+      "total_cognitive": 0,
+      "function_count": 6,
+      "lines": 27,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/project.reconcile.test.ts",
+      "fan_in": 0,
+      "fan_out": 4,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.09,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 27,
+      "total_cognitive": 0,
+      "function_count": 27,
+      "lines": 307,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/uiStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 90.9,
+      "total_cyclomatic": 53,
+      "total_cognitive": 1,
+      "function_count": 52,
+      "lines": 254,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/test/tauri-mocks.ts",
+      "fan_in": 13,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.3,
+      "maintainability_index": 91.0,
+      "total_cyclomatic": 53,
+      "total_cognitive": 25,
+      "function_count": 29,
+      "lines": 179,
+      "crap_max": 13.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 91.1,
+      "total_cyclomatic": 180,
+      "total_cognitive": 9,
+      "function_count": 170,
+      "lines": 1236,
+      "crap_max": 10.4,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/streamingCache.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 91.1,
+      "total_cyclomatic": 58,
+      "total_cognitive": 2,
+      "function_count": 56,
+      "lines": 378,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/import.ts",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 91.1,
+      "total_cyclomatic": 11,
+      "total_cognitive": 8,
+      "function_count": 6,
+      "lines": 73,
+      "crap_max": 5.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/scope.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 91.1,
+      "total_cyclomatic": 30,
+      "total_cognitive": 1,
+      "function_count": 29,
+      "lines": 199,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/MenuDrawer.tsx",
+      "fan_in": 2,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 91.2,
+      "total_cyclomatic": 11,
+      "total_cognitive": 1,
+      "function_count": 10,
+      "lines": 98,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/AddToSetDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 91.2,
+      "total_cyclomatic": 6,
+      "total_cognitive": 2,
+      "function_count": 4,
+      "lines": 57,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioContext.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.2,
+      "maintainability_index": 91.2,
+      "total_cyclomatic": 19,
+      "total_cognitive": 0,
+      "function_count": 19,
+      "lines": 97,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/gainManager.ts",
+      "fan_in": 7,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 91.2,
+      "total_cyclomatic": 9,
+      "total_cognitive": 3,
+      "function_count": 6,
+      "lines": 82,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/library.queries.ts",
+      "fan_in": 13,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.18,
+      "maintainability_index": 91.3,
+      "total_cyclomatic": 7,
+      "total_cognitive": 1,
+      "function_count": 6,
+      "lines": 40,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ConfirmRemoveMissingDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 91.4,
+      "total_cyclomatic": 16,
+      "total_cognitive": 12,
+      "function_count": 6,
+      "lines": 112,
+      "crap_max": 9.3,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/gainManager.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 91.4,
+      "total_cyclomatic": 40,
+      "total_cognitive": 6,
+      "function_count": 34,
+      "lines": 276,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/fileResolve.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 91.4,
+      "total_cyclomatic": 11,
+      "total_cognitive": 1,
+      "function_count": 10,
+      "lines": 81,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/fsUtils.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 91.4,
+      "total_cyclomatic": 48,
+      "total_cognitive": 1,
+      "function_count": 47,
+      "lines": 350,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/migrations.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 91.4,
+      "total_cyclomatic": 107,
+      "total_cognitive": 0,
+      "function_count": 106,
+      "lines": 744,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/SetPicker.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 91.5,
+      "total_cyclomatic": 5,
+      "total_cognitive": 0,
+      "function_count": 5,
+      "lines": 38,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/export.test.ts",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 91.5,
+      "total_cyclomatic": 35,
+      "total_cognitive": 0,
+      "function_count": 35,
+      "lines": 359,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/padDefaults.test.ts",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 91.5,
+      "total_cyclomatic": 23,
+      "total_cognitive": 0,
+      "function_count": 23,
+      "lines": 226,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/scope.ts",
+      "fan_in": 15,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.28,
+      "maintainability_index": 91.6,
+      "total_cyclomatic": 25,
+      "total_cognitive": 12,
+      "function_count": 6,
+      "lines": 90,
+      "crap_max": 7.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/fileResolve.ts",
+      "fan_in": 3,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.23,
+      "maintainability_index": 91.7,
+      "total_cyclomatic": 9,
+      "total_cognitive": 5,
+      "function_count": 4,
+      "lines": 40,
+      "crap_max": 4.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/import.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 91.7,
+      "total_cyclomatic": 15,
+      "total_cognitive": 1,
+      "function_count": 14,
+      "lines": 112,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/padUtils.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 91.7,
+      "total_cyclomatic": 8,
+      "total_cognitive": 0,
+      "function_count": 8,
+      "lines": 62,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/ytdlp.queries.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 91.7,
+      "total_cyclomatic": 19,
+      "total_cognitive": 0,
+      "function_count": 19,
+      "lines": 147,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonProgress.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.09,
+      "maintainability_index": 91.8,
+      "total_cyclomatic": 9,
+      "total_cognitive": 0,
+      "function_count": 9,
+      "lines": 96,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useProjectSoundReconcileOnLoad.ts",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.33,
+      "maintainability_index": 92.0,
+      "total_cyclomatic": 6,
+      "total_cognitive": 2,
+      "function_count": 4,
+      "lines": 18,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundFolderTree.test.tsx",
+      "fan_in": 0,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 92.1,
+      "total_cyclomatic": 10,
+      "total_cognitive": 0,
+      "function_count": 10,
+      "lines": 125,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/utils.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 92.1,
+      "total_cyclomatic": 35,
+      "total_cognitive": 2,
+      "function_count": 34,
+      "lines": 206,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/playbackStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 92.1,
+      "total_cyclomatic": 49,
+      "total_cognitive": 0,
+      "function_count": 49,
+      "lines": 296,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ProjectDialogs.tsx",
+      "fan_in": 1,
+      "fan_out": 5,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.03,
+      "maintainability_index": 92.2,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 37,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/uiStore.ts",
+      "fan_in": 32,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.26,
+      "maintainability_index": 92.2,
+      "total_cyclomatic": 36,
+      "total_cognitive": 5,
+      "function_count": 30,
+      "lines": 140,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadStatusButton.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 92.3,
+      "total_cyclomatic": 7,
+      "total_cognitive": 5,
+      "function_count": 2,
+      "lines": 62,
+      "crap_max": 6.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/AddSetDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 92.3,
+      "total_cyclomatic": 7,
+      "total_cognitive": 2,
+      "function_count": 5,
+      "lines": 64,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/arrangement.ts",
+      "fan_in": 2,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 92.3,
+      "total_cyclomatic": 8,
+      "total_cognitive": 3,
+      "function_count": 3,
+      "lines": 39,
+      "crap_max": 4.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/history.helpers.ts",
+      "fan_in": 1,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 92.3,
+      "total_cyclomatic": 8,
+      "total_cognitive": 1,
+      "function_count": 7,
+      "lines": 71,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/logger.test.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.11,
+      "maintainability_index": 92.3,
+      "total_cyclomatic": 18,
+      "total_cognitive": 0,
+      "function_count": 18,
+      "lines": 157,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 92.4,
+      "total_cyclomatic": 247,
+      "total_cognitive": 35,
+      "function_count": 212,
+      "lines": 1499,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/TagPicker.tsx",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 92.5,
+      "total_cyclomatic": 5,
+      "total_cognitive": 0,
+      "function_count": 5,
+      "lines": 30,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/ytdlp.ts",
+      "fan_in": 3,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 92.5,
+      "total_cyclomatic": 5,
+      "total_cognitive": 2,
+      "function_count": 4,
+      "lines": 34,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadManager.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 92.6,
+      "total_cyclomatic": 5,
+      "total_cognitive": 0,
+      "function_count": 5,
+      "lines": 42,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/appSettings.queries.ts",
+      "fan_in": 5,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 92.6,
+      "total_cyclomatic": 3,
+      "total_cognitive": 0,
+      "function_count": 3,
+      "lines": 22,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/test/factories.ts",
+      "fan_in": 60,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 92.6,
+      "total_cyclomatic": 25,
+      "total_cognitive": 8,
+      "function_count": 20,
+      "lines": 245,
+      "crap_max": 5.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioContext.integration.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 92.7,
+      "total_cyclomatic": 10,
+      "total_cognitive": 0,
+      "function_count": 10,
+      "lines": 67,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/logger.ts",
+      "fan_in": 7,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.26,
+      "maintainability_index": 92.8,
+      "total_cyclomatic": 12,
+      "total_cognitive": 6,
+      "function_count": 7,
+      "lines": 46,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioVoice.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 93.0,
+      "total_cyclomatic": 60,
+      "total_cognitive": 0,
+      "function_count": 56,
+      "lines": 424,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/padDefaults.ts",
+      "fan_in": 6,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.14,
+      "maintainability_index": 93.0,
+      "total_cyclomatic": 11,
+      "total_cognitive": 6,
+      "function_count": 6,
+      "lines": 77,
+      "crap_max": 4.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/PlaySection.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.22,
+      "maintainability_index": 93.2,
+      "total_cyclomatic": 4,
+      "total_cognitive": 1,
+      "function_count": 3,
+      "lines": 18,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/main.tsx",
+      "fan_in": 1,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.06,
+      "maintainability_index": 93.2,
+      "total_cyclomatic": 2,
+      "total_cognitive": 0,
+      "function_count": 2,
+      "lines": 34,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/ErrorBoundary.tsx",
+      "fan_in": 1,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 93.3,
+      "total_cyclomatic": 9,
+      "total_cognitive": 3,
+      "function_count": 6,
+      "lines": 67,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadLayerSection.tsx",
+      "fan_in": 1,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 93.3,
+      "total_cyclomatic": 4,
+      "total_cognitive": 0,
+      "function_count": 4,
+      "lines": 48,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/multiFadeStore.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 93.3,
+      "total_cyclomatic": 55,
+      "total_cognitive": 0,
+      "function_count": 43,
+      "lines": 420,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/test/tauri-mocks.test.ts",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 93.3,
+      "total_cyclomatic": 19,
+      "total_cognitive": 0,
+      "function_count": 19,
+      "lines": 146,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/LibraryItemPicker.test.tsx",
+      "fan_in": 0,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 93.6,
+      "total_cyclomatic": 17,
+      "total_cognitive": 0,
+      "function_count": 17,
+      "lines": 139,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/streamingCache.ts",
+      "fan_in": 7,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 93.6,
+      "total_cyclomatic": 22,
+      "total_cognitive": 14,
+      "function_count": 8,
+      "lines": 188,
+      "crap_max": 6.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/SetPicker.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 93.7,
+      "total_cyclomatic": 3,
+      "total_cognitive": 0,
+      "function_count": 3,
+      "lines": 24,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioVoice.ts",
+      "fan_in": 6,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 93.7,
+      "total_cyclomatic": 26,
+      "total_cognitive": 3,
+      "function_count": 21,
+      "lines": 126,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/cacheUtils.ts",
+      "fan_in": 1,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 93.8,
+      "total_cyclomatic": 3,
+      "total_cognitive": 1,
+      "function_count": 2,
+      "lines": 14,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/SidePanel.tsx",
+      "fan_in": 1,
+      "fan_out": 3,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.07,
+      "maintainability_index": 93.9,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 14,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useWindowCloseHandler.ts",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 94.0,
+      "total_cyclomatic": 10,
+      "total_cognitive": 3,
+      "function_count": 7,
+      "lines": 48,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/ConfirmDeleteSoundsDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 94.2,
+      "total_cyclomatic": 8,
+      "total_cognitive": 6,
+      "function_count": 3,
+      "lines": 81,
+      "crap_max": 5.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useUpdater.ts",
+      "fan_in": 1,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 94.3,
+      "total_cyclomatic": 5,
+      "total_cognitive": 2,
+      "function_count": 3,
+      "lines": 29,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/utils.ts",
+      "fan_in": 19,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.19,
+      "maintainability_index": 94.3,
+      "total_cyclomatic": 15,
+      "total_cognitive": 8,
+      "function_count": 6,
+      "lines": 78,
+      "crap_max": 5.1,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/test/setup.ts",
+      "fan_in": 0,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.07,
+      "maintainability_index": 94.3,
+      "total_cyclomatic": 2,
+      "total_cognitive": 0,
+      "function_count": 2,
+      "lines": 30,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/LibraryItemPicker.tsx",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 94.9,
+      "total_cyclomatic": 18,
+      "total_cognitive": 7,
+      "function_count": 10,
+      "lines": 104,
+      "crap_max": 7.5,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SidePanel/FolderBrowser.tsx",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.03,
+      "maintainability_index": 94.9,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 39,
+      "crap_max": 1.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/SaveProjectDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 94.9,
+      "total_cyclomatic": 14,
+      "total_cognitive": 7,
+      "function_count": 7,
+      "lines": 83,
+      "crap_max": 20.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/playbackStore.ts",
+      "fan_in": 34,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.17,
+      "maintainability_index": 94.9,
+      "total_cyclomatic": 34,
+      "total_cognitive": 9,
+      "function_count": 25,
+      "lines": 195,
+      "crap_max": 21.8,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useResolveFolderQueue.ts",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.05,
+      "maintainability_index": 95.0,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 20,
+      "crap_max": 1.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useResolveSoundQueue.ts",
+      "fan_in": 2,
+      "fan_out": 2,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.05,
+      "maintainability_index": 95.0,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 20,
+      "crap_max": 1.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioContext.ts",
+      "fan_in": 11,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.24,
+      "maintainability_index": 95.2,
+      "total_cyclomatic": 8,
+      "total_cognitive": 4,
+      "function_count": 4,
+      "lines": 33,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/updaterStore.ts",
+      "fan_in": 2,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.16,
+      "maintainability_index": 95.2,
+      "total_cyclomatic": 16,
+      "total_cognitive": 11,
+      "function_count": 5,
+      "lines": 97,
+      "crap_max": 17.6,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/padUtils.ts",
+      "fan_in": 2,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 95.4,
+      "total_cyclomatic": 3,
+      "total_cognitive": 1,
+      "function_count": 2,
+      "lines": 26,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/schemas.ts",
+      "fan_in": 88,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.06,
+      "maintainability_index": 95.4,
+      "total_cyclomatic": 20,
+      "total_cognitive": 6,
+      "function_count": 14,
+      "lines": 335,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/state/multiFadeStore.ts",
+      "fan_in": 15,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.15,
+      "maintainability_index": 95.5,
+      "total_cyclomatic": 14,
+      "total_cognitive": 3,
+      "function_count": 12,
+      "lines": 96,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useBreakpoint.ts",
+      "fan_in": 2,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.21,
+      "maintainability_index": 95.8,
+      "total_cyclomatic": 7,
+      "total_cognitive": 1,
+      "function_count": 6,
+      "lines": 33,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ExportProgressDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.13,
+      "maintainability_index": 96.1,
+      "total_cyclomatic": 14,
+      "total_cognitive": 6,
+      "function_count": 7,
+      "lines": 111,
+      "crap_max": 20.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/fsUtils.ts",
+      "fan_in": 6,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 96.4,
+      "total_cyclomatic": 17,
+      "total_cognitive": 8,
+      "function_count": 8,
+      "lines": 139,
+      "crap_max": 4.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/usePreloadImages.ts",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 96.5,
+      "total_cyclomatic": 6,
+      "total_cognitive": 0,
+      "function_count": 6,
+      "lines": 49,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/constants.ts",
+      "fan_in": 30,
+      "fan_out": 1,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.02,
+      "maintainability_index": 96.6,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 54,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/hooks/useResolveQueue.ts",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.12,
+      "maintainability_index": 97.0,
+      "total_cyclomatic": 5,
+      "total_cognitive": 2,
+      "function_count": 4,
+      "lines": 42,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/lib/audio/audioEvents.ts",
+      "fan_in": 3,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 97.5,
+      "total_cyclomatic": 4,
+      "total_cognitive": 2,
+      "function_count": 2,
+      "lines": 42,
+      "crap_max": 3.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ConfirmCloseDialog.tsx",
+      "fan_in": 2,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 97.7,
+      "total_cyclomatic": 4,
+      "total_cognitive": 1,
+      "function_count": 3,
+      "lines": 48,
+      "crap_max": 6.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadOverlaySlider.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.07,
+      "maintainability_index": 98.1,
+      "total_cyclomatic": 3,
+      "total_cognitive": 0,
+      "function_count": 3,
+      "lines": 46,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ConfirmDeletePadDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.07,
+      "maintainability_index": 98.1,
+      "total_cyclomatic": 3,
+      "total_cognitive": 1,
+      "function_count": 2,
+      "lines": 45,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/modals/ConfirmDeleteSceneDialog.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.07,
+      "maintainability_index": 98.1,
+      "total_cyclomatic": 3,
+      "total_cognitive": 1,
+      "function_count": 2,
+      "lines": 45,
+      "crap_max": 2.9,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "vite.config.ts",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.08,
+      "maintainability_index": 98.1,
+      "total_cyclomatic": 3,
+      "total_cognitive": 2,
+      "function_count": 1,
+      "lines": 40,
+      "crap_max": 12.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/PadLabeledSlider.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.06,
+      "maintainability_index": 98.2,
+      "total_cyclomatic": 3,
+      "total_cognitive": 0,
+      "function_count": 3,
+      "lines": 49,
+      "crap_max": 1.2,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/composite/SceneView/padAnimations.ts",
+      "fan_in": 2,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.05,
+      "maintainability_index": 99.3,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 22,
+      "crap_max": 1.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "src/components/screens/LoadingScreen.tsx",
+      "fan_in": 1,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.1,
+      "maintainability_index": 99.4,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 10,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    },
+    {
+      "path": "scripts/changelog-release-notes.cjs",
+      "fan_in": 0,
+      "fan_out": 0,
+      "dead_code_ratio": 0.0,
+      "complexity_density": 0.01,
+      "maintainability_index": 99.7,
+      "total_cyclomatic": 1,
+      "total_cognitive": 0,
+      "function_count": 1,
+      "lines": 69,
+      "crap_max": 2.0,
+      "crap_above_threshold": 0
+    }
+  ],
+  "large_functions": [
+    {
+      "path": "src/state/projectStore.test.ts",
+      "name": "<arrow>",
+      "line": 15,
+      "line_count": 854
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 40,
+      "line_count": 623
+    },
+    {
+      "path": "src/lib/audio/audioTick.test.ts",
+      "name": "<arrow>",
+      "line": 43,
+      "line_count": 573
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundsPanel.test.tsx",
+      "name": "<arrow>",
+      "line": 130,
+      "line_count": 552
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 57,
+      "line_count": 545
+    },
+    {
+      "path": "src/components/modals/ResolveMissingFolderDialog.tsx",
+      "name": "ResolveMissingFolderDialog",
+      "line": 81,
+      "line_count": 463
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigSection.test.tsx",
+      "name": "<arrow>",
+      "line": 59,
+      "line_count": 458
+    },
+    {
+      "path": "src/state/libraryStore.test.ts",
+      "name": "<arrow>",
+      "line": 9,
+      "line_count": 416
+    },
+    {
+      "path": "src/state/multiFadeStore.test.ts",
+      "name": "<arrow>",
+      "line": 4,
+      "line_count": 416
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 647,
+      "line_count": 385
+    },
+    {
+      "path": "src/hooks/useAutoSave.test.ts",
+      "name": "<arrow>",
+      "line": 80,
+      "line_count": 364
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 3661,
+      "line_count": 364
+    },
+    {
+      "path": "src/components/composite/SidePanel/FoldersPanel.tsx",
+      "name": "FoldersPanel",
+      "line": 92,
+      "line_count": 361
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundList.tsx",
+      "name": "SoundList",
+      "line": 78,
+      "line_count": 323
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.test.tsx",
+      "name": "<arrow>",
+      "line": 27,
+      "line_count": 321
+    },
+    {
+      "path": "src/lib/migrations.test.ts",
+      "name": "<arrow>",
+      "line": 427,
+      "line_count": 317
+    },
+    {
+      "path": "src/lib/audio/fadeMixer.test.ts",
+      "name": "<arrow>",
+      "line": 37,
+      "line_count": 306
+    },
+    {
+      "path": "src/hooks/useBootLoader.test.tsx",
+      "name": "<arrow>",
+      "line": 83,
+      "line_count": 291
+    },
+    {
+      "path": "src/hooks/useBulkRemove.test.ts",
+      "name": "<arrow>",
+      "line": 69,
+      "line_count": 278
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 233,
+      "line_count": 269
+    },
+    {
+      "path": "src/contexts/ProjectActionsContext.tsx",
+      "name": "ProjectActionsProvider",
+      "line": 88,
+      "line_count": 257
+    },
+    {
+      "path": "src/lib/audio/audioTick.test.ts",
+      "name": "<arrow>",
+      "line": 336,
+      "line_count": 255
+    },
+    {
+      "path": "src/components/composite/SceneView/SceneView.tsx",
+      "name": "SceneView",
+      "line": 65,
+      "line_count": 252
+    },
+    {
+      "path": "src/state/uiStore.test.ts",
+      "name": "<arrow>",
+      "line": 4,
+      "line_count": 250
+    },
+    {
+      "path": "src/lib/audio/gainManager.test.ts",
+      "name": "<arrow>",
+      "line": 28,
+      "line_count": 248
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 3106,
+      "line_count": 243
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.tsx",
+      "name": "PadButton",
+      "line": 219,
+      "line_count": 237
+    },
+    {
+      "path": "src/components/composite/SceneView/SceneView.test.tsx",
+      "name": "<arrow>",
+      "line": 83,
+      "line_count": 235
+    },
+    {
+      "path": "src/state/downloadStore.test.ts",
+      "name": "<arrow>",
+      "line": 23,
+      "line_count": 235
+    },
+    {
+      "path": "src/hooks/usePadGesture.ts",
+      "name": "usePadGesture",
+      "line": 30,
+      "line_count": 234
+    },
+    {
+      "path": "src/hooks/usePadVolumeDisplay.test.ts",
+      "name": "<arrow>",
+      "line": 17,
+      "line_count": 233
+    },
+    {
+      "path": "src/components/modals/DownloadDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 285,
+      "line_count": 231
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 3353,
+      "line_count": 229
+    },
+    {
+      "path": "src/components/composite/SidePanel/AddTagsDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 51,
+      "line_count": 228
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundList.test.tsx",
+      "name": "<arrow>",
+      "line": 158,
+      "line_count": 227
+    },
+    {
+      "path": "src/lib/export.test.ts",
+      "name": "<arrow>",
+      "line": 33,
+      "line_count": 214
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 4174,
+      "line_count": 213
+    },
+    {
+      "path": "src/components/modals/DownloadDialog.tsx",
+      "name": "DownloadDialog",
+      "line": 26,
+      "line_count": 208
+    },
+    {
+      "path": "src/components/composite/SidePanel/AddTagsDialog.tsx",
+      "name": "AddTagsDialog",
+      "line": 22,
+      "line_count": 207
+    },
+    {
+      "path": "src/components/screens/start/StartScreen.tsx",
+      "name": "StartScreen",
+      "line": 20,
+      "line_count": 207
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 720,
+      "line_count": 205
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 4390,
+      "line_count": 205
+    },
+    {
+      "path": "src/components/modals/ResolveMissingDialog.tsx",
+      "name": "ResolveMissingDialog",
+      "line": 31,
+      "line_count": 204
+    },
+    {
+      "path": "src/state/projectStore.ts",
+      "name": "useProjectStore",
+      "line": 75,
+      "line_count": 201
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.tsx",
+      "name": "SoundSelector",
+      "line": 35,
+      "line_count": 197
+    },
+    {
+      "path": "src/lib/history.test.ts",
+      "name": "<arrow>",
+      "line": 90,
+      "line_count": 195
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 1210,
+      "line_count": 194
+    },
+    {
+      "path": "src/components/composite/SceneView/PadBackFace.tsx",
+      "name": "PadBackFace",
+      "line": 34,
+      "line_count": 192
+    },
+    {
+      "path": "src/components/composite/SceneView/PadBackFace.test.tsx",
+      "name": "<arrow>",
+      "line": 75,
+      "line_count": 191
+    },
+    {
+      "path": "src/lib/audio/audioVoice.test.ts",
+      "name": "<arrow>",
+      "line": 234,
+      "line_count": 190
+    },
+    {
+      "path": "src/components/composite/SceneView/BackFaceLayerRow.tsx",
+      "name": "BackFaceLayerRow",
+      "line": 27,
+      "line_count": 188
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1704,
+      "line_count": 185
+    },
+    {
+      "path": "src/hooks/useGlobalHotkeys.ts",
+      "name": "useGlobalHotkeys",
+      "line": 49,
+      "line_count": 181
+    },
+    {
+      "path": "src/hooks/usePadGesture.ts",
+      "name": "gestureHandlers",
+      "line": 81,
+      "line_count": 180
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 334,
+      "line_count": 180
+    },
+    {
+      "path": "src/lib/library.test.ts",
+      "name": "<arrow>",
+      "line": 20,
+      "line_count": 179
+    },
+    {
+      "path": "src/hooks/useGlobalHotkeys.test.ts",
+      "name": "<arrow>",
+      "line": 478,
+      "line_count": 178
+    },
+    {
+      "path": "src/state/libraryStore.ts",
+      "name": "useLibraryStore",
+      "line": 69,
+      "line_count": 176
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 1035,
+      "line_count": 174
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 779,
+      "line_count": 174
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 1827,
+      "line_count": 173
+    },
+    {
+      "path": "src/hooks/useGlobalHotkeys.test.ts",
+      "name": "<arrow>",
+      "line": 303,
+      "line_count": 172
+    },
+    {
+      "path": "src/hooks/useAddFolder.test.ts",
+      "name": "<arrow>",
+      "line": 61,
+      "line_count": 171
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTab.tsx",
+      "name": "SceneTab",
+      "line": 18,
+      "line_count": 170
+    },
+    {
+      "path": "src/lib/audio/audioVoice.test.ts",
+      "name": "<arrow>",
+      "line": 62,
+      "line_count": 169
+    },
+    {
+      "path": "src/components/composite/SidePanel/SetsPanel.tsx",
+      "name": "SetsPanel",
+      "line": 51,
+      "line_count": 168
+    },
+    {
+      "path": "src/lib/project.test.ts",
+      "name": "<arrow>",
+      "line": 90,
+      "line_count": 168
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 1411,
+      "line_count": 164
+    },
+    {
+      "path": "src/components/modals/DownloadDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 48,
+      "line_count": 160
+    },
+    {
+      "path": "src/hooks/usePadVolumeDisplay.test.ts",
+      "name": "<arrow>",
+      "line": 75,
+      "line_count": 156
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonFadeOverlay.test.tsx",
+      "name": "<arrow>",
+      "line": 61,
+      "line_count": 152
+    },
+    {
+      "path": "src/lib/project.test.ts",
+      "name": "<arrow>",
+      "line": 594,
+      "line_count": 147
+    },
+    {
+      "path": "src/components/composite/SceneView/SceneView.test.tsx",
+      "name": "<arrow>",
+      "line": 171,
+      "line_count": 146
+    },
+    {
+      "path": "src/lib/logger.test.ts",
+      "name": "<arrow>",
+      "line": 12,
+      "line_count": 145
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 645,
+      "line_count": 144
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundsPanel.tsx",
+      "name": "SoundsPanel",
+      "line": 23,
+      "line_count": 143
+    },
+    {
+      "path": "src/hooks/useGlobalHotkeys.test.ts",
+      "name": "<arrow>",
+      "line": 102,
+      "line_count": 143
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 2033,
+      "line_count": 143
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 4028,
+      "line_count": 143
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1890,
+      "line_count": 142
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.test.tsx",
+      "name": "<arrow>",
+      "line": 87,
+      "line_count": 141
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 1685,
+      "line_count": 139
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1039,
+      "line_count": 134
+    },
+    {
+      "path": "src/components/composite/SceneView/PadFadeControls.tsx",
+      "name": "PadFadeControls",
+      "line": 56,
+      "line_count": 132
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 66,
+      "line_count": 131
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundsPanel.test.tsx",
+      "name": "<arrow>",
+      "line": 550,
+      "line_count": 131
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 560,
+      "line_count": 130
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 4598,
+      "line_count": 127
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.tsx",
+      "name": "FoldersTab",
+      "line": 74,
+      "line_count": 126
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 52,
+      "line_count": 126
+    },
+    {
+      "path": "src/hooks/useResolveFolderQueue.test.ts",
+      "name": "<arrow>",
+      "line": 6,
+      "line_count": 124
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1478,
+      "line_count": 124
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 743,
+      "line_count": 124
+    },
+    {
+      "path": "src/lib/fsUtils.test.ts",
+      "name": "<arrow>",
+      "line": 133,
+      "line_count": 123
+    },
+    {
+      "path": "src/lib/ytdlp.test.ts",
+      "name": "<arrow>",
+      "line": 23,
+      "line_count": 123
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundList.test.tsx",
+      "name": "<arrow>",
+      "line": 262,
+      "line_count": 122
+    },
+    {
+      "path": "src/hooks/useBootLoader.ts",
+      "name": "useBootLoader",
+      "line": 24,
+      "line_count": 122
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 264,
+      "line_count": 121
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 400,
+      "line_count": 119
+    },
+    {
+      "path": "src/hooks/useResolveSoundQueue.test.ts",
+      "name": "<arrow>",
+      "line": 6,
+      "line_count": 118
+    },
+    {
+      "path": "src/state/appSettingsStore.test.ts",
+      "name": "<arrow>",
+      "line": 9,
+      "line_count": 118
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigDialog.tsx",
+      "name": "LayerConfigDialogInner",
+      "line": 44,
+      "line_count": 117
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 515,
+      "line_count": 117
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.test.tsx",
+      "name": "<arrow>",
+      "line": 19,
+      "line_count": 115
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 602,
+      "line_count": 115
+    },
+    {
+      "path": "src/lib/project.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 193,
+      "line_count": 114
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 926,
+      "line_count": 112
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundFolderTree.test.tsx",
+      "name": "<arrow>",
+      "line": 14,
+      "line_count": 111
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.test.tsx",
+      "name": "<arrow>",
+      "line": 198,
+      "line_count": 111
+    },
+    {
+      "path": "src/hooks/useAudioErrorHandler.test.ts",
+      "name": "<arrow>",
+      "line": 26,
+      "line_count": 111
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/LibraryItemPicker.test.tsx",
+      "name": "<arrow>",
+      "line": 30,
+      "line_count": 109
+    },
+    {
+      "path": "src/hooks/useBulkRemove.ts",
+      "name": "useBulkRemove",
+      "line": 25,
+      "line_count": 109
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 588,
+      "line_count": 109
+    },
+    {
+      "path": "src/lib/audio/resolveSounds.test.ts",
+      "name": "<arrow>",
+      "line": 300,
+      "line_count": 108
+    },
+    {
+      "path": "src/lib/utils.test.ts",
+      "name": "<arrow>",
+      "line": 4,
+      "line_count": 108
+    },
+    {
+      "path": "src/hooks/usePadVolumeDisplay.ts",
+      "name": "usePadVolumeDisplay",
+      "line": 24,
+      "line_count": 107
+    },
+    {
+      "path": "src/hooks/useReconcileLibrary.test.ts",
+      "name": "<arrow>",
+      "line": 39,
+      "line_count": 107
+    },
+    {
+      "path": "src/lib/audio/bufferCache.test.ts",
+      "name": "<arrow>",
+      "line": 36,
+      "line_count": 107
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 462,
+      "line_count": 107
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 2177,
+      "line_count": 107
+    },
+    {
+      "path": "src/lib/history.test.ts",
+      "name": "<arrow>",
+      "line": 286,
+      "line_count": 106
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 250,
+      "line_count": 106
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 144,
+      "line_count": 105
+    },
+    {
+      "path": "src/lib/audio/fadeMixer.test.ts",
+      "name": "<arrow>",
+      "line": 111,
+      "line_count": 104
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadItem.test.tsx",
+      "name": "<arrow>",
+      "line": 35,
+      "line_count": 103
+    },
+    {
+      "path": "src/lib/migrations.test.ts",
+      "name": "<arrow>",
+      "line": 192,
+      "line_count": 103
+    },
+    {
+      "path": "src/lib/audio/streamingCache.test.ts",
+      "name": "<arrow>",
+      "line": 52,
+      "line_count": 102
+    },
+    {
+      "path": "src/lib/padDefaults.test.ts",
+      "name": "<arrow>",
+      "line": 124,
+      "line_count": 102
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 456,
+      "line_count": 101
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 2447,
+      "line_count": 101
+    },
+    {
+      "path": "src/components/composite/SidePanel/FolderBrowser.test.tsx",
+      "name": "<arrow>",
+      "line": 141,
+      "line_count": 100
+    },
+    {
+      "path": "src/lib/downloads.test.ts",
+      "name": "<arrow>",
+      "line": 7,
+      "line_count": 100
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 1043,
+      "line_count": 99
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 792,
+      "line_count": 98
+    },
+    {
+      "path": "src/hooks/useProjectLifecycle.test.ts",
+      "name": "<arrow>",
+      "line": 77,
+      "line_count": 98
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1605,
+      "line_count": 98
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.tsx",
+      "name": "FolderRow",
+      "line": 388,
+      "line_count": 97
+    },
+    {
+      "path": "src/hooks/useSoundPreview.test.ts",
+      "name": "<arrow>",
+      "line": 34,
+      "line_count": 97
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 505,
+      "line_count": 96
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.ts",
+      "name": "startLayerSound",
+      "line": 259,
+      "line_count": 96
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 2285,
+      "line_count": 96
+    },
+    {
+      "path": "src/lib/audio/layerTrigger.test.ts",
+      "name": "<arrow>",
+      "line": 1583,
+      "line_count": 95
+    },
+    {
+      "path": "src/lib/fsUtils.test.ts",
+      "name": "<arrow>",
+      "line": 5,
+      "line_count": 94
+    },
+    {
+      "path": "src/components/modals/ConfirmRemoveMissingDialog.tsx",
+      "name": "ConfirmRemoveMissingDialog",
+      "line": 19,
+      "line_count": 93
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 767,
+      "line_count": 93
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 3010,
+      "line_count": 93
+    },
+    {
+      "path": "src/lib/fsUtils.test.ts",
+      "name": "<arrow>",
+      "line": 257,
+      "line_count": 93
+    },
+    {
+      "path": "src/hooks/useDownloadEventListener.test.ts",
+      "name": "<arrow>",
+      "line": 129,
+      "line_count": 92
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.tsx",
+      "name": "SceneTabBar",
+      "line": 25,
+      "line_count": 91
+    },
+    {
+      "path": "src/lib/migrations.test.ts",
+      "name": "<arrow>",
+      "line": 100,
+      "line_count": 91
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.test.tsx",
+      "name": "<arrow>",
+      "line": 137,
+      "line_count": 90
+    },
+    {
+      "path": "src/components/modals/ResolveMissingFolderDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 80,
+      "line_count": 90
+    },
+    {
+      "path": "src/hooks/useProjectLifecycle.ts",
+      "name": "useProjectLifecycle",
+      "line": 17,
+      "line_count": 90
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 896,
+      "line_count": 90
+    },
+    {
+      "path": "src/lib/audio/preview.ts",
+      "name": "playPreview",
+      "line": 48,
+      "line_count": 90
+    },
+    {
+      "path": "src/lib/audio/resolveSounds.test.ts",
+      "name": "<arrow>",
+      "line": 205,
+      "line_count": 90
+    },
+    {
+      "path": "src/hooks/useBulkRemove.test.ts",
+      "name": "<arrow>",
+      "line": 257,
+      "line_count": 89
+    },
+    {
+      "path": "src/lib/appSettings.test.ts",
+      "name": "<arrow>",
+      "line": 16,
+      "line_count": 89
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 2665,
+      "line_count": 89
+    },
+    {
+      "path": "src/lib/import.test.ts",
+      "name": "<arrow>",
+      "line": 23,
+      "line_count": 89
+    },
+    {
+      "path": "src/components/composite/SidePanel/SoundList.tsx",
+      "name": "<arrow>",
+      "line": 296,
+      "line_count": 88
+    },
+    {
+      "path": "src/hooks/useReconcileLibrary.ts",
+      "name": "useReconcileLibrary",
+      "line": 9,
+      "line_count": 88
+    },
+    {
+      "path": "src/state/libraryStore.test.ts",
+      "name": "<arrow>",
+      "line": 50,
+      "line_count": 87
+    },
+    {
+      "path": "src/hooks/useDownloadEventListener.test.ts",
+      "name": "<arrow>",
+      "line": 222,
+      "line_count": 86
+    },
+    {
+      "path": "src/test/tauri-mocks.test.ts",
+      "name": "<arrow>",
+      "line": 7,
+      "line_count": 86
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/MenuDrawer.tsx",
+      "name": "MenuDrawer",
+      "line": 13,
+      "line_count": 85
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 176,
+      "line_count": 85
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigSection.tsx",
+      "name": "LayerConfigSection",
+      "line": 375,
+      "line_count": 84
+    },
+    {
+      "path": "src/components/composite/DownloadManager/DownloadStatusButton.test.tsx",
+      "name": "<arrow>",
+      "line": 36,
+      "line_count": 83
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.test.tsx",
+      "name": "<arrow>",
+      "line": 192,
+      "line_count": 83
+    },
+    {
+      "path": "src/hooks/useMultiFadeSideEffects.test.ts",
+      "name": "<arrow>",
+      "line": 38,
+      "line_count": 83
+    },
+    {
+      "path": "src/hooks/useMultiFadeMode.test.ts",
+      "name": "<arrow>",
+      "line": 135,
+      "line_count": 82
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 560,
+      "line_count": 82
+    },
+    {
+      "path": "src/lib/audio/gainManager.test.ts",
+      "name": "<arrow>",
+      "line": 104,
+      "line_count": 82
+    },
+    {
+      "path": "src/state/playbackStore.test.ts",
+      "name": "<arrow>",
+      "line": 136,
+      "line_count": 82
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1235,
+      "line_count": 81
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 2549,
+      "line_count": 81
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 1418,
+      "line_count": 81
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonProgress.test.tsx",
+      "name": "<arrow>",
+      "line": 16,
+      "line_count": 80
+    },
+    {
+      "path": "src/lib/audio/resolveSounds.test.ts",
+      "name": "<arrow>",
+      "line": 118,
+      "line_count": 80
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 94,
+      "line_count": 79
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 291,
+      "line_count": 79
+    },
+    {
+      "path": "src/lib/migrations.test.ts",
+      "name": "<arrow>",
+      "line": 347,
+      "line_count": 79
+    },
+    {
+      "path": "src/hooks/useMissingSoundsNotification.test.ts",
+      "name": "<arrow>",
+      "line": 52,
+      "line_count": 78
+    },
+    {
+      "path": "src/lib/library.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 664,
+      "line_count": 78
+    },
+    {
+      "path": "src/state/projectStore.test.ts",
+      "name": "<arrow>",
+      "line": 656,
+      "line_count": 78
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.tsx",
+      "name": "PadFrontFace",
+      "line": 141,
+      "line_count": 77
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 217,
+      "line_count": 77
+    },
+    {
+      "path": "src/lib/project.test.ts",
+      "name": "<arrow>",
+      "line": 742,
+      "line_count": 77
+    },
+    {
+      "path": "src/lib/ytdlp.queries.test.ts",
+      "name": "<arrow>",
+      "line": 70,
+      "line_count": 77
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/soundTreeUtils.test.ts",
+      "name": "<arrow>",
+      "line": 27,
+      "line_count": 76
+    },
+    {
+      "path": "src/components/modals/ExportProgressDialog.tsx",
+      "name": "ExportProgressDialog",
+      "line": 35,
+      "line_count": 76
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.tsx",
+      "name": "UpdateStatusRow",
+      "line": 303,
+      "line_count": 76
+    },
+    {
+      "path": "src/state/projectStore.test.ts",
+      "name": "<arrow>",
+      "line": 579,
+      "line_count": 76
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/LayerConfigSection.tsx",
+      "name": "ArrangementSection",
+      "line": 293,
+      "line_count": 75
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButtonFadeOverlay.tsx",
+      "name": "PadButtonFadeOverlay",
+      "line": 26,
+      "line_count": 75
+    },
+    {
+      "path": "src/components/modals/DownloadDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 209,
+      "line_count": 75
+    },
+    {
+      "path": "src/hooks/useAutoSave.ts",
+      "name": "useAutoSave",
+      "line": 28,
+      "line_count": 75
+    },
+    {
+      "path": "src/hooks/useBulkRemove.test.ts",
+      "name": "<arrow>",
+      "line": 143,
+      "line_count": 75
+    },
+    {
+      "path": "src/lib/audio/preview.test.ts",
+      "name": "<arrow>",
+      "line": 83,
+      "line_count": 75
+    },
+    {
+      "path": "src/lib/audio/preview.test.ts",
+      "name": "<arrow>",
+      "line": 161,
+      "line_count": 75
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.test.tsx",
+      "name": "<arrow>",
+      "line": 117,
+      "line_count": 74
+    },
+    {
+      "path": "src/state/updaterStore.ts",
+      "name": "useUpdaterStore",
+      "line": 23,
+      "line_count": 74
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/LibraryItemPicker.tsx",
+      "name": "LibraryItemPicker",
+      "line": 32,
+      "line_count": 72
+    },
+    {
+      "path": "src/hooks/useBulkRemove.test.ts",
+      "name": "<arrow>",
+      "line": 70,
+      "line_count": 72
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 3586,
+      "line_count": 72
+    },
+    {
+      "path": "src/lib/project.ts",
+      "name": "saveProjectAs",
+      "line": 270,
+      "line_count": 72
+    },
+    {
+      "path": "src/state/projectStore.test.ts",
+      "name": "<arrow>",
+      "line": 213,
+      "line_count": 72
+    },
+    {
+      "path": "src/components/composite/SceneTabBar/SceneTabBar.test.tsx",
+      "name": "<arrow>",
+      "line": 276,
+      "line_count": 71
+    },
+    {
+      "path": "src/components/composite/SceneView/PadFadeControls.test.tsx",
+      "name": "<arrow>",
+      "line": 48,
+      "line_count": 71
+    },
+    {
+      "path": "src/components/screens/main/MainPage.tsx",
+      "name": "MainPageInner",
+      "line": 39,
+      "line_count": 71
+    },
+    {
+      "path": "src/contexts/ProjectActionsContext.tsx",
+      "name": "handleExportClick",
+      "line": 165,
+      "line_count": 71
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 294,
+      "line_count": 70
+    },
+    {
+      "path": "src/lib/audio/streamingCache.test.ts",
+      "name": "<arrow>",
+      "line": 249,
+      "line_count": 70
+    },
+    {
+      "path": "src/state/multiFadeStore.test.ts",
+      "name": "<arrow>",
+      "line": 74,
+      "line_count": 70
+    },
+    {
+      "path": "src/state/playbackStore.ts",
+      "name": "usePlaybackStore",
+      "line": 126,
+      "line_count": 69
+    },
+    {
+      "path": "src/lib/audio/fadeMixer.test.ts",
+      "name": "<arrow>",
+      "line": 274,
+      "line_count": 68
+    },
+    {
+      "path": "src/lib/library.reconcile.ts",
+      "name": "checkMissingStatus",
+      "line": 231,
+      "line_count": 68
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 1029,
+      "line_count": 68
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 1098,
+      "line_count": 68
+    },
+    {
+      "path": "src/test/tauri-mocks.ts",
+      "name": "createMockFileSystem",
+      "line": 110,
+      "line_count": 68
+    },
+    {
+      "path": "src/hooks/useResolveQueue.test.ts",
+      "name": "<arrow>",
+      "line": 5,
+      "line_count": 67
+    },
+    {
+      "path": "src/lib/project.reconcile.test.ts",
+      "name": "<arrow>",
+      "line": 22,
+      "line_count": 67
+    },
+    {
+      "path": "src/components/composite/LibraryPickers/TagPicker.test.tsx",
+      "name": "<arrow>",
+      "line": 12,
+      "line_count": 66
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.tsx",
+      "name": "TagModeSection",
+      "line": 242,
+      "line_count": 66
+    },
+    {
+      "path": "src/hooks/useBootLoader.ts",
+      "name": "<arrow>",
+      "line": 77,
+      "line_count": 66
+    },
+    {
+      "path": "src/hooks/useImportSounds.test.ts",
+      "name": "<arrow>",
+      "line": 44,
+      "line_count": 66
+    },
+    {
+      "path": "src/components/composite/SceneView/MultiFadePill.test.tsx",
+      "name": "<arrow>",
+      "line": 26,
+      "line_count": 65
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.test.tsx",
+      "name": "<arrow>",
+      "line": 294,
+      "line_count": 65
+    },
+    {
+      "path": "src/components/modals/SettingsDialog.test.tsx",
+      "name": "<arrow>",
+      "line": 365,
+      "line_count": 65
+    },
+    {
+      "path": "src/hooks/usePadGesture.test.ts",
+      "name": "<arrow>",
+      "line": 388,
+      "line_count": 65
+    },
+    {
+      "path": "src/state/libraryStore.test.ts",
+      "name": "<arrow>",
+      "line": 171,
+      "line_count": 65
+    },
+    {
+      "path": "src/state/projectStore.test.ts",
+      "name": "<arrow>",
+      "line": 325,
+      "line_count": 65
+    },
+    {
+      "path": "src/components/composite/SceneView/PadButton.test.tsx",
+      "name": "<arrow>",
+      "line": 229,
+      "line_count": 64
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 698,
+      "line_count": 64
+    },
+    {
+      "path": "src/state/multiFadeStore.ts",
+      "name": "useMultiFadeStore",
+      "line": 32,
+      "line_count": 64
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 100,
+      "line_count": 63
+    },
+    {
+      "path": "src/lib/export.test.ts",
+      "name": "<arrow>",
+      "line": 248,
+      "line_count": 63
+    },
+    {
+      "path": "src/state/multiFadeStore.test.ts",
+      "name": "<arrow>",
+      "line": 10,
+      "line_count": 63
+    },
+    {
+      "path": "src/components/composite/PadConfigDrawer/SoundSelector.test.tsx",
+      "name": "<arrow>",
+      "line": 135,
+      "line_count": 62
+    },
+    {
+      "path": "src/lib/audio/audioState.test.ts",
+      "name": "<arrow>",
+      "line": 699,
+      "line_count": 62
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 1336,
+      "line_count": 62
+    },
+    {
+      "path": "src/lib/history.test.ts",
+      "name": "<arrow>",
+      "line": 27,
+      "line_count": 62
+    },
+    {
+      "path": "src/lib/migrations.test.ts",
+      "name": "<arrow>",
+      "line": 37,
+      "line_count": 62
+    },
+    {
+      "path": "src/state/multiFadeStore.test.ts",
+      "name": "<arrow>",
+      "line": 204,
+      "line_count": 62
+    },
+    {
+      "path": "src/state/projectStore.test.ts",
+      "name": "<arrow>",
+      "line": 150,
+      "line_count": 62
+    },
+    {
+      "path": "src/components/composite/SidePanel/EditSection.tsx",
+      "name": "EditSection",
+      "line": 14,
+      "line_count": 61
+    },
+    {
+      "path": "src/components/modals/SaveProjectDialog.tsx",
+      "name": "SaveProjectDialog",
+      "line": 22,
+      "line_count": 61
+    },
+    {
+      "path": "src/lib/audio/padPlayer.test.ts",
+      "name": "<arrow>",
+      "line": 371,
+      "line_count": 61
+    },
+    {
+      "path": "src/lib/schemas.test.ts",
+      "name": "<arrow>",
+      "line": 373,
+      "line_count": 61
+    }
+  ]
+}

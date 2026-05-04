@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this diff — both modifications are internal developer tooling only.
+- Added a `fallow_health.json` code quality report showing 240 files analyzed with an average maintainability score of 90.0 and zero dead code or circular dependencies.
+- Expanded allowed developer tool commands in local Claude Code settings (ESLint, Cargo check/doc).
 - Fixed pads briefly flashing as inactive between chained sounds during sequential/shuffled playback
 - Fixed pads remaining stuck in "playing" state when a loop or hold chain has no sounds to restart with
 - Improved pad display updates when a looping chain restarts
