@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Album artwork embedded in audio files is now automatically extracted and displayed on pad buttons while they're playing
+- Pads show a blurred cover art background instead of a solid black overlay when triggered
+- A cover art thumbnail appears in the sound name overlay on active pads
+- Cover art stays visible for the full duration of playback, even as track metadata advances
 - Album/cover art embedded in audio files (MP3, FLAC, OGG, M4A, WAV) is now automatically extracted and displayed throughout the app.
 - Sound library entries show cover art thumbnails with a blurred background effect instead of a generic music note icon.
 - Active pads display a blurred cover art background while a sound is playing.

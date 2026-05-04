@@ -313,6 +313,7 @@ export async function startLayerSound(
         layerName: layer.name,
         playbackMode: layer.playbackMode,
         durationMs: sound.durationMs,
+        coverArtDataUrl: sound.coverArtDataUrl,
       });
     }
     usePlaybackStore.getState().addPlayingPad(pad.id);

@@ -16,6 +16,7 @@ import { PadButtonProgress } from "./PadButtonProgress";
 import { PadButtonFadeOverlay } from "./PadButtonFadeOverlay";
 import { PadFadePopoverContent } from "./PadFadePopoverContent";
 import { PadSoundMetadataDisplay } from "./PadSoundMetadataDisplay";
+import { PadCoverArt } from "./PadCoverArt";
 import { usePadDisplayStore } from "@/state/padDisplayStore";
 import { PAD_FLIP_DURATION_MS, PAD_FLIP_EASE, PAD_STAGGER_MS } from "./padAnimations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -146,6 +147,7 @@ function PadFrontFace({
   showVolumeDisplay, volumeExiting, displayVolume, isPopoverOpen, padSoundState,
 }: PadFrontFaceProps) {
   const currentVoice = usePadDisplayStore((s) => s.currentVoice[pad.id] ?? null);
+  const hasCoverArt = !!currentVoice?.coverArtDataUrl;
 
   return (
     <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
@@ -154,11 +156,12 @@ function PadFrontFace({
         {...(multiFadeActive ? multiFadeHandlers : (isUnplayable ? {} : gestureHandlers))}
         className={getPadButtonClassName(isUnplayable, multiFadeActive, multiFadeSelectionClass, isPlaying)}
         style={{
-          backgroundColor: isPlaying ? "#000" : (pad.color ?? undefined),
+          backgroundColor: isPlaying ? (hasCoverArt ? "rgba(0,0,0,0.6)" : "#000") : (pad.color ?? undefined),
           transition: "background-color 0.7s ease",
           color: isPlaying ? "#fff" : undefined,
         }}
       >
+        <PadCoverArt padId={pad.id} />
         {/* Volume transition bar — fades in on enter, lingers 450ms, then fades out */}
         {showVolumeDisplay && (
           <motion.div

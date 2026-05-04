@@ -23,6 +23,7 @@ pub fn run() {
             commands::pick_file_and_grant,
             commands::pick_files_and_grant,
             commands::restore_path_scope,
+            commands::extract_cover_art,
         ]);
 
     #[cfg(debug_assertions)]
