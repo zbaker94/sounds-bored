@@ -324,11 +324,32 @@ export function SoundList({
                 )}
               </ItemMedia>
               <ItemMedia>
-                <HugeiconsIcon
-                  icon={Music}
-                  size={14}
-                  className={isSoundMissing ? "text-destructive/70" : undefined}
-                />
+                {sound.coverArtDataUrl && !isSoundMissing ? (
+                  <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        backgroundImage: `url(${sound.coverArtDataUrl})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        filter: "blur(4px) brightness(0.7)",
+                        transform: "scale(1.2)",
+                      }}
+                    />
+                    <img
+                      data-testid="sound-cover-art"
+                      src={sound.coverArtDataUrl}
+                      className="relative w-full h-full object-contain"
+                      alt=""
+                    />
+                  </div>
+                ) : (
+                  <HugeiconsIcon
+                    icon={Music}
+                    size={14}
+                    className={isSoundMissing ? "text-destructive/70" : undefined}
+                  />
+                )}
               </ItemMedia>
               <ItemContent>
                 <ItemTitle

@@ -90,6 +90,14 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
         <span className={`text-xs ${layerActive ? "text-emerald-400" : "text-muted-foreground"}`}>
           {layerActive ? "\u25CF" : "\u25CB"}
         </span>
+        {allSounds.length === 1 && allSounds[0]?.coverArtDataUrl && (
+          <img
+            data-testid="layer-cover-art-thumbnail"
+            src={allSounds[0].coverArtDataUrl}
+            className="w-4 h-4 rounded-sm object-cover flex-shrink-0"
+            alt=""
+          />
+        )}
         <span className="text-xs font-medium flex-1 truncate">Layer {index + 1}</span>
 
         <AnimatePresence mode="wait">
@@ -156,7 +164,14 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
               <PopoverContent side="top" sideOffset={6} className="w-48 p-2">
                 <ol className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
                   {allSounds.map((s, i) => (
-                    <li key={s.id} className="text-xs py-0.5 text-muted-foreground">{i + 1}. {s.name}</li>
+                    <li key={s.id} className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+                      {s.coverArtDataUrl ? (
+                        <img src={s.coverArtDataUrl} className="w-4 h-4 rounded-sm object-cover flex-shrink-0" alt="" />
+                      ) : (
+                        <span className="w-4 flex-shrink-0" />
+                      )}
+                      {i + 1}. {s.name}
+                    </li>
                   ))}
                 </ol>
               </PopoverContent>

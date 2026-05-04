@@ -1001,6 +1001,47 @@ pub fn restore_path_scope(app: AppHandle, path: String) -> Result<(), String> {
     apply_scope_grants(&app, &path)
 }
 
+/// Extracts embedded cover art from an audio file and returns it as a base64
+/// data URL (e.g. "data:image/jpeg;base64,..."), or null if none is present.
+/// Supports MP3 (ID3v2 APIC), FLAC (PICTURE block), OGG Vorbis, M4A (covr), WAV.
+#[tauri::command]
+pub fn extract_cover_art(path: String) -> Result<Option<String>, String> {
+    use lofty::prelude::*;
+    use lofty::probe::Probe;
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+    validate_grant_path(&path)?;
+
+    let tagged_file = Probe::open(&path)
+        .map_err(|e| e.to_string())?
+        .read()
+        .map_err(|e| e.to_string())?;
+
+    use lofty::picture::MimeType;
+    for tag in tagged_file.tags() {
+        for picture in tag.pictures() {
+            let data = picture.data();
+            if data.is_empty() {
+                continue;
+            }
+            // Only allow known raster image types; reject Unknown/SVG to prevent
+            // CSS injection via backgroundImage and SVG script execution in <img>.
+            let mime_str = match picture.mime_type() {
+                Some(MimeType::Jpeg) => "image/jpeg",
+                Some(MimeType::Png) => "image/png",
+                Some(MimeType::Gif) => "image/gif",
+                Some(MimeType::Bmp) => "image/bmp",
+                Some(MimeType::Tiff) => "image/tiff",
+                _ => continue,
+            };
+            let encoded = STANDARD.encode(data);
+            return Ok(Some(format!("data:{};base64,{}", mime_str, encoded)));
+        }
+    }
+
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1496,3 +1496,24 @@ describe("SetSchema", () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe("SoundSchema — coverArtDataUrl", () => {
+  const base = { id: "s1", name: "Test", tags: [], sets: [] };
+
+  it("accepts a sound without coverArtDataUrl (field absent)", () => {
+    expect(SoundSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("accepts a valid base64 data URL", () => {
+    expect(SoundSchema.safeParse({ ...base, coverArtDataUrl: "data:image/jpeg;base64,abc123" }).success).toBe(true);
+  });
+
+  it("accepts empty string sentinel (checked, no art found)", () => {
+    expect(SoundSchema.safeParse({ ...base, coverArtDataUrl: "" }).success).toBe(true);
+  });
+
+  it("rejects non-string coverArtDataUrl", () => {
+    expect(SoundSchema.safeParse({ ...base, coverArtDataUrl: 123 }).success).toBe(false);
+    expect(SoundSchema.safeParse({ ...base, coverArtDataUrl: true }).success).toBe(false);
+  });
+});

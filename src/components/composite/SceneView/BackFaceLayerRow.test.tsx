@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
-import { createMockPad, createMockLayer } from "@/test/factories";
+import { createMockPad, createMockLayer, createMockSound, createMockSoundInstance } from "@/test/factories";
 import { BackFaceLayerRow } from "./BackFaceLayerRow";
 
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -91,5 +91,47 @@ describe("BackFaceLayerRow progress bar", () => {
     const bar = screen.getByTestId("back-face-layer-progress-bar") as HTMLElement;
     expect(bar).not.toBeNull();
     expect(bar.style.width).toBe("100%");
+  });
+});
+
+describe("BackFaceLayerRow cover art thumbnail", () => {
+  it("shows thumbnail in header when layer has exactly one sound with cover art", () => {
+    const sound = createMockSound({ id: "s1", filePath: "/music/kick.wav", coverArtDataUrl: "data:image/jpeg;base64,abc" });
+    const instance = createMockSoundInstance({ id: "si-1", soundId: "s1" });
+    const layer = createMockLayer({ id: "layer-art", selection: { type: "assigned", instances: [instance] } });
+    const pad = createMockPad({ id: "pad-art", layers: [layer] });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+    render(<BackFaceLayerRow pad={pad} layer={layer} index={0} onEditLayer={vi.fn()} onRemoveLayer={vi.fn()} />);
+
+    const img = screen.getByTestId("layer-cover-art-thumbnail");
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute("src", "data:image/jpeg;base64,abc");
+  });
+
+  it("does not show header thumbnail when layer has multiple sounds", () => {
+    const s1 = createMockSound({ id: "s1", filePath: "/music/kick.wav", coverArtDataUrl: "data:image/jpeg;base64,one" });
+    const s2 = createMockSound({ id: "s2", filePath: "/music/snare.wav", coverArtDataUrl: "data:image/jpeg;base64,two" });
+    const i1 = createMockSoundInstance({ id: "si-1", soundId: "s1" });
+    const i2 = createMockSoundInstance({ id: "si-2", soundId: "s2" });
+    const layer = createMockLayer({ id: "layer-multi", arrangement: "sequential", selection: { type: "assigned", instances: [i1, i2] } });
+    const pad = createMockPad({ id: "pad-multi", layers: [layer] });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2] });
+
+    render(<BackFaceLayerRow pad={pad} layer={layer} index={0} onEditLayer={vi.fn()} onRemoveLayer={vi.fn()} />);
+
+    expect(screen.queryByTestId("layer-cover-art-thumbnail")).not.toBeInTheDocument();
+  });
+
+  it("does not show header thumbnail when single sound has no cover art", () => {
+    const sound = createMockSound({ id: "s1", filePath: "/music/kick.wav" });  // no coverArtDataUrl
+    const instance = createMockSoundInstance({ id: "si-1", soundId: "s1" });
+    const layer = createMockLayer({ id: "layer-noart", selection: { type: "assigned", instances: [instance] } });
+    const pad = createMockPad({ id: "pad-noart", layers: [layer] });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+    render(<BackFaceLayerRow pad={pad} layer={layer} index={0} onEditLayer={vi.fn()} onRemoveLayer={vi.fn()} />);
+
+    expect(screen.queryByTestId("layer-cover-art-thumbnail")).not.toBeInTheDocument();
   });
 });

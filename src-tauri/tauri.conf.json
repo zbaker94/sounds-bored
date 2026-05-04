@@ -25,7 +25,8 @@
           "'self'",
           "asset:",
           "http://asset.localhost",
-          "https://asset.localhost"
+          "https://asset.localhost",
+          "data:"
         ],
         "media-src": [
           "'self'",
