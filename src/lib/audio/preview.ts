@@ -93,9 +93,10 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
         // play() rejected (autoplay policy, decode error, permission denied, etc.).
         // Tear down the partial audio graph so we don't leak the source node or
         // leave isPreviewPlaying=true with no active voice.
-        try { sourceNode.disconnect(); previewGain.disconnect(); } catch { /* already disconnected */ }
+        try { sourceNode.disconnect(); previewGain.disconnect(); previewLimiter.disconnect(); } catch { /* already disconnected */ }
         if (currentStreamingAudio === audio) {
           currentStreamingAudio = null;
+          currentPreviewLimiter = null;
         }
         throw err;
       }

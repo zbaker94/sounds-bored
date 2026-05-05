@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed an audio resource leak where the preview limiter node was not disconnected when playback failed (e.g., due to autoplay policy or permission errors)
 - Sound previews now route through a dynamics compressor (limiter) before the master output, preventing clipping on loud sounds during preview playback.
 - Fixed audio resource cleanup so per-pad limiter nodes are properly released when individual pads are stopped or removed, preventing potential audio glitches or memory leaks.
 - Normalization can now boost quiet sounds beyond unity gain, resulting in louder, more consistent playback for quiet audio files.

@@ -158,9 +158,11 @@ describe("preview — streaming path (large files)", () => {
     const { playPreview } = await import("./preview");
     const sound = createMockSound({ filePath: "ambient.wav" });
 
+    vi.mocked(mockLimiterNode.disconnect).mockReset();
     await expect(playPreview(sound)).rejects.toThrow("NotAllowedError");
 
     expect(mockSourceNode.disconnect).toHaveBeenCalledOnce();
+    expect(mockLimiterNode.disconnect).toHaveBeenCalledOnce();
     expect(mockSetIsPreviewPlaying).toHaveBeenCalledWith(false);
   });
 
