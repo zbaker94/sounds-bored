@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed audio preview not fully cleaning up when stopped, which could cause lingering gain nodes and audio artifacts
+- Improved reliability of loudness and genre/mood analysis by using a stricter type system internally, reducing the chance of mismatched analysis results
+- "Skip already analyzed" in the analysis warning dialog now more accurately identifies which sounds have already been analyzed for the selected analysis type
 - Loudness and Genre/Mood analysis are now separate actions — select sounds and choose "Loudness" or "Genre/Mood" independently instead of running both together
 - The analysis status indicator now shows specific progress text ("Analyzing loudness…" or "Analyzing genre/mood…") instead of the generic "Analyzing sounds…"
 - Running a Genre/Mood analysis no longer overwrites existing loudness data, and vice versa — each analysis type only updates its own fields

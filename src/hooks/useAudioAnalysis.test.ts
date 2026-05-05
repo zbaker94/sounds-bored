@@ -58,7 +58,7 @@ describe("useAudioAnalysis", () => {
 
   it("records started event into store", async () => {
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", type: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
@@ -78,7 +78,7 @@ describe("useAudioAnalysis", () => {
   it("updates loudnessLufs only on loudness-type complete", async () => {
     const sound = createMockSound({ id: "s1", filePath: "/a.wav" });
     useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", type: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
@@ -96,7 +96,7 @@ describe("useAudioAnalysis", () => {
   it("updates genre and mood only on genre-type complete", async () => {
     const sound = createMockSound({ id: "s1", filePath: "/a.wav", loudnessLufs: -14 });
     useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", type: "genre" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "genre" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
@@ -113,7 +113,7 @@ describe("useAudioAnalysis", () => {
 
   it("records error and dispatches next when error is set", async () => {
     const { logError } = await import("@/lib/logger");
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", type: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
@@ -127,7 +127,7 @@ describe("useAudioAnalysis", () => {
   });
 
   it("ignores a malformed complete payload", async () => {
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", type: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
@@ -140,7 +140,7 @@ describe("useAudioAnalysis", () => {
   });
 
   it("calls dispatchNextFromQueue after each completed event", async () => {
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", type: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());

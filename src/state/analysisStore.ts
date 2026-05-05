@@ -3,7 +3,7 @@ import { create } from "zustand";
 type AnalysisStatus = "idle" | "running" | "completed";
 
 export type AnalysisType = "loudness" | "genre";
-export type AnalysisEntry = { id: string; path: string; type: AnalysisType };
+export type AnalysisEntry = { id: string; path: string; analysisType: AnalysisType };
 
 interface AnalysisState {
   status: AnalysisStatus;
@@ -48,6 +48,8 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
       completedCount: 0,
       errors: {},
       pendingQueue: queue,
+      currentSoundId: null,
+      currentAnalysisType: null,
     }),
 
   recordStarted: (soundId, type) => set({ currentSoundId: soundId, currentAnalysisType: type }),

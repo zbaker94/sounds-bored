@@ -8,6 +8,7 @@ import type { Sound } from "@/lib/schemas";
 
 let currentSource: AudioBufferSourceNode | null = null;
 let currentStreamingAudio: HTMLAudioElement | null = null;
+let currentPreviewGain: GainNode | null = null;
 let previewRafId: number | null = null;
 // Tracks the last emitted progress so the RAF loop skips no-op store updates,
 // mirroring the PROGRESS_EPSILON diff guard used by audioTick.ts.
@@ -42,6 +43,10 @@ export function stopPreview(): void {
     currentStreamingAudio.currentTime = 0;
     currentStreamingAudio = null;
   }
+  if (currentPreviewGain) {
+    try { currentPreviewGain.disconnect(); } catch { /* already disconnected */ }
+    currentPreviewGain = null;
+  }
   stopPreviewRaf();
   usePlaybackStore.getState().setIsPreviewPlaying(false);
 }
@@ -65,6 +70,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       sourceNode.connect(previewGain);
       previewGain.connect(getMasterGain());
       currentStreamingAudio = audio;
+      currentPreviewGain = previewGain;
       audio.onended = () => {
         if (currentStreamingAudio === audio) {
           currentStreamingAudio = null;
@@ -108,6 +114,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
       source.connect(previewGain);
       previewGain.connect(getMasterGain());
+      currentPreviewGain = previewGain;
       source.onended = () => {
         if (currentSource === source) {
           currentSource = null;

@@ -17,7 +17,7 @@ import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
 import { DownloadDialog } from "@/components/modals/DownloadDialog";
-import { AnalysisWarningDialog, shouldWarnBeforeAnalysis } from "@/components/modals/AnalysisWarningDialog";
+import { AnalysisWarningDialog, shouldWarnBeforeAnalysis, isSoundAnalyzedForType } from "@/components/modals/AnalysisWarningDialog";
 import { DownloadStatusButton } from "@/components/composite/DownloadManager/DownloadStatusButton";
 import { AnalysisStatusButton } from "./AnalysisStatusButton";
 import { FolderBrowser } from "./FolderBrowser";
@@ -207,11 +207,7 @@ export function SoundsPanel() {
         onSkipAnalyzed={() => {
           const type = analysisWarningType!;
           setAnalysisWarningType(null);
-          const unanalyzed = selectedSounds.filter(
-            type === "loudness"
-              ? (s) => s.loudnessLufs === undefined
-              : (s) => s.genre === undefined && s.mood === undefined,
-          );
+          const unanalyzed = selectedSounds.filter((s) => !isSoundAnalyzedForType(s, type));
           void scheduleAnalysisForSounds(unanalyzed, type);
         }}
         onAnalyzeAll={() => {

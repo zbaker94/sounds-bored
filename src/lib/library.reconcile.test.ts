@@ -1044,8 +1044,8 @@ describe("scheduleAnalysisForUnanalyzed", () => {
       entries: [{ id: "s2", path: "/music/b.wav", analysisType: "loudness" }],
     });
     expect(useAnalysisStore.getState().pendingQueue).toEqual([
-      { id: "s3", path: "/music/c.wav", type: "loudness" },
-      { id: "s1", path: "/music/a.wav", type: "loudness" },
+      { id: "s3", path: "/music/c.wav", analysisType: "loudness" },
+      { id: "s1", path: "/music/a.wav", analysisType: "loudness" },
     ]);
     expect(useAnalysisStore.getState().queueLength).toBe(3);
     expect(useAnalysisStore.getState().status).toBe("running");

@@ -20,10 +20,14 @@ interface AnalysisWarningDialogProps {
   onCancel: () => void;
 }
 
+export function isSoundAnalyzedForType(sound: Sound, type: AnalysisType): boolean {
+  return type === "loudness"
+    ? sound.loudnessLufs !== undefined
+    : sound.genre !== undefined || sound.mood !== undefined;
+}
+
 function countAnalyzed(sounds: Sound[], type: AnalysisType): number {
-  return sounds.filter((s) =>
-    type === "loudness" ? s.loudnessLufs !== undefined : s.genre !== undefined || s.mood !== undefined,
-  ).length;
+  return sounds.filter((s) => isSoundAnalyzedForType(s, type)).length;
 }
 
 const TYPE_LABEL: Record<AnalysisType, string> = {
@@ -81,9 +85,7 @@ export function AnalysisWarningDialog({
 }
 
 export function shouldWarnBeforeAnalysis(sounds: Sound[], type: AnalysisType): boolean {
-  const hasAnalyzed = sounds.some((s) =>
-    type === "loudness" ? s.loudnessLufs !== undefined : s.genre !== undefined || s.mood !== undefined,
-  );
+  const hasAnalyzed = sounds.some((s) => isSoundAnalyzedForType(s, type));
   const totalBytes = sounds.reduce((sum, s) => sum + (s.fileSizeBytes ?? 0), 0);
   const hasLargeFiles =
     sounds.some((s) => (s.fileSizeBytes ?? 0) >= ANALYSIS_LARGE_FILE_BYTES) ||

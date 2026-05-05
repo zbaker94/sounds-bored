@@ -363,10 +363,8 @@ export async function dispatchNextFromQueue(): Promise<void> {
   while (true) {
     const next = useAnalysisStore.getState().dequeueNext();
     if (!next) return;
-    // Map TS `type` to the camelCase field the Rust command expects.
-    const entry = { id: next.id, path: next.path, analysisType: next.type };
     try {
-      await invoke<void>("start_audio_analysis", { entries: [entry] });
+      await invoke<void>("start_audio_analysis", { entries: [next] });
       return; // success — wait for the complete event to drive the next dispatch
     } catch (err) {
       logError("start_audio_analysis failed", { soundId: next.id, err: String(err) });
@@ -387,7 +385,7 @@ export async function scheduleAnalysisForSounds(sounds: Sound[], type: AnalysisT
   const queue = sounds
     .filter((s) => s.filePath)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath!, type }));
+    .map((s) => ({ id: s.id, path: s.filePath!, analysisType: type }));
   if (queue.length === 0) return;
   useAnalysisStore.getState().startAnalysis(queue);
   await dispatchNextFromQueue();
@@ -409,7 +407,7 @@ export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<vo
   const queue = sounds
     .filter((s) => s.filePath && s.loudnessLufs === undefined)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath!, type: "loudness" as const }));
+    .map((s) => ({ id: s.id, path: s.filePath!, analysisType: "loudness" as const }));
   if (queue.length === 0) return;
   useAnalysisStore.getState().startAnalysis(queue);
   await dispatchNextFromQueue();

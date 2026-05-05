@@ -6,7 +6,7 @@ function getState() {
 }
 
 function makeQueue(count: number) {
-  return Array.from({ length: count }, (_, i) => ({ id: `s${i + 1}`, path: `/a${i + 1}.wav`, type: "loudness" as const }));
+  return Array.from({ length: count }, (_, i) => ({ id: `s${i + 1}`, path: `/a${i + 1}.wav`, analysisType: "loudness" as const }));
 }
 
 describe("analysisStore", () => {
@@ -124,8 +124,8 @@ describe("analysisStore", () => {
       const queue = makeQueue(2);
       getState().startAnalysis(queue);
       const next = getState().dequeueNext();
-      expect(next).toEqual({ id: "s1", path: "/a1.wav", type: "loudness" });
-      expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav", type: "loudness" }]);
+      expect(next).toEqual({ id: "s1", path: "/a1.wav", analysisType: "loudness" });
+      expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav", analysisType: "loudness" }]);
     });
 
     it("returns undefined when queue is empty", () => {

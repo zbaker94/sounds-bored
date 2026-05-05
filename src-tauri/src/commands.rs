@@ -1047,11 +1047,18 @@ pub fn extract_cover_art(path: String) -> Result<Option<String>, String> {
 const ANALYSIS_EVENT: &str = "audio::analysis::complete";
 const ANALYSIS_STARTED_EVENT: &str = "audio::analysis::started";
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AnalysisType {
+    Loudness,
+    Genre,
+}
+
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisStartedEvent {
     pub sound_id: String,
-    pub analysis_type: String,
+    pub analysis_type: AnalysisType,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -1059,7 +1066,7 @@ pub struct AnalysisStartedEvent {
 pub struct AnalysisEntry {
     pub id: String,
     pub path: String,
-    pub analysis_type: String,
+    pub analysis_type: AnalysisType,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -1070,7 +1077,7 @@ pub struct AnalysisCompleteEvent {
     pub genre: Option<String>,
     pub mood: Option<String>,
     pub error: Option<String>,
-    pub analysis_type: String,
+    pub analysis_type: AnalysisType,
 }
 
 fn decode_audio_to_f32(abs_path: &str) -> Result<(Vec<f32>, u32, usize), String> {
@@ -1184,52 +1191,57 @@ pub async fn start_audio_analysis(app: AppHandle, entries: Vec<AnalysisEntry>) -
                 analysis_type: entry.analysis_type.clone(),
             });
 
-            let event = if entry.analysis_type == "genre" {
-                let result = (|| -> Result<(Option<String>, Option<String>), String> {
-                    let (samples, sample_rate, _) = decode_audio_to_f32(&entry.path)?;
-                    extract_mir(&samples, sample_rate)
-                })();
-                match result {
-                    Ok((genre, mood)) => AnalysisCompleteEvent {
-                        sound_id: entry.id.clone(),
-                        loudness_lufs: None,
-                        genre,
-                        mood,
-                        error: None,
-                        analysis_type: entry.analysis_type.clone(),
-                    },
-                    Err(e) => AnalysisCompleteEvent {
-                        sound_id: entry.id.clone(),
-                        loudness_lufs: None,
-                        genre: None,
-                        mood: None,
-                        error: Some(e),
-                        analysis_type: entry.analysis_type.clone(),
-                    },
+            let event = match entry.analysis_type {
+                AnalysisType::Genre => {
+                    let result = (|| -> Result<(Option<String>, Option<String>), String> {
+                        let (samples, sample_rate, _) = decode_audio_to_f32(&entry.path)?;
+                        extract_mir(&samples, sample_rate)
+                    })();
+                    match result {
+                        Ok((genre, mood)) => AnalysisCompleteEvent {
+                            sound_id: entry.id.clone(),
+                            loudness_lufs: None,
+                            genre,
+                            mood,
+                            error: None,
+                            analysis_type: entry.analysis_type,
+                        },
+                        Err(e) => AnalysisCompleteEvent {
+                            sound_id: entry.id.clone(),
+                            loudness_lufs: None,
+                            genre: None,
+                            mood: None,
+                            error: Some(e),
+                            analysis_type: entry.analysis_type,
+                        },
+                    }
                 }
-            } else {
-                // "loudness" (default) — decode + EBU R128 only
-                let result = (|| -> Result<f64, String> {
-                    let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
-                    measure_loudness(&samples, sample_rate, channels)
-                })();
-                match result {
-                    Ok(lufs) => AnalysisCompleteEvent {
-                        sound_id: entry.id.clone(),
-                        loudness_lufs: Some(lufs),
-                        genre: None,
-                        mood: None,
-                        error: None,
-                        analysis_type: entry.analysis_type.clone(),
-                    },
-                    Err(e) => AnalysisCompleteEvent {
-                        sound_id: entry.id.clone(),
-                        loudness_lufs: None,
-                        genre: None,
-                        mood: None,
-                        error: Some(e),
-                        analysis_type: entry.analysis_type.clone(),
-                    },
+                AnalysisType::Loudness => {
+                    // TODO: if a future "full" analysis type (loudness + genre) is added,
+                    // the decode step here can be shared with the genre branch to avoid
+                    // reading the file twice.
+                    let result = (|| -> Result<f64, String> {
+                        let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
+                        measure_loudness(&samples, sample_rate, channels)
+                    })();
+                    match result {
+                        Ok(lufs) => AnalysisCompleteEvent {
+                            sound_id: entry.id.clone(),
+                            loudness_lufs: Some(lufs),
+                            genre: None,
+                            mood: None,
+                            error: None,
+                            analysis_type: entry.analysis_type,
+                        },
+                        Err(e) => AnalysisCompleteEvent {
+                            sound_id: entry.id.clone(),
+                            loudness_lufs: None,
+                            genre: None,
+                            mood: None,
+                            error: Some(e),
+                            analysis_type: entry.analysis_type,
+                        },
+                    }
                 }
             };
 
