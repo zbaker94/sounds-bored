@@ -53,6 +53,7 @@
  * Name               | Keys       | Values                                    | Purpose                                         | Cleared by
  * -------------------|------------|-------------------------------------------|-------------------------------------------------|-----------------------------------
  * padGainMap         | pad ID     | GainNode                                  | Per-pad gain node in audio graph                | clearAllPadGains() (disconnects+clears), stopAllPads()
+ * padLimiterMap      | pad ID     | DynamicsCompressorNode                    | Per-pad brickwall limiter after padGain         | clearAllPadGains() (disconnects+clears)
  * layerGainMap       | layer ID   | GainNode                                  | Per-layer gain node, connects to padGain        | clearAllLayerGains() (disconnects+clears), stopAllPads()
  * voiceMap           | pad ID     | AudioVoice[]                              | Active voices per pad (UI + stop tracking)      | clearAllVoices(), stopAllVoices()
  * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
@@ -71,13 +72,17 @@
 import { getAudioContext, getMasterGain } from "./audioContext";
 import type { AudioVoice } from "./audioVoice";
 import type { Sound } from "@/lib/schemas";
+import { createLimiterNode } from "./gainNormalization";
 
 // ---------------------------------------------------------------------------
 // Private state â€” all 11 Maps/Sets
 // ---------------------------------------------------------------------------
 
-/** Per-pad GainNodes: source(s) -> voiceGain -> layerGain -> padGain -> masterGain -> destination */
+/** Per-pad GainNodes: source(s) -> voiceGain -> layerGain -> padGain -> padLimiter -> masterGain -> destination */
 const padGainMap = new Map<string, GainNode>();
+
+/** Per-pad DynamicsCompressorNodes: padGain → padLimiter → masterGain → destination */
+const padLimiterMap = new Map<string, DynamicsCompressorNode>();
 
 /** Active voices per pad. Every layer voice is also in voiceMap â€” see recordLayerVoice invariant. */
 const voiceMap = new Map<string, AudioVoice[]>();
@@ -333,7 +338,10 @@ export function getPadGain(padId: string): GainNode {
   const ctx = getAudioContext();
   const gain = ctx.createGain();
   gain.gain.value = 1.0;
-  gain.connect(getMasterGain());
+  const limiter = createLimiterNode(ctx);
+  gain.connect(limiter);
+  limiter.connect(getMasterGain());
+  padLimiterMap.set(padId, limiter);
   padGainMap.set(padId, gain);
   return gain;
 }
@@ -419,6 +427,8 @@ export function computeAllLayerProgress(): Record<string, number> {
 export function clearAllPadGains(): void {
   for (const gain of padGainMap.values()) gain.disconnect();
   padGainMap.clear();
+  for (const limiter of padLimiterMap.values()) limiter.disconnect();
+  padLimiterMap.clear();
 }
 
 export function clearAllLayerGains(): void {
@@ -484,6 +494,11 @@ export function clearInactivePadGains(): void {
     if (!voiceMap.has(padId)) {
       padGainMap.get(padId)!.disconnect();
       padGainMap.delete(padId);
+      const limiter = padLimiterMap.get(padId);
+      if (limiter) {
+        limiter.disconnect();
+        padLimiterMap.delete(padId);
+      }
     }
   }
 }
@@ -495,6 +510,11 @@ export function clearPadGainsForIds(padIds: ReadonlySet<string>): void {
     if (gain) {
       gain.disconnect();
       padGainMap.delete(padId);
+    }
+    const limiter = padLimiterMap.get(padId);
+    if (limiter) {
+      limiter.disconnect();
+      padLimiterMap.delete(padId);
     }
   }
 }

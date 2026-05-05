@@ -4,6 +4,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockCtx = {
   currentTime: 0,
   createGain: vi.fn(),
+  createDynamicsCompressor: vi.fn(() => ({
+    threshold: { value: 0 }, knee: { value: 0 }, ratio: { value: 1 },
+    attack: { value: 0 }, release: { value: 0 },
+    connect: vi.fn(), disconnect: vi.fn(),
+  })),
 };
 
 vi.mock("./audioContext", () => ({

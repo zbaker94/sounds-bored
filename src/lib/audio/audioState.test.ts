@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockCtx = {
   currentTime: 0,
   createGain: vi.fn(),
+  createDynamicsCompressor: vi.fn(),
 };
 
 vi.mock("./audioContext", () => ({
@@ -24,8 +25,21 @@ function makeMockGain() {
   };
 }
 
+function makeMockCompressor() {
+  return {
+    threshold: { value: 0 },
+    knee: { value: 0 },
+    ratio: { value: 1 },
+    attack: { value: 0 },
+    release: { value: 0 },
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  };
+}
+
 // ── Imports (after mocks) ────────────────────────────────────────────────────
 
+import { getMasterGain } from "./audioContext";
 import {
   getPadProgress,
   getPadGain,
@@ -33,6 +47,8 @@ import {
   cancelPadFade,
   clearAllFadeTracking,
   clearAllPadGains,
+  clearPadGainsForIds,
+  clearInactivePadGains,
   clearAllLayerGains,
   clearAllLayerChains,
   clearAllLayerCycleIndexes,
@@ -85,6 +101,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockCtx.currentTime = 0;
   mockCtx.createGain.mockImplementation(() => makeMockGain());
+  mockCtx.createDynamicsCompressor.mockImplementation(() => makeMockCompressor());
   clearAllPadGains();
   clearAllLayerGains();
   clearAllLayerChains();
@@ -1255,6 +1272,93 @@ describe("stop cleanup timeout tracking", () => {
     expect(() => clearAllAudioState()).not.toThrow();
 
     vi.useRealTimers();
+  });
+});
+
+// ── Per-pad limiter ───────────────────────────────────────────────────────────
+
+describe("getPadGain limiter wiring", () => {
+  it("creates a DynamicsCompressorNode and connects padGain → limiter → masterGain", () => {
+    const mockGain = makeMockGain();
+    const mockLimiter = makeMockCompressor();
+    const mockMaster = { connect: vi.fn() };
+    mockCtx.createGain.mockReturnValueOnce(mockGain);
+    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
+    vi.mocked(getMasterGain).mockReturnValueOnce(mockMaster as any);
+
+    getPadGain("pad-limiter-1");
+
+    expect(mockCtx.createDynamicsCompressor).toHaveBeenCalledOnce();
+    expect(mockGain.connect).toHaveBeenCalledWith(mockLimiter);
+    expect(mockLimiter.connect).toHaveBeenCalledWith(mockMaster);
+  });
+
+  it("does not create a new limiter on subsequent calls for the same pad", () => {
+    getPadGain("pad-limiter-2");
+    vi.clearAllMocks();
+    getPadGain("pad-limiter-2");
+    expect(mockCtx.createDynamicsCompressor).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearAllPadGains limiter cleanup", () => {
+  it("disconnects and clears limiters alongside pad gains", () => {
+    const mockGain = makeMockGain();
+    const mockLimiter = makeMockCompressor();
+    mockCtx.createGain.mockReturnValueOnce(mockGain);
+    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
+
+    getPadGain("pad-cl-1");
+    clearAllPadGains();
+
+    expect(mockGain.disconnect).toHaveBeenCalledOnce();
+    expect(mockLimiter.disconnect).toHaveBeenCalledOnce();
+  });
+});
+
+describe("clearInactivePadGains limiter cleanup", () => {
+  it("disconnects limiters for pads with no active voices", () => {
+    const mockGain = makeMockGain();
+    const mockLimiter = makeMockCompressor();
+    mockCtx.createGain.mockReturnValueOnce(mockGain);
+    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
+
+    getPadGain("pad-inactive-1"); // no voices registered
+
+    clearInactivePadGains();
+
+    expect(mockGain.disconnect).toHaveBeenCalledOnce();
+    expect(mockLimiter.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("does not disconnect limiters for pads that still have active voices", () => {
+    const mockGain = makeMockGain();
+    const mockLimiter = makeMockCompressor();
+    mockCtx.createGain.mockReturnValueOnce(mockGain);
+    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
+
+    getPadGain("pad-active-1");
+    const voice = { stop: vi.fn(), setOnEnded: vi.fn(), setLoop: vi.fn() } as unknown as AudioVoice;
+    recordVoice("pad-active-1", voice);
+
+    clearInactivePadGains();
+
+    expect(mockLimiter.disconnect).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearPadGainsForIds limiter cleanup", () => {
+  it("disconnects limiters for the specified pad IDs", () => {
+    const mockGain = makeMockGain();
+    const mockLimiter = makeMockCompressor();
+    mockCtx.createGain.mockReturnValueOnce(mockGain);
+    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
+
+    getPadGain("pad-scope-1");
+    clearPadGainsForIds(new Set(["pad-scope-1"]));
+
+    expect(mockGain.disconnect).toHaveBeenCalledOnce();
+    expect(mockLimiter.disconnect).toHaveBeenCalledOnce();
   });
 });
 
