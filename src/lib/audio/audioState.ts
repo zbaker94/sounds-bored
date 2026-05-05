@@ -53,7 +53,7 @@
  * Name               | Keys       | Values                                    | Purpose                                         | Cleared by
  * -------------------|------------|-------------------------------------------|-------------------------------------------------|-----------------------------------
  * padGainMap         | pad ID     | GainNode                                  | Per-pad gain node in audio graph                | clearAllPadGains() (disconnects+clears), stopAllPads()
- * padLimiterMap      | pad ID     | DynamicsCompressorNode                    | Per-pad brickwall limiter after padGain         | clearAllPadGains() (disconnects+clears)
+ * padLimiterMap      | pad ID     | DynamicsCompressorNode                    | Per-pad brickwall limiter after padGain         | clearAllPadGains(), clearPadGainsForIds(), clearInactivePadGains()
  * layerGainMap       | layer ID   | GainNode                                  | Per-layer gain node, connects to padGain        | clearAllLayerGains() (disconnects+clears), stopAllPads()
  * voiceMap           | pad ID     | AudioVoice[]                              | Active voices per pad (UI + stop tracking)      | clearAllVoices(), stopAllVoices()
  * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
