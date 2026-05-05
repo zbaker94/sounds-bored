@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Sounds are now automatically normalized to a consistent loudness level (-14 LUFS) during playback, so pads no longer vary wildly in volume
 - Fixed audio preview not fully cleaning up when stopped, which could cause lingering gain nodes and audio artifacts
 - Improved reliability of loudness and genre/mood analysis by using a stricter type system internally, reducing the chance of mismatched analysis results
 - "Skip already analyzed" in the analysis warning dialog now more accurately identifies which sounds have already been analyzed for the selected analysis type
