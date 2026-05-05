@@ -1,7 +1,7 @@
 import { ensureResumed, getMasterGain } from "./audioContext";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile } from "./streamingCache";
-import { normalizedVoiceGain } from "./gainNormalization";
+import { normalizedVoiceGain, createLimiterNode } from "./gainNormalization";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Sound } from "@/lib/schemas";
@@ -9,6 +9,7 @@ import type { Sound } from "@/lib/schemas";
 let currentSource: AudioBufferSourceNode | null = null;
 let currentStreamingAudio: HTMLAudioElement | null = null;
 let currentPreviewGain: GainNode | null = null;
+let currentPreviewLimiter: DynamicsCompressorNode | null = null;
 let previewRafId: number | null = null;
 // Tracks the last emitted progress so the RAF loop skips no-op store updates,
 // mirroring the PROGRESS_EPSILON diff guard used by audioTick.ts.
@@ -47,6 +48,10 @@ export function stopPreview(): void {
     try { currentPreviewGain.disconnect(); } catch { /* already disconnected */ }
     currentPreviewGain = null;
   }
+  if (currentPreviewLimiter) {
+    try { currentPreviewLimiter.disconnect(); } catch { /* already disconnected */ }
+    currentPreviewLimiter = null;
+  }
   stopPreviewRaf();
   usePlaybackStore.getState().setIsPreviewPlaying(false);
 }
@@ -67,10 +72,13 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       const sourceNode = ctx.createMediaElementSource(audio);
       const previewGain = ctx.createGain();
       previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
+      const previewLimiter = createLimiterNode(ctx);
       sourceNode.connect(previewGain);
-      previewGain.connect(getMasterGain());
+      previewGain.connect(previewLimiter);
+      previewLimiter.connect(getMasterGain());
       currentStreamingAudio = audio;
       currentPreviewGain = previewGain;
+      currentPreviewLimiter = previewLimiter;
       audio.onended = () => {
         if (currentStreamingAudio === audio) {
           currentStreamingAudio = null;
@@ -112,9 +120,12 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       source.buffer = buffer;
       const previewGain = ctx.createGain();
       previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
+      const previewLimiter = createLimiterNode(ctx);
       source.connect(previewGain);
-      previewGain.connect(getMasterGain());
+      previewGain.connect(previewLimiter);
+      previewLimiter.connect(getMasterGain());
       currentPreviewGain = previewGain;
+      currentPreviewLimiter = previewLimiter;
       source.onended = () => {
         if (currentSource === source) {
           currentSource = null;

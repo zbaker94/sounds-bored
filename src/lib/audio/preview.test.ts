@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createMockSound } from "@/test/factories";
+import { getMasterGain } from "./audioContext";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mockSourceNode = { connect: vi.fn(), disconnect: vi.fn() };
 const mockGainNode = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+const mockLimiterNode = {
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  threshold: { value: 0 },
+  knee: { value: 0 },
+  ratio: { value: 1 },
+  attack: { value: 0 },
+  release: { value: 0 },
+};
 
 const mockCtx = {
   createMediaElementSource: vi.fn(() => mockSourceNode),
@@ -15,6 +25,7 @@ const mockCtx = {
     onended: null as (() => void) | null,
   })),
   createGain: vi.fn(() => mockGainNode),
+  createDynamicsCompressor: vi.fn(() => mockLimiterNode),
 };
 
 vi.mock("./audioContext", () => ({
@@ -86,10 +97,13 @@ describe("preview — streaming path (large files)", () => {
     mockAudioInstances.length = 0;
     mockCtx.createMediaElementSource.mockClear();
     mockCtx.createGain.mockClear();
+    mockCtx.createDynamicsCompressor.mockClear();
     mockSourceNode.connect.mockClear();
     mockSourceNode.disconnect.mockClear();
     mockGainNode.connect.mockClear();
     mockGainNode.disconnect.mockClear();
+    vi.mocked(mockLimiterNode.connect).mockReset();
+    vi.mocked(mockLimiterNode.disconnect).mockReset();
     mockSetIsPreviewPlaying.mockClear();
     mockSetPreviewProgress.mockClear();
     // Restore default happy-path Audio stub so tests that replace it don't bleed into siblings
@@ -166,6 +180,8 @@ describe("preview — buffer path (small files)", () => {
   beforeEach(async () => {
     mockSetIsPreviewPlaying.mockClear();
     mockSetPreviewProgress.mockClear();
+    vi.mocked(mockLimiterNode.connect).mockReset();
+    vi.mocked(mockLimiterNode.disconnect).mockReset();
     // Force the buffer branch (not a large file)
     const mod = await import("./streamingCache");
     (mod.checkIsLargeFile as ReturnType<typeof vi.fn>).mockResolvedValue(false);
@@ -235,5 +251,65 @@ describe("preview — buffer path (small files)", () => {
     capturedOnEnded?.();
 
     expect(onEnded).not.toHaveBeenCalled();
+  });
+});
+
+describe("playPreview limiter wiring (buffer path)", () => {
+  beforeEach(async () => {
+    mockSetIsPreviewPlaying.mockClear();
+    mockSetPreviewProgress.mockClear();
+    vi.mocked(mockLimiterNode.connect).mockReset();
+    vi.mocked(mockLimiterNode.disconnect).mockReset();
+    mockCtx.createDynamicsCompressor.mockClear();
+    mockGainNode.connect.mockClear();
+    // Force the buffer branch (not a large file)
+    const mod = await import("./streamingCache");
+    (mod.checkIsLargeFile as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    // Reset module-level state
+    const { stopPreview } = await import("./preview");
+    stopPreview();
+  });
+
+  it("creates a DynamicsCompressorNode and wires previewGain → limiter → masterGain", async () => {
+    const sound = createMockSound({ loudnessLufs: -20 });
+    const mockMaster = { connect: vi.fn() };
+    vi.mocked(getMasterGain).mockReturnValueOnce(mockMaster as any);
+
+    const { playPreview } = await import("./preview");
+    await playPreview(sound);
+
+    expect(mockCtx.createDynamicsCompressor).toHaveBeenCalledOnce();
+    expect(mockGainNode.connect).toHaveBeenCalledWith(mockLimiterNode);
+    expect(mockLimiterNode.connect).toHaveBeenCalledWith(mockMaster);
+  });
+});
+
+describe("stopPreview limiter teardown", () => {
+  beforeEach(async () => {
+    mockSetIsPreviewPlaying.mockClear();
+    mockSetPreviewProgress.mockClear();
+    vi.mocked(mockLimiterNode.connect).mockReset();
+    vi.mocked(mockLimiterNode.disconnect).mockReset();
+    // Force the buffer branch (not a large file)
+    const mod = await import("./streamingCache");
+    (mod.checkIsLargeFile as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    // Reset module-level state
+    const { stopPreview } = await import("./preview");
+    stopPreview();
+  });
+
+  it("disconnects the limiter node on stopPreview", async () => {
+    const sound = createMockSound({ loudnessLufs: -20 });
+    const { playPreview, stopPreview } = await import("./preview");
+    await playPreview(sound);
+    vi.mocked(mockLimiterNode.disconnect).mockReset();
+    stopPreview();
+    expect(mockLimiterNode.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("is a no-op if no preview is active", async () => {
+    const { stopPreview } = await import("./preview");
+    stopPreview(); // no prior playPreview call
+    expect(mockLimiterNode.disconnect).not.toHaveBeenCalled();
   });
 });
