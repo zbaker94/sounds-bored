@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved audio limiter accuracy with additional parameter validation for knee, attack, and release settings
 - Loudness normalization now applies a configurable boost cap (default +12 dB) instead of hard-clamping output to 1.0, allowing quiet sounds to be amplified more naturally
 - A brickwall limiter node is now available to catch audio peaks that exceed 0 dBFS after normalization, preventing distortion
 - Normalization behavior is now driven by a centralized `NormalizationConfig` (target LUFS, max boost, limiter settings) that can be customized per use case

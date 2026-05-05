@@ -129,6 +129,9 @@ describe("createLimiterNode", () => {
     createLimiterNode(mockCtx, customConfig);
 
     expect(mockLimiter.threshold.value).toBe(-6);
+    expect(mockLimiter.knee.value).toBe(3);
     expect(mockLimiter.ratio.value).toBe(10);
+    expect(mockLimiter.attack.value).toBe(0.005);
+    expect(mockLimiter.release.value).toBe(0.2);
   });
 });
