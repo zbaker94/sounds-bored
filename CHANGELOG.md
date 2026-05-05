@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Normalization can now boost quiet sounds beyond unity gain, resulting in louder, more consistent playback for quiet audio files.
+- A limiter node now handles audio peaks instead of hard-clamping gain at 1.0, reducing distortion on loud sounds while allowing quieter sounds to be fully boosted.
 - Audio output now passes through a per-pad brickwall limiter, preventing clipping and distortion when multiple sounds play simultaneously on the same pad.
 - Improved audio limiter accuracy with additional parameter validation for knee, attack, and release settings
 - Loudness normalization now applies a configurable boost cap (default +12 dB) instead of hard-clamping output to 1.0, allowing quiet sounds to be amplified more naturally

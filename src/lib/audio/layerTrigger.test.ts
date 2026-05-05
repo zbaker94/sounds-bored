@@ -200,14 +200,15 @@ describe("layerTrigger", () => {
       expect(result).toBeLessThanOrEqual(1.0);
     });
 
-    it("clamps to 1.0 when normalization would exceed unity gain", async () => {
+    it("applies normalization boost (no longer clamped to 1.0)", async () => {
       const { getVoiceVolume } = await import("./layerTrigger");
       const sound = createMockSound({ id: "s1", loudnessLufs: -20 });
       const layer = createMockLayer({
         selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
       });
-      // rawGain = 1.0; normGain ≈ 1.995 → clamped to 1.0
-      expect(getVoiceVolume(layer, sound)).toBe(1.0);
+      // rawGain = 1.0; normGain ≈ 1.995 (targetLufs=-14, boost=6dB)
+      // No longer clamped to 1.0; limiter node handles peaks
+      expect(getVoiceVolume(layer, sound)).toBeCloseTo(Math.pow(10, 6 / 20), 4);
     });
 
     it("passes through rawGain unchanged when loudnessLufs is undefined", async () => {
