@@ -425,6 +425,17 @@ describe("useAutoSave", () => {
     expect(mockSaveProject).toHaveBeenCalledTimes(2);
   });
 
+  it("saves library even when no project is open (folderPath is null)", () => {
+    // Library is a global resource — it should save regardless of project state.
+    useProjectStore.setState({ ...initialProjectState });
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
+
+    renderHook(() => useAutoSave(30_000));
+
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
+    expect(mockSaveProject).not.toHaveBeenCalled();
+  });
+
   // ── No filesystem scan ──────────────────────────────────────────────────────
 
   it("does NOT call refreshMissingState on mount or interval ticks", () => {

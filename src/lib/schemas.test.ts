@@ -1518,3 +1518,51 @@ describe("SoundSchema — coverArtDataUrl", () => {
     expect(SoundSchema.safeParse({ ...base, coverArtDataUrl: true }).success).toBe(false);
   });
 });
+
+describe("SoundSchema — analysis fields (loudnessLufs, genre, mood)", () => {
+  const base = { id: "s1", name: "Kick", tags: [], sets: [] };
+
+  it("accepts a sound without loudnessLufs (field absent)", () => {
+    expect(SoundSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("accepts a valid negative loudnessLufs", () => {
+    expect(SoundSchema.safeParse({ ...base, loudnessLufs: -14.3 }).success).toBe(true);
+  });
+
+  it("accepts loudnessLufs at 0 (silence)", () => {
+    expect(SoundSchema.safeParse({ ...base, loudnessLufs: 0 }).success).toBe(true);
+  });
+
+  it("rejects NaN loudnessLufs", () => {
+    expect(SoundSchema.safeParse({ ...base, loudnessLufs: NaN }).success).toBe(false);
+  });
+
+  it("rejects Infinity loudnessLufs", () => {
+    expect(SoundSchema.safeParse({ ...base, loudnessLufs: Infinity }).success).toBe(false);
+    expect(SoundSchema.safeParse({ ...base, loudnessLufs: -Infinity }).success).toBe(false);
+  });
+
+  it("accepts optional genre and mood strings", () => {
+    expect(SoundSchema.safeParse({ ...base, genre: "hip-hop", mood: "energetic" }).success).toBe(true);
+  });
+
+  it("accepts sound without genre/mood", () => {
+    expect(SoundSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("rejects non-string genre", () => {
+    expect(SoundSchema.safeParse({ ...base, genre: 42 }).success).toBe(false);
+  });
+
+  it("round-trips through JSON serialization", () => {
+    const sound = { ...base, loudnessLufs: -18.7, genre: "jazz", mood: "calm" };
+    const parsed = SoundSchema.safeParse(JSON.parse(JSON.stringify(sound)));
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.loudnessLufs).toBeCloseTo(-18.7);
+      expect(parsed.data.genre).toBe("jazz");
+      expect(parsed.data.mood).toBe("calm");
+    }
+  });
+});

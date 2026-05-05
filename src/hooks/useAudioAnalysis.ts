@@ -3,12 +3,10 @@ import { listen } from "@tauri-apps/api/event";
 import { z } from "zod";
 import { useAnalysisStore } from "@/state/analysisStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { saveCurrentLibraryAndClearDirty } from "@/lib/library";
 import { dispatchNextFromQueue } from "@/lib/library.reconcile";
 import { logError } from "@/lib/logger";
-
-const ANALYSIS_COMPLETE_EVENT = "audio::analysis::complete";
-const ANALYSIS_STARTED_EVENT = "audio::analysis::started";
+import { resolveGenre } from "@/lib/genreTaxonomy";
+import { ANALYSIS_COMPLETE_EVENT, ANALYSIS_STARTED_EVENT } from "@/lib/constants";
 
 const AnalysisCompletePayloadSchema = z.object({
   soundId: z.string(),
@@ -46,17 +44,14 @@ export function useAudioAnalysis() {
       } else {
         useLibraryStore.getState().updateSoundAnalysis(soundId, {
           loudnessLufs: loudnessLufs ?? undefined,
-          genre: genre ?? undefined,
+          genre: genre != null ? resolveGenre(genre) : undefined,
           mood: mood ?? undefined,
         });
         useAnalysisStore.getState().recordComplete(soundId);
       }
 
       void dispatchNextFromQueue();
-
-      if (useAnalysisStore.getState().status === "completed") {
-        void saveCurrentLibraryAndClearDirty();
-      }
+      // Library persistence is handled by useAutoSave's interval-based dirty-flag check.
     }));
 
     return () => {

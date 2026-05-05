@@ -140,6 +140,66 @@ describe("analysisStore", () => {
     });
   });
 
+  describe("cancelQueue", () => {
+    it("clears pendingQueue and shrinks queueLength to allow progress to reach 100%", () => {
+      getState().startAnalysis(makeQueue(5));
+      getState().dequeueNext(); // simulate one dispatched
+      getState().recordComplete("s1");
+      getState().cancelQueue();
+      expect(getState().pendingQueue).toEqual([]);
+      // queueLength shrinks to completedCount (1) + inFlight (1)
+      expect(getState().queueLength).toBe(2);
+      expect(getState().analyzingCount).toBe(1);
+    });
+
+    it("reaches completed status after the in-flight item finishes post-cancel", () => {
+      getState().startAnalysis(makeQueue(3));
+      getState().dequeueNext();
+      getState().recordComplete("s1");
+      getState().cancelQueue();
+      // simulate the one remaining in-flight sound completing
+      getState().recordComplete("s2");
+      expect(getState().status).toBe("completed");
+      expect(getState().completedCount).toBe(2);
+    });
+
+    it("is a no-op when status is idle", () => {
+      getState().cancelQueue();
+      expect(getState().status).toBe("idle");
+      expect(getState().queueLength).toBe(0);
+    });
+
+    it("is a no-op when status is completed", () => {
+      getState().startAnalysis(makeQueue(1));
+      getState().recordComplete("s1");
+      expect(getState().status).toBe("completed");
+      getState().cancelQueue();
+      expect(getState().status).toBe("completed");
+    });
+
+    it("works when pendingQueue is already empty (single in-flight item)", () => {
+      getState().startAnalysis(makeQueue(1));
+      getState().dequeueNext(); // queue now empty, item is in-flight
+      expect(getState().pendingQueue).toEqual([]);
+      getState().cancelQueue(); // should still update queueLength
+      expect(getState().pendingQueue).toEqual([]);
+      expect(getState().queueLength).toBe(1);
+      // item completes → reaches completed
+      getState().recordComplete("s1");
+      expect(getState().status).toBe("completed");
+    });
+
+    it("handles cancel followed by recordError for in-flight item", () => {
+      getState().startAnalysis(makeQueue(4));
+      getState().dequeueNext();
+      getState().recordComplete("s1");
+      getState().cancelQueue();
+      getState().recordError("s2", "decode failed");
+      expect(getState().status).toBe("completed");
+      expect(getState().errors).toEqual({ s2: "decode failed" });
+    });
+  });
+
   describe("reset", () => {
     it("returns store to initial state", () => {
       getState().startAnalysis(makeQueue(5));

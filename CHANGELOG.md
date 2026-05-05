@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- You can now manually analyze selected sounds for loudness and genre/mood using an "Analyze" button that appears when sounds are selected in the library panel.
+- Each sound in the library now displays a dB adjustment pill showing how much its volume will be boosted or cut during normalization.
+- A warning dialog now appears before analysis if any selected sounds are large (>50 MB) or have already been analyzed, with an option to skip already-analyzed sounds.
+- You can now cancel a running analysis from the analysis status popover, which stops queued files while allowing the current file to finish.
+- The search box in the sounds panel now hints that you can search by genre and mood in addition to name.
 - Sounds are now automatically analyzed for loudness, genre, and mood when added to your library (enable in Settings → Playback → Auto-analyze sounds)
 - Playback volumes are automatically normalized to a consistent loudness level (-14 LUFS) so sounds play back at balanced volumes
 - Genre and mood labels appear under each sound in the library panel and are searchable via the search bar

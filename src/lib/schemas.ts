@@ -50,7 +50,7 @@ export const SoundSchema = z.object({
   durationMs: z.number().min(0).finite().optional(),
   fileSizeBytes: z.number().min(0).finite().optional(),   // file size in bytes — populated at reconcile/download time
   coverArtDataUrl: z.string().optional(),                  // base64 data URL of embedded cover art — populated at reconcile/download time
-  loudnessLufs: z.number().finite().optional(),             // integrated loudness in LUFS (e.g. -14.3) — populated by audio analysis
+  loudnessLufs: z.number().finite().optional(),             // integrated loudness in LUFS (e.g. -14.3) — present only when analysis succeeded (never null in persisted data)
   genre: z.string().optional(),                             // detected or user-overridden genre label
   mood: z.string().optional(),                              // detected or user-overridden mood label
 });

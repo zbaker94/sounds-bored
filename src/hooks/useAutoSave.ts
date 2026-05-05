@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useProjectStore } from "@/state/projectStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -46,12 +46,12 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     });
   }, []);
 
-  const notifyAutoSaveFailure = () => {
+  const notifyAutoSaveFailure = useCallback(() => {
     const now = Date.now();
     if (now - lastAutoSaveErrorRef.current < AUTO_SAVE_ERROR_DEBOUNCE_MS) return;
     lastAutoSaveErrorRef.current = now;
     toast.error("Auto-save failed — your changes may not be saved to disk.");
-  };
+  }, []); // only depends on the ref and toast (both stable)
 
   // Library auto-save runs unconditionally — the library is a global resource
   // independent of which project (if any) is currently open.
@@ -70,7 +70,7 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     saveLibrary();
     const intervalId = setInterval(saveLibrary, interval);
     return () => clearInterval(intervalId);
-  }, [interval]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [interval, notifyAutoSaveFailure]);
 
   // Project auto-save only runs when a saved project is open.
   useEffect(() => {
@@ -92,5 +92,5 @@ export function useAutoSave(interval: number = AUTOSAVE_INTERVAL) {
     saveCurrentProject();
     const intervalId = setInterval(saveCurrentProject, interval);
     return () => clearInterval(intervalId);
-  }, [folderPath, isTemporary, interval]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [folderPath, isTemporary, interval, notifyAutoSaveFailure]);
 }

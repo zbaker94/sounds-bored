@@ -1,15 +1,15 @@
-export const GENRE_TAXONOMY: Record<string, string[]> = {
+export const GENRE_TAXONOMY = {
   "ambient": ["atmosphere", "atmospheric", "drone", "soundscape", "dark ambient"],
   "blues": ["blues rock", "delta blues", "chicago blues", "rhythm and blues"],
   "classical": ["orchestral", "chamber music", "baroque", "romantic", "contemporary classical", "symphony"],
   "country": ["americana", "bluegrass", "country rock", "outlaw country", "folk country"],
   "electronic": ["edm", "electronic dance music", "electronica", "idm", "intelligent dance music"],
-  "folk": ["folk rock", "acoustic folk", "indie folk", "singer-songwriter", "traditional folk"],
-  "funk": ["funk rock", "p-funk", "soul funk", "afrofunk"],
+  "folk": ["folk rock", "acoustic folk", "singer-songwriter", "traditional folk"],
+  "funk": ["funk rock", "p-funk", "soul funk", "afrofunk", "jazz funk"],
   "hip-hop": ["hip hop", "hiphop", "rap", "trap", "boom bap", "lo-fi hip hop"],
   "house": ["deep house", "tech house", "progressive house", "tropical house", "afro house"],
   "indie": ["indie rock", "indie pop", "indie folk", "alternative indie"],
-  "jazz": ["bebop", "cool jazz", "free jazz", "fusion jazz", "jazz funk", "smooth jazz", "swing"],
+  "jazz": ["bebop", "cool jazz", "free jazz", "fusion jazz", "smooth jazz", "swing"],
   "latin": ["salsa", "bossa nova", "reggaeton", "cumbia", "latin pop", "merengue", "bachata"],
   "metal": ["heavy metal", "death metal", "black metal", "thrash metal", "doom metal", "metalcore"],
   "new-age": ["new age", "meditation music", "healing", "spa music", "yoga music"],
@@ -21,15 +21,15 @@ export const GENRE_TAXONOMY: Record<string, string[]> = {
   "soul": ["motown", "southern soul", "blue-eyed soul", "gospel"],
   "techno": ["detroit techno", "industrial techno", "minimal techno", "acid techno"],
   "trance": ["progressive trance", "psytrance", "psychedelic trance", "uplifting trance", "goa"],
-  "world": ["african", "celtic", "middle eastern", "asian", "latin", "world music", "ethnic"],
-};
+  "world": ["african", "celtic", "middle eastern", "asian", "world music", "ethnic"],
+} as const satisfies Record<string, readonly string[]>;
 
 export type Genre = keyof typeof GENRE_TAXONOMY;
 
 export function resolveGenre(raw: string): string {
   const normalized = raw.toLowerCase().trim();
   for (const [canonical, synonyms] of Object.entries(GENRE_TAXONOMY)) {
-    if (canonical === normalized || synonyms.includes(normalized)) {
+    if (canonical === normalized || (synonyms as readonly string[]).includes(normalized)) {
       return canonical;
     }
   }

@@ -38,11 +38,12 @@ vi.mock("@/lib/scope", () => ({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-import { addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
+import { addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed } from "@/lib/library.reconcile";
 import { toast } from "sonner";
 import { pickFolder } from "@/lib/scope";
 
 const mockAddGlobalFolder = addGlobalFolderAndReconcile as ReturnType<typeof vi.fn>;
+const mockScheduleAnalysis = scheduleAnalysisForUnanalyzed as ReturnType<typeof vi.fn>;
 const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
 const mockToastSuccess = toast.success as ReturnType<typeof vi.fn>;
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
@@ -57,6 +58,8 @@ beforeEach(() => {
   mockPickFolder.mockReset();
   mockToastSuccess.mockReset();
   mockToastError.mockReset();
+  mockScheduleAnalysis.mockReset();
+  mockScheduleAnalysis.mockResolvedValue(undefined);
 });
 
 describe("useAddFolder", () => {
@@ -199,6 +202,38 @@ describe("useAddFolder", () => {
 
     expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("write failed"));
     expect(result.current.isAddingFolder).toBe(false);
+  });
+
+  it("schedules analysis when autoAnalysis is true after a successful add", async () => {
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ globalFolders: [], autoAnalysis: true }),
+    });
+    mockPickFolder.mockResolvedValue("/music/new");
+    mockAddGlobalFolder.mockResolvedValue({ updatedSettings: createMockAppSettings(), changed: false });
+
+    const { result } = renderHook(() => useAddFolder());
+    await act(async () => {
+      await result.current.handleAddFolder();
+    });
+
+    expect(mockScheduleAnalysis).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not schedule analysis when autoAnalysis is false", async () => {
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ globalFolders: [], autoAnalysis: false }),
+    });
+    mockPickFolder.mockResolvedValue("/music/new");
+    mockAddGlobalFolder.mockResolvedValue({ updatedSettings: createMockAppSettings(), changed: false });
+
+    const { result } = renderHook(() => useAddFolder());
+    await act(async () => {
+      await result.current.handleAddFolder();
+    });
+
+    expect(mockScheduleAnalysis).not.toHaveBeenCalled();
   });
 
   it("uses live store settings — settings changed after render are reflected in handler", async () => {

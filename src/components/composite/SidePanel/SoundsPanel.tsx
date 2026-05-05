@@ -3,17 +3,20 @@ import { pickFiles, grantDroppedPaths } from "@/lib/scope";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CloudUploadIcon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import { CloudUploadIcon, Search01Icon, Cancel01Icon, AudioWave01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useAnalysisStore } from "@/state/analysisStore";
 import { useImportSounds } from "@/hooks/useImportSounds";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
+import { scheduleAnalysisForSounds, scheduleAnalysisForUnanalyzed } from "@/lib/library.reconcile";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
 import { DownloadDialog } from "@/components/modals/DownloadDialog";
+import { AnalysisWarningDialog, shouldWarnBeforeAnalysis } from "@/components/modals/AnalysisWarningDialog";
 import { DownloadStatusButton } from "@/components/composite/DownloadManager/DownloadStatusButton";
 import { AnalysisStatusButton } from "./AnalysisStatusButton";
 import { FolderBrowser } from "./FolderBrowser";
@@ -40,6 +43,23 @@ export function SoundsPanel() {
   const [addToSetOpen, setAddToSetOpen] = useState(false);
   const [addTagsOpen, setAddTagsOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [analysisWarningOpen, setAnalysisWarningOpen] = useState(false);
+
+  const sounds = useLibraryStore((s) => s.sounds);
+  const analysisStatus = useAnalysisStore((s) => s.status);
+
+  const selectedSounds = useMemo(
+    () => sounds.filter((s) => selectedSoundIds.has(s.id)),
+    [sounds, selectedSoundIds],
+  );
+
+  function handleAnalyzeSelected() {
+    if (shouldWarnBeforeAnalysis(selectedSounds)) {
+      setAnalysisWarningOpen(true);
+    } else {
+      void scheduleAnalysisForSounds(selectedSounds);
+    }
+  }
 
   useEffect(() => { setSelectedSoundIds(new Set()); }, [selectedId]);
 
@@ -107,11 +127,22 @@ export function SoundsPanel() {
         </Button>
         <AnalysisStatusButton />
         <DownloadStatusButton onOpenDialog={() => setDownloadDialogOpen(true)} />
+        {selectedSoundIds.size > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleAnalyzeSelected}
+            disabled={analysisStatus === "running"}
+          >
+            <HugeiconsIcon icon={AudioWave01Icon} size={14} />
+            Analyze ({selectedSoundIds.size})
+          </Button>
+        )}
         <div className="relative ml-auto flex items-center">
           <HugeiconsIcon icon={Search01Icon} size={14} className="absolute left-2.5 text-white/50 pointer-events-none" />
           <Input
             type="text"
-            placeholder="Search..."
+            placeholder="Search name, genre, mood…"
             className="h-8 pl-8 pr-7 w-48 text-sm rounded-full bg-black border-white text-white placeholder:text-white/60 focus-visible:border-white focus-visible:ring-white/20"
             value={searchQuery}
             onChange={(e) => {
@@ -157,6 +188,19 @@ export function SoundsPanel() {
         draggable={false}
       />
       <DownloadDialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen} />
+      <AnalysisWarningDialog
+        open={analysisWarningOpen}
+        sounds={selectedSounds}
+        onSkipAnalyzed={() => {
+          setAnalysisWarningOpen(false);
+          void scheduleAnalysisForUnanalyzed(selectedSounds);
+        }}
+        onAnalyzeAll={() => {
+          setAnalysisWarningOpen(false);
+          void scheduleAnalysisForSounds(selectedSounds);
+        }}
+        onCancel={() => setAnalysisWarningOpen(false)}
+      />
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
       <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={selectedSoundIdsArray} />
       <AddTagsDialog open={addTagsOpen} onOpenChange={setAddTagsOpen} selectedSoundIds={selectedSoundIdsArray} />

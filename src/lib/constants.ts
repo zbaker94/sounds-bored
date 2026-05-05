@@ -48,6 +48,14 @@ export const SYSTEM_TAG_IMPORTED = "imported";
 // Download events
 export const DOWNLOAD_EVENT = "download://progress";
 
+// Analysis events (must match Rust emit names in commands.rs)
+export const ANALYSIS_COMPLETE_EVENT = "audio::analysis::complete";
+export const ANALYSIS_STARTED_EVENT = "audio::analysis::started";
+
+// Analysis size thresholds for the large-file warning dialog
+export const ANALYSIS_LARGE_FILE_BYTES = 50_000_000;  // 50 MB
+export const ANALYSIS_LARGE_TOTAL_BYTES = 200_000_000; // 200 MB
+
 // Shared empty-reference sentinels — use to keep useMemo/useCallback deps stable
 // when `settings?.globalFolders` is undefined. DO NOT mutate.
 export const EMPTY_GLOBAL_FOLDERS: GlobalFolder[] = [];

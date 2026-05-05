@@ -86,9 +86,10 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
 
   cancelQueue: () =>
     set((state) => {
-      if (state.pendingQueue.length === 0) return state;
+      if (state.status !== "running") return state;
       // Shrink the queue to just what's already completed + the one in-flight,
       // so the progress UI reaches 100% naturally when the current file finishes.
+      // Pending sounds are dropped; the in-flight Rust task will complete on its own.
       const inFlight = 1;
       return {
         pendingQueue: [],

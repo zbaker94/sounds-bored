@@ -182,6 +182,37 @@ describe("layerTrigger", () => {
       });
       expect(getVoiceVolume(layer, sound)).toBe(0);
     });
+
+    it("applies loudness normalization when loudnessLufs is set (-20 LUFS → +6 dB boost)", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1", loudnessLufs: -20 });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 50 }] },
+      });
+      // rawGain = 0.5; normGain = 10^(6/20) ≈ 1.995; result = 0.5 * 1.995 ≈ 0.998
+      const result = getVoiceVolume(layer, sound);
+      expect(result).toBeCloseTo(0.5 * Math.pow(10, 6 / 20), 4);
+      expect(result).toBeLessThanOrEqual(1.0);
+    });
+
+    it("clamps to 1.0 when normalization would exceed unity gain", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1", loudnessLufs: -20 });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
+      });
+      // rawGain = 1.0; normGain ≈ 1.995 → clamped to 1.0
+      expect(getVoiceVolume(layer, sound)).toBe(1.0);
+    });
+
+    it("passes through rawGain unchanged when loudnessLufs is undefined", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1", loudnessLufs: undefined });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 80 }] },
+      });
+      expect(getVoiceVolume(layer, sound)).toBeCloseTo(0.8);
+    });
   });
 
   // ── getLayerNormalizedVolume ──────────────────────────────────────────────

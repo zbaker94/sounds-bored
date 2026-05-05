@@ -9,7 +9,8 @@ vi.mock("@tauri-apps/api/path", () => ({
   join: mockJoin,
 }));
 
-vi.mock("@/lib/constants", () => ({
+vi.mock("@/lib/constants", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/constants")>()),
   APP_FOLDER: "SoundsBored",
 }));
 

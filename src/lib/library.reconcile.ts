@@ -7,6 +7,7 @@ import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAnalysisStore } from "@/state/analysisStore";
+import { logError } from "@/lib/logger";
 
 /**
  * Result of reconciling the global library against the file system.
@@ -354,27 +355,41 @@ export async function checkMissingStatus(
 // Pure reconciliation and detection logic remains above.
 
 /**
- * Convenience utility: run `checkMissingStatus` against current store state
- * and commit the result into the library store in one call.
- *
- * @param globalFolders - Optional override for the folder list. Pass this when
- *   settings were just saved to disk but the Zustand store hasn't yet received
- *   the updated data (e.g. immediately after `saveSettings`). Defaults to
- *   `useAppSettingsStore.getState().settings?.globalFolders`.
- */
-/**
  * Dispatch the next queued sound for analysis. Called once per completed file
- * to keep exactly one file in-flight in Rust at a time.
+ * to keep exactly one file in-flight in Rust at a time. Iterates until a
+ * dispatch succeeds or the queue is empty.
  */
 export async function dispatchNextFromQueue(): Promise<void> {
-  const next = useAnalysisStore.getState().dequeueNext();
-  if (!next) return;
-  try {
-    await invoke<void>("start_audio_analysis", { entries: [next] });
-  } catch {
-    useAnalysisStore.getState().recordError(next.id, "Failed to start analysis");
-    await dispatchNextFromQueue();
+  while (true) {
+    const next = useAnalysisStore.getState().dequeueNext();
+    if (!next) return;
+    try {
+      await invoke<void>("start_audio_analysis", { entries: [next] });
+      return; // success — wait for the complete event to drive the next dispatch
+    } catch (err) {
+      logError("start_audio_analysis failed", { soundId: next.id, err: String(err) });
+      useAnalysisStore.getState().recordError(next.id, "Failed to start analysis");
+    }
   }
+}
+
+/**
+ * Queue analysis for an explicit list of sounds regardless of whether they
+ * have already been analyzed. Sorted smallest-first. Used for on-demand
+ * "Analyze selected" triggered by the user.
+ *
+ * No-op if analysis is already running — callers must wait for completion
+ * before scheduling a new batch to avoid clobbering the in-flight state.
+ */
+export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> {
+  if (useAnalysisStore.getState().status === "running") return;
+  const queue = sounds
+    .filter((s) => s.filePath)
+    .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
+    .map((s) => ({ id: s.id, path: s.filePath! }));
+  if (queue.length === 0) return;
+  useAnalysisStore.getState().startAnalysis(queue);
+  await dispatchNextFromQueue();
 }
 
 /**
@@ -384,9 +399,11 @@ export async function dispatchNextFromQueue(): Promise<void> {
  * backend emits one `audio::analysis::complete` event per file and
  * `useAudioAnalysis` hook drives the next dispatch.
  *
- * No-op if all sounds are already analyzed or no sounds have a filePath.
+ * No-op if all sounds are already analyzed, no sounds have a filePath, or
+ * analysis is already running.
  */
 export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<void> {
+  if (useAnalysisStore.getState().status === "running") return;
   const queue = sounds
     .filter((s) => s.filePath && s.loudnessLufs === undefined)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
@@ -396,6 +413,15 @@ export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<vo
   await dispatchNextFromQueue();
 }
 
+/**
+ * Convenience utility: run `checkMissingStatus` against current store state
+ * and commit the result into the library store in one call.
+ *
+ * @param globalFolders - Optional override for the folder list. Pass this when
+ *   settings were just saved to disk but the Zustand store hasn't yet received
+ *   the updated data (e.g. immediately after `saveSettings`). Defaults to
+ *   `useAppSettingsStore.getState().settings?.globalFolders`.
+ */
 export async function refreshMissingState(globalFolders?: GlobalFolder[]): Promise<void> {
   const settings = useAppSettingsStore.getState().settings;
   const folders = globalFolders ?? settings?.globalFolders;

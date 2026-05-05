@@ -58,6 +58,7 @@ export function useAddFolder(): {
         await saveCurrentLibrary();
       }
       if (settings.autoAnalysis) {
+        // Re-read from store — the React-subscribed `sounds` is stale after the reconcile mutation above.
         void scheduleAnalysisForUnanalyzed(useLibraryStore.getState().sounds);
       }
       toast.success(`Folder "${name}" added`);

@@ -17,6 +17,10 @@ export function useAutoAnalysis() {
 
     if (prev === null) {
       // Settings just loaded — boot-time analysis is handled by useBootLoader.
+      // Skipping this run is StrictMode-safe: if the double-mount fires again,
+      // prev will be a real boolean (not null), so the toggle logic below runs.
+      // scheduleAnalysisForUnanalyzed is a no-op when analysis is already running,
+      // so a spurious second trigger is harmless.
       return;
     }
 

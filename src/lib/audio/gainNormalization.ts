@@ -1,4 +1,4 @@
-const DEFAULT_TARGET_LUFS = -14;
+export const DEFAULT_TARGET_LUFS = -14;
 
 export function computeNormalizationGain(
   loudnessLufs: number,

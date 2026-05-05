@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, memo } from "react";
+import { DEFAULT_TARGET_LUFS } from "@/lib/audio/gainNormalization";
 import { remove } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -65,6 +66,16 @@ const PreviewProgressBar = memo(function PreviewProgressBar() {
 
 const panelClass =
   "backdrop-blur-sm hover:backdrop-blur-lg bg-black/50 rounded-lg";
+
+function NormalizationPill({ lufs }: { lufs: number }) {
+  const dBAdj = DEFAULT_TARGET_LUFS - lufs;
+  const sign = dBAdj >= 0 ? "+" : "";
+  return (
+    <span className="shrink-0 text-[10px] font-mono px-1 py-0.5 rounded bg-white/10 text-white/50 leading-none">
+      {sign}{dBAdj.toFixed(1)} dB
+    </span>
+  );
+}
 
 interface SoundListProps {
   selectedId: string | null;
@@ -354,11 +365,16 @@ export function SoundList({
                 )}
               </ItemMedia>
               <ItemContent>
-                <ItemTitle
-                  className={isSoundMissing ? "text-destructive" : undefined}
-                >
-                  {sound.name}
-                </ItemTitle>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <ItemTitle
+                    className={isSoundMissing ? "text-destructive" : undefined}
+                  >
+                    {sound.name}
+                  </ItemTitle>
+                  {!isSoundMissing && sound.loudnessLufs !== undefined && (
+                    <NormalizationPill lufs={sound.loudnessLufs} />
+                  )}
+                </div>
                 <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
                 {!isSoundMissing && (sound.genre || sound.mood) && (
                   <p className="text-xs text-white/40 truncate">
