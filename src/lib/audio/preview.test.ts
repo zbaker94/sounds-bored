@@ -4,6 +4,7 @@ import { createMockSound } from "@/test/factories";
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mockSourceNode = { connect: vi.fn(), disconnect: vi.fn() };
+const mockGainNode = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
 
 const mockCtx = {
   createMediaElementSource: vi.fn(() => mockSourceNode),
@@ -13,7 +14,7 @@ const mockCtx = {
     buffer: null as AudioBuffer | null,
     onended: null as (() => void) | null,
   })),
-  createGain: vi.fn(),
+  createGain: vi.fn(() => mockGainNode),
 };
 
 vi.mock("./audioContext", () => ({
@@ -84,8 +85,11 @@ describe("preview — streaming path (large files)", () => {
   beforeEach(async () => {
     mockAudioInstances.length = 0;
     mockCtx.createMediaElementSource.mockClear();
+    mockCtx.createGain.mockClear();
     mockSourceNode.connect.mockClear();
     mockSourceNode.disconnect.mockClear();
+    mockGainNode.connect.mockClear();
+    mockGainNode.disconnect.mockClear();
     mockSetIsPreviewPlaying.mockClear();
     mockSetPreviewProgress.mockClear();
     // Restore default happy-path Audio stub so tests that replace it don't bleed into siblings

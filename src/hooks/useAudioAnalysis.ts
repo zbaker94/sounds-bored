@@ -14,9 +14,13 @@ const AnalysisCompletePayloadSchema = z.object({
   genre: z.string().nullable(),
   mood: z.string().nullable(),
   error: z.string().nullable(),
+  analysisType: z.enum(["loudness", "genre"]).default("loudness"),
 });
 
-const AnalysisStartedPayloadSchema = z.object({ soundId: z.string() });
+const AnalysisStartedPayloadSchema = z.object({
+  soundId: z.string(),
+  analysisType: z.enum(["loudness", "genre"]).default("loudness"),
+});
 
 export function useAudioAnalysis() {
   useEffect(() => {
@@ -29,24 +33,33 @@ export function useAudioAnalysis() {
 
     register(listen<unknown>(ANALYSIS_STARTED_EVENT, (event) => {
       const parsed = AnalysisStartedPayloadSchema.safeParse(event.payload);
-      if (parsed.success) useAnalysisStore.getState().recordStarted(parsed.data.soundId);
+      if (parsed.success) {
+        useAnalysisStore.getState().recordStarted(parsed.data.soundId, parsed.data.analysisType);
+      }
     }));
 
     register(listen<unknown>(ANALYSIS_COMPLETE_EVENT, (event) => {
       const parsed = AnalysisCompletePayloadSchema.safeParse(event.payload);
       if (!parsed.success) return;
 
-      const { soundId, loudnessLufs, genre, mood, error } = parsed.data;
+      const { soundId, loudnessLufs, genre, mood, error, analysisType } = parsed.data;
 
       if (error) {
         logError("Audio analysis failed", { soundId, error });
         useAnalysisStore.getState().recordError(soundId, error);
       } else {
-        useLibraryStore.getState().updateSoundAnalysis(soundId, {
-          loudnessLufs: loudnessLufs ?? undefined,
-          genre: genre != null ? resolveGenre(genre) : undefined,
-          mood: mood ?? undefined,
-        });
+        // Only update fields that belong to this analysis type to avoid
+        // overwriting existing loudness with null during a genre-only run.
+        if (analysisType === "genre") {
+          useLibraryStore.getState().updateSoundAnalysis(soundId, {
+            genre: genre != null ? resolveGenre(genre) : undefined,
+            mood: mood ?? undefined,
+          });
+        } else {
+          useLibraryStore.getState().updateSoundAnalysis(soundId, {
+            loudnessLufs: loudnessLufs ?? undefined,
+          });
+        }
         useAnalysisStore.getState().recordComplete(soundId);
       }
 

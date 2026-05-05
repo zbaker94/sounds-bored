@@ -6,7 +6,7 @@ import { AUDIO_EXTENSIONS } from "./constants";
 import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAnalysisStore } from "@/state/analysisStore";
+import { useAnalysisStore, AnalysisType } from "@/state/analysisStore";
 import { logError } from "@/lib/logger";
 
 /**
@@ -363,8 +363,10 @@ export async function dispatchNextFromQueue(): Promise<void> {
   while (true) {
     const next = useAnalysisStore.getState().dequeueNext();
     if (!next) return;
+    // Map TS `type` to the camelCase field the Rust command expects.
+    const entry = { id: next.id, path: next.path, analysisType: next.type };
     try {
-      await invoke<void>("start_audio_analysis", { entries: [next] });
+      await invoke<void>("start_audio_analysis", { entries: [entry] });
       return; // success — wait for the complete event to drive the next dispatch
     } catch (err) {
       logError("start_audio_analysis failed", { soundId: next.id, err: String(err) });
@@ -374,30 +376,30 @@ export async function dispatchNextFromQueue(): Promise<void> {
 }
 
 /**
- * Queue analysis for an explicit list of sounds regardless of whether they
- * have already been analyzed. Sorted smallest-first. Used for on-demand
- * "Analyze selected" triggered by the user.
+ * Queue analysis of the given type for an explicit list of sounds. Sorted
+ * smallest-first. Used for on-demand "Analyze selected" triggered by the user.
  *
  * No-op if analysis is already running — callers must wait for completion
  * before scheduling a new batch to avoid clobbering the in-flight state.
  */
-export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> {
+export async function scheduleAnalysisForSounds(sounds: Sound[], type: AnalysisType): Promise<void> {
   if (useAnalysisStore.getState().status === "running") return;
   const queue = sounds
     .filter((s) => s.filePath)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath! }));
+    .map((s) => ({ id: s.id, path: s.filePath!, type }));
   if (queue.length === 0) return;
   useAnalysisStore.getState().startAnalysis(queue);
   await dispatchNextFromQueue();
 }
 
 /**
- * Queue loudness + genre/mood analysis for all sounds that have a filePath but
- * have not yet been analyzed (loudnessLufs === undefined). Dispatches one file
- * at a time, smallest first, to bound memory usage. Fire-and-forget: the Rust
- * backend emits one `audio::analysis::complete` event per file and
- * `useAudioAnalysis` hook drives the next dispatch.
+ * Queue loudness analysis for sounds that have a filePath but have not yet had
+ * their loudness measured (loudnessLufs === undefined). Dispatches one file at
+ * a time, smallest first, to bound memory usage. Fire-and-forget.
+ *
+ * Used exclusively for auto-analysis on boot and after folder reconcile.
+ * Genre/mood analysis is always user-initiated.
  *
  * No-op if all sounds are already analyzed, no sounds have a filePath, or
  * analysis is already running.
@@ -407,7 +409,7 @@ export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<vo
   const queue = sounds
     .filter((s) => s.filePath && s.loudnessLufs === undefined)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath! }));
+    .map((s) => ({ id: s.id, path: s.filePath!, type: "loudness" as const }));
   if (queue.length === 0) return;
   useAnalysisStore.getState().startAnalysis(queue);
   await dispatchNextFromQueue();

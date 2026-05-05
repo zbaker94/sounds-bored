@@ -3,7 +3,7 @@ import { pickFiles, grantDroppedPaths } from "@/lib/scope";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CloudUploadIcon, Search01Icon, Cancel01Icon, AudioWave01Icon } from "@hugeicons/core-free-icons";
+import { CloudUploadIcon, Search01Icon, Cancel01Icon, AudioWave01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -11,7 +11,8 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useAnalysisStore } from "@/state/analysisStore";
 import { useImportSounds } from "@/hooks/useImportSounds";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
-import { scheduleAnalysisForSounds, scheduleAnalysisForUnanalyzed } from "@/lib/library.reconcile";
+import { scheduleAnalysisForSounds } from "@/lib/library.reconcile";
+import type { AnalysisType } from "@/state/analysisStore";
 import { AddSetDialog } from "./AddSetDialog";
 import { AddToSetDialog } from "./AddToSetDialog";
 import { AddTagsDialog } from "./AddTagsDialog";
@@ -43,7 +44,7 @@ export function SoundsPanel() {
   const [addToSetOpen, setAddToSetOpen] = useState(false);
   const [addTagsOpen, setAddTagsOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [analysisWarningOpen, setAnalysisWarningOpen] = useState(false);
+  const [analysisWarningType, setAnalysisWarningType] = useState<AnalysisType | null>(null);
 
   const sounds = useLibraryStore((s) => s.sounds);
   const analysisStatus = useAnalysisStore((s) => s.status);
@@ -53,11 +54,11 @@ export function SoundsPanel() {
     [sounds, selectedSoundIds],
   );
 
-  function handleAnalyzeSelected() {
-    if (shouldWarnBeforeAnalysis(selectedSounds)) {
-      setAnalysisWarningOpen(true);
+  function handleAnalyzeSelected(type: AnalysisType) {
+    if (shouldWarnBeforeAnalysis(selectedSounds, type)) {
+      setAnalysisWarningType(type);
     } else {
-      void scheduleAnalysisForSounds(selectedSounds);
+      void scheduleAnalysisForSounds(selectedSounds, type);
     }
   }
 
@@ -128,15 +129,26 @@ export function SoundsPanel() {
         <AnalysisStatusButton />
         <DownloadStatusButton onOpenDialog={() => setDownloadDialogOpen(true)} />
         {selectedSoundIds.size > 0 && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleAnalyzeSelected}
-            disabled={analysisStatus === "running"}
-          >
-            <HugeiconsIcon icon={AudioWave01Icon} size={14} />
-            Analyze ({selectedSoundIds.size})
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleAnalyzeSelected("loudness")}
+              disabled={analysisStatus === "running"}
+            >
+              <HugeiconsIcon icon={AudioWave01Icon} size={14} />
+              Loudness ({selectedSoundIds.size})
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleAnalyzeSelected("genre")}
+              disabled={analysisStatus === "running"}
+            >
+              <HugeiconsIcon icon={Mic01Icon} size={14} />
+              Genre/Mood ({selectedSoundIds.size})
+            </Button>
+          </>
         )}
         <div className="relative ml-auto flex items-center">
           <HugeiconsIcon icon={Search01Icon} size={14} className="absolute left-2.5 text-white/50 pointer-events-none" />
@@ -189,17 +201,25 @@ export function SoundsPanel() {
       />
       <DownloadDialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen} />
       <AnalysisWarningDialog
-        open={analysisWarningOpen}
+        open={analysisWarningType !== null}
         sounds={selectedSounds}
+        type={analysisWarningType ?? "loudness"}
         onSkipAnalyzed={() => {
-          setAnalysisWarningOpen(false);
-          void scheduleAnalysisForUnanalyzed(selectedSounds);
+          const type = analysisWarningType!;
+          setAnalysisWarningType(null);
+          const unanalyzed = selectedSounds.filter(
+            type === "loudness"
+              ? (s) => s.loudnessLufs === undefined
+              : (s) => s.genre === undefined && s.mood === undefined,
+          );
+          void scheduleAnalysisForSounds(unanalyzed, type);
         }}
         onAnalyzeAll={() => {
-          setAnalysisWarningOpen(false);
-          void scheduleAnalysisForSounds(selectedSounds);
+          const type = analysisWarningType!;
+          setAnalysisWarningType(null);
+          void scheduleAnalysisForSounds(selectedSounds, type);
         }}
-        onCancel={() => setAnalysisWarningOpen(false)}
+        onCancel={() => setAnalysisWarningType(null)}
       />
       <AddSetDialog open={addSetOpen} onOpenChange={setAddSetOpen} />
       <AddToSetDialog open={addToSetOpen} onOpenChange={setAddToSetOpen} soundIds={selectedSoundIdsArray} />

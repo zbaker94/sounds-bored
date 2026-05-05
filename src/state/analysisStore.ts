@@ -2,7 +2,8 @@ import { create } from "zustand";
 
 type AnalysisStatus = "idle" | "running" | "completed";
 
-export type AnalysisEntry = { id: string; path: string };
+export type AnalysisType = "loudness" | "genre";
+export type AnalysisEntry = { id: string; path: string; type: AnalysisType };
 
 interface AnalysisState {
   status: AnalysisStatus;
@@ -11,12 +12,13 @@ interface AnalysisState {
   completedCount: number;
   errors: Record<string, string>;
   currentSoundId: string | null;
+  currentAnalysisType: AnalysisType | null;
   pendingQueue: AnalysisEntry[];
 }
 
 interface AnalysisActions {
   startAnalysis: (queue: AnalysisEntry[]) => void;
-  recordStarted: (soundId: string) => void;
+  recordStarted: (soundId: string, type: AnalysisType) => void;
   recordComplete: (soundId: string) => void;
   recordError: (soundId: string, error: string) => void;
   dequeueNext: () => AnalysisEntry | undefined;
@@ -31,6 +33,7 @@ export const initialAnalysisState: AnalysisState = {
   completedCount: 0,
   errors: {},
   currentSoundId: null,
+  currentAnalysisType: null,
   pendingQueue: [],
 };
 
@@ -47,7 +50,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
       pendingQueue: queue,
     }),
 
-  recordStarted: (soundId) => set({ currentSoundId: soundId }),
+  recordStarted: (soundId, type) => set({ currentSoundId: soundId, currentAnalysisType: type }),
 
   recordComplete: (_soundId) =>
     set((state) => {
@@ -59,6 +62,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
         analyzingCount,
         status: done ? "completed" : "running",
         currentSoundId: done ? null : state.currentSoundId,
+        currentAnalysisType: done ? null : state.currentAnalysisType,
       };
     }),
 
@@ -73,6 +77,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
         errors: { ...state.errors, [soundId]: error },
         status: done ? "completed" : "running",
         currentSoundId: done ? null : state.currentSoundId,
+        currentAnalysisType: done ? null : state.currentAnalysisType,
       };
     }),
 

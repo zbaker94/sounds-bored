@@ -9,23 +9,37 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ANALYSIS_LARGE_FILE_BYTES, ANALYSIS_LARGE_TOTAL_BYTES } from "@/lib/constants";
+import type { AnalysisType } from "@/state/analysisStore";
 
 interface AnalysisWarningDialogProps {
   open: boolean;
   sounds: Sound[];
+  type: AnalysisType;
   onSkipAnalyzed: () => void;
   onAnalyzeAll: () => void;
   onCancel: () => void;
 }
 
+function countAnalyzed(sounds: Sound[], type: AnalysisType): number {
+  return sounds.filter((s) =>
+    type === "loudness" ? s.loudnessLufs !== undefined : s.genre !== undefined || s.mood !== undefined,
+  ).length;
+}
+
+const TYPE_LABEL: Record<AnalysisType, string> = {
+  loudness: "Loudness",
+  genre: "Genre/Mood",
+};
+
 export function AnalysisWarningDialog({
   open,
   sounds,
+  type,
   onSkipAnalyzed,
   onAnalyzeAll,
   onCancel,
 }: AnalysisWarningDialogProps) {
-  const analyzedCount = sounds.filter((s) => s.loudnessLufs !== undefined).length;
+  const analyzedCount = countAnalyzed(sounds, type);
   const totalBytes = sounds.reduce((sum, s) => sum + (s.fileSizeBytes ?? 0), 0);
   const hasLargeFiles =
     sounds.some((s) => (s.fileSizeBytes ?? 0) >= ANALYSIS_LARGE_FILE_BYTES) ||
@@ -35,7 +49,7 @@ export function AnalysisWarningDialog({
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Analyze {sounds.length} sound{sounds.length !== 1 ? "s" : ""}?</DialogTitle>
+          <DialogTitle>Analyze {TYPE_LABEL[type]} — {sounds.length} sound{sounds.length !== 1 ? "s" : ""}?</DialogTitle>
           {hasLargeFiles && (
             <DialogDescription>
               One or more selected files are large. Analysis can be slow and
@@ -66,8 +80,10 @@ export function AnalysisWarningDialog({
   );
 }
 
-export function shouldWarnBeforeAnalysis(sounds: Sound[]): boolean {
-  const hasAnalyzed = sounds.some((s) => s.loudnessLufs !== undefined);
+export function shouldWarnBeforeAnalysis(sounds: Sound[], type: AnalysisType): boolean {
+  const hasAnalyzed = sounds.some((s) =>
+    type === "loudness" ? s.loudnessLufs !== undefined : s.genre !== undefined || s.mood !== undefined,
+  );
   const totalBytes = sounds.reduce((sum, s) => sum + (s.fileSizeBytes ?? 0), 0);
   const hasLargeFiles =
     sounds.some((s) => (s.fileSizeBytes ?? 0) >= ANALYSIS_LARGE_FILE_BYTES) ||

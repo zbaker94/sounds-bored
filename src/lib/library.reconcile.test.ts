@@ -1041,11 +1041,11 @@ describe("scheduleAnalysisForUnanalyzed", () => {
 
     expect(mockCore.invoke).toHaveBeenCalledTimes(1);
     expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
-      entries: [{ id: "s2", path: "/music/b.wav" }],
+      entries: [{ id: "s2", path: "/music/b.wav", analysisType: "loudness" }],
     });
     expect(useAnalysisStore.getState().pendingQueue).toEqual([
-      { id: "s3", path: "/music/c.wav" },
-      { id: "s1", path: "/music/a.wav" },
+      { id: "s3", path: "/music/c.wav", type: "loudness" },
+      { id: "s1", path: "/music/a.wav", type: "loudness" },
     ]);
     expect(useAnalysisStore.getState().queueLength).toBe(3);
     expect(useAnalysisStore.getState().status).toBe("running");
@@ -1060,7 +1060,7 @@ describe("scheduleAnalysisForUnanalyzed", () => {
     await scheduleAnalysisForUnanalyzed(sounds);
 
     expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
-      entries: [{ id: "s1", path: "/music/a.wav" }],
+      entries: [{ id: "s1", path: "/music/a.wav", analysisType: "loudness" }],
     });
     expect(useAnalysisStore.getState().status).toBe("running");
     expect(useAnalysisStore.getState().queueLength).toBe(1);

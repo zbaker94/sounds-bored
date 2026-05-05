@@ -1051,6 +1051,7 @@ const ANALYSIS_STARTED_EVENT: &str = "audio::analysis::started";
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisStartedEvent {
     pub sound_id: String,
+    pub analysis_type: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -1058,6 +1059,7 @@ pub struct AnalysisStartedEvent {
 pub struct AnalysisEntry {
     pub id: String,
     pub path: String,
+    pub analysis_type: String,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -1068,6 +1070,7 @@ pub struct AnalysisCompleteEvent {
     pub genre: Option<String>,
     pub mood: Option<String>,
     pub error: Option<String>,
+    pub analysis_type: String,
 }
 
 fn decode_audio_to_f32(abs_path: &str) -> Result<(Vec<f32>, u32, usize), String> {
@@ -1176,30 +1179,58 @@ pub async fn start_audio_analysis(app: AppHandle, entries: Vec<AnalysisEntry>) -
     tauri::async_runtime::spawn(async move {
         for entry in entries {
             validate_grant_path(&entry.path).unwrap_or_default();
-            let _ = app.emit(ANALYSIS_STARTED_EVENT, AnalysisStartedEvent { sound_id: entry.id.clone() });
+            let _ = app.emit(ANALYSIS_STARTED_EVENT, AnalysisStartedEvent {
+                sound_id: entry.id.clone(),
+                analysis_type: entry.analysis_type.clone(),
+            });
 
-            let analysis = (|| -> Result<(f64, Option<String>, Option<String>), String> {
-                let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
-                let lufs = measure_loudness(&samples, sample_rate, channels)?;
-                let (genre, mood) = extract_mir(&samples, sample_rate).unwrap_or((None, None));
-                Ok((lufs, genre, mood))
-            })();
-
-            let event = match analysis {
-                Ok((lufs, genre, mood)) => AnalysisCompleteEvent {
-                    sound_id: entry.id.clone(),
-                    loudness_lufs: Some(lufs),
-                    genre,
-                    mood,
-                    error: None,
-                },
-                Err(e) => AnalysisCompleteEvent {
-                    sound_id: entry.id.clone(),
-                    loudness_lufs: None,
-                    genre: None,
-                    mood: None,
-                    error: Some(e),
-                },
+            let event = if entry.analysis_type == "genre" {
+                let result = (|| -> Result<(Option<String>, Option<String>), String> {
+                    let (samples, sample_rate, _) = decode_audio_to_f32(&entry.path)?;
+                    extract_mir(&samples, sample_rate)
+                })();
+                match result {
+                    Ok((genre, mood)) => AnalysisCompleteEvent {
+                        sound_id: entry.id.clone(),
+                        loudness_lufs: None,
+                        genre,
+                        mood,
+                        error: None,
+                        analysis_type: entry.analysis_type.clone(),
+                    },
+                    Err(e) => AnalysisCompleteEvent {
+                        sound_id: entry.id.clone(),
+                        loudness_lufs: None,
+                        genre: None,
+                        mood: None,
+                        error: Some(e),
+                        analysis_type: entry.analysis_type.clone(),
+                    },
+                }
+            } else {
+                // "loudness" (default) — decode + EBU R128 only
+                let result = (|| -> Result<f64, String> {
+                    let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
+                    measure_loudness(&samples, sample_rate, channels)
+                })();
+                match result {
+                    Ok(lufs) => AnalysisCompleteEvent {
+                        sound_id: entry.id.clone(),
+                        loudness_lufs: Some(lufs),
+                        genre: None,
+                        mood: None,
+                        error: None,
+                        analysis_type: entry.analysis_type.clone(),
+                    },
+                    Err(e) => AnalysisCompleteEvent {
+                        sound_id: entry.id.clone(),
+                        loudness_lufs: None,
+                        genre: None,
+                        mood: None,
+                        error: Some(e),
+                        analysis_type: entry.analysis_type.clone(),
+                    },
+                }
             };
 
             let _ = app.emit(ANALYSIS_EVENT, event);

@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Loudness and Genre/Mood analysis are now separate actions — select sounds and choose "Loudness" or "Genre/Mood" independently instead of running both together
+- The analysis status indicator now shows specific progress text ("Analyzing loudness…" or "Analyzing genre/mood…") instead of the generic "Analyzing sounds…"
+- Running a Genre/Mood analysis no longer overwrites existing loudness data, and vice versa — each analysis type only updates its own fields
+- Sound previews now apply loudness normalization, so previewed sounds play back at a consistent volume relative to your other sounds
 - You can now manually analyze selected sounds for loudness and genre/mood using an "Analyze" button that appears when sounds are selected in the library panel.
 - Each sound in the library now displays a dB adjustment pill showing how much its volume will be boosted or cut during normalization.
 - A warning dialog now appears before analysis if any selected sounds are large (>50 MB) or have already been analyzed, with an option to skip already-analyzed sounds.

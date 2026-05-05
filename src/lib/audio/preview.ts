@@ -1,6 +1,7 @@
 import { ensureResumed, getMasterGain } from "./audioContext";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile } from "./streamingCache";
+import { normalizedVoiceGain } from "./gainNormalization";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Sound } from "@/lib/schemas";
@@ -59,7 +60,10 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       audio.crossOrigin = 'anonymous';
       audio.src = url;
       const sourceNode = ctx.createMediaElementSource(audio);
-      sourceNode.connect(getMasterGain());
+      const previewGain = ctx.createGain();
+      previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
+      sourceNode.connect(previewGain);
+      previewGain.connect(getMasterGain());
       currentStreamingAudio = audio;
       audio.onended = () => {
         if (currentStreamingAudio === audio) {
@@ -75,7 +79,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
         // play() rejected (autoplay policy, decode error, permission denied, etc.).
         // Tear down the partial audio graph so we don't leak the source node or
         // leave isPreviewPlaying=true with no active voice.
-        try { sourceNode.disconnect(); } catch { /* already disconnected */ }
+        try { sourceNode.disconnect(); previewGain.disconnect(); } catch { /* already disconnected */ }
         if (currentStreamingAudio === audio) {
           currentStreamingAudio = null;
         }
@@ -100,7 +104,10 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       const buffer = await loadBuffer(sound);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(getMasterGain());
+      const previewGain = ctx.createGain();
+      previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
+      source.connect(previewGain);
+      previewGain.connect(getMasterGain());
       source.onended = () => {
         if (currentSource === source) {
           currentSource = null;
