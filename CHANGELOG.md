@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Loudness normalization now applies a configurable boost cap (default +12 dB) instead of hard-clamping output to 1.0, allowing quiet sounds to be amplified more naturally
+- A brickwall limiter node is now available to catch audio peaks that exceed 0 dBFS after normalization, preventing distortion
+- Normalization behavior is now driven by a centralized `NormalizationConfig` (target LUFS, max boost, limiter settings) that can be customized per use case
 - Sounds are now automatically normalized to a consistent loudness level (-14 LUFS) during playback, so pads no longer vary wildly in volume
 - Fixed audio preview not fully cleaning up when stopped, which could cause lingering gain nodes and audio artifacts
 - Improved reliability of loudness and genre/mood analysis by using a stricter type system internally, reducing the chance of mismatched analysis results
