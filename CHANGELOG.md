@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Updated Tauri API dependency to version 2.11.0 for improved stability and compatibility
+
 ## v1.6.0-rc1
 
 Version 1.6.0 brings a major overhaul to pad editing (right-click to flip a pad and edit it inline), automatic cover art display throughout the app, audio auto-normalization to -14 LUFS with per-pad limiting for consistent volume, and on-demand loudness and genre/mood analysis for your sound library. This release also introduces move/copy between scenes, a redesigned fade system, a persistent download history that survives restarts, atomic saves to prevent file corruption, and a wide range of audio engine reliability, performance, and security improvements.
