@@ -4320,7 +4320,7 @@ dependencies = [
 
 [[package]]
 name = "sounds-bored"
-version = "1.6.0-rc2"
+version = "1.6.0-rc3"
 dependencies = [
  "base64 0.22.1",
  "lofty",

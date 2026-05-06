@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Version bumped to 1.6.0-rc3
 - Windows installer updated to version 1.6.0.2
 
 ## v1.6.0-rc2
