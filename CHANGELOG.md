@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.6.0-rc2
+
+This release candidate update aligns the app with Tauri 2.11.0 for improved stability and compatibility, with no user-facing feature changes.
+
 - Updated app version from 1.6.0-rc1 to 1.6.0-rc2
 - Updated Tauri API dependency to version 2.11.0 for improved stability and compatibility
 
