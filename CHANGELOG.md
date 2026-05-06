@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Version bumped to 1.6.0-rc1 (release candidate for the upcoming 1.6.0 update)
 - Fixed a bug where using "next" retrigger on sequential or shuffled layers left the now-playing display stuck showing the previous (stopped) sound instead of updating to the new one.
 - Fixed skip forward/back buttons not clearing the stale now-playing display before showing the newly started sound.
 - Shuffled layers now show the actual randomized play order in the sound list popover (captured at open time), with a note that the order is re-randomized on each trigger when no current order exists.
