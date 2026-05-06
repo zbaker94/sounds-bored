@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Windows installer updated to version 1.6.0.2
+
 ## v1.6.0-rc2
 
 This release candidate update aligns the app with Tauri 2.11.0 for improved stability and compatibility, with no user-facing feature changes.

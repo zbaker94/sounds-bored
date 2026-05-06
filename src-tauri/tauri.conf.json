@@ -63,6 +63,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "windows": {
+      "wix": {
+        "version": "1.6.0.2"
+      }
+    },
     "createUpdaterArtifacts": true,
     "externalBin": [
       "binaries/yt-dlp",
