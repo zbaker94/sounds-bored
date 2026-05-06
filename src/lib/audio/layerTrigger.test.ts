@@ -741,6 +741,130 @@ describe("startLayerSound padDisplayStore integration", () => {
   });
 });
 
+// ── "next" retrigger + skip — metadata display correctness ───────────────────
+
+describe("handleNextRetrigger display correctness", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn(),
+    });
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
+    const { usePadDisplayStore, initialPadDisplayState, _resetVoiceSeq } = await import("@/state/padDisplayStore");
+    usePadDisplayStore.setState({ ...initialPadDisplayState });
+    _resetVoiceSeq();
+  });
+
+  it("'next' retrigger with remaining sounds updates currentVoice to the new sound", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const { applyRetriggerMode } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, recordLayerVoice, setLayerChain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "disp-next-rem-pad" });
+    const s1 = createMockSound({ id: "s1", name: "sound-one", filePath: "s1.wav" });
+    const s2 = createMockSound({ id: "s2", name: "sound-two", filePath: "s2.wav" });
+    const layer = createMockLayer({
+      id: "disp-next-rem-layer",
+      retriggerMode: "next",
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [
+        { id: "i1", soundId: "s1", volume: 100 },
+        { id: "i2", soundId: "s2", volume: 100 },
+      ]},
+    });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+    const mockVoice = makeMinimalVoice();
+    recordLayerVoice(pad.id, layer.id, mockVoice as unknown as import("./audioVoice").AudioVoice);
+    setLayerChain(layer.id, [s2]);
+
+    // Seed display with the currently-playing sound (s1).
+    usePadDisplayStore.getState().enqueueVoice(pad.id, {
+      soundName: "sound-one", layerName: undefined, playbackMode: "loop",
+      durationMs: undefined, coverArtDataUrl: undefined,
+    });
+    expect(usePadDisplayStore.getState().currentVoice[pad.id]?.soundName).toBe("sound-one");
+
+    await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1, s2]);
+
+    // Display must show the next sound, not remain stuck on the stopped sound.
+    expect(usePadDisplayStore.getState().currentVoice[pad.id]?.soundName).toBe("sound-two");
+  });
+
+  it("'next' retrigger cycleMode clears the stale display before returning 'proceed'", async () => {
+    const { applyRetriggerMode } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, recordLayerVoice, setLayerChain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "disp-next-cyc-pad" });
+    const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
+    const layer = createMockLayer({
+      id: "disp-next-cyc-layer",
+      retriggerMode: "next",
+      arrangement: "sequential",
+      cycleMode: true,
+    });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+    const mockVoice = makeMinimalVoice();
+    recordLayerVoice(pad.id, layer.id, mockVoice as unknown as import("./audioVoice").AudioVoice);
+    setLayerChain(layer.id, [s1]);
+
+    usePadDisplayStore.getState().enqueueVoice(pad.id, {
+      soundName: "old-sound", layerName: undefined, playbackMode: "one-shot",
+      durationMs: undefined, coverArtDataUrl: undefined,
+    });
+    expect(usePadDisplayStore.getState().currentVoice[pad.id]?.soundName).toBe("old-sound");
+
+    const result = await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1]);
+
+    expect(result).toBe("proceed");
+    // Display must be cleared so startLayerPlayback can set the new currentVoice.
+    expect(usePadDisplayStore.getState().currentVoice[pad.id]).toBeNull();
+  });
+
+  it("'next' retrigger loop + exhausted queue clears stale display and shows restarted sound", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const { applyRetriggerMode } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, recordLayerVoice, setLayerChain } = await import("./audioState");
+    const { usePadDisplayStore } = await import("@/state/padDisplayStore");
+
+    const pad = createMockPad({ id: "disp-next-loop-pad" });
+    const s1 = createMockSound({ id: "s1", name: "first-sound", filePath: "s1.wav" });
+    const layer = createMockLayer({
+      id: "disp-next-loop-layer",
+      retriggerMode: "next",
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
+    });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+    const mockVoice = makeMinimalVoice();
+    recordLayerVoice(pad.id, layer.id, mockVoice as unknown as import("./audioVoice").AudioVoice);
+    setLayerChain(layer.id, []);
+
+    usePadDisplayStore.getState().enqueueVoice(pad.id, {
+      soundName: "old-loop-sound", layerName: undefined, playbackMode: "loop",
+      durationMs: undefined, coverArtDataUrl: undefined,
+    });
+    expect(usePadDisplayStore.getState().currentVoice[pad.id]?.soundName).toBe("old-loop-sound");
+
+    await applyRetriggerMode(pad, layer, true, mockCtx as unknown as AudioContext, layerGain, [s1]);
+
+    // Display must show the restarted first sound, not the stale stopped sound.
+    expect(usePadDisplayStore.getState().currentVoice[pad.id]?.soundName).toBe("first-sound");
+  });
+});
+
 describe("startLayerSound error bus", () => {
   it("emits isMissingFile:true via audioEvents on MissingFileError", async () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");

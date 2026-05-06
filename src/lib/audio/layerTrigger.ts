@@ -262,6 +262,31 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
 }
 
 /**
+ * Shared chain-continuation helper used by both the natural onended path and the manual
+ * "next"-retrigger path. Clears progress, shifts the metadata display, and starts the
+ * given next sound. Centralising this ensures both paths stay in sync.
+ *
+ * Natural onended path: fire-and-forget via .catch — no pending flag is held.
+ * Manual "next" retrigger: awaited — keeps the layer pending until the sound starts.
+ */
+async function continueLayerChain(
+  pad: Pad,
+  layer: Layer,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  next: Sound,
+  rest: Sound[],
+  allSounds: Sound[],
+): Promise<void> {
+  setLayerChain(layer.id, rest);
+  clearLayerProgressInfo(layer.id);
+  clearPadProgressInfo(pad.id);
+  startAudioTick();
+  usePadDisplayStore.getState().shiftVoice(pad.id);
+  await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
+}
+
+/**
  * Load and start a single sound for a layer. Sets up the onended callback that
  * auto-chains to the next sound in layerChainQueue (sequential/shuffled arrangement).
  *
@@ -293,12 +318,7 @@ export async function startLayerSound(
         // Chain continues — defer removePlayingPad until the next voice starts so
         // the pad doesn't briefly flash as "not playing" between chained sounds.
         const [next, ...rest] = remaining;
-        setLayerChain(layer.id, rest);
-        clearLayerProgressInfo(layer.id);
-        clearPadProgressInfo(pad.id);
-        startAudioTick();
-        usePadDisplayStore.getState().shiftVoice(pad.id);
-        startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds).catch(
+        continueLayerChain(pad, layer, ctx, layerGain, next, rest, allSounds).catch(
           (err) => { console.error("[layerTrigger] chain continuation failed:", err); },
         );
       } else if (remaining !== undefined && (liveMode === "loop" || liveMode === "hold")) {
@@ -463,14 +483,18 @@ async function handleNextRetrigger(
   clearPadProgressInfo(pad.id);
   clearLayerProgressInfo(layer.id);
 
+  // Clear the metadata overlay: this voice's onended was nulled so shiftVoice will not
+  // fire naturally. Explicit clear ensures the incoming sound's metadata becomes current
+  // rather than queuing behind the still-displayed stopped voice.
+  usePadDisplayStore.getState().clearPadDisplay(pad.id);
+
   if (layer.cycleMode && isChained(layer.arrangement)) {
     return "proceed";
   }
 
   if (remaining.length > 0) {
     const [next, ...rest] = remaining;
-    setLayerChain(layer.id, rest);
-    await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), resolved);
+    await continueLayerChain(pad, layer, ctx, layerGain, next, rest, resolved);
   } else if ((layer.playbackMode === "loop" || layer.playbackMode === "hold") && isChained(layer.arrangement)) {
     await loopBackToBeginning(pad, layer, ctx, layerGain, resolved);
   }
@@ -793,6 +817,8 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
 
 /** Shared preamble for skip functions: cancel fade, resume context, start a single sound, record pad as playing. */
 function startSoundInLayer(pad: Pad, layer: Layer, sound: Sound, resolved: Sound[]): void {
+  // The previous voice was stopped externally (no natural onended), so clear stale display.
+  usePadDisplayStore.getState().clearPadDisplay(pad.id);
   clearPadFadeTracking(pad.id);
   ensureResumed().then((ctx) => {
     const padGain = getPadGain(pad.id);

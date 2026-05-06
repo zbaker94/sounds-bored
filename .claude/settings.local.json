@@ -60,7 +60,10 @@
       "Bash(Get-ChildItem -Path C:\\\\Repos\\\\sounds-bored -Recurse -Filter \"MainPage.tsx\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(cargo check *)",
-      "Bash(cargo doc *)"
+      "Bash(cargo doc *)",
+      "Bash(gh search *)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:docs.rs)"
     ]
   },
   "enableAllProjectMcpServers": true,

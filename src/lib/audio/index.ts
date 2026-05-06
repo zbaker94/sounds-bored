@@ -58,6 +58,7 @@ export {
   isPadFading,
   isLayerActive,
   isPadActive,
+  getLayerPlayOrder,
   clearAllAudioState,
 } from "./audioState";
 

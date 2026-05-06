@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, memo, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { Pad, Layer } from "@/lib/schemas";
+import type { Pad, Layer, Sound } from "@/lib/schemas";
 import { Slider } from "@/components/ui/slider";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -19,7 +19,7 @@ import { useProjectStore } from "@/state/projectStore";
 import {
   triggerLayer, stopLayerWithRamp, setLayerVolume,
   skipLayerForward, skipLayerBack,
-  emitAudioError, resolveLayerSounds, getLayerNormalizedVolume,
+  emitAudioError, resolveLayerSounds, getLayerNormalizedVolume, getLayerPlayOrder,
 } from "@/lib/audio";
 import { summarizeLayerSelection } from "@/lib/layerHelpers";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -80,7 +80,16 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
 
   const isChained = layer.arrangement === "sequential" || layer.arrangement === "shuffled";
   const [listOpen, setListOpen] = useState(false);
+  const [capturedPlayOrder, setCapturedPlayOrder] = useState<Sound[] | null>(null);
   const listAnchorRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (listOpen && layer.arrangement === "shuffled") {
+      setCapturedPlayOrder(getLayerPlayOrder(layer.id) ?? null);
+    } else if (!listOpen) {
+      setCapturedPlayOrder(null);
+    }
+  }, [listOpen, layer.id, layer.arrangement]);
 
   const selectionSummary = summarizeLayerSelection(layer, allSounds, tags, sets);
 
@@ -162,8 +171,11 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
             <Popover open={listOpen} onOpenChange={setListOpen}>
               <PopoverAnchor virtualRef={listAnchorRef as React.RefObject<{ getBoundingClientRect: () => DOMRect }>} />
               <PopoverContent side="top" sideOffset={6} className="w-48 p-2">
+                {isChained && layer.arrangement === "shuffled" && !capturedPlayOrder && (
+                  <p className="text-xs text-muted-foreground mb-1.5">Randomized each trigger</p>
+                )}
                 <ol className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
-                  {allSounds.map((s, i) => (
+                  {(layer.arrangement === "shuffled" && capturedPlayOrder ? capturedPlayOrder : allSounds).map((s, i) => (
                     <li key={s.id} className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
                       {s.coverArtDataUrl ? (
                         <img src={s.coverArtDataUrl} className="w-4 h-4 rounded-sm object-cover flex-shrink-0" alt="" />
