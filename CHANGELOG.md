@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.6.0-rc3
+
+Version 1.6.0-rc3 is now available with an updated Windows installer that resolves MSI compatibility issues from the previous release candidate.
+
 - Version bumped to 1.6.0-rc3
 - Windows installer updated to version 1.6.0.2
 
