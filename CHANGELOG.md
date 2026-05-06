@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Fixed a file encoding issue that could cause problems loading configuration files
+
 ## v1.6.0-rc3
 
 Version 1.6.0-rc3 is now available with an updated Windows installer that resolves MSI compatibility issues from the previous release candidate.
