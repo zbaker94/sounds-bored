@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Version bumped to 1.6.0-rc4
 - Fixed a file encoding issue that could cause problems loading configuration files
 
 ## v1.6.0-rc3
