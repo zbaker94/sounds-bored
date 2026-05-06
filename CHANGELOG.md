@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Updated app version from 1.6.0-rc1 to 1.6.0-rc2
 - Updated Tauri API dependency to version 2.11.0 for improved stability and compatibility
 
 ## v1.6.0-rc1
