@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.6.0-rc4
+
+Fixed a file encoding issue that could cause startup or configuration loading failures; also bumped to v1.6.0-rc4.
+
 - Version bumped to 1.6.0-rc4
 - Fixed a file encoding issue that could cause problems loading configuration files
 
