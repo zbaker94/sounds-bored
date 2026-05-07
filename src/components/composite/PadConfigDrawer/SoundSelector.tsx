@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import Fuse from "fuse.js";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { filterSoundsByTags } from "@/lib/audio";
-import type { LayerSelection, Sound, SoundInstance } from "@/lib/schemas";
+import type { GlobalFolder, LayerSelection, Sound, SoundInstance } from "@/lib/schemas";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,7 @@ import {
   ComboboxInput,
 } from "@/components/ui/combobox";
 import { TagPicker } from "@/components/composite/LibraryPickers";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { SoundFolderTree } from "./SoundFolderTree";
 import { buildTree, findFolderNode, getSoundsInSubtree } from "./soundTreeUtils";
 
@@ -81,99 +82,16 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
   // ── Assigned mode ────────────────────────────────────────────────────────────
 
   if (value.type === "assigned") {
-    const selectedIds = new Set(value.instances.map((i) => i.soundId));
-
-    function toggleSound(soundId: string) {
-      if (value.type !== "assigned") return;
-      if (selectedIds.has(soundId)) {
-        onChange({
-          type: "assigned",
-          instances: value.instances.filter((i) => i.soundId !== soundId),
-        });
-      } else {
-        const newInstance: SoundInstance = {
-          id: crypto.randomUUID(),
-          soundId,
-          volume: 100,
-        };
-        onChange({
-          type: "assigned",
-          instances: [...value.instances, newInstance],
-        });
-      }
-    }
-
-    function toggleFolder(folderId: string) {
-      if (value.type !== "assigned") return;
-      const tree = buildTree(sounds, globalFolders);
-      const folderNode = findFolderNode(tree, folderId);
-      if (!folderNode) return;
-      const subtreeSounds = getSoundsInSubtree(folderNode);
-      const allSelected = subtreeSounds.every((s) => selectedIds.has(s.id));
-      if (allSelected) {
-        const subtreeIds = new Set(subtreeSounds.map((s) => s.id));
-        onChange({
-          type: "assigned",
-          instances: value.instances.filter((i) => !subtreeIds.has(i.soundId)),
-        });
-      } else {
-        const existing = new Set(value.instances.map((i) => i.soundId));
-        const newInstances: SoundInstance[] = subtreeSounds
-          .filter((s) => !existing.has(s.id))
-          .map((s) => ({ id: crypto.randomUUID(), soundId: s.id, volume: 100 }));
-        onChange({
-          type: "assigned",
-          instances: [...value.instances, ...newInstances],
-        });
-      }
-    }
-
-    if (sounds.length === 0) {
-      return (
-        <p className="text-sm text-muted-foreground">No sounds in library yet.</p>
-      );
-    }
-
-    const trimmed = query.trim();
-    const searchResults = trimmed
-      ? fuse.search(trimmed).map((r) => r.item.sound)
-      : null;
-
     return (
-      <div className="flex flex-col gap-2">
-        <Input
-          placeholder="Search sounds or tags..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {searchResults !== null ? (
-          searchResults.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No results.</p>
-          ) : (
-            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
-              {searchResults.map((sound) => (
-                <label
-                  key={sound.id}
-                  className="flex items-center gap-2 cursor-pointer text-sm"
-                >
-                  <Checkbox
-                    checked={selectedIds.has(sound.id)}
-                    onCheckedChange={() => toggleSound(sound.id)}
-                  />
-                  {sound.name}
-                </label>
-              ))}
-            </div>
-          )
-        ) : (
-          <SoundFolderTree
-            sounds={sounds}
-            selectedIds={selectedIds}
-            onToggleSound={toggleSound}
-            onToggleFolder={toggleFolder}
-          />
-        )}
-      </div>
+      <AssignedSection
+        value={value}
+        onChange={onChange}
+        sounds={sounds}
+        globalFolders={globalFolders}
+        fuse={fuse}
+        query={query}
+        setQuery={setQuery}
+      />
     );
   }
 
@@ -226,6 +144,140 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
         </ComboboxContent>
       </Combobox>
       <p className="text-xs text-muted-foreground">Sounds are drawn from this set at trigger time. Manage set membership in the Library panel.</p>
+    </div>
+  );
+}
+
+// ── Assigned mode extracted component ───────────────────────────────────────
+
+const SoundSearchRow = memo(function SoundSearchRow({
+  sound,
+  isSelected,
+  onToggle,
+}: {
+  sound: Sound;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer text-sm">
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={() => onToggle(sound.id)}
+      />
+      {sound.name}
+    </label>
+  );
+});
+
+interface AssignedSectionProps {
+  value: Extract<LayerSelection, { type: "assigned" }>;
+  onChange: (value: LayerSelection) => void;
+  sounds: Sound[];
+  globalFolders: GlobalFolder[];
+  fuse: Fuse<SoundSearchDoc>;
+  query: string;
+  setQuery: (q: string) => void;
+}
+
+function AssignedSection({
+  value,
+  onChange,
+  sounds,
+  globalFolders,
+  fuse,
+  query,
+  setQuery,
+}: AssignedSectionProps) {
+  const soundsRef = useLatestRef(sounds);
+
+  const selectedIds = useMemo(
+    () => new Set(value.instances.map((i) => i.soundId)),
+    [value.instances],
+  );
+
+  const toggleSound = useCallback((soundId: string) => {
+    if (selectedIds.has(soundId)) {
+      onChange({
+        type: "assigned",
+        instances: value.instances.filter((i) => i.soundId !== soundId),
+      });
+    } else {
+      const newInstance: SoundInstance = {
+        id: crypto.randomUUID(),
+        soundId,
+        volume: 100,
+      };
+      onChange({
+        type: "assigned",
+        instances: [...value.instances, newInstance],
+      });
+    }
+  }, [selectedIds, value.instances, onChange]);
+
+  const toggleFolder = useCallback((folderId: string) => {
+    const tree = buildTree(soundsRef.current, globalFolders);
+    const folderNode = findFolderNode(tree, folderId);
+    if (!folderNode) return;
+    const subtreeSounds = getSoundsInSubtree(folderNode);
+    const allSelected = subtreeSounds.every((s) => selectedIds.has(s.id));
+    if (allSelected) {
+      const subtreeIds = new Set(subtreeSounds.map((s) => s.id));
+      onChange({
+        type: "assigned",
+        instances: value.instances.filter((i) => !subtreeIds.has(i.soundId)),
+      });
+    } else {
+      const existing = new Set(value.instances.map((i) => i.soundId));
+      const newInstances: SoundInstance[] = subtreeSounds
+        .filter((s) => !existing.has(s.id))
+        .map((s) => ({ id: crypto.randomUUID(), soundId: s.id, volume: 100 }));
+      onChange({
+        type: "assigned",
+        instances: [...value.instances, ...newInstances],
+      });
+    }
+  }, [selectedIds, value.instances, globalFolders, onChange, soundsRef]);
+
+  if (sounds.length === 0) {
+    return <p className="text-sm text-muted-foreground">No sounds in library yet.</p>;
+  }
+
+  const trimmed = query.trim();
+  const searchResults = trimmed
+    ? fuse.search(trimmed).map((r) => r.item.sound)
+    : null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Input
+        placeholder="Search sounds or tags..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {searchResults !== null ? (
+        searchResults.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No results.</p>
+        ) : (
+          <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+            {searchResults.map((sound) => (
+              <SoundSearchRow
+                key={sound.id}
+                sound={sound}
+                isSelected={selectedIds.has(sound.id)}
+                onToggle={toggleSound}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        <SoundFolderTree
+          sounds={sounds}
+          selectedIds={selectedIds}
+          onToggleSound={toggleSound}
+          onToggleFolder={toggleFolder}
+        />
+      )}
     </div>
   );
 }

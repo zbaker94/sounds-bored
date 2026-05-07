@@ -39,7 +39,7 @@ describe("useAutoAnalysis", () => {
     expect(mockScheduleAnalysisForUnanalyzed).not.toHaveBeenCalled();
   });
 
-  it("schedules analysis when autoAnalysis toggles from false to true while idle", async () => {
+  it("schedules analysis when autoAnalysis toggles from false to true while not running", async () => {
     const { useAutoAnalysis } = await import("./useAutoAnalysis");
     useAppSettingsStore.setState({
       ...initialAppSettingsState,
@@ -77,6 +77,26 @@ describe("useAutoAnalysis", () => {
     expect(mockScheduleAnalysisForUnanalyzed).not.toHaveBeenCalled();
   });
 
+  it("schedules analysis when toggled on after a prior analysis completed", async () => {
+    const { useAutoAnalysis } = await import("./useAutoAnalysis");
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ autoAnalysis: false }),
+    });
+    useAnalysisStore.setState({ ...initialAnalysisState, status: "completed" });
+
+    renderHook(() => useAutoAnalysis());
+    await act(async () => {});
+
+    act(() => {
+      useAppSettingsStore.getState().setAutoAnalysis(true);
+    });
+    await act(async () => {});
+
+    expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalledTimes(1);
+    expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalledWith(expect.any(Array));
+  });
+
   it("cancels the queue when autoAnalysis toggles from true to false", async () => {
     const { useAutoAnalysis } = await import("./useAutoAnalysis");
     useAppSettingsStore.setState({
@@ -100,5 +120,26 @@ describe("useAutoAnalysis", () => {
     await act(async () => {});
 
     expect(cancelSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels the queue when autoAnalysis toggles off while status is completed", async () => {
+    const { useAutoAnalysis } = await import("./useAutoAnalysis");
+    // Start with autoAnalysis already on so the first-render skip sets prevRef to true
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ autoAnalysis: true }),
+    });
+    useAnalysisStore.setState({ ...initialAnalysisState, status: "completed" });
+
+    renderHook(() => useAutoAnalysis());
+    await act(async () => {});
+
+    const cancelSpy = vi.spyOn(useAnalysisStore.getState(), "cancelQueue");
+
+    act(() => { useAppSettingsStore.getState().setAutoAnalysis(false); });
+    await act(async () => {});
+
+    expect(cancelSpy).toHaveBeenCalled();
+    expect(mockScheduleAnalysisForUnanalyzed).not.toHaveBeenCalled();
   });
 });

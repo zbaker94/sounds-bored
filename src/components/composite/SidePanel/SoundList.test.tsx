@@ -236,6 +236,59 @@ describe("SoundList", () => {
     expect(nextSet.has("k")).toBe(true);
   });
 
+  it("handleToggle reads latest selectedSoundIds after rerender (ref-staleness guard)", async () => {
+    const kick = createMockSound({ id: "k", name: "Kick" });
+    const snare = createMockSound({ id: "s", name: "Snare" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [kick, snare] });
+
+    const onSelectionChange = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const buildJsx = (selectedSoundIds: Set<string>) => (
+      <QueryClientProvider client={qc}>
+        <TooltipProvider>
+          <SoundList
+            selectedId={null}
+            searchQuery=""
+            selectedSoundIds={selectedSoundIds}
+            onSelectionChange={onSelectionChange}
+            onOpenAddToSet={vi.fn()}
+            onOpenAddTags={vi.fn()}
+          />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+
+    const { rerender } = render(buildJsx(new Set(["k"])));
+    rerender(buildJsx(new Set(["k", "s"])));
+
+    // Click kick — should deselect kick from {k, s}, leaving {s}
+    const kickRow = screen.getByText("Kick");
+    await act(async () => { fireEvent.click(kickRow); });
+
+    expect(onSelectionChange).toHaveBeenCalledTimes(1);
+    const result = onSelectionChange.mock.calls[0][0] as Set<string>;
+    expect(result.has("k")).toBe(false);
+    expect(result.has("s")).toBe(true);
+  });
+
+  it("analysis store updates do not trigger unexpected selection changes", async () => {
+    const kick = createMockSound({ id: "k", name: "Kick" });
+    const snare = createMockSound({ id: "s", name: "Snare" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [kick, snare] });
+
+    const onSelectionChange = vi.fn();
+    renderList({ onSelectionChange, selectedSoundIds: new Set(["k"]) });
+
+    act(() => {
+      useLibraryStore.getState().updateSoundAnalysis("s", { loudnessLufs: -14 });
+    });
+
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(screen.getByText("Kick")).toBeInTheDocument();
+    expect(screen.getByText("Snare")).toBeInTheDocument();
+  });
+
   it("Select All calls onSelectionChange with every selectable sound id", async () => {
     const a = createMockSound({ id: "a", name: "A" });
     const b = createMockSound({ id: "b", name: "B" });

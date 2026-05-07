@@ -1,5 +1,10 @@
 # Changelog
 
+## Current Changes
+- Fixed auto-analysis not re-triggering after a completed analysis run when toggled off then back on
+- Fixed stale closure bug in sound list where toggling selection after a re-render could lose previously selected sounds
+- Sound list and sound selector rendering optimized — large libraries with background analysis no longer cause unnecessary UI re-renders
+
 ## v1.6.0-rc5
 
 Version 1.6.0-rc5 delivers a comprehensive overhaul of volume accuracy during playback — pads now reliably preserve their current volume when retriggered, when advancing through sequential sound chains, and when fades reverse mid-playback. Volume display flickering and stale readings after playback ends have also been resolved.
