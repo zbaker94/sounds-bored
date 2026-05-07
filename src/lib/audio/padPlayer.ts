@@ -7,7 +7,7 @@ import { usePadMetricsStore } from "@/state/padMetricsStore";
 import type { Pad, Scene } from "@/lib/schemas";
 import { isFadeablePad } from "@/lib/padUtils";
 import { emitAudioError } from "./audioEvents";
-import { stopAudioTick } from "./audioTick";
+import { startAudioTick, stopAudioTick } from "./audioTick";
 
 import {
   addStopCleanupTimeout,
@@ -285,7 +285,9 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
   clearPadFadeTracking(pad.id);
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVol, ctx.currentTime);
-  // Tick reads gain node value automatically — no store call needed.
+  // Signal the tick to re-sample on the next frame so any stale padVolumes entry
+  // (from a previous play session) is cleared before the buffer finishes loading.
+  startAudioTick();
 
   // Pre-collect eligible layers and set their pending flags synchronously before any await.
   // This closes the race window: a rapid re-trigger arriving during async work will see

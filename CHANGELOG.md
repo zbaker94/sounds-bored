@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where a pad's volume could briefly flicker or play at the wrong level when triggered after a previous playback session ended.
 - Fixed a bug where pad volume levels could show stale readings when a pad was stopped and immediately retriggered while other pads were still playing.
 - Fixed a bug where a pad's volume display could briefly reset or show a stale value when a sequential or looping sound advanced from one clip to the next.
 - Volume adjustments made while a pad is playing are now correctly preserved across chain-link boundaries (e.g., when sound A ends and sound B begins in a sequential loop).
