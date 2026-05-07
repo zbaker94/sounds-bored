@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where adjusting a pad's volume during sequential/loop playback would reset to the default level when one sound clip ended and the next began
 - Fixed a bug where retriggering an active pad would snap its volume back to the configured level, overriding any live volume adjustments made during playback.
 
 ## v1.6.0-rc4
