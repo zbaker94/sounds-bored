@@ -321,8 +321,11 @@ function tick(): void {
   rafId = requestAnimationFrame(tick);
 }
 
-/** Start the global audio tick if not already running. Idempotent. */
+/** Start the global audio tick if not already running. Idempotent.
+ * Always marks gainSampleNeeded so the next frame re-samples padGain nodes —
+ * catches stale prevPadVolumes when the tick is already running for other pads. */
 export function startAudioTick(): void {
+  gainSampleNeeded = true;
   if (rafId !== null) return;
   rafId = requestAnimationFrame(tick);
 }
