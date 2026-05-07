@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where the volume indicator on a pad could show a stale volume from a previous playback session after the sound stopped
+- Fixed volume continuity when re-pressing a pad mid-playback during sequential sound chains — the trigger now reads the live audio gain instead of a cached store value that could be temporarily cleared
+- The pad volume display now correctly falls back to the pad's configured default volume (instead of always 100%) when no audio is actively fading
 - Fixed pad volume display resetting to 100% correctly when a pad stops playing and no drag is in progress
 - Fixed a bug where a pad's volume could briefly flicker or play at the wrong level when triggered after a previous playback session ended.
 - Fixed a bug where pad volume levels could show stale readings when a pad was stopped and immediately retriggered while other pads were still playing.

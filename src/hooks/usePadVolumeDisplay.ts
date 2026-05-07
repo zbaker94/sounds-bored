@@ -25,6 +25,7 @@ export function usePadVolumeDisplay(
   padId: string,
   isDragging: boolean,
   dragVolume: number | null,
+  defaultVolume: number,
 ): PadVolumeDisplay {
   // padVolumes entry exists only when tick sees gain < 0.999 — absence means full volume
   const liveVolume = usePadMetricsStore((s) => s.padVolumes[padId]);
@@ -77,17 +78,20 @@ export function usePadVolumeDisplay(
   const volumeFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Keep defaultVolume in a ref so the hide-timeout closure reads the latest value.
+  // This is updated on every render — safe because it's a ref write, not state.
+  const defaultVolumeRef = useRef(defaultVolume);
+  defaultVolumeRef.current = defaultVolume;
+
   // Mutating a ref during render is intentional here: we need the most recent
   // liveVolume/dragVolume synchronously when computing displayVolume below, without
   // adding them as useState (which would delay by one render) or useEffect (async).
   // React Strict Mode's double-render is safe because refs persist across both calls
   // and the second write is idempotent with the first.
-  const lastVolumeRef = useRef(liveVolume ?? 1.0);
-  if (liveVolume !== undefined) {
-    lastVolumeRef.current = liveVolume;
-  } else if (dragVolume === null) {
-    lastVolumeRef.current = 1.0;
-  }
+  // Initialized to defaultVolume (not 1.0) so cross-session fallback agrees with
+  // the back-face slider, which also falls back to pad.volume when liveVolume is absent.
+  const lastVolumeRef = useRef(liveVolume ?? defaultVolume);
+  if (liveVolume !== undefined) lastVolumeRef.current = liveVolume;
   if (dragVolume !== null) lastVolumeRef.current = dragVolume;
   // During a drag, prefer dragVolume (updated synchronously on every pointer move) over
   // liveVolume (tick-driven, up to one RAF frame stale). Fallback to last seen tick value.
@@ -115,6 +119,10 @@ export function usePadVolumeDisplay(
           volumeHideTimerRef.current = null;
           setShowVolumeDisplay(false);
           setVolumeExiting(false);
+          // Reset for the next display cycle so stale cross-session values don't
+          // persist — next show will start from the schema default (same fallback
+          // the back-face slider uses), not from a previous play session's volume.
+          lastVolumeRef.current = defaultVolumeRef.current;
         }, 220);
       }, 450);
     }
