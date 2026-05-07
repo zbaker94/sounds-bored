@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import {
@@ -20,24 +20,24 @@ interface SoundFolderTreeProps {
   onToggleFolder: (folderId: string) => void;
 }
 
-function SoundNodeRow({
+const SoundNodeRow = memo(function SoundNodeRow({
   sound,
   selected,
   onToggle,
 }: {
   sound: Sound;
   selected: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
 }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer text-sm">
-      <Checkbox checked={selected} onCheckedChange={onToggle} />
+      <Checkbox checked={selected} onCheckedChange={() => onToggle(sound.id)} />
       {sound.name}
     </label>
   );
-}
+});
 
-function FolderNodeRow({
+const FolderNodeRow = memo(function FolderNodeRow({
   node,
   selectedIds,
   onToggleSound,
@@ -87,14 +87,14 @@ function FolderNodeRow({
               key={child.sound.id}
               sound={child.sound}
               selected={selectedIds.has(child.sound.id)}
-              onToggle={() => onToggleSound(child.sound.id)}
+              onToggle={onToggleSound}
             />
           )
         )}
       </CollapsibleContent>
     </Collapsible>
   );
-}
+});
 
 export function SoundFolderTree({
   sounds,
@@ -129,7 +129,7 @@ export function SoundFolderTree({
             key={node.sound.id}
             sound={node.sound}
             selected={selectedIds.has(node.sound.id)}
-            onToggle={() => onToggleSound(node.sound.id)}
+            onToggle={onToggleSound}
           />
         )
       )}

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { DEFAULT_TARGET_LUFS } from "@/lib/audio/gainNormalization";
 import { remove } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
@@ -38,6 +38,8 @@ import { useProjectStore } from "@/state/projectStore";
 import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import { getAffectedPads, type AffectedPad } from "@/lib/project.reconcile";
 import { cn } from "@/lib/utils";
+import type { Sound, Tag } from "@/lib/schemas";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { SoundListItemTags } from "./SoundListItemTags";
 import { ConfirmDeleteSoundsDialog } from "./ConfirmDeleteSoundsDialog";
 
@@ -77,6 +79,147 @@ function NormalizationPill({ lufs }: { lufs: number }) {
   );
 }
 
+interface SoundListItemProps {
+  sound: Sound;
+  isMissing: boolean;
+  isSelected: boolean;
+  isPreviewing: boolean;
+  allTags: Tag[];
+  onToggle: (soundId: string) => void;
+  onPreview: (sound: Sound) => void;
+  onResolve: (sound: Sound) => void;
+}
+
+/**
+ * Memoized per-item renderer. Immer's structural sharing means only the sound
+ * that was just updated gets a new object reference — all other items skip
+ * reconciliation entirely, so a batch analysis of N sounds costs O(1) renders
+ * per completion instead of O(N).
+ */
+const SoundListItem = memo(function SoundListItem({
+  sound,
+  isMissing,
+  isSelected,
+  isPreviewing,
+  allTags,
+  onToggle,
+  onPreview,
+  onResolve,
+}: SoundListItemProps) {
+  return (
+    <Item
+      variant="panel"
+      className="bg-black/5"
+      onClick={() => {
+        if (isMissing) { onResolve(sound); return; }
+        onToggle(sound.id);
+      }}
+    >
+      <ItemMedia>
+        {isMissing ? (
+          <HugeiconsIcon
+            icon={Alert02Icon}
+            size={14}
+            className="text-destructive"
+          />
+        ) : (
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggle(sound.id)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+      </ItemMedia>
+      <ItemMedia>
+        {sound.coverArtDataUrl && !isMissing ? (
+          <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url(${sound.coverArtDataUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: "blur(4px) brightness(0.7)",
+                transform: "scale(1.2)",
+              }}
+            />
+            <img
+              data-testid="sound-cover-art"
+              src={sound.coverArtDataUrl}
+              className="relative w-full h-full object-contain"
+              alt=""
+            />
+          </div>
+        ) : (
+          <HugeiconsIcon
+            icon={Music}
+            size={14}
+            className={isMissing ? "text-destructive/70" : undefined}
+          />
+        )}
+      </ItemMedia>
+      <ItemContent>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <ItemTitle
+            className={isMissing ? "text-destructive" : undefined}
+          >
+            {sound.name}
+          </ItemTitle>
+          {!isMissing && sound.loudnessLufs !== undefined && (
+            <NormalizationPill lufs={sound.loudnessLufs} />
+          )}
+        </div>
+        <SoundListItemTags soundTagIds={sound.tags} allTags={allTags} />
+        {!isMissing && (sound.genre || sound.mood) && (
+          <p className="text-xs text-white/40 truncate">
+            {[sound.genre, sound.mood].filter(Boolean).join(" · ")}
+          </p>
+        )}
+        {isPreviewing && <PreviewProgressBar />}
+      </ItemContent>
+      <ItemActions>
+        {isMissing ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onResolve(sound);
+                  }}
+                >
+                  <HugeiconsIcon icon={Alert02Icon} size={14} />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              File missing — click to resolve
+            </TooltipContent>
+          </Tooltip>
+        ) : sound.filePath ? (
+          <Button
+            variant="secondary"
+            size="icon-xs"
+            className="hover:text-white hover:bg-ghost/20"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreview(sound);
+            }}
+          >
+            <HugeiconsIcon
+              icon={isPreviewing ? StopIcon : PlayIcon}
+              size={14}
+            />
+          </Button>
+        ) : null}
+      </ItemActions>
+    </Item>
+  );
+});
+
 interface SoundListProps {
   selectedId: string | null;
   searchQuery: string;
@@ -113,6 +256,28 @@ export function SoundList({
     handleSoundDialogResolved,
     handleSoundDialogClose,
   } = useResolveSoundQueue();
+
+  // Stable ref-backed callbacks so SoundListItem memo is effective during
+  // analysis. Immer's structural sharing means only the analyzed sound gets a
+  // new object reference — all other items skip reconciliation when callbacks
+  // are stable across renders.
+  const selectedSoundIdsRef = useLatestRef(selectedSoundIds);
+  const togglePreviewRef = useLatestRef(togglePreview);
+
+  const handleToggle = useCallback((soundId: string) => {
+    const next = new Set(selectedSoundIdsRef.current);
+    if (next.has(soundId)) next.delete(soundId);
+    else next.add(soundId);
+    onSelectionChange(next);
+  }, [onSelectionChange]);
+
+  const handlePreview = useCallback((sound: Sound) => {
+    void togglePreviewRef.current(sound);
+  }, []);
+
+  const handleResolve = useCallback((sound: Sound) => {
+    setSoundDialogQueue([sound]);
+  }, [setSoundDialogQueue]);
 
   const soundsForSelectedId = useMemo(
     () =>
@@ -167,13 +332,6 @@ export function SoundList({
     } else {
       onSelectionChange(new Set(selectableIds));
     }
-  }
-
-  function toggleSelection(soundId: string) {
-    const next = new Set(selectedSoundIds);
-    if (next.has(soundId)) next.delete(soundId);
-    else next.add(soundId);
-    onSelectionChange(next);
   }
 
   function showDeleteToast(count: number, deletedFromDisk: number, failedCount: number) {
@@ -306,125 +464,19 @@ export function SoundList({
         </div>
       )}
       <div className="overflow-y-auto p-2 flex-1">
-        {filteredSounds.map((sound) => {
-          const isSoundMissing = missingSoundIds.has(sound.id);
-          return (
-            <Item
-              key={sound.id}
-              variant="panel"
-              className="bg-black/5"
-              onClick={() => {
-                if (isSoundMissing) {
-                  setSoundDialogQueue([sound]);
-                  return;
-                }
-                toggleSelection(sound.id);
-              }}
-            >
-              <ItemMedia>
-                {isSoundMissing ? (
-                  <HugeiconsIcon
-                    icon={Alert02Icon}
-                    size={14}
-                    className="text-destructive"
-                  />
-                ) : (
-                  <Checkbox
-                    checked={selectedSoundIds.has(sound.id)}
-                    onCheckedChange={() => toggleSelection(sound.id)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                )}
-              </ItemMedia>
-              <ItemMedia>
-                {sound.coverArtDataUrl && !isSoundMissing ? (
-                  <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        backgroundImage: `url(${sound.coverArtDataUrl})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        filter: "blur(4px) brightness(0.7)",
-                        transform: "scale(1.2)",
-                      }}
-                    />
-                    <img
-                      data-testid="sound-cover-art"
-                      src={sound.coverArtDataUrl}
-                      className="relative w-full h-full object-contain"
-                      alt=""
-                    />
-                  </div>
-                ) : (
-                  <HugeiconsIcon
-                    icon={Music}
-                    size={14}
-                    className={isSoundMissing ? "text-destructive/70" : undefined}
-                  />
-                )}
-              </ItemMedia>
-              <ItemContent>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <ItemTitle
-                    className={isSoundMissing ? "text-destructive" : undefined}
-                  >
-                    {sound.name}
-                  </ItemTitle>
-                  {!isSoundMissing && sound.loudnessLufs !== undefined && (
-                    <NormalizationPill lufs={sound.loudnessLufs} />
-                  )}
-                </div>
-                <SoundListItemTags soundTagIds={sound.tags} allTags={tags} />
-                {!isSoundMissing && (sound.genre || sound.mood) && (
-                  <p className="text-xs text-white/40 truncate">
-                    {[sound.genre, sound.mood].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-                {previewingId === sound.id && <PreviewProgressBar />}
-              </ItemContent>
-              <ItemActions>
-                {isSoundMissing ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          className="text-destructive hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSoundDialogQueue([sound]);
-                          }}
-                        >
-                          <HugeiconsIcon icon={Alert02Icon} size={14} />
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      File missing — click to resolve
-                    </TooltipContent>
-                  </Tooltip>
-                ) : sound.filePath ? (
-                  <Button
-                    variant="secondary"
-                    size="icon-xs"
-                    className="hover:text-white hover:bg-ghost/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePreview(sound);
-                    }}
-                  >
-                    <HugeiconsIcon
-                      icon={previewingId === sound.id ? StopIcon : PlayIcon}
-                      size={14}
-                    />
-                  </Button>
-                ) : null}
-              </ItemActions>
-            </Item>
-          );
-        })}
+        {filteredSounds.map((sound) => (
+          <SoundListItem
+            key={sound.id}
+            sound={sound}
+            isMissing={missingSoundIds.has(sound.id)}
+            isSelected={selectedSoundIds.has(sound.id)}
+            isPreviewing={previewingId === sound.id}
+            allTags={tags}
+            onToggle={handleToggle}
+            onPreview={handlePreview}
+            onResolve={handleResolve}
+          />
+        ))}
       </div>
       <ResolveMissingDialog
         sound={soundDialogQueue[0] ?? null}
