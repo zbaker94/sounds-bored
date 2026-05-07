@@ -1,9 +1,8 @@
 import { useRef, useMemo, useState, useEffect } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
-import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, emitAudioError } from "@/lib/audio";
+import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, getLivePadVolume, emitAudioError } from "@/lib/audio";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { usePadMetricsStore } from "@/state/padMetricsStore";
 import { useRafThrottledState } from "./useRafThrottledState";
 
 // Gesture thresholds
@@ -90,16 +89,17 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
     /**
      * Resolve the volume to use when triggering a tap or hold-release.
-     * If the pad is active (already playing), honour its current padVolumes entry.
-     * If it's not active, always start at 1.0 — padVolumes may be 0 from the hold
-     * phase display update and must not corrupt the trigger.
+     * Reads directly from the GainNode (getLivePadVolume) rather than padVolumes
+     * because padVolumes can be transiently cleared when the tick self-terminates
+     * between sequential chain sounds — the GainNode persists and always reflects truth.
      */
     function triggerVolume(): number {
-      const padVolumes = usePadMetricsStore.getState().padVolumes;
       if (hasHoldLayer) {
-        return checkHoldLayerActive() ? (padVolumes[padRef.current.id] ?? 1.0) : 1.0;
+        return checkHoldLayerActive() ? (getLivePadVolume(padRef.current.id) ?? 1.0) : 1.0;
       }
-      return usePlaybackStore.getState().playingPadIds.has(padRef.current.id) ? (padVolumes[padRef.current.id] ?? 1.0) : 1.0;
+      return usePlaybackStore.getState().playingPadIds.has(padRef.current.id)
+        ? (getLivePadVolume(padRef.current.id) ?? 1.0)
+        : 1.0;
     }
 
     function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
@@ -139,7 +139,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         //   otherwise start at 1.0 (triggered at pointer-down, padVolumes may be stale).
         // For one-shot pads: resume at current volume if already playing, else start at 0.
         const vol = s.wasPlayingAtStart
-          ? (usePadMetricsStore.getState().padVolumes[padRef.current.id] ?? 1.0)
+          ? (getLivePadVolume(padRef.current.id) ?? 1.0)
           : hasHoldLayer ? 1.0 : 0;
         s.startVolume = vol;
         s.currentVolume = vol;

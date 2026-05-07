@@ -30,10 +30,15 @@ vi.mock("@/lib/audio/fadeMixer", () => ({
 
 vi.mock("@/lib/audio/audioState", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/audio/audioState")>();
-  return { ...actual, isLayerActive: vi.fn().mockReturnValue(false), isPadFading: vi.fn().mockReturnValue(false) };
+  return {
+    ...actual,
+    isLayerActive: vi.fn().mockReturnValue(false),
+    isPadFading: vi.fn().mockReturnValue(false),
+    getLivePadVolume: vi.fn().mockReturnValue(undefined),
+  };
 });
 
-import { isLayerActive, triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio";
+import { isLayerActive, getLivePadVolume, triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio";
 
 // ─── Shared test fixtures ────────────────────────────────────────────────────
 
@@ -487,6 +492,7 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
     usePadMetricsStore.setState({ ...initialPadMetricsState });
     vi.mocked(triggerPad).mockClear();
     vi.mocked(isLayerActive).mockReturnValue(false);
+    vi.mocked(getLivePadVolume).mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -512,12 +518,12 @@ describe("usePadGesture — mixed hold + one-shot pad", () => {
     expect(triggerPad).toHaveBeenCalledWith(mixedPad, 1.0);
   });
 
-  it("triggers at current padVolume when the hold layer itself is active (re-press while holding)", () => {
+  it("triggers at current gain node volume when the hold layer itself is active (re-press while holding)", () => {
     // Simulate: hold layer is actively playing at volume 0.7.
-    // triggerVolume() should honour the current padVolume.
+    // triggerVolume() reads getLivePadVolume (gain node) not padVolumes (stale store).
     vi.mocked(isLayerActive).mockImplementation((layerId) => layerId === "layer-hold");
+    vi.mocked(getLivePadVolume).mockReturnValue(0.7);
     usePlaybackStore.setState({ playingPadIds: new Set([mixedPad.id]) });
-    usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [mixedPad.id]: 0.7 } });
 
     const { result } = renderHook(() => usePadGesture(mixedPad));
 

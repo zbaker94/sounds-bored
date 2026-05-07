@@ -346,7 +346,17 @@ export function getPadGain(padId: string): GainNode {
   return gain;
 }
 
-/** Iterate active pad gain nodes â€” only pads currently in voiceMap (with active voices). */
+/**
+ * Read the current gain value for a pad without creating a new gain node.
+ * Returns undefined if no gain node exists for this pad yet.
+ * Reads gain.gain.value directly from the GainNode — authoritative even during
+ * chain transitions when padVolumes (the tick-sampled store) may be transiently cleared.
+ */
+export function getLivePadVolume(padId: string): number | undefined {
+  return padGainMap.get(padId)?.gain.value;
+}
+
+/** Iterate active pad gain nodes — only pads currently in voiceMap (with active voices). */
 export function forEachActivePadGain(fn: (padId: string, gain: GainNode) => void): void {
   for (const padId of voiceMap.keys()) {
     const gain = padGainMap.get(padId);

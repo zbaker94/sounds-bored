@@ -265,6 +265,7 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
     pad.id,
     isDragging,
     dragVolume,
+    (pad.volume ?? 100) / 100,
   );
 
   // Multi-fade mode derived state

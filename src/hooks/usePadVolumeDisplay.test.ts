@@ -18,11 +18,18 @@ describe("usePadVolumeDisplay", () => {
   describe("initial state", () => {
     it("starts with display hidden and full volume", () => {
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       expect(result.current.showVolumeDisplay).toBe(false);
       expect(result.current.volumeExiting).toBe(false);
       expect(result.current.displayVolume).toBe(1.0);
+    });
+
+    it("uses defaultVolume as fallback when liveVolume is absent", () => {
+      const { result } = renderHook(() =>
+        usePadVolumeDisplay(PAD_ID, false, null, 0.7)
+      );
+      expect(result.current.displayVolume).toBe(0.7);
     });
   });
 
@@ -30,7 +37,7 @@ describe("usePadVolumeDisplay", () => {
     it("shows display immediately when dragging starts", () => {
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
-          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
+          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume, 1.0),
         { initialProps: { isDragging: false, dragVolume: null as number | null } }
       );
       expect(result.current.showVolumeDisplay).toBe(false);
@@ -44,7 +51,7 @@ describe("usePadVolumeDisplay", () => {
         padVolumes: { [PAD_ID]: 0.8 },
       });
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, true, 0.3)
+        usePadVolumeDisplay(PAD_ID, true, 0.3, 1.0)
       );
       // dragVolume takes precedence
       expect(result.current.displayVolume).toBe(0.3);
@@ -53,7 +60,7 @@ describe("usePadVolumeDisplay", () => {
     it("starts linger timer when dragging stops (isVolumeActive → false)", () => {
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
-          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
+          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume, 1.0),
         { initialProps: { isDragging: true, dragVolume: 0.5 as number | null } }
       );
       expect(result.current.showVolumeDisplay).toBe(true);
@@ -74,7 +81,7 @@ describe("usePadVolumeDisplay", () => {
   describe("audio fade (liveVolume from store)", () => {
     it("shows display when liveVolume appears in store", () => {
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       act(() => {
         usePadMetricsStore.getState().setPadMetrics({
@@ -87,7 +94,7 @@ describe("usePadVolumeDisplay", () => {
 
     it("starts stability timer (300ms) when liveVolume stops changing", () => {
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       act(() => {
         usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.7 } });
@@ -102,7 +109,7 @@ describe("usePadVolumeDisplay", () => {
 
     it("hides display after full linger + fade sequence from store update", () => {
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       act(() => {
         usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.5 } });
@@ -125,7 +132,7 @@ describe("usePadVolumeDisplay", () => {
       // Simulate the engine-layer fix: padVolumes cleared synchronously when pad stops,
       // so liveVolume was never set before the hook mounted.
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       // Bar was never showing (padVolumes was never set)
       expect(result.current.showVolumeDisplay).toBe(false);
@@ -141,7 +148,7 @@ describe("usePadVolumeDisplay", () => {
     it("cancels pending linger timer when drag resumes during linger", () => {
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
-          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
+          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume, 1.0),
         { initialProps: { isDragging: true, dragVolume: 0.4 as number | null } }
       );
       rerender({ isDragging: false, dragVolume: null });
@@ -160,7 +167,7 @@ describe("usePadVolumeDisplay", () => {
       // Pad stops → clearVoice clears padVolumes synchronously → liveVolume goes undefined.
       // The stability timer must be cancelled immediately (not fire 300ms later).
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       act(() => {
         usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.4 } });
@@ -187,7 +194,7 @@ describe("usePadVolumeDisplay", () => {
       // (but the bar was already showing due to drag, so the linger runs).
       const { result, rerender } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
-          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
+          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume, 1.0),
         { initialProps: { isDragging: true, dragVolume: 0.5 as number | null } }
       );
       // Drag ends — linger starts
@@ -201,11 +208,38 @@ describe("usePadVolumeDisplay", () => {
       expect(result.current.volumeExiting).toBe(false);
     });
 
+    it("resets lastVolumeRef to defaultVolume after display cycle ends so next cycle starts fresh", () => {
+      // Regression: stale lastVolumeRef from session A (0.5) would show on session B
+      // when liveVolume is absent and defaultVolume differs (e.g. pad.volume = 1.0).
+      const { result } = renderHook(() =>
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
+      );
+      // Session A: fade shows bar at 0.5
+      act(() => {
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [PAD_ID]: 0.5 } });
+      });
+      expect(result.current.displayVolume).toBe(0.5);
+      // Pad stops — padVolumes cleared
+      act(() => {
+        usePadMetricsStore.getState().setPadMetrics({ padVolumes: {} });
+      });
+      // Wait for full linger + hide (450ms + 220ms) — resets lastVolumeRef to 1.0
+      act(() => { vi.advanceTimersByTime(450 + 220); });
+      expect(result.current.showVolumeDisplay).toBe(false);
+      // Session B: pad retriggers at full volume (liveVolume still absent — gain at 1.0)
+      // The bar is NOT actively showing, but if it were to show, displayVolume should be
+      // defaultVolume (1.0), not the stale 0.5 from session A.
+      // Verify by starting a drag (which shows the bar) with no liveVolume:
+      // dragVolume dominates during drag, so use a non-drag scenario to read the fallback.
+      // Advance time so isVolumeActive is false, then check displayVolume fallback.
+      expect(result.current.displayVolume).toBe(1.0); // reset to defaultVolume, not stale 0.5
+    });
+
     it("re-shows bar on rapid re-trigger after natural end", () => {
       // Verifies that after a pad stops (padVolumes cleared) and re-triggers,
       // a new fade correctly shows the bar again.
       const { result } = renderHook(() =>
-        usePadVolumeDisplay(PAD_ID, false, null)
+        usePadVolumeDisplay(PAD_ID, false, null, 1.0)
       );
       // First trigger: fade shows bar
       act(() => {
@@ -232,7 +266,7 @@ describe("usePadVolumeDisplay", () => {
     it("clears pending timers when unmounted during linger phase", () => {
       const { result, rerender, unmount } = renderHook(
         ({ isDragging, dragVolume }: { isDragging: boolean; dragVolume: number | null }) =>
-          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume),
+          usePadVolumeDisplay(PAD_ID, isDragging, dragVolume, 1.0),
         { initialProps: { isDragging: true, dragVolume: 0.5 as number | null } }
       );
       rerender({ isDragging: false, dragVolume: null });

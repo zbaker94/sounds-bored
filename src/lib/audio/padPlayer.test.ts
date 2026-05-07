@@ -436,6 +436,70 @@ describe("sequential arrangement", () => {
     // No more sounds loaded after chain completes
     expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
   });
+
+  it("starts the audio tick after natural chain continuation so the store is updated", async () => {
+    const { startAudioTick } = await import("./audioTick");
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    await triggerPad(pad);
+    await tick();
+    vi.mocked(startAudioTick).mockClear();
+
+    // Voice A ends naturally — chain auto-advances to voice B
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // startAudioTick must be called so the tick re-samples padGain on the next frame
+    expect(startAudioTick).toHaveBeenCalled();
+  });
+
+  it("does not reset padGain to pad.volume on natural chain continuation", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    const layer = createMockLayer({
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer], volume: 100 });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Simulate volume adjusted to 60%
+    gains[0].gain.value = 0.6;
+    const setValueCallsAfterInitial = gains[0].gain.setValueAtTime.mock.calls.length;
+
+    // Voice A ends naturally
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // No new setValueAtTime calls on padGain — gain was not reset to 1.0 or pad.volume
+    expect(gains[0].gain.setValueAtTime).toHaveBeenCalledTimes(setValueCallsAfterInitial);
+    expect(gains[0].gain.value).toBe(0.6);
+  });
 });
 
 describe("shuffled arrangement", () => {
@@ -652,6 +716,47 @@ describe("loop playback mode", () => {
     await tick();
     expect(mockLoadBuffer).toHaveBeenCalledTimes(3);
     expect(mockLoadBuffer.mock.calls[2][0].id).toBe(sounds[0].id);
+  });
+
+  it('sequential+loop: does not reset padGain to pad.volume on loop chain restart', async () => {
+    const { triggerPad } = await import('./padPlayer');
+    const sounds = [
+      createMockSound({ filePath: 'a.wav' }),
+      createMockSound({ filePath: 'b.wav' }),
+    ];
+    setSounds(sounds);
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    const layer = createMockLayer({
+      playbackMode: 'loop',
+      arrangement: 'sequential',
+      selection: { type: 'assigned', instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer], volume: 100 });
+    await triggerPad(pad);
+    await tick();
+
+    // User adjusts volume to 65% mid-playback (gains[0] is padGain)
+    gains[0].gain.value = 0.65;
+
+    // A ends -> B starts (continueLayerChain)
+    createdSources[0].simulateEnd();
+    await tick();
+
+    // B ends -> chain exhausted -> restartLoopChain re-triggers from A
+    const setValueCallsBeforeRestart = gains[0].gain.setValueAtTime.mock.calls.length;
+    createdSources[1].simulateEnd();
+    await tick();
+
+    // padGain must not have been reset - gain node value unchanged, no extra setValueAtTime
+    expect(gains[0].gain.setValueAtTime).toHaveBeenCalledTimes(setValueCallsBeforeRestart);
+    expect(gains[0].gain.value).toBe(0.65);
   });
 
   it("hold mode: simultaneous+hold sets source.loop = true", async () => {
@@ -1041,6 +1146,73 @@ describe("retrigger next", () => {
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves the live pad gain on next-retrigger instead of resetting to pad.volume", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Collect gain mocks in creation order: padGain (0), layerGain (1), voiceGain (2)
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Simulate user adjusting volume to 70% via the gain node (as setPadVolume does)
+    gains[0].gain.value = 0.7;
+
+    // Next-retrigger must not reset gain to 1.0 — must preserve 0.7
+    await triggerPad(pad);
+    await tick();
+
+    // gains[0] is the padGain — the last setValueAtTime call must be 0.7, not 1.0
+    expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.7, expect.any(Number));
+  });
+
+  it("preserves live pad gain on restart-retrigger (fix applies to all retrigger modes)", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      retriggerMode: "restart",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    gains[0].gain.value = 0.6;
+
+    await triggerPad(pad);
+    await tick();
+
+    expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.6, expect.any(Number));
   });
 });
 
@@ -3890,8 +4062,8 @@ describe("executeFadeTap â€” toggle state machine", () => {
     expect(isPadFading(pad.id)).toBe(true);
 
     // Simulate mid-fade-in: gain is partway between 0 and 0.8.
-    // Set the store value that reverseFade reads (audioTick writes this each RAF frame).
-    usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [pad.id]: 0.4 } });
+    // Set gain.value directly — reverseActiveFade reads getLivePadVolume() which reads the GainNode.
+    mockGain.gain.value = 0.4;
     mockGain.gain.linearRampToValueAtTime.mockClear();
     mockGain.gain.setValueAtTime.mockClear();
 

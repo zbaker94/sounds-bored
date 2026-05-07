@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _stopMasterVolumeSync, _stopLayerVoiceSetListener } from "./audioTick";
+import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _getGainSampleNeeded, _stopMasterVolumeSync, _stopLayerVoiceSetListener } from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
@@ -130,8 +130,10 @@ describe("audioTick", () => {
     // Invoke the tick callback manually — getActivePadCount returns 0, so it self-terminates
     capturedCallback!(performance.now());
 
-    expect(usePadMetricsStore.getState().padVolumes).toEqual({});
-    expect(usePadMetricsStore.getState().padProgress).toEqual({});
+    // padMetrics are preserved — pad GainNode persists through chain gaps; only cleared by stopAudioTick
+    expect(usePadMetricsStore.getState().padVolumes).toEqual({ "pad-1": 0.5 });
+    expect(usePadMetricsStore.getState().padProgress).toEqual({ "pad-1": 0.3 });
+    // Layer metrics are cleared — no active voices remain
     expect(useLayerMetricsStore.getState().activeLayerIds.size).toBe(0);
 
     // No further RAF should have been scheduled (tick exited)
@@ -252,7 +254,7 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
   });
 
-  it("skips forEachActivePadGain and forEachActiveLayerGain when isAnyGainChanging returns false", () => {
+  it("skips forEachActivePadGain and forEachActiveLayerGain when isAnyGainChanging returns false and gainSampleNeeded is false", () => {
     vi.mocked(getActivePadCount).mockReturnValue(1);
     vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.5 });
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
@@ -265,12 +267,86 @@ describe("audioTick", () => {
     });
 
     startAudioTick();
+    // Tick 1: gainSampleNeeded=true (from resetTrackers in stopAudioTick afterEach) — samples even though
+    // isAnyGainChanging is false. This clears gainSampleNeeded.
+    capturedCallback!(performance.now());
+    vi.mocked(forEachActivePadGain).mockClear();
+    vi.mocked(forEachActiveLayerGain).mockClear();
+
+    // Tick 2: gainSampleNeeded=false and isAnyGainChanging=false — must skip sampling
     capturedCallback!(performance.now());
 
     expect(forEachActivePadGain).not.toHaveBeenCalled();
     expect(forEachActiveLayerGain).not.toHaveBeenCalled();
 
     rafSpy.mockRestore();
+  });
+
+  it("samples gain nodes on first tick after self-terminate/restart even when isAnyGainChanging is false", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(isAnyGainChanging).mockReturnValue(false);
+    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+      fn("pad-1", { gain: { value: 0.74 } } as unknown as GainNode);
+    });
+    vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    // gainSampleNeeded=true from stopAudioTick in afterEach (calls resetTrackers)
+    expect(_getGainSampleNeeded()).toBe(true);
+
+    capturedCallback!(performance.now());
+
+    // Even though isAnyGainChanging()=false, the first tick must sample and emit padVolumes
+    expect(forEachActivePadGain).toHaveBeenCalled();
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBe(0.74);
+    // gainSampleNeeded is now cleared — subsequent ticks will fast-path
+    expect(_getGainSampleNeeded()).toBe(false);
+
+    rafSpy.mockRestore();
+  });
+
+  it("clears stale padVolumes when startAudioTick is called while tick already running", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(isAnyGainChanging).mockReturnValue(false);
+
+    // First: simulate pad playing at 70%
+    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+      fn("pad-1", { gain: { value: 0.7 } } as unknown as GainNode);
+    });
+    vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // tick 1: gainSampleNeeded=true, samples 0.7
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBe(0.7);
+    capturedCallback!(performance.now()); // tick 2: fast-path, prevPadVolumes reused
+    expect(_getGainSampleNeeded()).toBe(false);
+
+    // Pad stops and is immediately retriggered at 100% while tick still running
+    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+      fn("pad-1", { gain: { value: 1.0 } } as unknown as GainNode);
+    });
+    // startAudioTick() must mark gainSampleNeeded so stale 0.7 entry gets cleared
+    startAudioTick();
+    expect(_getGainSampleNeeded()).toBe(true);
+
+    capturedCallback!(performance.now()); // tick 3: re-samples, gain=1.0 not stored -> clears pad-1
+    expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBeUndefined();
   });
 
   it("calls forEachActivePadGain and forEachActiveLayerGain when isAnyGainChanging returns true", () => {
