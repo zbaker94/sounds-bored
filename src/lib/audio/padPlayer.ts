@@ -267,13 +267,19 @@ export function releasePadHoldLayers(pad: Pad): void {
   }
 }
 
-// startVolume: 0-1. Defaults to pad.volume (0-100) divided by 100 so the pad plays at its configured level.
-// Pass 0 explicitly for silent-start gesture-drag and fade-in operations.
+// startVolume: 0-1. For a fresh trigger (pad not active), defaults to pad.volume.
+// For retriggering an already-active pad, defaults to the current live gain so the
+// user-adjusted volume is not reset to pad.volume. Pass 0 explicitly for silent-start
+// gesture-drag and fade-in operations.
 export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> {
-  const startVol = startVolume ?? ((pad.volume ?? 100) / 100);
   const { sounds } = useLibraryStore.getState();
   const ctx = await ensureResumed();
   const padGain = getPadGain(pad.id);
+  // Preserve the live gain when retriggering an active pad — avoids snapping volume
+  // back to pad.volume. Fresh triggers (pad not active) use pad.volume.
+  const startVol = startVolume ?? (isPadActive(pad.id)
+    ? padGain.gain.value
+    : ((pad.volume ?? 100) / 100));
   // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
   // that are about to be started below.
   clearPadFadeTracking(pad.id);

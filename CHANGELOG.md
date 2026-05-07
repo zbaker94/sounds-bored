@@ -1,5 +1,8 @@
 # Changelog
 
+## Current Changes
+- Fixed a bug where retriggering an active pad would snap its volume back to the configured level, overriding any live volume adjustments made during playback.
+
 ## v1.6.0-rc4
 
 Fixed a file encoding issue that could cause startup or configuration loading failures; also bumped to v1.6.0-rc4.

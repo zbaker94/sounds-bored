@@ -1042,6 +1042,73 @@ describe("retrigger next", () => {
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
     expect(mockLoadBuffer).toHaveBeenCalledTimes(2);
   });
+
+  it("preserves the live pad gain on next-retrigger instead of resetting to pad.volume", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sounds = [
+      createMockSound({ filePath: "a.wav" }),
+      createMockSound({ filePath: "b.wav" }),
+    ];
+    setSounds(sounds);
+
+    const layer = createMockLayer({
+      retriggerMode: "next",
+      arrangement: "sequential",
+      selection: { type: "assigned", instances: sounds.map((s) => ({ id: s.id, soundId: s.id, volume: 1 })) },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    // Collect gain mocks in creation order: padGain (0), layerGain (1), voiceGain (2)
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    // Simulate user adjusting volume to 70% via the gain node (as setPadVolume does)
+    gains[0].gain.value = 0.7;
+
+    // Next-retrigger must not reset gain to 1.0 — must preserve 0.7
+    await triggerPad(pad);
+    await tick();
+
+    // gains[0] is the padGain — the last setValueAtTime call must be 0.7, not 1.0
+    expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.7, expect.any(Number));
+  });
+
+  it("preserves live pad gain on restart-retrigger (fix applies to all retrigger modes)", async () => {
+    const { triggerPad } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      retriggerMode: "restart",
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    gains[0].gain.value = 0.6;
+
+    await triggerPad(pad);
+    await tick();
+
+    expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.6, expect.any(Number));
+  });
 });
 
 describe("stopAllPads â€” ramped", () => {
