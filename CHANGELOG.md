@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Updated to version 1.6.0-rc5
 - Fixed pad volume display flickering to full volume between sequential sound triggers on a pad
 - Fade reversal and crossfade now read the actual live gain value, making mid-fade direction changes more accurate
 - Retriggering an active pad now reliably preserves its current volume even when playback events overlap during startup
