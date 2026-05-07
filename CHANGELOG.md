@@ -1,6 +1,9 @@
 # Changelog
 
-## Current Changes
+## v1.6.0-rc5
+
+Version 1.6.0-rc5 delivers a comprehensive overhaul of volume accuracy during playback — pads now reliably preserve their current volume when retriggered, when advancing through sequential sound chains, and when fades reverse mid-playback. Volume display flickering and stale readings after playback ends have also been resolved.
+
 - Updated to version 1.6.0-rc5
 - Fixed pad volume display flickering to full volume between sequential sound triggers on a pad
 - Fade reversal and crossfade now read the actual live gain value, making mid-fade direction changes more accurate
