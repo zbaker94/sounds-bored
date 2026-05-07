@@ -83,7 +83,11 @@ export function usePadVolumeDisplay(
   // React Strict Mode's double-render is safe because refs persist across both calls
   // and the second write is idempotent with the first.
   const lastVolumeRef = useRef(liveVolume ?? 1.0);
-  if (liveVolume !== undefined) lastVolumeRef.current = liveVolume;
+  if (liveVolume !== undefined) {
+    lastVolumeRef.current = liveVolume;
+  } else if (dragVolume === null) {
+    lastVolumeRef.current = 1.0;
+  }
   if (dragVolume !== null) lastVolumeRef.current = dragVolume;
   // During a drag, prefer dragVolume (updated synchronously on every pointer move) over
   // liveVolume (tick-driven, up to one RAF frame stale). Fallback to last seen tick value.

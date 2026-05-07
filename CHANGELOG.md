@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed pad volume display resetting to 100% correctly when a pad stops playing and no drag is in progress
 - Fixed a bug where a pad's volume could briefly flicker or play at the wrong level when triggered after a previous playback session ended.
 - Fixed a bug where pad volume levels could show stale readings when a pad was stopped and immediately retriggered while other pads were still playing.
 - Fixed a bug where a pad's volume display could briefly reset or show a stale value when a sequential or looping sound advanced from one clip to the next.
