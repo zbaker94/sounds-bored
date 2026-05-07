@@ -30,6 +30,7 @@ import {
   getAllVoices,
   getLayerIdsForPads,
   getLayerVoices,
+  getLivePadVolume,
   getPadGain,
   clearInactivePadGains,
   clearLayerGainsForIds,
@@ -80,17 +81,15 @@ export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
   const reverseTarget = getPadFadeFromVolume(pad.id);
   if (reverseTarget === undefined) return;
 
-  const padVolumes = usePadMetricsStore.getState().padVolumes;
-  const currentVol = padVolumes[pad.id] ?? reverseTarget;
+  const currentVol = getLivePadVolume(pad.id) ?? reverseTarget;
 
   fadePad(pad, currentVol, reverseTarget, duration);
   usePlaybackStore.getState().addReversingPad(pad.id);
 }
 
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
-  const padVolumes = usePadMetricsStore.getState().padVolumes;
   fadingOut.forEach((pad) => {
-    const currentVol = padVolumes[pad.id] ?? ((pad.volume ?? 100) / 100);
+    const currentVol = getLivePadVolume(pad.id) ?? ((pad.volume ?? 100) / 100);
     fadePad(pad, currentVol, (pad.fadeTargetVol ?? 0) / 100, resolveFadeDuration(pad, globalFadeDurationMs));
   });
   fadingIn.forEach((pad) =>
@@ -102,8 +101,7 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
 
 function reverseActiveFade(pad: Pad, highVol: number, lowVol: number, duration: number): void {
   const reverseTarget = getPadFadeFromVolume(pad.id);
-  const padVolumes = usePadMetricsStore.getState().padVolumes;
-  const currentVol = padVolumes[pad.id] ?? (reverseTarget ?? highVol);
+  const currentVol = getLivePadVolume(pad.id) ?? (reverseTarget ?? highVol);
   const targetVol = reverseTarget ?? (isPadFadingOut(pad.id) ? highVol : lowVol);
   fadePad(pad, currentVol, targetVol, duration);
 }
@@ -139,8 +137,10 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
 
 /**
  * Cancel an in-progress fade, freezing the gain at the current ramp position.
- * Uses the last RAF-sampled volume from the store rather than gain.gain.value
- * to avoid anchoring back to the ramp's start point.
+ * Intentionally reads padVolumes (RAF-sampled) rather than getLivePadVolume() —
+ * during a scheduled Web Audio ramp, gain.gain.value reflects the scheduler's
+ * internal interpolation start point, not the perceivable current position.
+ * The store sample better approximates what the user hears at the cancel moment.
  */
 export function stopFade(pad: Pad): void {
   const padVolumes = usePadMetricsStore.getState().padVolumes;
@@ -273,12 +273,16 @@ export function releasePadHoldLayers(pad: Pad): void {
 // gesture-drag and fade-in operations.
 export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> {
   const { sounds } = useLibraryStore.getState();
-  const ctx = await ensureResumed();
+  // Capture gain state before any await — isPadActive and gain.gain.value can change
+  // across async boundaries (e.g. stopAllPads firing during ensureResumed).
   const padGain = getPadGain(pad.id);
+  const wasActive = isPadActive(pad.id);
+  const liveGain = wasActive ? padGain.gain.value : null;
+  const ctx = await ensureResumed();
   // Preserve the live gain when retriggering an active pad — avoids snapping volume
   // back to pad.volume. Fresh triggers (pad not active) use pad.volume.
-  const startVol = startVolume ?? (isPadActive(pad.id)
-    ? padGain.gain.value
+  const startVol = startVolume ?? (wasActive
+    ? (liveGain ?? (pad.volume ?? 100) / 100)
     : ((pad.volume ?? 100) / 100));
   // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
   // that are about to be started below.
@@ -343,6 +347,8 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
     // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
     // that are about to be started below (same fix as triggerPad).
     clearPadFadeTracking(pad.id);
+    // Signal the tick to re-sample stale padVolumes entries (same as triggerPad).
+    startAudioTick();
 
     await triggerLayerOfPad(pad, layer, ctx, padGain, resolved, {
       // triggerLayer-specific: after a "stop"-mode ramp-stop, check if the pad

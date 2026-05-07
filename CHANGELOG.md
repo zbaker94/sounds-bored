@@ -1,16 +1,13 @@
 # Changelog
 
 ## Current Changes
-- Fixed a bug where the volume indicator on a pad could show a stale volume from a previous playback session after the sound stopped
-- Fixed volume continuity when re-pressing a pad mid-playback during sequential sound chains — the trigger now reads the live audio gain instead of a cached store value that could be temporarily cleared
-- The pad volume display now correctly falls back to the pad's configured default volume (instead of always 100%) when no audio is actively fading
-- Fixed pad volume display resetting to 100% correctly when a pad stops playing and no drag is in progress
-- Fixed a bug where a pad's volume could briefly flicker or play at the wrong level when triggered after a previous playback session ended.
-- Fixed a bug where pad volume levels could show stale readings when a pad was stopped and immediately retriggered while other pads were still playing.
-- Fixed a bug where a pad's volume display could briefly reset or show a stale value when a sequential or looping sound advanced from one clip to the next.
-- Volume adjustments made while a pad is playing are now correctly preserved across chain-link boundaries (e.g., when sound A ends and sound B begins in a sequential loop).
-- Fixed a bug where adjusting a pad's volume during sequential/loop playback would reset to the default level when one sound clip ended and the next began
-- Fixed a bug where retriggering an active pad would snap its volume back to the configured level, overriding any live volume adjustments made during playback.
+- Fixed pad volume display flickering to full volume between sequential sound triggers on a pad
+- Fade reversal and crossfade now read the actual live gain value, making mid-fade direction changes more accurate
+- Retriggering an active pad now reliably preserves its current volume even when playback events overlap during startup
+- Triggering an individual layer on a pad now correctly refreshes volume tracking, matching the behavior of full pad triggers
+- Fixed volume resetting to 100% when retriggering a pad or advancing through a sequential chain — pad volume is now read directly from the live audio gain node instead of a store cache that can be transiently cleared between chain links
+- Fixed the volume bar showing a stale reading from a previous play session after a pad stops — the display now correctly falls back to the pad's configured volume
+- Volume adjustments made during playback (e.g. via drag) are preserved across chain-link boundaries and when a pad is retriggered
 
 ## v1.6.0-rc4
 

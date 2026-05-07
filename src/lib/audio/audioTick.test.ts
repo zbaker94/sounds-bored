@@ -130,8 +130,10 @@ describe("audioTick", () => {
     // Invoke the tick callback manually — getActivePadCount returns 0, so it self-terminates
     capturedCallback!(performance.now());
 
-    expect(usePadMetricsStore.getState().padVolumes).toEqual({});
-    expect(usePadMetricsStore.getState().padProgress).toEqual({});
+    // padMetrics are preserved — pad GainNode persists through chain gaps; only cleared by stopAudioTick
+    expect(usePadMetricsStore.getState().padVolumes).toEqual({ "pad-1": 0.5 });
+    expect(usePadMetricsStore.getState().padProgress).toEqual({ "pad-1": 0.3 });
+    // Layer metrics are cleared — no active voices remain
     expect(useLayerMetricsStore.getState().activeLayerIds.size).toBe(0);
 
     // No further RAF should have been scheduled (tick exited)

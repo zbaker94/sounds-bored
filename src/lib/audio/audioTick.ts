@@ -268,7 +268,11 @@ function tick(): void {
   if (getActivePadCount() === 0) {
     rafId = null;
     resetTrackers();
-    clearAllTickFields();
+    // Clear layer metrics (no active voices) but preserve padMetrics — the pad GainNode
+    // persists through sequential chain gaps, so wiping padVolumes here would cause a
+    // false "full volume" flash mid-chain. padMetrics is cleared by stopAudioTick() on
+    // explicit stop or project close.
+    useLayerMetricsStore.getState().clearLayerMetrics();
     return;
   }
 

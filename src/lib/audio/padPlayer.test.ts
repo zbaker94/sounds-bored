@@ -4062,8 +4062,8 @@ describe("executeFadeTap â€” toggle state machine", () => {
     expect(isPadFading(pad.id)).toBe(true);
 
     // Simulate mid-fade-in: gain is partway between 0 and 0.8.
-    // Set the store value that reverseFade reads (audioTick writes this each RAF frame).
-    usePadMetricsStore.getState().setPadMetrics({ padVolumes: { [pad.id]: 0.4 } });
+    // Set gain.value directly — reverseActiveFade reads getLivePadVolume() which reads the GainNode.
+    mockGain.gain.value = 0.4;
     mockGain.gain.linearRampToValueAtTime.mockClear();
     mockGain.gain.setValueAtTime.mockClear();
 

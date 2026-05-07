@@ -10,16 +10,14 @@ export interface PadVolumeDisplay {
 /**
  * Manages volume bar display state for a pad button.
  *
- * Subscribes to padVolumes[padId] from playbackStore and coordinates:
+ * Subscribes to padVolumes[padId] from padMetricsStore and coordinates:
  * - A 300ms stability timer to detect when a fade has settled
  * - A 450ms linger then 220ms fade-out sequence when volume becomes inactive
  *
- * Note: padVolumes is cleared synchronously in clearVoice (audioState.ts) at the
- * same time as removePlayingPad, so there is no stale-entry race to guard against here.
- *
- * @param padId - The pad ID to watch in playbackStore
+ * @param padId - The pad ID to watch in padMetricsStore
  * @param isDragging - Whether the user is actively dragging the volume slider
  * @param dragVolume - The instantaneous drag volume (0–1), or null when not dragging
+ * @param defaultVolume - Fallback volume (0–1) when no live or drag volume is present
  */
 export function usePadVolumeDisplay(
   padId: string,
