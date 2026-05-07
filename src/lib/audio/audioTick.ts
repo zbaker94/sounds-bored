@@ -54,6 +54,11 @@ let prevActiveLayerIds = new Set<string>();
 // True on startup and after resetTrackers() so the first tick after start/resume
 // always captures the current active layer set — matches the old -1 sentinel behavior.
 let layerVoiceSetChanged = true;
+// True on startup and after resetTrackers() so the first tick after the tick
+// restarts (gap between chain-link sounds, stop/restart) always samples gain nodes
+// regardless of isAnyGainChanging(). Prevents prevPadVolumes={} (cleared by
+// resetTrackers) from being reused stale when no ramp happens to be in flight.
+let gainSampleNeeded = true;
 let prevPadProgress: Record<string, number> = {};
 let prevLayerProgress: Record<string, number> = {};
 let prevLayerPlayOrder: Record<string, string[]> = {};
@@ -68,6 +73,8 @@ const prevLayerChainSource = new Map<string, readonly unknown[]>();
 
 /** Exposed for test introspection only — do not use in production code. */
 export const _getPrevActiveLayerIds = (): ReadonlySet<string> => prevActiveLayerIds;
+/** Exposed for test introspection only — do not use in production code. */
+export const _getGainSampleNeeded = (): boolean => gainSampleNeeded;
 
 /** Reset all per-frame tracker state. Called on start, self-terminate, and stop. */
 function resetTrackers(): void {
@@ -75,6 +82,7 @@ function resetTrackers(): void {
   prevLayerVolumes = {};
   prevActiveLayerIds = new Set();
   layerVoiceSetChanged = true; // ensure first tick after reset always refreshes activeLayerIds
+  gainSampleNeeded = true;     // ensure first tick after reset always samples gain nodes
   prevPadProgress = {};
   prevLayerProgress = {};
   prevLayerPlayOrder = {};
@@ -109,7 +117,7 @@ function computeGainChanges(): {
   padVolumesChanged: boolean;
   layerVolumesChanged: boolean;
 } {
-  if (!isAnyGainChanging()) {
+  if (!gainSampleNeeded && !isAnyGainChanging()) {
     return {
       nextPadVolumes: prevPadVolumes,
       nextLayerVolumes: prevLayerVolumes,
@@ -117,6 +125,7 @@ function computeGainChanges(): {
       layerVolumesChanged: false,
     };
   }
+  gainSampleNeeded = false;
   const nextPadVolumes: Record<string, number> = {};
   forEachActivePadGain((padId, gain) => {
     const v = gain.gain.value;

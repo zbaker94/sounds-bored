@@ -49,7 +49,6 @@ import {
   incrementLayerConsecutiveFailures,
   isLayerActive,
   isPadActive,
-  markGainRamp,
   recordLayerVoice,
   registerStreamingAudio,
   resetLayerConsecutiveFailures,
@@ -234,11 +233,6 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
   const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
-  // Re-signal the tick to sample padGain on the next frame. The chain-link gap
-  // (voice A ended, voice B not yet started) can cause the tick to self-terminate
-  // and clear prevPadVolumes. Without this, isAnyGainChanging() stays false after
-  // the gap and the tick fast-paths with an empty record, losing the live gain value.
-  markGainRamp(0.016);
   startAudioTick();
   usePadDisplayStore.getState().shiftVoice(pad.id);
   if (isChained(liveArr)) {
@@ -287,11 +281,6 @@ async function continueLayerChain(
   setLayerChain(layer.id, rest);
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
-  // Re-signal the tick to sample padGain on the next frame. The chain-link gap
-  // (voice A ended, voice B not yet started) can cause the tick to self-terminate
-  // and clear prevPadVolumes. Without this, isAnyGainChanging() stays false after
-  // the gap and the tick fast-paths with an empty record, losing the live gain value.
-  markGainRamp(0.016);
   startAudioTick();
   usePadDisplayStore.getState().shiftVoice(pad.id);
   await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where a pad's volume display could briefly reset or show a stale value when a sequential or looping sound advanced from one clip to the next.
+- Volume adjustments made while a pad is playing are now correctly preserved across chain-link boundaries (e.g., when sound A ends and sound B begins in a sequential loop).
 - Fixed a bug where adjusting a pad's volume during sequential/loop playback would reset to the default level when one sound clip ended and the next began
 - Fixed a bug where retriggering an active pad would snap its volume back to the configured level, overriding any live volume adjustments made during playback.
 
