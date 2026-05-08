@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release; all updates are internal developer documentation and tooling configuration.
 - Fixed loudness analysis not queuing correctly when another analysis was already in progress (issue #418)
 - Fixed analysis queue getting stuck after a malformed or failed analysis event — the queue now advances automatically on error
 - Fixed sounds returning `null` loudness being re-analyzed repeatedly on every app boot
