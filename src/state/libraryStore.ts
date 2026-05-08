@@ -43,7 +43,7 @@ interface LibraryActions {
   /** Like assignTagsToSounds but bypasses the system tag guard. For internal use (import, bootloader). */
   systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
   /** Update analysis results for a single sound. Persisted via isDirty. */
-  updateSoundAnalysis: (soundId: string, data: { loudnessLufs?: number; genre?: string; mood?: string }) => void;
+  updateSoundAnalysis: (soundId: string, data: { loudnessLufs?: number }) => void;
   /** Update runtime missing-file state. Not persisted. */
   setMissingState: (
     missingSoundIds: Set<string>,
@@ -245,8 +245,6 @@ export const useLibraryStore = create<LibraryStore>()(
         const sound = draft.sounds.find((s) => s.id === soundId);
         if (!sound) return;
         if (data.loudnessLufs !== undefined) sound.loudnessLufs = data.loudnessLufs;
-        if (data.genre !== undefined) sound.genre = data.genre;
-        if (data.mood !== undefined) sound.mood = data.mood;
         draft.isDirty = true;
       }),
 

@@ -58,7 +58,7 @@ describe("useAudioAnalysis", () => {
 
   it("records started event into store", async () => {
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
@@ -75,51 +75,31 @@ describe("useAudioAnalysis", () => {
     expect(useAnalysisStore.getState().currentSoundId).toBeNull();
   });
 
-  it("updates loudnessLufs only on loudness-type complete", async () => {
+  it("updates loudnessLufs on complete event", async () => {
     const sound = createMockSound({ id: "s1", filePath: "/a.wav" });
     useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
-    act(() => emitComplete({ soundId: "s1", loudnessLufs: -18, genre: null, mood: null, error: null, analysisType: "loudness" }));
+    act(() => emitComplete({ soundId: "s1", loudnessLufs: -18, error: null }));
 
     const updated = useLibraryStore.getState().sounds.find((s) => s.id === "s1");
     expect(updated?.loudnessLufs).toBe(-18);
-    expect(updated?.genre).toBeUndefined();
-    expect(updated?.mood).toBeUndefined();
-    expect(useAnalysisStore.getState().completedCount).toBe(1);
-  });
-
-  it("updates genre and mood only on genre-type complete", async () => {
-    const sound = createMockSound({ id: "s1", filePath: "/a.wav", loudnessLufs: -14 });
-    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "genre" }]);
-
-    const { useAudioAnalysis } = await import("./useAudioAnalysis");
-    renderHook(() => useAudioAnalysis());
-    await act(async () => {});
-
-    act(() => emitComplete({ soundId: "s1", loudnessLufs: null, genre: "hip hop", mood: "energetic", error: null, analysisType: "genre" }));
-
-    const updated = useLibraryStore.getState().sounds.find((s) => s.id === "s1");
-    expect(updated?.loudnessLufs).toBe(-14); // loudness preserved — not overwritten by genre run
-    expect(updated?.genre).toBe("hip-hop"); // resolveGenre normalizes "hip hop" → "hip-hop"
-    expect(updated?.mood).toBe("energetic");
     expect(useAnalysisStore.getState().completedCount).toBe(1);
   });
 
   it("records error and dispatches next when error is set", async () => {
     const { logError } = await import("@/lib/logger");
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
-    act(() => emitComplete({ soundId: "s1", loudnessLufs: null, genre: null, mood: null, error: "decode failed" }));
+    act(() => emitComplete({ soundId: "s1", loudnessLufs: null, error: "decode failed" }));
 
     expect(useAnalysisStore.getState().errors).toEqual({ s1: "decode failed" });
     expect(logError).toHaveBeenCalledWith("Audio analysis failed", expect.objectContaining({ soundId: "s1" }));
@@ -127,7 +107,7 @@ describe("useAudioAnalysis", () => {
   });
 
   it("ignores a malformed complete payload", async () => {
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
@@ -140,13 +120,13 @@ describe("useAudioAnalysis", () => {
   });
 
   it("calls dispatchNextFromQueue after each completed event", async () => {
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav", analysisType: "loudness" }]);
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
-    act(() => emitComplete({ soundId: "s1", loudnessLufs: -14, genre: null, mood: null, error: null }));
+    act(() => emitComplete({ soundId: "s1", loudnessLufs: -14, error: null }));
     await act(async () => {});
 
     expect(mockDispatchNextFromQueue).toHaveBeenCalledTimes(1);

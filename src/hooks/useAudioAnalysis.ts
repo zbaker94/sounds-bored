@@ -5,21 +5,16 @@ import { useAnalysisStore } from "@/state/analysisStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { dispatchNextFromQueue } from "@/lib/library.reconcile";
 import { logError } from "@/lib/logger";
-import { resolveGenre } from "@/lib/genreTaxonomy";
 import { ANALYSIS_COMPLETE_EVENT, ANALYSIS_STARTED_EVENT } from "@/lib/constants";
 
 const AnalysisCompletePayloadSchema = z.object({
   soundId: z.string(),
   loudnessLufs: z.number().finite().nullable(),
-  genre: z.string().nullable(),
-  mood: z.string().nullable(),
   error: z.string().nullable(),
-  analysisType: z.enum(["loudness", "genre"]).default("loudness"),
 });
 
 const AnalysisStartedPayloadSchema = z.object({
   soundId: z.string(),
-  analysisType: z.enum(["loudness", "genre"]).default("loudness"),
 });
 
 export function useAudioAnalysis() {
@@ -34,7 +29,7 @@ export function useAudioAnalysis() {
     register(listen<unknown>(ANALYSIS_STARTED_EVENT, (event) => {
       const parsed = AnalysisStartedPayloadSchema.safeParse(event.payload);
       if (parsed.success) {
-        useAnalysisStore.getState().recordStarted(parsed.data.soundId, parsed.data.analysisType);
+        useAnalysisStore.getState().recordStarted(parsed.data.soundId);
       }
     }));
 
@@ -42,24 +37,15 @@ export function useAudioAnalysis() {
       const parsed = AnalysisCompletePayloadSchema.safeParse(event.payload);
       if (!parsed.success) return;
 
-      const { soundId, loudnessLufs, genre, mood, error, analysisType } = parsed.data;
+      const { soundId, loudnessLufs, error } = parsed.data;
 
       if (error) {
         logError("Audio analysis failed", { soundId, error });
         useAnalysisStore.getState().recordError(soundId, error);
       } else {
-        // Only update fields that belong to this analysis type to avoid
-        // overwriting existing loudness with null during a genre-only run.
-        if (analysisType === "genre") {
-          useLibraryStore.getState().updateSoundAnalysis(soundId, {
-            genre: genre != null ? resolveGenre(genre) : undefined,
-            mood: mood ?? undefined,
-          });
-        } else {
-          useLibraryStore.getState().updateSoundAnalysis(soundId, {
-            loudnessLufs: loudnessLufs ?? undefined,
-          });
-        }
+        useLibraryStore.getState().updateSoundAnalysis(soundId, {
+          loudnessLufs: loudnessLufs ?? undefined,
+        });
         useAnalysisStore.getState().recordComplete(soundId);
       }
 

@@ -2,8 +2,7 @@ import { create } from "zustand";
 
 type AnalysisStatus = "idle" | "running" | "completed";
 
-export type AnalysisType = "loudness" | "genre";
-export type AnalysisEntry = { id: string; path: string; analysisType: AnalysisType };
+export type AnalysisEntry = { id: string; path: string };
 
 interface AnalysisState {
   status: AnalysisStatus;
@@ -12,13 +11,12 @@ interface AnalysisState {
   completedCount: number;
   errors: Record<string, string>;
   currentSoundId: string | null;
-  currentAnalysisType: AnalysisType | null;
   pendingQueue: AnalysisEntry[];
 }
 
 interface AnalysisActions {
   startAnalysis: (queue: AnalysisEntry[]) => void;
-  recordStarted: (soundId: string, type: AnalysisType) => void;
+  recordStarted: (soundId: string) => void;
   recordComplete: (soundId: string) => void;
   recordError: (soundId: string, error: string) => void;
   dequeueNext: () => AnalysisEntry | undefined;
@@ -33,7 +31,6 @@ export const initialAnalysisState: AnalysisState = {
   completedCount: 0,
   errors: {},
   currentSoundId: null,
-  currentAnalysisType: null,
   pendingQueue: [],
 };
 
@@ -49,10 +46,9 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
       errors: {},
       pendingQueue: queue,
       currentSoundId: null,
-      currentAnalysisType: null,
     }),
 
-  recordStarted: (soundId, type) => set({ currentSoundId: soundId, currentAnalysisType: type }),
+  recordStarted: (soundId) => set({ currentSoundId: soundId }),
 
   recordComplete: (_soundId) =>
     set((state) => {
@@ -64,7 +60,6 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
         analyzingCount,
         status: done ? "completed" : "running",
         currentSoundId: done ? null : state.currentSoundId,
-        currentAnalysisType: done ? null : state.currentAnalysisType,
       };
     }),
 
@@ -79,7 +74,6 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
         errors: { ...state.errors, [soundId]: error },
         status: done ? "completed" : "running",
         currentSoundId: done ? null : state.currentSoundId,
-        currentAnalysisType: done ? null : state.currentAnalysisType,
       };
     }),
 

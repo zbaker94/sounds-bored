@@ -10,14 +10,13 @@ import { useAnalysisStore } from "@/state/analysisStore";
 import { useLibraryStore } from "@/state/libraryStore";
 
 export function AnalysisStatusButton() {
-  const { status, completedCount, queueLength, errorCount, currentSoundId, currentAnalysisType } = useAnalysisStore(
+  const { status, completedCount, queueLength, errorCount, currentSoundId } = useAnalysisStore(
     useShallow((s) => ({
       status: s.status,
       completedCount: s.completedCount,
       queueLength: s.queueLength,
       errorCount: Object.keys(s.errors).length,
       currentSoundId: s.currentSoundId,
-      currentAnalysisType: s.currentAnalysisType,
     })),
   );
 
@@ -56,13 +55,7 @@ export function AnalysisStatusButton() {
             className={isRunning ? "animate-spin text-primary" : "text-green-400"}
           />
           <span className="text-xs font-medium">
-            {isRunning
-              ? currentAnalysisType === "loudness"
-                ? "Analyzing loudness…"
-                : currentAnalysisType === "genre"
-                  ? "Analyzing genre/mood…"
-                  : "Analyzing sounds…"
-              : "Analysis complete"}
+            {isRunning ? "Analyzing loudness…" : "Analysis complete"}
           </span>
         </div>
         <Progress value={progress} className="mb-2" />

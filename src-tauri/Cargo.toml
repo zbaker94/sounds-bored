@@ -35,5 +35,4 @@ base64 = "0.22"
 symphonia = { version = "0.5.5", features = ["mp3", "ogg", "vorbis", "flac", "wav", "pcm", "aiff", "aac"] }
 oximedia-normalize = "0.1.6"
 oximedia-metering = "0.1.6"
-oximedia-mir = "0.1.6"
 
