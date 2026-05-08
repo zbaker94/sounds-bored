@@ -1,6 +1,26 @@
 import type { Layer, Sound } from "@/lib/schemas";
 
 /**
+ * Branded type for a Sound[] captured at a defined moment in time.
+ * Distinguishable from a live-store reference at compile time; identical at runtime.
+ *
+ * Use `snapshotSounds()` to create a SoundSnapshot. Pass to `resolveLayerSounds` / `resolveSounds`.
+ */
+export type SoundSnapshot = Sound[] & { readonly __brand: "SoundSnapshot" };
+
+/**
+ * Mark a Sound[] as captured at this point in time. Zero runtime cost — no copy, no allocation.
+ *
+ * IMPORTANT: This does NOT defensively copy. Stability across the snapshot's lifetime
+ * depends on the caller's source being structurally immutable after capture. `libraryStore`
+ * satisfies this via Immer: every mutation produces a new array reference, so an existing
+ * snapshot cannot be mutated in place. Do not call from a code path that mutates Sound[] directly.
+ */
+export function snapshotSounds(sounds: Sound[]): SoundSnapshot {
+  return sounds as SoundSnapshot;
+}
+
+/**
  * Module-level WeakMap cache: Sound[] reference → Map<id, Sound>.
  * Re-used across all calls that share the same sounds array reference.
  * Exported only for test introspection — do not use in production code.
@@ -8,8 +28,11 @@ import type { Layer, Sound } from "@/lib/schemas";
  * Why WeakMap: libraryStore uses Immer, so the sounds array reference is
  * stable until the library changes (at which point Immer produces a new
  * reference and the old Map is naturally GC-eligible).
+ *
+ * Keyed on SoundSnapshot to match the resolveLayerSounds parameter contract —
+ * only explicitly snapshotted arrays should enter the cache.
  */
-export const _soundByIdCache = new WeakMap<Sound[], Map<string, Sound>>();
+export const _soundByIdCache = new WeakMap<SoundSnapshot, Map<string, Sound>>();
 
 /**
  * Module-level cache for tag and set selections.
@@ -25,7 +48,7 @@ export const _soundByIdCache = new WeakMap<Sound[], Map<string, Sound>>();
  * references. All current consumers read-only (length checks, iteration,
  * spread to new arrays).
  */
-export const _tagSetCache = new WeakMap<Sound[], Map<string, Sound[]>>();
+export const _tagSetCache = new WeakMap<SoundSnapshot, Map<string, Sound[]>>();
 
 /** Normalized cache key for tag/set selections.
  *  Uses JSON.stringify to safely encode tag IDs that may contain any character. */
@@ -46,7 +69,7 @@ function tagSetKey(sel: { type: "tag"; tagIds: string[]; matchMode: "any" | "all
  * All four consumers (playback, UI, export, preload) delegate here to ensure
  * consistent behaviour across selection types.
  */
-export function resolveLayerSounds(layer: Layer, sounds: Sound[]): Sound[] {
+export function resolveLayerSounds(layer: Layer, sounds: SoundSnapshot): Sound[] {
   const sel = layer.selection;
   switch (sel.type) {
     case "assigned": {

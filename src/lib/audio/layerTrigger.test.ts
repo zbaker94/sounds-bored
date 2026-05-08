@@ -1,5 +1,6 @@
 // src/lib/audio/layerTrigger.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { snapshotSounds } from "./resolveSounds";
 import { createMockLayer, createMockPad, createMockSound } from "@/test/factories";
 
 const mockCtx = {
@@ -87,7 +88,7 @@ describe("layerTrigger", () => {
       const layer = createMockLayer({
         selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }, { id: "i2", soundId: "s2", volume: 100 }] },
       });
-      expect(resolveSounds(layer, [s1, s2])).toEqual([s1]);
+      expect(resolveSounds(layer, snapshotSounds([s1, s2]))).toEqual([s1]);
     });
 
     it("returns empty array when no sounds match", async () => {
@@ -95,7 +96,7 @@ describe("layerTrigger", () => {
       const layer = createMockLayer({
         selection: { type: "assigned", instances: [{ id: "i1", soundId: "missing", volume: 100 }] },
       });
-      expect(resolveSounds(layer, [])).toEqual([]);
+      expect(resolveSounds(layer, snapshotSounds([]))).toEqual([]);
     });
 
     it("filters out sounds without filePath for tag selection", async () => {
@@ -103,7 +104,7 @@ describe("layerTrigger", () => {
       const withPath = createMockSound({ id: "t1", filePath: "t1.wav", tags: ["drums"] });
       const noPath = createMockSound({ id: "t2", filePath: undefined, tags: ["drums"] });
       const layer = createMockLayer({ selection: { type: "tag", tagIds: ["drums"], matchMode: "any", defaultVolume: 100 } });
-      expect(resolveSounds(layer, [withPath, noPath])).toEqual([withPath]);
+      expect(resolveSounds(layer, snapshotSounds([withPath, noPath]))).toEqual([withPath]);
     });
 
     it("filters out sounds without filePath for set selection", async () => {
@@ -111,7 +112,7 @@ describe("layerTrigger", () => {
       const withPath = createMockSound({ id: "s1", filePath: "s1.wav", sets: ["set-x"] });
       const noPath = createMockSound({ id: "s2", filePath: undefined, sets: ["set-x"] });
       const layer = createMockLayer({ selection: { type: "set", setId: "set-x", defaultVolume: 100 } });
-      expect(resolveSounds(layer, [withPath, noPath])).toEqual([withPath]);
+      expect(resolveSounds(layer, snapshotSounds([withPath, noPath]))).toEqual([withPath]);
     });
   });
 

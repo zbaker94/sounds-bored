@@ -24,7 +24,7 @@ import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache"
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
 import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
-import { resolveLayerSounds } from "./resolveSounds";
+import { resolveLayerSounds, snapshotSounds, type SoundSnapshot } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectStore } from "@/state/projectStore";
 import type { Layer, LayerSelection, Pad, Sound } from "@/lib/schemas";
@@ -113,7 +113,7 @@ export function getLayerNormalizedVolume(layer: Layer): number {
 }
 
 /** Resolve a layer's sound selection to playable Sound objects (filePath required). */
-export function resolveSounds(layer: Layer, sounds: Sound[]): Sound[] {
+export function resolveSounds(layer: Layer, sounds: SoundSnapshot): Sound[] {
   return resolveLayerSounds(layer, sounds).filter((s) => !!s.filePath);
 }
 
@@ -228,7 +228,10 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
   const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
   const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
   const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
-  const liveSounds = resolveSounds(liveLayerSnap, useLibraryStore.getState().sounds);
+  // Intentional live-store read: loop restart deliberately picks up config changes made during
+  // playback (arrangement, selection, playback mode) so they take effect on the next cycle.
+  // snapshotSounds() captures the library at this exact moment for the duration of this restart.
+  const liveSounds = resolveSounds(liveLayerSnap, snapshotSounds(useLibraryStore.getState().sounds));
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
   startAudioTick();
@@ -726,7 +729,9 @@ export function syncLayerArrangement(layer: Layer): void {
   if (voices.length === 0) return;
 
   if (isChained(layer.arrangement)) {
-    const allSounds = resolveSounds(layer, useLibraryStore.getState().sounds);
+    // Intentional live-store read: called synchronously from a pad-save handler to rebuild
+    // the chain queue with the updated arrangement while playback is in progress.
+    const allSounds = resolveSounds(layer, snapshotSounds(useLibraryStore.getState().sounds));
     const newOrder = buildPlayOrder(layer.arrangement, allSounds);
     if (newOrder.length === 0) {
       deleteLayerChain(layer.id);
@@ -753,7 +758,9 @@ export function syncLayerSelection(layer: Layer): void {
   if (voices.length === 0) return;
 
   if (isChained(layer.arrangement)) {
-    const allSounds = resolveSounds(layer, useLibraryStore.getState().sounds);
+    // Intentional live-store read: called synchronously from a pad-save handler to rebuild
+    // the chain queue with the updated selection while playback is in progress.
+    const allSounds = resolveSounds(layer, snapshotSounds(useLibraryStore.getState().sounds));
     const newOrder = buildPlayOrder(layer.arrangement, allSounds);
     if (newOrder.length === 0) {
       deleteLayerChain(layer.id);
@@ -833,7 +840,7 @@ export function skipLayerForward(pad: Pad, layerId: string): void {
   if (!isChained(layer.arrangement)) return;
 
   const { sounds } = useLibraryStore.getState();
-  const resolved = resolveSounds(layer, sounds);
+  const resolved = resolveSounds(layer, snapshotSounds(sounds));
   if (resolved.length === 0) return;
 
   if (layer.cycleMode) {
@@ -880,7 +887,7 @@ export function skipLayerBack(pad: Pad, layerId: string): void {
   if (!isChained(layer.arrangement)) return;
 
   const { sounds } = useLibraryStore.getState();
-  const resolved = resolveSounds(layer, sounds);
+  const resolved = resolveSounds(layer, snapshotSounds(sounds));
   if (resolved.length === 0) return;
 
   if (layer.cycleMode) {

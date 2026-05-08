@@ -26,7 +26,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES, resolveLayerSounds } from "@/lib/audio";
+import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES, resolveLayerSounds, snapshotSounds } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { cn, modKey } from "@/lib/utils";
 import {
@@ -48,7 +48,7 @@ function collectLargeSceneSounds(scene: Scene, librarySounds: Sound[]): Sound[] 
   const toPreload: Sound[] = [];
   for (const pad of scene.pads) {
     for (const layer of pad.layers) {
-      for (const sound of resolveLayerSounds(layer, librarySounds)) {
+      for (const sound of resolveLayerSounds(layer, snapshotSounds(librarySounds))) {
         if (sound.filePath && isLarge(sound) && !seen.has(sound.id)) {
           seen.add(sound.id);
           toPreload.push(sound);
