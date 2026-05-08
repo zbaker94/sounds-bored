@@ -18,11 +18,9 @@ import {
   clearAllLayerCycleIndexes,
   clearAllLayerPending,
   clearAllLayerPlayOrders,
-  clearAllStreamingAudio,
   clearAllPadProgressInfo,
   clearAllLayerProgressInfo,
   clearLayerPending,
-  clearLayerStreamingAudio,
   clearPadProgressInfo,
   deleteLayerChain,
   forEachActivePadGain,
@@ -46,6 +44,7 @@ import {
   setLayerPending,
   getPadFadeFromVolume,
 } from "./audioState";
+import { clearAll as clearAllStreaming, dispose as disposeStreaming } from "./streamingAudioLifecycle";
 
 import {
   resolveFadeDuration,
@@ -233,7 +232,7 @@ export function stopAllPads(): void {
   // new audio session.
   const stopTimeoutId = setTimeout(() => {
     cancelGlobalStopTimeout(); // clear the tracker (timeout already fired)
-    clearAllStreamingAudio();
+    clearAllStreaming();
     clearAllPadProgressInfo();
     clearAllLayerProgressInfo();
     clearLayerGainsForIds(getLayerIdsForPads(stoppedPadIds));
@@ -262,7 +261,7 @@ export function releasePadHoldLayers(pad: Pad): void {
 
     // rampStopLayerVoices nulls onended before stopping, so the cleanup callback
     // won't fire — delete the layer's streaming entry explicitly.
-    clearLayerStreamingAudio(pad.id, layer.id);
+    disposeStreaming(pad.id, layer.id);
     rampStopLayerVoices(pad.id, layer, voices);
   }
 }

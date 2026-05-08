@@ -52,12 +52,10 @@ import {
   clearAllLayerGains,
   clearAllLayerChains,
   clearAllLayerCycleIndexes,
-  clearAllStreamingAudio,
   clearAllPadProgressInfo,
   clearAllLayerPending,
   clearAllVoices,
   setPadProgressInfo,
-  registerStreamingAudio,
   isPadFadingOut,
   isPadFading,
   addFadingOutPad,
@@ -85,14 +83,11 @@ import {
   _notifyLayerVoiceSetChangedForTest,
   computeAllPadProgress,
   computeAllLayerProgress,
-  unregisterStreamingAudio,
-  clearLayerStreamingAudio,
   setLayerProgressInfo,
   clearAllLayerProgressInfo,
   _padToLayerIds,
-  _padBestStreamingAudio,
-  _layerBestStreamingAudio,
 } from "./audioState";
+import { register as registerStreaming, clearAll as clearAllStreaming, dispose as disposeStreaming, isPadStreaming } from "./streamingAudioLifecycle";
 import type { AudioVoice } from "./audioVoice";
 
 // ── Setup ────────────────────────────────────────────────────────────────────
@@ -106,7 +101,7 @@ beforeEach(() => {
   clearAllLayerGains();
   clearAllLayerChains();
   clearAllLayerCycleIndexes();
-  clearAllStreamingAudio();
+  clearAllStreaming();
   clearAllPadProgressInfo();
   clearAllLayerPending();
   clearAllFadeTracking();
@@ -150,8 +145,8 @@ describe("getPadProgress", () => {
       currentTime: 5,
     } as unknown as HTMLAudioElement;
 
-    registerStreamingAudio("pad-1", "layer-1", audio1);
-    registerStreamingAudio("pad-1", "layer-2", audio2);
+    registerStreaming("pad-1", "layer-1", audio1);
+    registerStreaming("pad-1", "layer-2", audio2);
 
     // Should pick audio2 (longest duration=20), progress = 5/20 = 0.25
     expect(getPadProgress("pad-1")).toBeCloseTo(0.25);
@@ -168,7 +163,7 @@ describe("getPadProgress", () => {
       addEventListener: vi.fn(),
     } as unknown as HTMLAudioElement;
 
-    registerStreamingAudio("pad-1", "layer-1", audio);
+    registerStreaming("pad-1", "layer-1", audio);
     expect(getPadProgress("pad-1")).toBe(0);
   });
 
@@ -808,8 +803,6 @@ describe("clearAllAudioState", () => {
       isLayerPending,
       isPadActive,
       getLayerGain,
-      registerStreamingAudio,
-      isPadStreaming,
       setGlobalStopTimeout,
     } = await import("./audioState");
 
@@ -824,7 +817,7 @@ describe("clearAllAudioState", () => {
 
     // Register a streaming audio element so isPadStreaming returns true before clear
     const mockAudio = { pause: vi.fn(), currentTime: 0, duration: 10, addEventListener: vi.fn() } as unknown as HTMLAudioElement;
-    registerStreamingAudio("pad-clearall", "layer-clearall", mockAudio);
+    registerStreaming("pad-clearall", "layer-clearall", mockAudio);
     expect(isPadStreaming("pad-clearall")).toBe(true);
 
     // Schedule a timeout (simulates stopAllPads post-ramp cleanup)
@@ -985,117 +978,26 @@ function makeAudio(duration: number, currentTime = 0): HTMLAudioElement {
   } as unknown as HTMLAudioElement;
 }
 
-describe("streaming audio best-element cache (_padBestStreamingAudio / _layerBestStreamingAudio)", () => {
-  it("registerStreamingAudio populates pad cache with the registered element", () => {
-    const el = makeAudio(10);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(el);
-  });
-
-  it("registerStreamingAudio populates layer cache with the registered element", () => {
-    const el = makeAudio(10);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    expect(_layerBestStreamingAudio.get("layer-1")).toBe(el);
-  });
-
-  it("pad cache picks the element with the longest finite duration", () => {
-    const short = makeAudio(5);
-    const long = makeAudio(20);
-    registerStreamingAudio("pad-1", "layer-1", short);
-    registerStreamingAudio("pad-1", "layer-2", long);
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(long);
-  });
-
-  it("layer cache picks the element with the longest finite duration within that layer", () => {
-    const el1 = makeAudio(5);
-    const el2 = makeAudio(15);
-    registerStreamingAudio("pad-1", "layer-1", el1);
-    registerStreamingAudio("pad-1", "layer-1", el2);
-    expect(_layerBestStreamingAudio.get("layer-1")).toBe(el2);
-  });
-
-  it("element with NaN duration is set as best only when it is the sole element", () => {
-    const nanEl = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", nanEl);
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(nanEl);
-  });
-
-  it("element with finite duration wins over element with NaN duration", () => {
-    const nanEl = makeAudio(NaN);
-    const finiteEl = makeAudio(10);
-    registerStreamingAudio("pad-1", "layer-1", nanEl);
-    registerStreamingAudio("pad-1", "layer-2", finiteEl);
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(finiteEl);
-  });
-
-  it("unregisterStreamingAudio updates pad cache when the best element is removed", () => {
-    const short = makeAudio(5);
-    const long = makeAudio(20);
-    registerStreamingAudio("pad-1", "layer-1", short);
-    registerStreamingAudio("pad-1", "layer-2", long);
-    unregisterStreamingAudio("pad-1", "layer-2", long);
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(short);
-  });
-
-  it("unregisterStreamingAudio clears pad cache when the last element is removed", () => {
-    const el = makeAudio(10);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    unregisterStreamingAudio("pad-1", "layer-1", el);
-    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
-  });
-
-  it("unregisterStreamingAudio updates layer cache when the best element is removed", () => {
-    const el1 = makeAudio(5);
-    const el2 = makeAudio(20);
-    registerStreamingAudio("pad-1", "layer-1", el1);
-    registerStreamingAudio("pad-1", "layer-1", el2);
-    unregisterStreamingAudio("pad-1", "layer-1", el2);
-    expect(_layerBestStreamingAudio.get("layer-1")).toBe(el1);
-  });
-
-  it("clearLayerStreamingAudio removes the layer's entry from the layer cache", () => {
-    registerStreamingAudio("pad-1", "layer-1", makeAudio(10));
-    clearLayerStreamingAudio("pad-1", "layer-1");
-    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
-  });
-
-  it("clearLayerStreamingAudio updates the pad cache to exclude the cleared layer", () => {
-    const el1 = makeAudio(10); // layer-1
-    const el2 = makeAudio(20); // layer-2 — initially best
-    registerStreamingAudio("pad-1", "layer-1", el1);
-    registerStreamingAudio("pad-1", "layer-2", el2);
-    clearLayerStreamingAudio("pad-1", "layer-2");
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(el1);
-  });
-
-  it("clearAllStreamingAudio clears both caches", () => {
-    registerStreamingAudio("pad-1", "layer-1", makeAudio(10));
-    clearAllStreamingAudio();
-    expect(_padBestStreamingAudio.size).toBe(0);
-    expect(_layerBestStreamingAudio.size).toBe(0);
-  });
-});
-
 describe("getPadProgress — streaming path uses cached best element", () => {
   it("returns correct progress from the cached best streaming element", () => {
     const el = makeAudio(10, 3);
-    registerStreamingAudio("pad-1", "layer-1", el);
+    registerStreaming("pad-1", "layer-1", el);
     expect(getPadProgress("pad-1")).toBeCloseTo(0.3);
   });
 
   it("returns 0 when cached element has NaN duration", () => {
-    registerStreamingAudio("pad-1", "layer-1", makeAudio(NaN, 0));
+    registerStreaming("pad-1", "layer-1", makeAudio(NaN, 0));
     expect(getPadProgress("pad-1")).toBe(0);
   });
 
   it("returns correct progress after cache is updated by unregistering the best element", () => {
     const long = makeAudio(20, 10); // progress 0.5
     const short = makeAudio(5, 2);  // progress 0.4
-    registerStreamingAudio("pad-1", "layer-1", short);
-    registerStreamingAudio("pad-1", "layer-2", long);
+    registerStreaming("pad-1", "layer-1", short);
+    registerStreaming("pad-1", "layer-2", long);
     expect(getPadProgress("pad-1")).toBeCloseTo(0.5); // uses long (best)
 
-    unregisterStreamingAudio("pad-1", "layer-2", long);
+    disposeStreaming("pad-1", "layer-2", long);
     expect(getPadProgress("pad-1")).toBeCloseTo(0.4); // now uses short
   });
 });
@@ -1103,13 +1005,13 @@ describe("getPadProgress — streaming path uses cached best element", () => {
 describe("computeAllLayerProgress — streaming path uses cached best element", () => {
   it("returns progress for a streaming layer using the cached best element", () => {
     const el = makeAudio(10, 4);
-    registerStreamingAudio("pad-1", "layer-1", el);
+    registerStreaming("pad-1", "layer-1", el);
     const progress = computeAllLayerProgress();
     expect(progress["layer-1"]).toBeCloseTo(0.4);
   });
 
   it("buffer layer progress takes priority over streaming for the same layer ID", () => {
-    registerStreamingAudio("pad-1", "layer-1", makeAudio(10, 5));
+    registerStreaming("pad-1", "layer-1", makeAudio(10, 5));
     setLayerProgressInfo("layer-1", { startedAt: 0, duration: 10, isLooping: false });
     mockCtx.currentTime = 2;
     const progress = computeAllLayerProgress();
@@ -1118,117 +1020,13 @@ describe("computeAllLayerProgress — streaming path uses cached best element", 
   });
 
   it("returns 0 for a streaming layer whose element has NaN duration", () => {
-    registerStreamingAudio("pad-1", "layer-1", makeAudio(NaN, 0));
+    registerStreaming("pad-1", "layer-1", makeAudio(NaN, 0));
     const progress = computeAllLayerProgress();
     expect(progress["layer-1"]).toBe(0);
   });
 
   it("returns empty object when no layers are active", () => {
     expect(computeAllLayerProgress()).toEqual({});
-  });
-});
-
-// ---------------------------------------------------------------------------
-// loadedmetadata listener lifecycle — stale-closure and duplicate-listener guards
-// ---------------------------------------------------------------------------
-
-describe("registerStreamingAudio — loadedmetadata listener lifecycle", () => {
-  it("loadedmetadata listener is a no-op after the element is unregistered", () => {
-    const el = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    unregisterStreamingAudio("pad-1", "layer-1", el);
-
-    // Simulate late loadedmetadata fire after unregister
-    Object.defineProperty(el, "duration", { value: 10, configurable: true });
-    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    // Cache must remain empty — listener should be a no-op
-    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
-    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
-  });
-
-  it("late loadedmetadata does not displace a new element registered after unregister", () => {
-    const staleEl = makeAudio(NaN);
-    const freshEl = makeAudio(5);
-    registerStreamingAudio("pad-1", "layer-1", staleEl);
-    unregisterStreamingAudio("pad-1", "layer-1", staleEl);
-    registerStreamingAudio("pad-1", "layer-1", freshEl); // new active element
-
-    // Fire stale loadedmetadata on the old element (now with a longer duration)
-    Object.defineProperty(staleEl, "duration", { value: 20, configurable: true });
-    (staleEl as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    // Cache must still point to freshEl — stale listener is a membership-guard no-op
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(freshEl);
-    expect(_layerBestStreamingAudio.get("layer-1")).toBe(freshEl);
-  });
-
-  it("loadedmetadata listener updates cache when element is still registered", () => {
-    const el1 = makeAudio(NaN);
-    const el2 = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", el1);
-    registerStreamingAudio("pad-1", "layer-2", el2);
-
-    // el2 fires loadedmetadata with a longer duration — cache should update
-    Object.defineProperty(el2, "duration", { value: 20, configurable: true });
-    (el2 as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    expect(_padBestStreamingAudio.get("pad-1")).toBe(el2);
-  });
-
-  it("pending listener is removed from element when unregisterStreamingAudio is called before loadedmetadata fires", () => {
-    const el = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    unregisterStreamingAudio("pad-1", "layer-1", el);
-
-    Object.defineProperty(el, "duration", { value: 10, configurable: true });
-    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    // Listener was removed by abort — caches must stay empty
-    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
-    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
-  });
-
-  it("pending listener is removed from element when clearLayerStreamingAudio is called before loadedmetadata fires", () => {
-    const el = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    clearLayerStreamingAudio("pad-1", "layer-1");
-
-    Object.defineProperty(el, "duration", { value: 10, configurable: true });
-    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
-    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
-  });
-
-  it("aborting one layer's listener does not remove another active layer's listener on the same element", () => {
-    const el = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    registerStreamingAudio("pad-2", "layer-2", el);
-
-    // Unregister only one — the other's listener must survive
-    unregisterStreamingAudio("pad-1", "layer-1", el);
-
-    Object.defineProperty(el, "duration", { value: 10, configurable: true });
-    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    // pad-2/layer-2 listener still fired and updated caches
-    expect(_padBestStreamingAudio.has("pad-2")).toBe(true);
-    expect(_layerBestStreamingAudio.has("layer-2")).toBe(true);
-  });
-
-  it("re-registering the same element before metadata fires aborts the previous listener", () => {
-    const el = makeAudio(NaN);
-    registerStreamingAudio("pad-1", "layer-1", el);
-    registerStreamingAudio("pad-1", "layer-1", el); // re-register: aborts the first listener
-    clearLayerStreamingAudio("pad-1", "layer-1");   // aborts the second listener
-
-    Object.defineProperty(el, "duration", { value: 10, configurable: true });
-    (el as unknown as { dispatchEvent: (e: Event) => boolean }).dispatchEvent(new Event("loadedmetadata"));
-
-    // Both listeners aborted — caches must stay empty
-    expect(_padBestStreamingAudio.has("pad-1")).toBe(false);
-    expect(_layerBestStreamingAudio.has("layer-1")).toBe(false);
   });
 });
 
