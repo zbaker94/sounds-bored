@@ -13,10 +13,6 @@ const AnalysisCompletePayloadSchema = z.object({
   error: z.string().nullable(),
 });
 
-const AnalysisStartedPayloadSchema = z.object({
-  soundId: z.string(),
-});
-
 export function useAudioAnalysis() {
   useEffect(() => {
     let cancelled = false;
@@ -26,12 +22,8 @@ export function useAudioAnalysis() {
       p.then((fn) => { if (cancelled) fn(); else unlisteners.push(fn); }).catch(() => {});
     }
 
-    register(listen<unknown>(ANALYSIS_STARTED_EVENT, (event) => {
-      const parsed = AnalysisStartedPayloadSchema.safeParse(event.payload);
-      if (parsed.success) {
-        clearDispatchInFlight();
-        useAnalysisStore.getState().recordStarted(parsed.data.soundId);
-      }
+    register(listen<unknown>(ANALYSIS_STARTED_EVENT, () => {
+      clearDispatchInFlight();
     }));
 
     register(listen<unknown>(ANALYSIS_COMPLETE_EVENT, (event) => {

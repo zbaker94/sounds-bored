@@ -9,10 +9,11 @@ import { ANALYSIS_COMPLETE_EVENT, ANALYSIS_STARTED_EVENT } from "@/lib/constants
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
 const mockDispatchNextFromQueue = vi.fn().mockResolvedValue(undefined);
+const mockClearDispatchInFlight = vi.fn();
 
 vi.mock("@/lib/library.reconcile", () => ({
   dispatchNextFromQueue: mockDispatchNextFromQueue,
-  clearDispatchInFlight: vi.fn(),
+  clearDispatchInFlight: mockClearDispatchInFlight,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -40,6 +41,7 @@ beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   mockDispatchNextFromQueue.mockReset();
   mockDispatchNextFromQueue.mockResolvedValue(undefined);
+  mockClearDispatchInFlight.mockClear();
   mockEvent.listen.mockClear();
   mockEvent.listen.mockReturnValue(Promise.resolve(vi.fn()));
 });
@@ -57,22 +59,23 @@ describe("useAudioAnalysis", () => {
     expect(registeredEvents).toContain(ANALYSIS_COMPLETE_EVENT);
   });
 
-  it("records started event into store", async () => {
+  it("started event always clears the dispatch in-flight flag", async () => {
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
-    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
     act(() => emitStarted({ soundId: "s1" }));
-    expect(useAnalysisStore.getState().currentSoundId).toBe("s1");
+    expect(mockClearDispatchInFlight).toHaveBeenCalled();
   });
 
-  it("ignores a malformed started payload", async () => {
+  it("clears dispatch in-flight flag even for malformed started payload", async () => {
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
     act(() => emitStarted({ notASoundId: 42 }));
+    expect(mockClearDispatchInFlight).toHaveBeenCalled();
+    // No store state should change
     expect(useAnalysisStore.getState().currentSoundId).toBeNull();
   });
 

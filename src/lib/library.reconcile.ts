@@ -372,7 +372,7 @@ export function clearDispatchInFlight(): void {
  */
 export async function dispatchNextFromQueue(): Promise<void> {
   while (true) {
-    const next = useAnalysisStore.getState().dequeueNext();
+    const next = useAnalysisStore.getState().advance();
     if (!next) return;
     _dispatchInFlight = true;
     try {
