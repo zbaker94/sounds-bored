@@ -59,23 +59,24 @@
  * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
  * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
  * layerProgressInfo  | layer ID   | { startedAt, duration, isLooping }        | Per-layer progress info for per-layer bars      | clearLayerProgressInfo(), stopAllPads()
- * padStreamingAudio  | pad ID     | Map<layerId, Set<HTMLAudioElement>>        | Active streaming elements for progress/cleanup  | clearLayerStreamingAudio(), stopAllPads()
- * pendingMetadataAborts | element  | Map<padId|layerId, AbortController>       | In-flight loadedmetadata listeners; aborted on clear/unregister | unregisterStreamingAudio(), clearLayerStreamingAudio(), clearAllStreamingAudio()
  * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
  * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
  * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
  * layerConsecutiveFailureMap | layer ID | number                             | Consecutive chain load failures (circuit-break) | resetLayerConsecutiveFailures(), clearAllLayerConsecutiveFailures()
  * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
  * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), removeFadingOutPad(), clearAllFadeTracking()
+ *
+ * padStreamingAudio / pendingMetadataAborts — owned by streamingAudioLifecycle module
  */
 
 import { getAudioContext, getMasterGain } from "./audioContext";
 import type { AudioVoice } from "./audioVoice";
 import type { Sound } from "@/lib/schemas";
 import { createLimiterNode } from "./gainNormalization";
+import { getBestForPad, iterateBestLayers, clearAll as clearAllStreamingAudio } from "./streamingAudioLifecycle";
 
 // ---------------------------------------------------------------------------
-// Private state â€” all 11 Maps/Sets
+// Private state â€” 9 Maps/Sets
 // ---------------------------------------------------------------------------
 
 /** Per-pad GainNodes: source(s) -> voiceGain -> layerGain -> padGain -> padLimiter -> masterGain -> destination */
@@ -128,74 +129,6 @@ const padProgressInfo = new Map<string, { startedAt: number; duration: number; i
 
 /** Tracks per-layer progress info for buffer path voices. One entry per active layer. */
 const layerProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
-
-/**
- * Tracks all active streaming elements per pad per layer for progress display and cleanup.
- * pad ID -> layer ID -> Set<HTMLAudioElement>. Per-layer keying ensures 'continue'-mode
- * retriggers preserve progress tracking for layers that do not restart.
- * HTMLAudioElement exposes currentTime/duration after loadedmetadata fires.
- *
- * @internal Mutate only via registerStreamingAudio / unregisterStreamingAudio /
- * clearLayerStreamingAudio / clearAllStreamingAudio so the best-element caches
- * (_padBestStreamingAudio / _layerBestStreamingAudio) remain consistent.
- */
-const padStreamingAudio = new Map<string, Map<string, Set<HTMLAudioElement>>>();
-
-/**
- * Cached "best" (longest-duration) streaming element per pad.
- * Recomputed on register/unregister/clear â€” never on the RAF hot path.
- * `getPadProgress` does a single Map lookup instead of a nested linear scan.
- * Exported with underscore prefix for test introspection only.
- */
-export const _padBestStreamingAudio = new Map<string, HTMLAudioElement>();
-
-/**
- * Cached "best" (longest-duration) streaming element per layer.
- * Same invalidation model as _padBestStreamingAudio.
- * `computeAllLayerProgress` does a single Map lookup per layer.
- * Exported with underscore prefix for test introspection only.
- */
-export const _layerBestStreamingAudio = new Map<string, HTMLAudioElement>();
-
-/** AbortControllers for pending `loadedmetadata` listeners, keyed by element →
- *  `${padId}|${layerId}`. Allows removing the listener when a layer is cleared
- *  before metadata loads rather than letting dead closures accumulate on reused elements. */
-const pendingMetadataAborts = new WeakMap<HTMLAudioElement, Map<string, AbortController>>();
-
-/** Pick the element with the longest *finite* duration from a Set. NaN-duration elements
- *  are treated as -Infinity so any finite-duration element wins over an unloaded one. */
-function pickBestStreaming(audioSet: Iterable<HTMLAudioElement>): HTMLAudioElement | null {
-  let best: HTMLAudioElement | null = null;
-  let bestDur = -Infinity;
-  for (const audio of audioSet) {
-    const d = isFinite(audio.duration) ? audio.duration : -Infinity;
-    if (!best || d > bestDur) { best = audio; bestDur = d; }
-  }
-  return best;
-}
-
-/** Recompute the best streaming element for a pad from scratch. */
-function recomputePadBestStreaming(padId: string): void {
-  const layerMap = padStreamingAudio.get(padId);
-  if (!layerMap) { _padBestStreamingAudio.delete(padId); return; }
-  // Flatten all elements across all layers and pick the best
-  const lm = layerMap; // TS loses narrowing inside function declarations; const alias preserves non-null type
-  function* allElements() {
-    for (const audioSet of lm.values()) yield* audioSet;
-  }
-  const best = pickBestStreaming(allElements());
-  if (best) { _padBestStreamingAudio.set(padId, best); }
-  else { _padBestStreamingAudio.delete(padId); }
-}
-
-/** Recompute the best streaming element for a specific layer. */
-function recomputeLayerBestStreaming(padId: string, layerId: string): void {
-  const audioSet = padStreamingAudio.get(padId)?.get(layerId);
-  if (!audioSet || audioSet.size === 0) { _layerBestStreamingAudio.delete(layerId); return; }
-  const best = pickBestStreaming(audioSet);
-  if (best) { _layerBestStreamingAudio.set(layerId, best); }
-  else { _layerBestStreamingAudio.delete(layerId); }
-}
 
 /** Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
  *  Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted. */
@@ -299,12 +232,6 @@ export function isAnyGainChanging(): boolean {
   return true;
 }
 
-/** True while a streaming (large-file) voice is active for this pad. */
-export function isPadStreaming(padId: string): boolean {
-  const layerMap = padStreamingAudio.get(padId);
-  return !!layerMap && layerMap.size > 0;
-}
-
 export function getPadProgress(padId: string, currentTime?: number): number | null {
   const info = padProgressInfo.get(padId);
   if (info) {
@@ -315,7 +242,7 @@ export function getPadProgress(padId: string, currentTime?: number): number | nu
     }
     return Math.min(1, Math.max(0, elapsed / info.duration));
   }
-  const best = _padBestStreamingAudio.get(padId);
+  const best = getBestForPad(padId);
   if (best !== undefined) {
     const d = best.duration;
     if (d > 0 && isFinite(d)) {
@@ -402,7 +329,7 @@ export function computeAllPadProgress(): Record<string, number> {
 /**
  * Compute layerProgress for all active layers in one pass.
  * Returns a Record<layerId, progress 0â€“1>.
- * Buffer layers are tracked via layerProgressInfo; streaming layers via padStreamingAudio.
+ * Buffer layers are tracked via layerProgressInfo; streaming layers via streamingAudioLifecycle.iterateBestLayers.
  */
 export function computeAllLayerProgress(): Record<string, number> {
   const result: Record<string, number> = {};
@@ -420,8 +347,8 @@ export function computeAllLayerProgress(): Record<string, number> {
     }
   }
 
-  // Streaming layers â€” use cached best element per layer (O(1) lookup per layer)
-  for (const [layerId, best] of _layerBestStreamingAudio) {
+  // Streaming layers â€” use streamingAudioLifecycle.iterateBestLayers (O(1) lookup per layer)
+  for (const [layerId, best] of iterateBestLayers()) {
     if (layerId in result) continue; // already from buffer path
     const d = best.duration;
     result[layerId] = d > 0 && isFinite(d) ? Math.min(1, Math.max(0, best.currentTime / d)) : 0;
@@ -685,106 +612,6 @@ export function getOrCreateLayerGain(layerId: string, normalizedVolume: number, 
 /** Get a layer gain node by ID. Returns undefined if not active. */
 export function getLayerGain(layerId: string): GainNode | undefined {
   return layerGainMap.get(layerId);
-}
-
-// ---------------------------------------------------------------------------
-// Streaming audio tracking
-// ---------------------------------------------------------------------------
-
-/** Remove a single layer's streaming audio entry. Called when retrigger modes null
- *  the onended callback before stopping, preventing the normal cleanup path. */
-export function clearLayerStreamingAudio(padId: string, layerId: string): void {
-  const padLayerMap = padStreamingAudio.get(padId);
-  if (!padLayerMap) return;
-  const audioSet = padLayerMap.get(layerId);
-  if (audioSet) {
-    const key = `${padId}|${layerId}`;
-    for (const el of audioSet) {
-      const controllers = pendingMetadataAborts.get(el);
-      if (controllers) {
-        controllers.get(key)?.abort();
-        controllers.delete(key);
-        if (controllers.size === 0) pendingMetadataAborts.delete(el);
-      }
-    }
-  }
-  padLayerMap.delete(layerId);
-  if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
-  _layerBestStreamingAudio.delete(layerId);
-  recomputePadBestStreaming(padId);
-}
-
-export function registerStreamingAudio(padId: string, layerId: string, el: HTMLAudioElement): void {
-  let padLayerMap = padStreamingAudio.get(padId);
-  if (!padLayerMap) {
-    padLayerMap = new Map();
-    padStreamingAudio.set(padId, padLayerMap);
-  }
-  const audioSet = padLayerMap.get(layerId) ?? new Set<HTMLAudioElement>();
-  audioSet.add(el);
-  padLayerMap.set(layerId, audioSet);
-  recomputePadBestStreaming(padId);
-  recomputeLayerBestStreaming(padId, layerId);
-  // Re-evaluate once metadata loads so the cache reflects the true duration rather than NaN.
-  // The listener is aborted on clear/unregister to prevent accumulation on reused elements;
-  // the membership guard is defense-in-depth.
-  if (!isFinite(el.duration)) {
-    const key = `${padId}|${layerId}`;
-    let controllers = pendingMetadataAborts.get(el);
-    if (!controllers) {
-      controllers = new Map();
-      pendingMetadataAborts.set(el, controllers);
-    }
-    controllers.get(key)?.abort();
-    const ac = new AbortController();
-    controllers.set(key, ac);
-    el.addEventListener("loadedmetadata", () => {
-      controllers!.delete(key);
-      if (padStreamingAudio.get(padId)?.get(layerId)?.has(el)) {
-        recomputePadBestStreaming(padId);
-        recomputeLayerBestStreaming(padId, layerId);
-      }
-    }, { once: true, signal: ac.signal });
-  }
-}
-
-export function unregisterStreamingAudio(padId: string, layerId: string, el: HTMLAudioElement): void {
-  const padLayerMap = padStreamingAudio.get(padId);
-  if (!padLayerMap) return;
-  const audioSet = padLayerMap.get(layerId);
-  if (!audioSet) return;
-  const key = `${padId}|${layerId}`;
-  const controllers = pendingMetadataAborts.get(el);
-  if (controllers) {
-    controllers.get(key)?.abort();
-    controllers.delete(key);
-    if (controllers.size === 0) pendingMetadataAborts.delete(el);
-  }
-  audioSet.delete(el);
-  if (audioSet.size === 0) padLayerMap.delete(layerId);
-  if (padLayerMap.size === 0) padStreamingAudio.delete(padId);
-  recomputePadBestStreaming(padId);
-  recomputeLayerBestStreaming(padId, layerId);
-}
-
-/** Clear all streaming audio tracking. */
-export function clearAllStreamingAudio(): void {
-  for (const [padId, padLayerMap] of padStreamingAudio) {
-    for (const [layerId, audioSet] of padLayerMap) {
-      const key = `${padId}|${layerId}`;
-      for (const el of audioSet) {
-        const controllers = pendingMetadataAborts.get(el);
-        if (controllers) {
-          controllers.get(key)?.abort();
-          controllers.delete(key);
-          if (controllers.size === 0) pendingMetadataAborts.delete(el);
-        }
-      }
-    }
-  }
-  padStreamingAudio.clear();
-  _padBestStreamingAudio.clear();
-  _layerBestStreamingAudio.clear();
 }
 
 // ---------------------------------------------------------------------------

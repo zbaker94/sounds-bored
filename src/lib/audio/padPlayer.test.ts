@@ -1,7 +1,8 @@
 ﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
-import { isLayerActive, isPadFading, isLayerPending, clearAllFadeTracking, isPadStreaming, getPadProgress, getPadGain, clearAllAudioState } from "./audioState";
+import { isLayerActive, isPadFading, isLayerPending, clearAllFadeTracking, getPadProgress, getPadGain, clearAllAudioState } from "./audioState";
+import { isPadStreaming } from "./streamingAudioLifecycle";
 import { fadePad, resolveFadeDuration, freezePadAtCurrentVolume } from "./fadeMixer";
 import { resetPadGain, setLayerVolume } from "./gainManager";
 import { stopLayerWithRamp, skipLayerForward, skipLayerBack, syncLayerPlaybackMode, syncLayerArrangement, syncLayerSelection, syncLayerConfig, selectionsEqual } from "./layerTrigger";

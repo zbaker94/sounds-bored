@@ -34,7 +34,6 @@ import {
   addStopCleanupTimeout,
   deleteStopCleanupTimeout,
   clearLayerVoice,
-  clearLayerStreamingAudio,
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
@@ -50,7 +49,6 @@ import {
   isLayerActive,
   isPadActive,
   recordLayerVoice,
-  registerStreamingAudio,
   resetLayerConsecutiveFailures,
   setLayerChain,
   setLayerCycleIndex,
@@ -62,8 +60,8 @@ import {
   clearPadProgressInfo,
   setLayerPending,
   stopLayerVoices,
-  unregisterStreamingAudio,
 } from "./audioState";
+import { register as registerStreaming, dispose as disposeStreaming } from "./streamingAudioLifecycle";
 
 /**
  * Maximum consecutive `loadLayerVoice` failures allowed within a single chain
@@ -197,7 +195,7 @@ async function loadLayerVoice(
     cachedAudio.currentTime = 0;
     cachedAudio.loop = shouldLayerLoopNatively(layer);
     const voice = wrapStreamingElement(cachedAudio, sourceNode, ctx, layerGain, voiceVolume);
-    registerStreamingAudio(padId, layer.id, cachedAudio);
+    registerStreaming(padId, layer.id, cachedAudio);
     return { voice, audio: cachedAudio };
   } else {
     // -- Buffer path (short files) ---
@@ -305,7 +303,7 @@ export async function startLayerSound(
     const { voice, audio } = await loadLayerVoice(sound, layer, ctx, layerGain, voiceVolume, pad.id);
 
     voice.setOnEnded(() => {
-      if (audio) unregisterStreamingAudio(pad.id, layer.id, audio);
+      if (audio) disposeStreaming(pad.id, layer.id, audio);
       clearLayerVoice(pad.id, layer.id, voice);
 
       // Chain to the next sound if one is queued (sequential/shuffled).
@@ -426,7 +424,7 @@ function handleStopRetrigger(pad: Pad, layer: Layer, resolved: Sound[], afterSto
   deleteLayerChain(layer.id);
   // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
   // callback won't fire — delete the layer's streaming entry explicitly.
-  clearLayerStreamingAudio(pad.id, layer.id);
+  disposeStreaming(pad.id, layer.id);
   stopLayerWithRampInternal(pad, layer);
   afterStopCleanup?.();
   // Cycle mode: advance cursor so next trigger plays the next sound.
@@ -478,7 +476,7 @@ async function handleNextRetrigger(
   // nulling first prevents the chain-advance callback from re-firing.
   for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
   deleteLayerChain(layer.id);
-  clearLayerStreamingAudio(pad.id, layer.id);
+  disposeStreaming(pad.id, layer.id);
   stopLayerVoices(pad.id, layer.id);
   clearPadProgressInfo(pad.id);
   clearLayerProgressInfo(layer.id);
@@ -798,7 +796,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
 
   deleteLayerChain(layerId);
   deleteLayerPlayOrder(layerId);
-  clearLayerStreamingAudio(pad.id, layerId);
+  disposeStreaming(pad.id, layerId);
 
   const voices = [...getLayerVoices(layerId)];
   if (voices.length === 0) return;

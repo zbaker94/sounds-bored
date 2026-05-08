@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactoring: streaming audio lifecycle tracking extracted into its own module for improved maintainability — no change to playback behavior
+- Progress bar tracking for large/streaming audio files remains fully accurate across all retrigger modes and multi-layer pads
 - Fixed a bug where editing a layer's config would clear the pad's mute group and mute target settings
 - No user-facing changes in this release; all updates are internal developer documentation and tooling configuration.
 - Fixed loudness analysis not queuing correctly when another analysis was already in progress (issue #418)
