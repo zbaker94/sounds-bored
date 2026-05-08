@@ -33,34 +33,40 @@ import { startAudioTick } from "./audioTick";
 import {
   addStopCleanupTimeout,
   deleteStopCleanupTimeout,
+  getPadProgressInfo,
+  setLayerProgressInfo,
+  setPadProgressInfo,
+  clearLayerProgressInfo,
+  clearPadProgressInfo,
+} from "./audioState";
+import {
   clearLayerVoice,
+  getLayerVoices,
+  isLayerActive,
+  isPadActive,
+  recordLayerVoice,
+  stopLayerVoices,
+} from "./voiceRegistry";
+import {
+  getLayerGain,
+  getOrCreateLayerGain,
+  getPadGain,
+} from "./gainRegistry";
+import {
+  clearLayerPending,
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
   getLayerChain,
   getLayerCycleIndex,
-  getLayerGain,
   getLayerPlayOrder,
-  getLayerVoices,
-  getOrCreateLayerGain,
-  getPadGain,
-  getPadProgressInfo,
   incrementLayerConsecutiveFailures,
-  isLayerActive,
-  isPadActive,
-  recordLayerVoice,
   resetLayerConsecutiveFailures,
   setLayerChain,
   setLayerCycleIndex,
-  setLayerPlayOrder,
-  setLayerProgressInfo,
-  setPadProgressInfo,
-  clearLayerProgressInfo,
-  clearLayerPending,
-  clearPadProgressInfo,
   setLayerPending,
-  stopLayerVoices,
-} from "./audioState";
+  setLayerPlayOrder,
+} from "./chainCycleState";
 import { register as registerStreaming, dispose as disposeStreaming } from "./streamingAudioLifecycle";
 
 /**

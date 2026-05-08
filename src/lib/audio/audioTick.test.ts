@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _getGainSampleNeeded, _stopMasterVolumeSync, _stopLayerVoiceSetListener } from "./audioTick";
+// _stopLayerVoiceSetListener is intentionally NOT imported — it would unsubscribe
+// the module-scope listener and break _notifyLayerVoiceSetChangedForTest for the
+// rest of the suite. _stopMasterVolumeSync is exposed here only as a smoke check
+// that the module-level subscription handle is exported as a function.
+import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _getGainSampleNeeded, _stopMasterVolumeSync } from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
@@ -16,30 +20,77 @@ vi.mock("./audioState", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./audioState")>();
   return {
     ...actual,
-    getActivePadCount: vi.fn().mockReturnValue(0),
-    forEachActivePadGain: vi.fn(),
-    forEachActiveLayerGain: vi.fn(),
-    getActiveLayerIdSet: vi.fn().mockReturnValue(new Set()),
     computeAllPadProgress: vi.fn().mockReturnValue({}),
     computeAllLayerProgress: vi.fn().mockReturnValue({}),
-    getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
-    getLayerChain: vi.fn().mockReturnValue(undefined),
     isAnyGainChanging: vi.fn().mockReturnValue(true),
   };
 });
 
+// Listener slot captured by the voiceRegistry mock — used by
+// _notifyLayerVoiceSetChangedForTest to fire the audioTick subscription.
+// vi.hoisted runs before vi.mock factories so the holder object is defined
+// when the voiceRegistry mock factory executes.
+const { _voiceListenerHolder } = vi.hoisted(() => ({
+  _voiceListenerHolder: { current: null as (() => void) | null },
+}));
+
+vi.mock("./voiceRegistry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./voiceRegistry")>();
+  return {
+    ...actual,
+    getActivePadCount: vi.fn().mockReturnValue(0),
+    getActivePadIds: vi.fn().mockReturnValue(new Set()),
+    getActiveLayerIdSet: vi.fn().mockReturnValue(new Set()),
+    // audioTick registers its listener at module load (audioTick.ts line ~106).
+    // The mock captures that registration so tests can fire it via _notifyVoiceSetChanged().
+    onLayerVoiceSetChanged: vi.fn((listener: () => void) => {
+      _voiceListenerHolder.current = listener;
+      return () => { _voiceListenerHolder.current = null; };
+    }),
+  };
+});
+
+vi.mock("./gainRegistry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./gainRegistry")>();
+  return {
+    ...actual,
+    forEachActivePadGain: vi.fn(),
+    forEachActiveLayerGain: vi.fn(),
+  };
+});
+
+vi.mock("./chainCycleState", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./chainCycleState")>();
+  return {
+    ...actual,
+    getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
+    getLayerChain: vi.fn().mockReturnValue(undefined),
+  };
+});
+
 import {
-  getActivePadCount,
-  forEachActivePadGain,
-  forEachActiveLayerGain,
-  getActiveLayerIdSet,
-  _notifyLayerVoiceSetChangedForTest,
   computeAllPadProgress,
   computeAllLayerProgress,
-  getLayerPlayOrder,
-  getLayerChain,
   isAnyGainChanging,
 } from "./audioState";
+import {
+  getActivePadCount,
+  getActiveLayerIdSet,
+} from "./voiceRegistry";
+import {
+  forEachActivePadGain,
+  forEachActiveLayerGain,
+} from "./gainRegistry";
+import {
+  getLayerPlayOrder,
+  getLayerChain,
+} from "./chainCycleState";
+
+/** Test helper — fires the layer-voice-set-changed listener captured by the
+ *  voiceRegistry mock. Replaces the deleted `_notifyLayerVoiceSetChangedForTest`. */
+function _notifyLayerVoiceSetChangedForTest(): void {
+  _voiceListenerHolder.current?.();
+}
 
 describe("audioTick", () => {
   beforeEach(() => {
@@ -47,6 +98,12 @@ describe("audioTick", () => {
     usePlaybackStore.setState({ ...initialPlaybackState });
     usePadMetricsStore.setState({ ...initialPadMetricsState });
     useLayerMetricsStore.setState({ ...initialLayerMetricsState });
+    // NOTE: _voiceListenerHolder.current is intentionally NOT reset between tests.
+    // audioTick.ts registers its layer-voice-set listener at module scope (line ~106)
+    // via onLayerVoiceSetChanged(...). Module-scope code only runs once across the
+    // test file, so clearing the holder here would orphan the listener for every
+    // subsequent test and break _notifyLayerVoiceSetChangedForTest. vi.clearAllMocks()
+    // resets mock call history without invalidating the captured reference.
     vi.mocked(getActivePadCount).mockReturnValue(0);
     vi.mocked(forEachActivePadGain).mockImplementation(() => {});
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
@@ -233,7 +290,7 @@ describe("audioTick", () => {
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
 
     // Simulate: pad-1 has gain 0.5, pad-2 has gain 1.0 (should be excluded)
-    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+    vi.mocked(forEachActivePadGain).mockImplementation((_ids, fn) => {
       fn("pad-1", { gain: { value: 0.5 } } as unknown as GainNode);
       fn("pad-2", { gain: { value: 1.0 } } as unknown as GainNode);
     });
@@ -287,7 +344,7 @@ describe("audioTick", () => {
     vi.mocked(computeAllPadProgress).mockReturnValue({});
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
     vi.mocked(isAnyGainChanging).mockReturnValue(false);
-    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+    vi.mocked(forEachActivePadGain).mockImplementation((_ids, fn) => {
       fn("pad-1", { gain: { value: 0.74 } } as unknown as GainNode);
     });
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
@@ -320,7 +377,7 @@ describe("audioTick", () => {
     vi.mocked(isAnyGainChanging).mockReturnValue(false);
 
     // First: simulate pad playing at 70%
-    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+    vi.mocked(forEachActivePadGain).mockImplementation((_ids, fn) => {
       fn("pad-1", { gain: { value: 0.7 } } as unknown as GainNode);
     });
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
@@ -338,7 +395,7 @@ describe("audioTick", () => {
     expect(_getGainSampleNeeded()).toBe(false);
 
     // Pad stops and is immediately retriggered at 100% while tick still running
-    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+    vi.mocked(forEachActivePadGain).mockImplementation((_ids, fn) => {
       fn("pad-1", { gain: { value: 1.0 } } as unknown as GainNode);
     });
     // startAudioTick() must mark gainSampleNeeded so stale 0.7 entry gets cleared
@@ -377,10 +434,10 @@ describe("audioTick", () => {
 
     // Tick 1: isAnyGainChanging = true — populate volumes
     vi.mocked(isAnyGainChanging).mockReturnValue(true);
-    vi.mocked(forEachActivePadGain).mockImplementation((fn) => {
+    vi.mocked(forEachActivePadGain).mockImplementation((_ids, fn) => {
       fn("pad-1", { gain: { value: 0.5 } } as unknown as GainNode);
     });
-    vi.mocked(forEachActiveLayerGain).mockImplementation((fn) => {
+    vi.mocked(forEachActiveLayerGain).mockImplementation((_ids, fn) => {
       fn("layer-1", { gain: { value: 0.7 } } as unknown as GainNode);
     });
 
