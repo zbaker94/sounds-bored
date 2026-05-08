@@ -5,6 +5,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { usePadDisplayStore } from "@/state/padDisplayStore";
 import { usePadMetricsStore } from "@/state/padMetricsStore";
 import type { Pad, Scene } from "@/lib/schemas";
+import { snapshotSounds } from "./resolveSounds";
 import { isFadeablePad } from "@/lib/padUtils";
 import { emitAudioError } from "./audioEvents";
 import { startAudioTick, stopAudioTick } from "./audioTick";
@@ -271,7 +272,10 @@ export function releasePadHoldLayers(pad: Pad): void {
 // user-adjusted volume is not reset to pad.volume. Pass 0 explicitly for silent-start
 // gesture-drag and fade-in operations.
 export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> {
-  const { sounds } = useLibraryStore.getState();
+  // Snapshot library sounds synchronously before any await — same race-window rationale as the
+  // gain capture below. A loadLibrary/updateLibrary call arriving during ensureResumed() would
+  // produce a new Immer array reference, making parallel layer work see inconsistent sounds.
+  const snapshot = snapshotSounds(useLibraryStore.getState().sounds);
   // Capture gain state before any await — isPadActive and gain.gain.value can change
   // across async boundaries (e.g. stopAllPads firing during ensureResumed).
   const padGain = getPadGain(pad.id);
@@ -298,7 +302,7 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
   type LayerWork = { layer: (typeof pad.layers)[number]; resolved: ReturnType<typeof resolveSounds> };
   const layerWork: LayerWork[] = [];
   for (const layer of pad.layers) {
-    const resolved = resolveSounds(layer, sounds);
+    const resolved = resolveSounds(layer, snapshot);
     if (resolved.length === 0) continue;
     if (isLayerPending(layer.id)) continue;
     setLayerPending(layer.id); // triggerLayerOfPad clears this on all exit paths (skip/chain-advanced/proceed/error).
@@ -332,8 +336,7 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
 
 /** Trigger a single layer of a pad in isolation, respecting retrigger mode/arrangement/selection. */
 export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Layer): Promise<void> {
-  const { sounds } = useLibraryStore.getState();
-  const resolved = resolveSounds(layer, sounds);
+  const resolved = resolveSounds(layer, snapshotSounds(useLibraryStore.getState().sounds));
   if (resolved.length === 0) return;
   // Set pending synchronously BEFORE any await to close the race window between
   // the check and the first await point.

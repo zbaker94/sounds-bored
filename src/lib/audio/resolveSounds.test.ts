@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { filterSoundsByTags, filterSoundsBySet, resolveLayerSounds, _soundByIdCache, _tagSetCache } from "./resolveSounds";
+import { filterSoundsByTags, filterSoundsBySet, resolveLayerSounds, _soundByIdCache, _tagSetCache, snapshotSounds } from "./resolveSounds";
 import { createMockLayer } from "@/test/factories";
 import type { Sound } from "@/lib/schemas";
 
@@ -121,7 +121,7 @@ describe("resolveLayerSounds", () => {
   const s3 = makeSound({ id: "s3", tags: ["ambient"], sets: ["set-a"] });
   const s4 = makeSound({ id: "s4", filePath: undefined, tags: ["drums"], sets: ["set-a"] }); // no filePath
 
-  const allSounds = [s1, s2, s3, s4];
+  const allSounds = snapshotSounds([s1, s2, s3, s4]);
 
   describe("assigned selection", () => {
     it("returns sounds matching the assigned instance soundIds", () => {
@@ -194,6 +194,45 @@ describe("resolveLayerSounds", () => {
       expect(result.find((s) => s.id === "s4")).toBeDefined();
     });
   });
+
+  describe("snapshot stability", () => {
+    it("snapshotSounds is zero-cost: returns the same reference, no copy or freeze", () => {
+      const arr: Sound[] = [makeSound({ id: "a" }), makeSound({ id: "b" })];
+      const snap = snapshotSounds(arr);
+      expect(snap).toBe(arr);
+      expect(snap.length).toBe(2);
+      expect(snap[0]).toBe(arr[0]);
+      expect(Object.isFrozen(snap)).toBe(false);
+    });
+
+    it("snapshotSounds does NOT defensively copy — mutation propagates (Immer prevents this in production)", () => {
+      // Documents the load-bearing invariant: stability relies on libraryStore/Immer
+      // never mutating the array in place. If it did, the snapshot would reflect the mutation.
+      const live: Sound[] = [makeSound({ id: "a", tags: ["x"] })];
+      const snap = snapshotSounds(live); // same reference — no copy
+      const layer = makeTagLayer(["x"], "any");
+      resolveLayerSounds(layer, snap); // populates WeakMap cache
+      // Mutating the underlying array mutates the snapshot (they're the same reference)
+      live.push(makeSound({ id: "b", tags: ["x"] }));
+      expect(snap).toHaveLength(2); // proves no copy was made
+    });
+
+    it("two snapshotSounds calls on the same array return the same reference → same WeakMap cache entry", () => {
+      const arr: Sound[] = [makeSound({ id: "s1" })];
+      const snapA = snapshotSounds(arr);
+      const snapB = snapshotSounds(arr);
+      const layer = makeAssignedLayer(["s1"]);
+      resolveLayerSounds(layer, snapA);
+      expect(_soundByIdCache.get(snapB)).toBe(_soundByIdCache.get(snapA));
+    });
+
+    it("rejects raw Sound[] at compile time — passing without snapshotSounds is a type error", () => {
+      const raw: Sound[] = [makeSound({ id: "x" })];
+      const layer = makeTagLayer(["drums"], "any");
+      // @ts-expect-error — raw Sound[] must not satisfy SoundSnapshot
+      resolveLayerSounds(layer, raw);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -205,13 +244,13 @@ describe("resolveLayerSounds", () => {
 describe("resolveLayerSounds — soundById Map caching", () => {
   // Fresh array per test — WeakMap entries from a previous test's array are
   // unreachable (the array goes out of scope) and won't pollute these assertions.
-  let sounds: Sound[];
+  let sounds: ReturnType<typeof snapshotSounds>;
 
   beforeEach(() => {
-    sounds = [
+    sounds = snapshotSounds([
       makeSound({ id: "s1", tags: ["drums"] }),
       makeSound({ id: "s2", tags: ["ambient"] }),
-    ];
+    ]);
   });
 
   it("populates the cache on the first assigned-selection call", () => {
@@ -238,7 +277,7 @@ describe("resolveLayerSounds — soundById Map caching", () => {
     const mapAfterFirst = _soundByIdCache.get(sounds);
 
     // Simulates a library update via Immer — new array reference
-    const updatedSounds: Sound[] = [...sounds];
+    const updatedSounds = snapshotSounds([...sounds]);
     resolveLayerSounds(layer, updatedSounds);
 
     expect(_soundByIdCache.has(updatedSounds)).toBe(true);
@@ -247,14 +286,14 @@ describe("resolveLayerSounds — soundById Map caching", () => {
   });
 
   it("does NOT add a cache entry for tag selection", () => {
-    const tagSounds: Sound[] = [makeSound({ id: "t1", tags: ["drums"] })];
+    const tagSounds = snapshotSounds([makeSound({ id: "t1", tags: ["drums"] })]);
     const layer = makeTagLayer(["drums"], "any");
     resolveLayerSounds(layer, tagSounds);
     expect(_soundByIdCache.has(tagSounds)).toBe(false);
   });
 
   it("does NOT add a cache entry for set selection", () => {
-    const setSounds: Sound[] = [makeSound({ id: "st1", sets: ["set-x"] })];
+    const setSounds = snapshotSounds([makeSound({ id: "st1", sets: ["set-x"] })]);
     const layer = makeSetLayer("set-x");
     resolveLayerSounds(layer, setSounds);
     expect(_soundByIdCache.has(setSounds)).toBe(false);
@@ -272,15 +311,15 @@ describe("resolveLayerSounds — soundById Map caching", () => {
   });
 
   it("populates an empty Map when sounds array is empty", () => {
-    const empty: Sound[] = [];
+    const empty = snapshotSounds([]);
     const layer = makeAssignedLayer([]);
     resolveLayerSounds(layer, empty);
     expect(_soundByIdCache.get(empty)?.size).toBe(0);
   });
 
   it("maintains independent cache entries for two different sounds array references", () => {
-    const soundsA = [makeSound({ id: "a1" })];
-    const soundsB = [makeSound({ id: "b1" })];
+    const soundsA = snapshotSounds([makeSound({ id: "a1" })]);
+    const soundsB = snapshotSounds([makeSound({ id: "b1" })]);
     const layerA = makeAssignedLayer(["a1"]);
     const layerB = makeAssignedLayer(["b1"]);
 
@@ -298,14 +337,14 @@ describe("resolveLayerSounds — soundById Map caching", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveLayerSounds — tag/set resolution caching", () => {
-  let sounds: Sound[];
+  let sounds: ReturnType<typeof snapshotSounds>;
 
   beforeEach(() => {
-    sounds = [
+    sounds = snapshotSounds([
       makeSound({ id: "s1", tags: ["drums"], sets: ["set-a"] }),
       makeSound({ id: "s2", tags: ["electronic"], sets: ["set-b"] }),
       makeSound({ id: "s3", tags: ["drums", "electronic"], sets: ["set-a"] }),
-    ];
+    ]);
   });
 
   it("caches tag selection result and returns the same array reference on repeated calls", () => {
@@ -359,7 +398,7 @@ describe("resolveLayerSounds — tag/set resolution caching", () => {
   it("new sounds reference causes a cache miss and re-runs the filter", () => {
     const layer = makeTagLayer(["drums"], "any");
     const first = resolveLayerSounds(layer, sounds);
-    const updatedSounds = [...sounds];
+    const updatedSounds = snapshotSounds([...sounds]);
     const second = resolveLayerSounds(layer, updatedSounds);
     expect(second).not.toBe(first);
     expect(_tagSetCache.has(updatedSounds)).toBe(true);
@@ -388,7 +427,7 @@ describe("resolveLayerSounds — tag/set resolution caching", () => {
   });
 
   it("tag selection against an empty sounds array returns [] and is cached", () => {
-    const emptySounds: Sound[] = [];
+    const emptySounds = snapshotSounds([]);
     const layer = makeTagLayer(["drums"], "any");
     const result = resolveLayerSounds(layer, emptySounds);
     expect(result).toEqual([]);
@@ -397,7 +436,7 @@ describe("resolveLayerSounds — tag/set resolution caching", () => {
   });
 
   it("set selection against an empty sounds array returns [] and is cached", () => {
-    const emptySounds: Sound[] = [];
+    const emptySounds = snapshotSounds([]);
     const layer = makeSetLayer("set-a");
     const result = resolveLayerSounds(layer, emptySounds);
     expect(result).toEqual([]);

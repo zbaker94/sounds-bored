@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a race condition where changing the sound library while a pad was triggering could cause inconsistent sound playback across layers of the same pad.
+- Loop restarts now correctly pick up arrangement, selection, and playback mode changes made during active playback, so edits take effect on the next cycle without stopping the pad.
+- Skip forward/back on chained layers now uses a stable snapshot of the sound library, preventing edge cases where a concurrent library update could affect navigation.
 - Fixed a bug where sounds already analyzed could be re-queued and re-analyzed during an active normalization run, wasting time and resources.
 - Analysis queue advancement is now atomic — dispatching a sound and marking it in-flight happen in a single step, reducing edge cases where progress tracking could stall.
 - The analysis in-flight flag is now cleared more reliably when a new sound starts processing, even if the event payload is malformed.

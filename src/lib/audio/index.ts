@@ -89,4 +89,4 @@ export { playPreview, stopPreview } from "./preview";
 export { emitAudioError, setAudioErrorHandler } from "./audioEvents";
 
 // ── Sound resolution ──────────────────────────────────────────────────────────
-export { filterSoundsByTags, filterSoundsBySet, resolveLayerSounds } from "./resolveSounds";
+export { filterSoundsByTags, filterSoundsBySet, resolveLayerSounds, snapshotSounds, type SoundSnapshot } from "./resolveSounds";

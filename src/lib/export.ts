@@ -1,14 +1,15 @@
 import type { Project, Sound } from "@/lib/schemas";
 import { hasFilePath } from "@/lib/schemas";
-import { resolveLayerSounds } from "@/lib/audio";
+import { resolveLayerSounds, snapshotSounds } from "@/lib/audio";
 import { basename } from "@/lib/utils";
 
 function getReferencedIds(project: Project, sounds: Sound[]): Set<string> {
   const ids = new Set<string>();
+  const snap = snapshotSounds(sounds);
   for (const scene of project.scenes) {
     for (const pad of scene.pads) {
       for (const layer of pad.layers) {
-        for (const sound of resolveLayerSounds(layer, sounds)) {
+        for (const sound of resolveLayerSounds(layer, snap)) {
           ids.add(sound.id);
         }
       }

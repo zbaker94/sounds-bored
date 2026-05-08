@@ -19,7 +19,7 @@ import { useProjectStore } from "@/state/projectStore";
 import {
   triggerLayer, stopLayerWithRamp, setLayerVolume,
   skipLayerForward, skipLayerBack,
-  emitAudioError, resolveLayerSounds, getLayerNormalizedVolume, getLayerPlayOrder,
+  emitAudioError, resolveLayerSounds, snapshotSounds, getLayerNormalizedVolume, getLayerPlayOrder,
 } from "@/lib/audio";
 import { summarizeLayerSelection } from "@/lib/layerHelpers";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -74,7 +74,7 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
   const sliderVol = localLayerVol ?? layerVol;
 
   const sounds = useLibraryStore((s) => s.sounds);
-  const allSounds = useMemo(() => resolveLayerSounds(layer, sounds), [layer, sounds]);
+  const allSounds = useMemo(() => resolveLayerSounds(layer, snapshotSounds(sounds)), [layer, sounds]);
   const tags = useLibraryStore((s) => s.tags);
   const sets = useLibraryStore((s) => s.sets);
 
