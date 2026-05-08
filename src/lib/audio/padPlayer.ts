@@ -15,36 +15,42 @@ import {
   deleteStopCleanupTimeout,
   cancelGlobalStopTimeout,
   clearAllFadeTracking,
-  clearAllLayerChains,
-  clearAllLayerCycleIndexes,
-  clearAllLayerPending,
-  clearAllLayerPlayOrders,
   clearAllPadProgressInfo,
   clearAllLayerProgressInfo,
-  clearLayerPending,
   clearPadProgressInfo,
-  deleteLayerChain,
-  forEachActivePadGain,
+  isPadFading,
+  isPadFadingOut,
+  isPadFadingIn,
+  setGlobalStopTimeout,
+  getPadFadeFromVolume,
+} from "./audioState";
+import {
   getActivePadIds,
   getAllVoices,
   getLayerIdsForPads,
   getLayerVoices,
+  isPadActive,
+  nullAllOnEnded,
+  stopSpecificVoices,
+} from "./voiceRegistry";
+import {
+  forEachActivePadGain,
   getLivePadVolume,
   getPadGain,
   clearInactivePadGains,
   clearLayerGainsForIds,
   clearPadGainsForIds,
-  stopSpecificVoices,
+} from "./gainRegistry";
+import {
+  clearAllLayerChains,
+  clearAllLayerCycleIndexes,
+  clearAllLayerPending,
+  clearAllLayerPlayOrders,
+  clearLayerPending,
+  deleteLayerChain,
   isLayerPending,
-  isPadActive,
-  isPadFading,
-  isPadFadingOut,
-  isPadFadingIn,
-  nullAllOnEnded,
-  setGlobalStopTimeout,
   setLayerPending,
-  getPadFadeFromVolume,
-} from "./audioState";
+} from "./chainCycleState";
 import { clearAll as clearAllStreaming, dispose as disposeStreaming } from "./streamingAudioLifecycle";
 
 import {
@@ -223,9 +229,9 @@ export function stopAllPads(): void {
 
   // Immediately disconnect stale (inactive) pad gain nodes — they have no
   // voices so no ramp is needed; same-tick removal shrinks the race window.
-  clearInactivePadGains();
+  clearInactivePadGains(stoppedPadIds);
 
-  forEachActivePadGain((_padId, gain) => {
+  forEachActivePadGain(stoppedPadIds, (_padId, gain) => {
     rampGainTo(gain.gain, 0, STOP_RAMP_S);
   });
   // Track this timeout so clearAllAudioState() can cancel it if project close

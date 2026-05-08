@@ -39,55 +39,32 @@ function makeMockCompressor() {
 
 // ── Imports (after mocks) ────────────────────────────────────────────────────
 
-import { getMasterGain } from "./audioContext";
 import {
   getPadProgress,
-  getPadGain,
-  getOrCreateLayerGain,
   cancelPadFade,
   clearAllFadeTracking,
-  clearAllPadGains,
-  clearPadGainsForIds,
-  clearInactivePadGains,
-  clearAllLayerGains,
-  clearAllLayerChains,
-  clearAllLayerCycleIndexes,
   clearAllPadProgressInfo,
-  clearAllLayerPending,
-  clearAllVoices,
+  clearAllLayerProgressInfo,
   setPadProgressInfo,
   isPadFadingOut,
   isPadFading,
   addFadingOutPad,
+  addFadingInPad,
+  isPadFadingIn,
   setFadePadTimeout,
-  getLayerCycleIndex,
-  setLayerCycleIndex,
-  deleteLayerCycleIndex,
-  recordVoice,
-  clearVoice,
-  recordLayerVoice,
-  clearLayerVoice,
-  stopPadVoices,
-  stopAllVoices,
-  stopLayerVoices,
-  stopSpecificVoices,
-  getLayerVoices,
-  nullAllOnEnded,
-  isPadActive,
-  isLayerActive,
-  forEachActivePadGain,
-  getActivePadCount,
-  forEachActiveLayerGain,
-  getActiveLayerIdSet,
-  onLayerVoiceSetChanged,
-  _notifyLayerVoiceSetChangedForTest,
+  setPadFadeFromVolume,
+  getPadFadeFromVolume,
   computeAllPadProgress,
   computeAllLayerProgress,
   setLayerProgressInfo,
-  clearAllLayerProgressInfo,
-  _padToLayerIds,
+  isAnyGainChanging,
+  clearAllAudioState,
+  markGainRamp,
 } from "./audioState";
 import { register as registerStreaming, clearAll as clearAllStreaming, dispose as disposeStreaming, isPadStreaming } from "./streamingAudioLifecycle";
+import { recordLayerVoice, clearAll as clearAllVoiceRegistry } from "./voiceRegistry";
+import { clearAll as clearAllGainRegistry } from "./gainRegistry";
+import { clearAll as clearAllChainCycleState } from "./chainCycleState";
 import type { AudioVoice } from "./audioVoice";
 
 // ── Setup ────────────────────────────────────────────────────────────────────
@@ -97,17 +74,29 @@ beforeEach(() => {
   mockCtx.currentTime = 0;
   mockCtx.createGain.mockImplementation(() => makeMockGain());
   mockCtx.createDynamicsCompressor.mockImplementation(() => makeMockCompressor());
-  clearAllPadGains();
-  clearAllLayerGains();
-  clearAllLayerChains();
-  clearAllLayerCycleIndexes();
+  // Reset every audioState collection in one call so private state like
+  // pendingStopCleanupTimeouts and _globalStopTimeoutId — which the per-suite
+  // helpers do not touch — also starts each test clean.
+  clearAllAudioState();
+  clearAllGainRegistry();
+  clearAllChainCycleState();
   clearAllStreaming();
   clearAllPadProgressInfo();
-  clearAllLayerPending();
   clearAllFadeTracking();
   clearAllLayerProgressInfo();
-  clearAllVoices(); // also clears _padToLayerIds (reverse index)
+  clearAllVoiceRegistry();
 });
+
+function makeVoice(opts: { onStop?: () => void } = {}): AudioVoice {
+  return {
+    start: async () => {},
+    stop: () => { opts.onStop?.(); },
+    stopWithRamp: () => {},
+    setVolume: () => {},
+    setLoop: () => {},
+    setOnEnded: vi.fn(),
+  };
+}
 
 // ── getPadProgress ───────────────────────────────────────────────────────────
 
@@ -175,164 +164,6 @@ describe("getPadProgress", () => {
   });
 });
 
-// ── getPadGain ───────────────────────────────────────────────────────────────
-
-describe("getPadGain", () => {
-  it("creates a GainNode on first call", () => {
-    const gain = getPadGain("pad-1");
-    expect(gain).toBeDefined();
-    expect(gain.connect).toBeDefined();
-    expect(mockCtx.createGain).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns the same GainNode on subsequent calls", () => {
-    const gain1 = getPadGain("pad-1");
-    const gain2 = getPadGain("pad-1");
-    expect(gain1).toBe(gain2);
-    // Only one createGain call — second call reuses cached node
-    expect(mockCtx.createGain).toHaveBeenCalledTimes(1);
-  });
-
-  it("creates separate GainNodes for different pads", () => {
-    const gain1 = getPadGain("pad-1");
-    const gain2 = getPadGain("pad-2");
-    expect(gain1).not.toBe(gain2);
-    expect(mockCtx.createGain).toHaveBeenCalledTimes(2);
-  });
-});
-
-// ── clearAllPadGains ─────────────────────────────────────────────────────────
-
-describe("clearAllPadGains", () => {
-  it("disconnects all pad gain nodes before clearing", () => {
-    const gain1 = getPadGain("pad-1");
-    const gain2 = getPadGain("pad-2");
-
-    clearAllPadGains();
-
-    expect(gain1.disconnect).toHaveBeenCalledTimes(1);
-    expect(gain2.disconnect).toHaveBeenCalledTimes(1);
-  });
-
-  it("empties the map so a subsequent getPadGain call creates a new node", () => {
-    const first = getPadGain("pad-1");
-    clearAllPadGains();
-    const second = getPadGain("pad-1");
-    expect(second).not.toBe(first);
-  });
-
-  it("is safe to call on an empty map", () => {
-    expect(() => clearAllPadGains()).not.toThrow();
-  });
-});
-
-// ── getOrCreateLayerGain ─────────────────────────────────────────────────────
-
-describe("getOrCreateLayerGain", () => {
-  beforeEach(() => {
-    clearAllLayerGains();
-    mockCtx.createGain.mockImplementation(makeMockGain);
-  });
-
-  it("sets gain.value to the normalized [0,1] volume on creation", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-vol-test", 0.8, padGain);
-    expect(layerGain.gain.value).toBe(0.8);
-  });
-
-  it("sets gain.value to 0 when volume is 0", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-zero", 0, padGain);
-    expect(layerGain.gain.value).toBe(0);
-  });
-
-  it("sets gain.value to 1 when volume is 1", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-full", 1, padGain);
-    expect(layerGain.gain.value).toBe(1);
-  });
-
-  it("connects the new gain node to padGain", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-connect", 0.5, padGain);
-    expect(layerGain.connect).toHaveBeenCalledWith(padGain);
-  });
-
-  it("returns the cached gain node on subsequent calls for the same layerId", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const countBefore = mockCtx.createGain.mock.calls.length;
-    const first = getOrCreateLayerGain("layer-cache", 0.8, padGain);
-    const second = getOrCreateLayerGain("layer-cache", 0.8, padGain);
-    expect(second).toBe(first);
-    // createGain called exactly once — cache hit does not create a new node
-    expect(mockCtx.createGain.mock.calls.length - countBefore).toBe(1);
-  });
-
-  it("calls cancelScheduledValues before setValueAtTime on cache hit", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-cancel", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
-    getOrCreateLayerGain("layer-cancel", 0.5, padGain);
-    expect(layerGain.gain.cancelScheduledValues).toHaveBeenCalledWith(mockCtx.currentTime);
-    const cancelOrder = layerGain.gain.cancelScheduledValues.mock.invocationCallOrder[0];
-    const setOrder = layerGain.gain.setValueAtTime.mock.invocationCallOrder[0];
-    expect(cancelOrder).toBeLessThan(setOrder);
-  });
-
-  it("calls setValueAtTime with the normalized [0,1] volume on cache hit", () => {
-    const padGain = getPadGain("pad-gain-test");
-    // First call creates the node
-    const layerGain = getOrCreateLayerGain("layer-sync", 0.8, padGain);
-    // Second call should sync the cached node's gain to the new volume
-    getOrCreateLayerGain("layer-sync", 0.5, padGain);
-    expect(layerGain.gain.setValueAtTime).toHaveBeenLastCalledWith(0.5, mockCtx.currentTime);
-  });
-
-  it("clamps volume > 1 to 1", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-over", 1.5, padGain);
-    expect(layerGain.gain.value).toBe(1);
-  });
-
-  it("clamps negative volume to 0", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-neg", -0.5, padGain);
-    expect(layerGain.gain.value).toBe(0);
-  });
-
-  it("defaults to 1 for NaN volume to avoid Web Audio RangeError", () => {
-    const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-nan", NaN, padGain);
-    expect(layerGain.gain.value).toBe(1);
-  });
-});
-
-// ── clearAllLayerGains ───────────────────────────────────────────────────────
-
-describe("clearAllLayerGains", () => {
-  it("disconnects all layer gain nodes before clearing", () => {
-    const padGain = getPadGain("pad-1");
-    const layerGain1 = getOrCreateLayerGain("layer-1", 0.8, padGain);
-    const layerGain2 = getOrCreateLayerGain("layer-2", 0.5, padGain);
-
-    clearAllLayerGains();
-
-    expect(layerGain1.disconnect).toHaveBeenCalledTimes(1);
-    expect(layerGain2.disconnect).toHaveBeenCalledTimes(1);
-  });
-
-  it("empties the map so a subsequent getOrCreateLayerGain call creates a new node", () => {
-    const padGain = getPadGain("pad-1");
-    const first = getOrCreateLayerGain("layer-1", 0.8, padGain);
-    clearAllLayerGains();
-    const second = getOrCreateLayerGain("layer-1", 0.8, padGain);
-    expect(second).not.toBe(first);
-  });
-
-  it("is safe to call on an empty map", () => {
-    expect(() => clearAllLayerGains()).not.toThrow();
-  });
-});
-
 // ── cancelPadFade ────────────────────────────────────────────────────────────
 
 describe("cancelPadFade", () => {
@@ -361,6 +192,12 @@ describe("cancelPadFade", () => {
     cancelPadFade("pad-sync");
 
     expect(isPadFadingOut("pad-sync")).toBe(false);
+  });
+
+  it("clears padFadeFromVolumes", () => {
+    setPadFadeFromVolume("pad-1", 0.5);
+    cancelPadFade("pad-1");
+    expect(getPadFadeFromVolume("pad-1")).toBeUndefined();
   });
 });
 
@@ -396,363 +233,28 @@ describe("clearAllFadeTracking", () => {
     // clearAllFadeTracking does not write tick-managed fields (padVolumes etc.) —
     // audioTick owns those and stopAudioTick handles clearing.
   });
-});
 
-// ── Voice tracking ──────────────────────────────────────────────────────────
-
-function makeVoice(opts: { onStop?: () => void } = {}): AudioVoice {
-  return {
-    start: async () => {},
-    stop: () => { opts.onStop?.(); },
-    stopWithRamp: () => {},
-    setVolume: () => {},
-    setLoop: () => {},
-    setOnEnded: vi.fn(),
-  };
-}
-
-describe("voice tracking", () => {
-  it("recordVoice tracks a voice and marks pad as active", () => {
-    const voice = makeVoice();
-    recordVoice("pad-1", voice);
-    expect(isPadActive("pad-1")).toBe(true);
+  it("clears padFadeFromVolumes", () => {
+    setPadFadeFromVolume("pad-1", 0.8);
+    clearAllFadeTracking();
+    expect(getPadFadeFromVolume("pad-1")).toBeUndefined();
   });
 
-  it("clearVoice removes voice and deactivates pad when empty", () => {
-    const voice = makeVoice();
-    recordVoice("pad-1", voice);
-    clearVoice("pad-1", voice);
-    expect(isPadActive("pad-1")).toBe(false);
-  });
-
-  it("stopPadVoices stops all voices and clears layer entries for that pad", () => {
-    const stopped: boolean[] = [];
-    const v1 = makeVoice({ onStop: () => stopped.push(true) });
-    const v2 = makeVoice({ onStop: () => stopped.push(true) });
-    recordLayerVoice("pad-1", "layer-1", v1);
-    recordLayerVoice("pad-1", "layer-2", v2);
-    stopPadVoices("pad-1");
-    expect(stopped).toHaveLength(2);
-    expect(isPadActive("pad-1")).toBe(false);
-    expect(isLayerActive("layer-1")).toBe(false);
-    expect(isLayerActive("layer-2")).toBe(false);
-  });
-
-  it("stopLayerVoices keeps pad active when other layer voices remain", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-1", "layer-2", makeVoice());
-    stopLayerVoices("pad-1", "layer-1");
-    expect(isPadActive("pad-1")).toBe(true);
-  });
-
-  it("stopAllVoices stops all voices and deactivates pads in local state", () => {
-    const stopped: boolean[] = [];
-    recordLayerVoice("pad-1", "layer-1", makeVoice({ onStop: () => stopped.push(true) }));
-    recordLayerVoice("pad-2", "layer-2", makeVoice({ onStop: () => stopped.push(true) }));
-    stopAllVoices();
-    expect(stopped).toHaveLength(2);
-    expect(isPadActive("pad-1")).toBe(false);
-    expect(isPadActive("pad-2")).toBe(false);
-  });
-
-  it("recordLayerVoice tracks in both voiceMap and layerVoiceMap", () => {
-    const voice = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", voice);
-    expect(isPadActive("pad-1")).toBe(true);
-    expect(isLayerActive("layer-1")).toBe(true);
-    expect(getLayerVoices("layer-1")).toHaveLength(1);
-  });
-
-  it("clearLayerVoice removes from both maps", () => {
-    const voice = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", voice);
-    clearLayerVoice("pad-1", "layer-1", voice);
-    expect(isLayerActive("layer-1")).toBe(false);
-    expect(isPadActive("pad-1")).toBe(false);
-  });
-
-  it("stopLayerVoices cleans up layer and pad maps correctly", () => {
-    const stopped: boolean[] = [];
-    const v1 = makeVoice({ onStop: () => stopped.push(true) });
-    const v2 = makeVoice({ onStop: () => stopped.push(true) });
-    recordLayerVoice("pad-1", "layer-1", v1);
-    recordLayerVoice("pad-1", "layer-1", v2);
-    stopLayerVoices("pad-1", "layer-1");
-    expect(stopped).toHaveLength(2);
-    expect(isLayerActive("layer-1")).toBe(false);
-    expect(isPadActive("pad-1")).toBe(false);
-  });
-
-  it("clearVoice keeps pad active when other voices remain", () => {
-    const v1 = makeVoice();
-    const v2 = makeVoice();
-    recordVoice("pad-1", v1);
-    recordVoice("pad-1", v2);
-    clearVoice("pad-1", v1);
-    expect(isPadActive("pad-1")).toBe(true);
-  });
-
-  it("stopLayerVoices keeps pad active when other layers still have voices", () => {
-    const v1 = makeVoice();
-    const v2 = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", v1);
-    recordLayerVoice("pad-1", "layer-2", v2);
-    stopLayerVoices("pad-1", "layer-1");
-    expect(isLayerActive("layer-1")).toBe(false);
-    expect(isLayerActive("layer-2")).toBe(true);
-    expect(isPadActive("pad-1")).toBe(true);
-  });
-
-  it("stopLayerVoices cleans maps before stop() so synchronous onended is a safe no-op", () => {
-    const reentrantVoice = makeVoice();
-    // Override stop() to simulate a streaming element that fires onended synchronously
-    reentrantVoice.stop = vi.fn(() => {
-      // At this point, maps should already be cleared — so this is a no-op
-      clearLayerVoice("pad-1", "layer-1", reentrantVoice);
-    });
-    recordLayerVoice("pad-1", "layer-1", reentrantVoice);
-    expect(() => stopLayerVoices("pad-1", "layer-1")).not.toThrow();
-    expect(isLayerActive("layer-1")).toBe(false);
-    expect(isPadActive("pad-1")).toBe(false);
-  });
-
-  it("getLayerVoices returns empty array when layer not active", () => {
-    expect(getLayerVoices("no-such-layer")).toEqual([]);
-  });
-
-  it("nullAllOnEnded nulls all onended callbacks", () => {
-    const v1 = makeVoice();
-    const v2 = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", v1);
-    recordLayerVoice("pad-2", "layer-2", v2);
-    nullAllOnEnded();
-    expect(v1.setOnEnded).toHaveBeenCalledWith(null);
-    expect(v2.setOnEnded).toHaveBeenCalledWith(null);
+  it("clears fadingInPadIds", () => {
+    addFadingInPad("pad-1");
+    clearAllFadeTracking();
+    expect(isPadFadingIn("pad-1")).toBe(false);
   });
 });
 
-// ── onLayerVoiceSetChanged ───────────────────────────────────────────────────
+// ── computeAllPadProgress / computeAllLayerProgress ──────────────────────────
 
-describe("onLayerVoiceSetChanged", () => {
-  it("fires the listener when a layer voice is recorded", () => {
-    let calls = 0;
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires the listener when a layer voice is cleared", () => {
-    let calls = 0;
-    const voice = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", voice);
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    clearLayerVoice("pad-1", "layer-1", voice);
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires the listener when clearAllVoices is called", () => {
-    let calls = 0;
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    clearAllVoices();
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires the listener when stopPadVoices is called", () => {
-    let calls = 0;
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    stopPadVoices("pad-1");
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires the listener when stopAllVoices is called", () => {
-    let calls = 0;
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    stopAllVoices();
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires the listener when stopLayerVoices is called", () => {
-    let calls = 0;
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    stopLayerVoices("pad-1", "layer-1");
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires the listener when stopSpecificVoices is called", () => {
-    let calls = 0;
-    const voice = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", voice);
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    stopSpecificVoices([voice], new Set(["pad-1"]));
-    expect(calls).toBe(1);
-    unsub();
-  });
-
-  it("fires once per recorded voice, not once per call", () => {
-    let calls = 0;
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-1", "layer-2", makeVoice());
-    recordLayerVoice("pad-2", "layer-3", makeVoice());
-    expect(calls).toBe(3);
-    unsub();
-  });
-
-  it("does not fire after the listener is unsubscribed", () => {
-    let calls = 0;
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    unsub();
-    clearAllVoices();
-    expect(calls).toBe(1);
-  });
-
-  it("registering a second listener replaces the first", () => {
-    let first = 0;
-    let second = 0;
-    onLayerVoiceSetChanged(() => { first++; });
-    const unsub = onLayerVoiceSetChanged(() => { second++; });
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    expect(first).toBe(0);
-    expect(second).toBe(1);
-    unsub();
-  });
-
-  it("_notifyLayerVoiceSetChangedForTest fires the listener without a map mutation", () => {
-    let calls = 0;
-    const unsub = onLayerVoiceSetChanged(() => { calls++; });
-    _notifyLayerVoiceSetChangedForTest();
-    expect(calls).toBe(1);
-    unsub();
-  });
-});
-
-// ── Layer cycle index ────────────────────────────────────────────────────────
-
-describe("layerCycleIndex", () => {
-  it("returns undefined for a layer with no cycle index set", () => {
-    expect(getLayerCycleIndex("layer-1")).toBeUndefined();
-  });
-
-  it("stores and retrieves a cycle index", () => {
-    setLayerCycleIndex("layer-1", 2);
-    expect(getLayerCycleIndex("layer-1")).toBe(2);
-  });
-
-  it("overwrites an existing cycle index", () => {
-    setLayerCycleIndex("layer-1", 0);
-    setLayerCycleIndex("layer-1", 3);
-    expect(getLayerCycleIndex("layer-1")).toBe(3);
-  });
-
-  it("deleteLayerCycleIndex removes the entry", () => {
-    setLayerCycleIndex("layer-1", 1);
-    deleteLayerCycleIndex("layer-1");
-    expect(getLayerCycleIndex("layer-1")).toBeUndefined();
-  });
-
-  it("clearAllLayerCycleIndexes removes all entries", () => {
-    setLayerCycleIndex("layer-1", 0);
-    setLayerCycleIndex("layer-2", 5);
-    clearAllLayerCycleIndexes();
-    expect(getLayerCycleIndex("layer-1")).toBeUndefined();
-    expect(getLayerCycleIndex("layer-2")).toBeUndefined();
-  });
-});
-
-// ── tick accessor functions ──────────────────────────────────────────────────
-
-describe("tick accessor functions", () => {
-  it("getActivePadCount returns 0 when no voices are active", () => {
-    expect(getActivePadCount()).toBe(0);
-  });
-
-  it("getActivePadCount returns correct count with voices recorded", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-2", "layer-2", makeVoice());
-    expect(getActivePadCount()).toBe(2);
-  });
-
-  it("forEachActivePadGain only iterates pads with both a voice AND a gain node", () => {
-    // pad-1: has both a gain node AND a voice
-    getPadGain("pad-1");
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-
-    // pad-2: has a gain node but NO voice (should not be iterated)
-    getPadGain("pad-2");
-
-    const visited: string[] = [];
-    forEachActivePadGain((padId) => visited.push(padId));
-    expect(visited).toEqual(["pad-1"]);
-  });
-
-  it("forEachActivePadGain passes the correct GainNode to fn", () => {
-    const gain = getPadGain("pad-1");
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-
-    let receivedGain: GainNode | undefined;
-    forEachActivePadGain((_padId, g) => { receivedGain = g; });
-    expect(receivedGain).toBe(gain);
-  });
-
-  it("forEachActiveLayerGain only iterates layers with both a voice AND a gain node", () => {
-    const padGain = getPadGain("pad-1");
-
-    // layer-1: has both a gain node AND a voice
-    getOrCreateLayerGain("layer-1", 1, padGain);
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-
-    // layer-2: has a gain node but NO voice (should not be iterated)
-    getOrCreateLayerGain("layer-2", 0.8, padGain);
-
-    const visited: string[] = [];
-    forEachActiveLayerGain((layerId) => visited.push(layerId));
-    expect(visited).toEqual(["layer-1"]);
-  });
-
-  it("forEachActiveLayerGain passes the correct GainNode to fn", () => {
-    const padGain = getPadGain("pad-1");
-    const layerGain = getOrCreateLayerGain("layer-1", 1, padGain);
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-
-    let receivedGain: GainNode | undefined;
-    forEachActiveLayerGain((_layerId, g) => { receivedGain = g; });
-    expect(receivedGain).toBe(layerGain);
-  });
-
-  it("getActiveLayerIdSet returns correct set of active layer IDs", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-1", "layer-2", makeVoice());
-    recordLayerVoice("pad-2", "layer-3", makeVoice());
-
-    const ids = getActiveLayerIdSet();
-    expect(ids).toBeInstanceOf(Set);
-    expect(ids.size).toBe(3);
-    expect(ids.has("layer-1")).toBe(true);
-    expect(ids.has("layer-2")).toBe(true);
-    expect(ids.has("layer-3")).toBe(true);
-  });
-
-  it("getActiveLayerIdSet returns empty set when no voices active", () => {
-    const ids = getActiveLayerIdSet();
-    expect(ids.size).toBe(0);
-  });
-
-  it("computeAllPadProgress returns empty object when no voices active", () => {
+describe("computeAllPadProgress", () => {
+  it("returns empty object when no voices active", () => {
     expect(computeAllPadProgress()).toEqual({});
   });
 
-  it("computeAllPadProgress returns progress for pads that have progress info", () => {
+  it("returns progress for pads that have progress info", () => {
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: false });
     mockCtx.currentTime = 2;
@@ -761,7 +263,7 @@ describe("tick accessor functions", () => {
     expect(result["pad-1"]).toBeCloseTo(0.5);
   });
 
-  it("computeAllPadProgress omits pads with no progress info", () => {
+  it("omits pads with no progress info", () => {
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     // no setPadProgressInfo or streaming audio for pad-1
 
@@ -769,7 +271,7 @@ describe("tick accessor functions", () => {
     expect(result["pad-1"]).toBeUndefined();
   });
 
-  it("computeAllPadProgress handles multiple active pads", () => {
+  it("handles multiple active pads", () => {
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     recordLayerVoice("pad-2", "layer-2", makeVoice());
     setPadProgressInfo("pad-1", { startedAt: 0, duration: 10, isLooping: false });
@@ -782,171 +284,33 @@ describe("tick accessor functions", () => {
   });
 });
 
-describe("clearAllAudioState", () => {
-  it("clears all runtime audio state in a single call", async () => {
-    vi.useFakeTimers();
-    const {
-      clearAllAudioState,
-      getPadGain,
-      getOrCreateLayerGain,
-      setPadProgressInfo,
-      getPadProgressInfo,
-      setLayerChain,
-      setLayerCycleIndex,
-      setLayerPlayOrder,
-      setLayerPending,
-      addFadingOutPad,
-      isPadFadingOut,
-      getLayerChain,
-      getLayerCycleIndex,
-      getLayerPlayOrder,
-      isLayerPending,
-      isPadActive,
-      getLayerGain,
-      setGlobalStopTimeout,
-    } = await import("./audioState");
+describe("computeAllLayerProgress — streaming path uses cached best element", () => {
+  it("returns progress for a streaming layer using the cached best element", () => {
+    const el = makeAudio(10, 4);
+    registerStreaming("pad-1", "layer-1", el);
+    const progress = computeAllLayerProgress();
+    expect(progress["layer-1"]).toBeCloseTo(0.4);
+  });
 
-    const padGain = getPadGain("pad-clearall");
-    getOrCreateLayerGain("layer-clearall", 0.8, padGain);
-    setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
-    setLayerChain("layer-clearall", []);
-    setLayerCycleIndex("layer-clearall", 2);
-    setLayerPlayOrder("layer-clearall", []);
-    setLayerPending("layer-clearall");
-    addFadingOutPad("pad-clearall");
+  it("buffer layer progress takes priority over streaming for the same layer ID", () => {
+    registerStreaming("pad-1", "layer-1", makeAudio(10, 5));
+    setLayerProgressInfo("layer-1", { startedAt: 0, duration: 10, isLooping: false });
+    mockCtx.currentTime = 2;
+    const progress = computeAllLayerProgress();
+    // Buffer result = 0.2 (not streaming 0.5)
+    expect(progress["layer-1"]).toBeCloseTo(0.2);
+  });
 
-    // Register a streaming audio element so isPadStreaming returns true before clear
-    const mockAudio = { pause: vi.fn(), currentTime: 0, duration: 10, addEventListener: vi.fn() } as unknown as HTMLAudioElement;
-    registerStreaming("pad-clearall", "layer-clearall", mockAudio);
-    expect(isPadStreaming("pad-clearall")).toBe(true);
+  it("returns 0 for a streaming layer whose element has NaN duration", () => {
+    registerStreaming("pad-1", "layer-1", makeAudio(NaN, 0));
+    const progress = computeAllLayerProgress();
+    expect(progress["layer-1"]).toBe(0);
+  });
 
-    // Schedule a timeout (simulates stopAllPads post-ramp cleanup)
-    const spy = vi.fn();
-    const timeoutId = setTimeout(spy, 9999);
-    setGlobalStopTimeout(timeoutId);
-
-    clearAllAudioState();
-
-    expect(isPadFadingOut("pad-clearall")).toBe(false);          // fade tracking cleared
-    expect(getLayerChain("layer-clearall")).toBeUndefined();     // layer chains cleared
-    expect(getLayerCycleIndex("layer-clearall")).toBeUndefined(); // cycle indexes cleared
-    expect(getLayerPlayOrder("layer-clearall")).toBeUndefined(); // play orders cleared
-    expect(isLayerPending("layer-clearall")).toBe(false);        // pending set cleared
-    expect(getPadProgressInfo("pad-clearall")).toBeUndefined();  // progress info cleared
-    expect(isPadActive("pad-clearall")).toBe(false);             // voices cleared
-    expect(getLayerGain("layer-clearall")).toBeUndefined();      // layer gains disconnected & cleared
-    expect(isPadStreaming("pad-clearall")).toBe(false);          // streaming audio cleared
-
-    // Global stop timeout should be cancelled — spy must NOT fire
-    vi.runAllTimers();
-    expect(spy).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
+  it("returns empty object when no layers are active", () => {
+    expect(computeAllLayerProgress()).toEqual({});
   });
 });
-
-// ---------------------------------------------------------------------------
-// padToLayerIds reverse index — guards O(layers_in_pad) behaviour of stopPadVoices
-// ---------------------------------------------------------------------------
-
-describe("padToLayerIds reverse index", () => {
-  it("recordLayerVoice adds the layer to the pad's reverse-index entry", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    expect(_padToLayerIds.get("pad-1")).toEqual(new Set(["layer-1"]));
-  });
-
-  it("recordLayerVoice accumulates multiple layers for the same pad", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-1", "layer-2", makeVoice());
-    expect(_padToLayerIds.get("pad-1")).toEqual(new Set(["layer-1", "layer-2"]));
-  });
-
-  it("recordLayerVoice tracks separate entries for different pads", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-2", "layer-2", makeVoice());
-    expect(_padToLayerIds.get("pad-1")).toEqual(new Set(["layer-1"]));
-    expect(_padToLayerIds.get("pad-2")).toEqual(new Set(["layer-2"]));
-  });
-
-  it("clearLayerVoice removes the layer from the pad's reverse-index when the layer has no remaining voices", () => {
-    const voice = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", voice);
-    clearLayerVoice("pad-1", "layer-1", voice);
-    // Entry for pad should be gone (no more layers)
-    const padEntry = _padToLayerIds.get("pad-1");
-    expect(padEntry === undefined || !padEntry.has("layer-1")).toBe(true);
-  });
-
-  it("clearLayerVoice keeps the layer in the reverse-index while other voices remain in that layer", () => {
-    const v1 = makeVoice();
-    const v2 = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", v1);
-    recordLayerVoice("pad-1", "layer-1", v2);
-    clearLayerVoice("pad-1", "layer-1", v1); // one voice remains
-    expect(_padToLayerIds.get("pad-1")?.has("layer-1")).toBe(true);
-  });
-
-  it("stopPadVoices clears the pad's reverse-index entry", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-1", "layer-2", makeVoice());
-    stopPadVoices("pad-1");
-    expect(_padToLayerIds.has("pad-1")).toBe(false);
-  });
-
-  it("stopPadVoices does NOT touch reverse-index entries for other pads", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-2", "layer-2", makeVoice());
-    stopPadVoices("pad-1");
-    expect(_padToLayerIds.get("pad-2")).toEqual(new Set(["layer-2"]));
-  });
-
-  it("stopLayerVoices removes the stopped layer from the pad's reverse-index", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-1", "layer-2", makeVoice());
-    stopLayerVoices("pad-1", "layer-1");
-    expect(_padToLayerIds.get("pad-1")?.has("layer-1")).toBe(false);
-    expect(_padToLayerIds.get("pad-1")?.has("layer-2")).toBe(true);
-  });
-
-  it("stopLayerVoices removes the pad's reverse-index entry when the last layer is stopped", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    stopLayerVoices("pad-1", "layer-1");
-    expect(_padToLayerIds.has("pad-1")).toBe(false);
-  });
-
-  it("stopAllVoices clears the entire reverse index", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    recordLayerVoice("pad-2", "layer-2", makeVoice());
-    stopAllVoices();
-    expect(_padToLayerIds.size).toBe(0);
-  });
-
-  it("clearAllVoices clears the entire reverse index", () => {
-    recordLayerVoice("pad-1", "layer-1", makeVoice());
-    clearAllVoices();
-    expect(_padToLayerIds.size).toBe(0);
-  });
-
-  it("stopPadVoices is a no-op on an unknown pad (no throw, index stays empty)", () => {
-    expect(() => stopPadVoices("never-recorded")).not.toThrow();
-    expect(_padToLayerIds.size).toBe(0);
-  });
-
-  it("recording the same voice twice does not corrupt the index on clear", () => {
-    const voice = makeVoice();
-    recordLayerVoice("pad-1", "layer-1", voice);
-    recordLayerVoice("pad-1", "layer-1", voice); // duplicate
-    clearLayerVoice("pad-1", "layer-1", voice);  // removes both duplicates (filter by reference)
-    // Layer should be gone since filter removes all occurrences
-    expect(isLayerActive("layer-1")).toBe(false);
-    expect(_padToLayerIds.has("pad-1")).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Streaming audio best-element cache — guards O(1) getPadProgress/
-// computeAllLayerProgress lookups (#160)
-// ---------------------------------------------------------------------------
 
 /** Create a mock audio element. Listeners registered via addEventListener are stored and
  *  can be fired by calling el.dispatchEvent(new Event("loadedmetadata")) — matching the
@@ -1002,31 +366,66 @@ describe("getPadProgress — streaming path uses cached best element", () => {
   });
 });
 
-describe("computeAllLayerProgress — streaming path uses cached best element", () => {
-  it("returns progress for a streaming layer using the cached best element", () => {
-    const el = makeAudio(10, 4);
-    registerStreaming("pad-1", "layer-1", el);
-    const progress = computeAllLayerProgress();
-    expect(progress["layer-1"]).toBeCloseTo(0.4);
+// ── clearAllAudioState ───────────────────────────────────────────────────────
+
+describe("clearAllAudioState", () => {
+  it("clears all runtime audio state in a single call", async () => {
+    vi.useFakeTimers();
+    const {
+      clearAllAudioState,
+      setPadProgressInfo,
+      getPadProgressInfo,
+      addFadingOutPad,
+      isPadFadingOut,
+      setGlobalStopTimeout,
+    } = await import("./audioState");
+    const { setLayerChain, setLayerCycleIndex, setLayerPlayOrder, setLayerPending, getLayerChain, getLayerCycleIndex, getLayerPlayOrder, isLayerPending } = await import("./chainCycleState");
+    const { getPadGain, getOrCreateLayerGain, getLayerGain } = await import("./gainRegistry");
+    const { isPadActive } = await import("./voiceRegistry");
+
+    const padGain = getPadGain("pad-clearall");
+    getOrCreateLayerGain("layer-clearall", 0.8, padGain);
+    setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
+    setLayerChain("layer-clearall", []);
+    setLayerCycleIndex("layer-clearall", 2);
+    setLayerPlayOrder("layer-clearall", []);
+    setLayerPending("layer-clearall");
+    addFadingOutPad("pad-clearall");
+
+    // Register a streaming audio element so isPadStreaming returns true before clear
+    const mockAudio = { pause: vi.fn(), currentTime: 0, duration: 10, addEventListener: vi.fn() } as unknown as HTMLAudioElement;
+    registerStreaming("pad-clearall", "layer-clearall", mockAudio);
+    expect(isPadStreaming("pad-clearall")).toBe(true);
+
+    // Schedule a timeout (simulates stopAllPads post-ramp cleanup)
+    const spy = vi.fn();
+    const timeoutId = setTimeout(spy, 9999);
+    setGlobalStopTimeout(timeoutId);
+
+    clearAllAudioState();
+
+    expect(isPadFadingOut("pad-clearall")).toBe(false);          // fade tracking cleared
+    expect(getLayerChain("layer-clearall")).toBeUndefined();     // layer chains cleared
+    expect(getLayerCycleIndex("layer-clearall")).toBeUndefined(); // cycle indexes cleared
+    expect(getLayerPlayOrder("layer-clearall")).toBeUndefined(); // play orders cleared
+    expect(isLayerPending("layer-clearall")).toBe(false);        // pending set cleared
+    expect(getPadProgressInfo("pad-clearall")).toBeUndefined();  // progress info cleared
+    expect(isPadActive("pad-clearall")).toBe(false);             // voices cleared
+    expect(getLayerGain("layer-clearall")).toBeUndefined();      // layer gains disconnected & cleared
+    expect(isPadStreaming("pad-clearall")).toBe(false);          // streaming audio cleared
+
+    // Global stop timeout should be cancelled — spy must NOT fire
+    vi.runAllTimers();
+    expect(spy).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 
-  it("buffer layer progress takes priority over streaming for the same layer ID", () => {
-    registerStreaming("pad-1", "layer-1", makeAudio(10, 5));
-    setLayerProgressInfo("layer-1", { startedAt: 0, duration: 10, isLooping: false });
-    mockCtx.currentTime = 2;
-    const progress = computeAllLayerProgress();
-    // Buffer result = 0.2 (not streaming 0.5)
-    expect(progress["layer-1"]).toBeCloseTo(0.2);
-  });
-
-  it("returns 0 for a streaming layer whose element has NaN duration", () => {
-    registerStreaming("pad-1", "layer-1", makeAudio(NaN, 0));
-    const progress = computeAllLayerProgress();
-    expect(progress["layer-1"]).toBe(0);
-  });
-
-  it("returns empty object when no layers are active", () => {
-    expect(computeAllLayerProgress()).toEqual({});
+  it("resets gain ramp deadline early so isAnyGainChanging() is false during teardown", () => {
+    markGainRamp(5); // schedule a 5-second ramp
+    expect(isAnyGainChanging()).toBe(true);
+    clearAllAudioState();
+    expect(isAnyGainChanging()).toBe(false);
   });
 });
 
@@ -1073,140 +472,27 @@ describe("stop cleanup timeout tracking", () => {
   });
 });
 
-// ── Per-pad limiter ───────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// isAnyGainChanging — fade-state portion (gainRampDeadline tests live in gainRegistry.test.ts)
+// ---------------------------------------------------------------------------
 
-describe("getPadGain limiter wiring", () => {
-  it("creates a DynamicsCompressorNode and connects padGain → limiter → masterGain", () => {
-    const mockGain = makeMockGain();
-    const mockLimiter = makeMockCompressor();
-    const mockMaster = { connect: vi.fn() };
-    mockCtx.createGain.mockReturnValueOnce(mockGain);
-    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
-    vi.mocked(getMasterGain).mockReturnValueOnce(mockMaster as any);
-
-    getPadGain("pad-limiter-1");
-
-    expect(mockCtx.createDynamicsCompressor).toHaveBeenCalledOnce();
-    expect(mockGain.connect).toHaveBeenCalledWith(mockLimiter);
-    expect(mockLimiter.connect).toHaveBeenCalledWith(mockMaster);
-  });
-
-  it("does not create a new limiter on subsequent calls for the same pad", () => {
-    getPadGain("pad-limiter-2");
-    vi.clearAllMocks();
-    getPadGain("pad-limiter-2");
-    expect(mockCtx.createDynamicsCompressor).not.toHaveBeenCalled();
-  });
-});
-
-describe("clearAllPadGains limiter cleanup", () => {
-  it("disconnects and clears limiters alongside pad gains", () => {
-    const mockGain = makeMockGain();
-    const mockLimiter = makeMockCompressor();
-    mockCtx.createGain.mockReturnValueOnce(mockGain);
-    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
-
-    getPadGain("pad-cl-1");
-    clearAllPadGains();
-
-    expect(mockGain.disconnect).toHaveBeenCalledOnce();
-    expect(mockLimiter.disconnect).toHaveBeenCalledOnce();
-  });
-});
-
-describe("clearInactivePadGains limiter cleanup", () => {
-  it("disconnects limiters for pads with no active voices", () => {
-    const mockGain = makeMockGain();
-    const mockLimiter = makeMockCompressor();
-    mockCtx.createGain.mockReturnValueOnce(mockGain);
-    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
-
-    getPadGain("pad-inactive-1"); // no voices registered
-
-    clearInactivePadGains();
-
-    expect(mockGain.disconnect).toHaveBeenCalledOnce();
-    expect(mockLimiter.disconnect).toHaveBeenCalledOnce();
-  });
-
-  it("does not disconnect limiters for pads that still have active voices", () => {
-    const mockGain = makeMockGain();
-    const mockLimiter = makeMockCompressor();
-    mockCtx.createGain.mockReturnValueOnce(mockGain);
-    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
-
-    getPadGain("pad-active-1");
-    const voice = { stop: vi.fn(), setOnEnded: vi.fn(), setLoop: vi.fn() } as unknown as AudioVoice;
-    recordVoice("pad-active-1", voice);
-
-    clearInactivePadGains();
-
-    expect(mockLimiter.disconnect).not.toHaveBeenCalled();
-  });
-});
-
-describe("clearPadGainsForIds limiter cleanup", () => {
-  it("disconnects limiters for the specified pad IDs", () => {
-    const mockGain = makeMockGain();
-    const mockLimiter = makeMockCompressor();
-    mockCtx.createGain.mockReturnValueOnce(mockGain);
-    mockCtx.createDynamicsCompressor.mockReturnValueOnce(mockLimiter);
-
-    getPadGain("pad-scope-1");
-    clearPadGainsForIds(new Set(["pad-scope-1"]));
-
-    expect(mockGain.disconnect).toHaveBeenCalledOnce();
-    expect(mockLimiter.disconnect).toHaveBeenCalledOnce();
-  });
-});
-
-describe("markGainRamp / isAnyGainChanging", () => {
-  beforeEach(async () => {
-    const { clearAllAudioState } = await import("./audioState");
-    mockCtx.currentTime = 0;
-    clearAllAudioState();
-  });
-
-  it("isAnyGainChanging returns false in steady state (no fade, no ramp)", async () => {
-    const { isAnyGainChanging } = await import("./audioState");
+describe("isAnyGainChanging — fade tracking portion", () => {
+  it("returns false in steady state (no fade, no ramp)", () => {
     expect(isAnyGainChanging()).toBe(false);
   });
 
-  it("markGainRamp makes isAnyGainChanging return true before the deadline", async () => {
-    const { markGainRamp, isAnyGainChanging } = await import("./audioState");
-    mockCtx.currentTime = 10;
-    markGainRamp(0.016); // deadline = 10 + 0.016 + 0.005 = 10.021
-    mockCtx.currentTime = 10.010; // before deadline
+  it("returns true when a pad is fading out", () => {
+    addFadingOutPad("pad-fade");
     expect(isAnyGainChanging()).toBe(true);
   });
 
-  it("isAnyGainChanging returns false and resets deadline after it expires", async () => {
-    const { markGainRamp, isAnyGainChanging } = await import("./audioState");
-    mockCtx.currentTime = 10;
-    markGainRamp(0.016); // deadline = 10.021
-    mockCtx.currentTime = 10.022; // past deadline
-    expect(isAnyGainChanging()).toBe(false);
-    // Deadline reset to -Infinity: calling again should stay false without a new ramp
-    mockCtx.currentTime = 10.030;
-    expect(isAnyGainChanging()).toBe(false);
-  });
-
-  it("markGainRamp uses max semantics — a shorter ramp does not shorten an existing deadline", async () => {
-    const { markGainRamp, isAnyGainChanging } = await import("./audioState");
-    mockCtx.currentTime = 10;
-    markGainRamp(1.0); // deadline = 11.005
-    mockCtx.currentTime = 10.5;
-    markGainRamp(0.016); // candidate = 10.521 — shorter, must not replace 11.005
-    mockCtx.currentTime = 10.8; // before original deadline, after shorter candidate
+  it("returns true when a fade timeout is pending", () => {
+    setFadePadTimeout("pad-fade", setTimeout(() => {}, 9999));
     expect(isAnyGainChanging()).toBe(true);
   });
 
-  it("clearAllAudioState resets gainRampDeadline so isAnyGainChanging returns false", async () => {
-    const { markGainRamp, isAnyGainChanging, clearAllAudioState } = await import("./audioState");
-    mockCtx.currentTime = 10;
-    markGainRamp(1.0); // deadline = 11.005
-    mockCtx.currentTime = 10.5; // before deadline — would return true
-    clearAllAudioState();
-    expect(isAnyGainChanging()).toBe(false);
+  it("returns true when a pad is fading in", () => {
+    addFadingInPad("pad-1");
+    expect(isAnyGainChanging()).toBe(true);
   });
 });

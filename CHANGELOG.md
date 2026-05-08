@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactored: voice tracking, gain node management, and layer chain/cycle state each extracted into focused sub-modules (`voiceRegistry`, `gainRegistry`, `chainCycleState`) — no change to playback behavior
+- Fade-in tracking added: the engine now correctly tracks pads that are mid-fade-in, preventing audio state inconsistencies during crossfades
+- `clearAllAudioState()` now resets the gain ramp deadline immediately so the audio tick stops sampling stale values faster during project close/reset
+- `forEachActivePadGain` and `forEachActiveLayerGain` now accept an explicit active ID set instead of reading voice state internally, eliminating redundant per-frame allocations in steady state
 - Fixed a race condition where changing the sound library while a pad was triggering could cause inconsistent sound playback across layers of the same pad.
 - Loop restarts now correctly pick up arrangement, selection, and playback mode changes made during active playback, so edits take effect on the next cycle without stopping the pad.
 - Skip forward/back on chained layers now uses a stable snapshot of the sound library, preventing edge cases where a concurrent library update could affect navigation.

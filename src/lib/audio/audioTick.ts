@@ -26,20 +26,26 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { usePadMetricsStore } from "@/state/padMetricsStore";
 import { useLayerMetricsStore } from "@/state/layerMetricsStore";
 import {
-  getActivePadCount,
-  forEachActivePadGain,
-  forEachActiveLayerGain,
-  getActiveLayerIdSet,
-  onLayerVoiceSetChanged,
   computeAllPadProgress,
   computeAllLayerProgress,
-  getLayerPlayOrder,
-  getLayerChain,
   isAnyGainChanging,
 } from "./audioState";
+import {
+  getActivePadCount,
+  getActivePadIds,
+  getActiveLayerIdSet,
+  onLayerVoiceSetChanged,
+} from "./voiceRegistry";
+import { forEachActivePadGain, forEachActiveLayerGain } from "./gainRegistry";
+import { getLayerPlayOrder, getLayerChain } from "./chainCycleState";
 import { applyMasterVolume } from "./audioContext";
 
 const VOLUME_EPSILON = 0.001;
+// Shared empty Set used as a sentinel when the gain-sample fast path is going to skip
+// the walk anyway — avoids allocating a fresh Set just to throw it away every frame.
+// Frozen so accidental runtime mutation is blocked at the object level;
+// TypeScript's ReadonlySet type already prevents .add() at compile time.
+const EMPTY_SET: ReadonlySet<string> = Object.freeze(new Set()) as ReadonlySet<string>;
 // Progress bars advance every frame while audio plays; a tolerance just below
 // 1 pixel of displayed movement skips duplicate frames without visible stall.
 // At 60 fps a 10 s sound advances ~0.0017/frame, so 0.001 skips at most 1 frame.
@@ -110,8 +116,15 @@ export const _stopLayerVoiceSetListener = onLayerVoiceSetChanged(() => {
  * Samples the current gain nodes and diffs against the previous tick.
  * Returns new volume records and change flags. Skips all allocation in
  * steady-state (no fade in flight) by reusing the previous records.
+ *
+ * The caller passes the current active pad/layer ID sets so this function
+ * does not need to call getActivePadIds()/getActiveLayerIdSet() itself —
+ * the tick gates those calls behind layerVoiceSetChanged for steady-state efficiency.
  */
-function computeGainChanges(): {
+function computeGainChanges(
+  activePadIds: ReadonlySet<string>,
+  activeLayerIds: ReadonlySet<string>,
+): {
   nextPadVolumes: Record<string, number>;
   nextLayerVolumes: Record<string, number>;
   padVolumesChanged: boolean;
@@ -127,12 +140,12 @@ function computeGainChanges(): {
   }
   gainSampleNeeded = false;
   const nextPadVolumes: Record<string, number> = {};
-  forEachActivePadGain((padId, gain) => {
+  forEachActivePadGain(activePadIds, (padId, gain) => {
     const v = gain.gain.value;
     if (v < 1 - VOLUME_EPSILON) nextPadVolumes[padId] = v;
   });
   const nextLayerVolumes: Record<string, number> = {};
-  forEachActiveLayerGain((layerId, gain) => {
+  forEachActiveLayerGain(activeLayerIds, (layerId, gain) => {
     nextLayerVolumes[layerId] = gain.gain.value;
   });
   const padVolumesChanged = !volumesEqual(nextPadVolumes, prevPadVolumes);
@@ -253,10 +266,12 @@ function computeProgressChanges(): {
   layerVoiceSetChanged = false;
   let nextActiveLayerIds: Set<string> = prevActiveLayerIds;
   if (activeLayerIdsChanged) {
-    nextActiveLayerIds = new Set(getActiveLayerIdSet());
-    // Clone again — Set has mutating methods, and consumers (the store) get
-    // nextActiveLayerIds; prevActiveLayerIds must be an independent copy so
-    // accidental consumer mutation cannot corrupt the next-tick diff.
+    // getActiveLayerIdSet() already returns a fresh Set — no defensive wrap needed
+    // for the consumer copy. We still allocate a separate clone for prevActiveLayerIds
+    // because Set has mutating methods and the store may receive nextActiveLayerIds;
+    // prevActiveLayerIds must be an independent copy so accidental consumer mutation
+    // cannot corrupt the next-tick diff.
+    nextActiveLayerIds = getActiveLayerIdSet();
     prevActiveLayerIds = new Set(nextActiveLayerIds);
   }
 
@@ -276,11 +291,22 @@ function tick(): void {
     return;
   }
 
-  const { nextPadVolumes, nextLayerVolumes, padVolumesChanged, layerVolumesChanged } =
-    computeGainChanges();
-
+  // computeProgressChanges runs first because it derives nextActiveLayerIds
+  // (gated by layerVoiceSetChanged so getActiveLayerIdSet() is only called when
+  // a voice mutation fired since the last tick — common steady-state fast path).
+  // We pass the resulting set into computeGainChanges so it does not need to
+  // re-query the voice registry.
   const { nextPadProgress, nextLayerProgress, nextActiveLayerIds, padProgressChanged, layerProgressChanged, activeLayerIdsChanged } =
     computeProgressChanges();
+
+  // Gate getActivePadIds() behind the same fast-path check used inside computeGainChanges.
+  // The Set allocated by getActivePadIds() is only consumed when forEachActivePadGain
+  // actually walks; in steady-state (no ramp, gainSampleNeeded already cleared) the
+  // walk is skipped, so we pass an empty Set to avoid the per-frame allocation.
+  const willSampleGains = gainSampleNeeded || isAnyGainChanging();
+  const activePadIdsForGains: ReadonlySet<string> = willSampleGains ? getActivePadIds() : EMPTY_SET;
+  const { nextPadVolumes, nextLayerVolumes, padVolumesChanged, layerVolumesChanged } =
+    computeGainChanges(activePadIdsForGains, nextActiveLayerIds);
 
   const { nextLayerPlayOrder, nextLayerChain, layerPlayOrderChanged, layerChainChanged } =
     collectLayerSoundLists(nextActiveLayerIds);

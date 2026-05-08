@@ -9,14 +9,15 @@ import {
   isPadFadingOut,
   setFadePadTimeout,
   deleteFadePadTimeout,
-  getPadGain,
+  setPadFadeFromVolume,
+} from "./audioState";
+import { getPadGain } from "./gainRegistry";
+import { nullPadOnEnded, stopPadVoices } from "./voiceRegistry";
+import {
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
-  nullPadOnEnded,
-  stopPadVoices,
-  setPadFadeFromVolume,
-} from "./audioState";
+} from "./chainCycleState";
 import { rampGainTo, resetPadGain } from "./gainManager";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";

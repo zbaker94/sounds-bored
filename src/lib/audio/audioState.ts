@@ -1,28 +1,35 @@
-﻿/**
- * audioState.ts â€” Non-serializable audio engine runtime state
+/**
+ * audioState.ts — Non-serializable audio engine runtime state (fade + progress + stop tracking).
  *
- * This module owns ALL runtime Maps/Sets used by the audio engine (padPlayer.ts).
- * These are kept separate from Zustand (playbackStore) because they contain
- * non-serializable Web Audio objects (GainNode, HTMLAudioElement) that cannot
- * live in a Zustand store.
+ * After the issue #425 extraction, this module owns only the state that did not
+ * fit naturally into one of the focused sub-modules:
+ *
+ *   - Fade tracking: fadePadTimeouts, fadingOutPadIds, fadingInPadIds, padFadeFromVolumes
+ *   - Pad/layer progress info (buffer-path startedAt/duration/isLooping)
+ *   - Stop cleanup timeouts (post-ramp setTimeout IDs from stopAllPads / rampStopLayerVoices)
+ *
+ * Sibling modules own the rest:
+ *   - voiceRegistry  — voice tracking, padToLayerIds reverse index, layer-voice-set listener
+ *   - gainRegistry   — pad/layer GainNode tracking, gain-ramp deadline
+ *   - chainCycleState — chain queue, cycle index, play order, pending, consecutive failures
+ *   - streamingAudioLifecycle — streaming audio elements + best-element cache
  *
  * ============================================================================
  * COORDINATION WITH playbackStore
  * ============================================================================
  *
- * This module is the SINGLE owner of ALL non-serializable audio engine runtime state.
  * playbackStore (Zustand) holds reactive UI signals split into two categories:
  *
  *   Push-based (written by upstream callers on discrete events): playingPadIds,
  *   fadingPadIds, fadingOutPadIds, reversingPadIds. These are updated
- *   synchronously when a pad starts or stops â€” routing them through the RAF
+ *   synchronously when a pad starts or stops — routing them through the RAF
  *   tick would add ~16 ms latency to UI feedback with no correctness benefit.
  *   This module DOES NOT write these fields directly; callers (padPlayer) read
  *   the local state here and mirror it to playbackStore at the call site.
  *
  *   Tick-managed (written by audioTick.ts each RAF frame): padVolumes,
  *   layerVolumes, padProgress, layerProgress, activeLayerIds, layerPlayOrder,
- *   layerChain. This module MUST NOT write these fields â€” doing so bypasses the
+ *   layerChain. This module MUST NOT write these fields — doing so bypasses the
  *   tick's diff logic and can create race conditions with the RAF loop.
  *
  * INVARIANT: This module does NOT import playbackStore. It is a pure local
@@ -31,125 +38,96 @@
  *
  * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
  *   fade tracking. Reason: voice.stop() fires onended synchronously, which reads
- *   layerChainQueue. If the queue is not cleared first, onended will advance the
- *   chain and restart sounds.
+ *   chainCycleState.layerChainQueue. If the queue is not cleared first, onended
+ *   will advance the chain and restart sounds.
  *
  * INVARIANT: Always use padPlayer.stopAllPads() as the single stop entry point.
  *   It clears fade tracking and chain queues first, nulls onended callbacks,
  *   ramps gain nodes to zero, then calls stopSpecificVoices() on the snapshot
  *   and mirrors the fully-stopped pads to playbackStore.playingPadIds.
- *
- * NOTE: padGainMap is a persistent lazy cache — getPadGain() creates entries on
- *   first trigger and they survive until clearAllPadGains() (called in the
- *   post-ramp timeout of stopAllPads or by clearAllAudioState). voiceMap only
- *   contains pads with currently-active voices; pads leave voiceMap when their
- *   last voice stops naturally. The two maps are NOT kept in sync between a
- *   natural voice stop and the next clearAllPadGains() call.
- *
- * ============================================================================
- * STATE INVENTORY
- * ============================================================================
- *
- * Name               | Keys       | Values                                    | Purpose                                         | Cleared by
- * -------------------|------------|-------------------------------------------|-------------------------------------------------|-----------------------------------
- * padGainMap         | pad ID     | GainNode                                  | Per-pad gain node in audio graph                | clearAllPadGains() (disconnects+clears), stopAllPads()
- * padLimiterMap      | pad ID     | DynamicsCompressorNode                    | Per-pad brickwall limiter after padGain         | clearAllPadGains(), clearPadGainsForIds(), clearInactivePadGains()
- * layerGainMap       | layer ID   | GainNode                                  | Per-layer gain node, connects to padGain        | clearAllLayerGains() (disconnects+clears), stopAllPads()
- * voiceMap           | pad ID     | AudioVoice[]                              | Active voices per pad (UI + stop tracking)      | clearAllVoices(), stopAllVoices()
- * layerVoiceMap      | layer ID   | AudioVoice[]                              | Active voices per layer                         | clearAllVoices(), stopAllVoices()
- * padProgressInfo    | pad ID     | { startedAt, duration, isLooping }        | Tracks longest-duration voice for progress bar  | clearPadProgressInfo(), stopAllPads()
- * layerProgressInfo  | layer ID   | { startedAt, duration, isLooping }        | Per-layer progress info for per-layer bars      | clearLayerProgressInfo(), stopAllPads()
- * layerChainQueue    | layer ID   | Sound[]                                   | Remaining sounds in sequential/shuffled chain   | deleteLayerChain(), clearAllLayerChains()
- * layerCycleIndex    | layer ID   | number                                    | Next play-order index for cycleMode layers      | deleteLayerCycleIndex(), clearAllLayerCycleIndexes()
- * layerPendingMap    | layer ID   | (Set membership)                          | Guards against async race on rapid retrigger    | clearLayerPending()
- * layerConsecutiveFailureMap | layer ID | number                             | Consecutive chain load failures (circuit-break) | resetLayerConsecutiveFailures(), clearAllLayerConsecutiveFailures()
- * fadePadTimeouts    | pad ID     | timeout ID                                | Pending fade cleanup timeouts                   | cancelPadFade(), clearAllFadeTracking()
- * fadingOutPadIds    | pad ID     | (Set membership)                          | Tracks pads actively fading out (gain -> 0)     | cancelPadFade(), removeFadingOutPad(), clearAllFadeTracking()
- *
- * padStreamingAudio / pendingMetadataAborts — owned by streamingAudioLifecycle module
  */
 
-import { getAudioContext, getMasterGain } from "./audioContext";
-import type { AudioVoice } from "./audioVoice";
-import type { Sound } from "@/lib/schemas";
-import { createLimiterNode } from "./gainNormalization";
+import { getAudioContext } from "./audioContext";
 import { getBestForPad, iterateBestLayers, clearAll as clearAllStreamingAudio } from "./streamingAudioLifecycle";
+import { isGainRampPending, clearAll as clearAllGainRegistry, resetGainRampDeadline } from "./gainRegistry";
+import { getActivePadIds, nullAllOnEnded, stopAllVoices } from "./voiceRegistry";
+import { clearAll as clearAllChainCycleState } from "./chainCycleState";
 
 // ---------------------------------------------------------------------------
-// Private state â€” 9 Maps/Sets
+// Backward-compat re-exports — imported from sub-modules.
+// Internal callers should import directly from the focused modules.
+// This barrel exists so test mocks targeting "./audioState" continue to work.
+// Candidates for removal once all test vi.mock() calls are migrated.
 // ---------------------------------------------------------------------------
+export {
+  isPadActive,
+  isLayerActive,
+  recordVoice,
+  clearVoice,
+  recordLayerVoice,
+  clearLayerVoice,
+  stopPadVoices,
+  stopLayerVoices,
+  stopAllVoices,
+  stopSpecificVoices,
+  getLayerVoices,
+  nullAllOnEnded,
+  nullPadOnEnded,
+  getActivePadIds,
+  getAllVoices,
+  getLayerIdsForPads,
+  getActivePadCount,
+  getActiveLayerIdSet,
+  clearAllVoices,
+  onLayerVoiceSetChanged,
+} from "./voiceRegistry";
 
-/** Per-pad GainNodes: source(s) -> voiceGain -> layerGain -> padGain -> padLimiter -> masterGain -> destination */
-const padGainMap = new Map<string, GainNode>();
+export {
+  getPadGain,
+  getLivePadVolume,
+  forEachActivePadGain,
+  forEachActiveLayerGain,
+  getOrCreateLayerGain,
+  getLayerGain,
+  clearAllPadGains,
+  clearAllLayerGains,
+  clearInactivePadGains,
+  clearPadGainsForIds,
+  clearLayerGainsForIds,
+  markGainRamp,
+} from "./gainRegistry";
 
-/** Per-pad DynamicsCompressorNodes: padGain → padLimiter → masterGain → destination */
-const padLimiterMap = new Map<string, DynamicsCompressorNode>();
+export {
+  getLayerChain,
+  setLayerChain,
+  deleteLayerChain,
+  clearAllLayerChains,
+  getLayerCycleIndex,
+  setLayerCycleIndex,
+  deleteLayerCycleIndex,
+  clearAllLayerCycleIndexes,
+  setLayerPlayOrder,
+  getLayerPlayOrder,
+  deleteLayerPlayOrder,
+  clearAllLayerPlayOrders,
+  isLayerPending,
+  setLayerPending,
+  clearLayerPending,
+  clearAllLayerPending,
+  getLayerConsecutiveFailures,
+  incrementLayerConsecutiveFailures,
+  resetLayerConsecutiveFailures,
+} from "./chainCycleState";
 
-/** Active voices per pad. Every layer voice is also in voiceMap â€” see recordLayerVoice invariant. */
-const voiceMap = new Map<string, AudioVoice[]>();
-
-/** Active voices per layer. */
-const layerVoiceMap = new Map<string, AudioVoice[]>();
-
-/**
- * Reverse index: pad ID â†’ Set of layer IDs with active voices for that pad.
- * Maintained alongside layerVoiceMap to allow stopPadVoices to touch only the
- * layers belonging to the stopped pad â€” O(layers_in_pad) instead of O(all_layers).
- * Exported with underscore prefix for test introspection only.
- */
-export const _padToLayerIds = new Map<string, Set<string>>();
-
-// Subscription model for active layer set changes. A single listener slot is used —
-// audioTick is the only subscriber. Mutation sites call notifyLayerVoiceSetChanged()
-// rather than manually incrementing a version counter, so future mutation paths
-// automatically notify the listener without requiring a manual bump.
-type LayerVoiceSetChangedListener = () => void;
-let layerVoiceSetChangeListener: LayerVoiceSetChangedListener | null = null;
-
-/** Register a listener that fires whenever layerVoiceMap is mutated.
- *  Returns an unsubscribe function. Only one listener slot exists; registering
- *  a second listener replaces the first. */
-export function onLayerVoiceSetChanged(listener: LayerVoiceSetChangedListener): () => void {
-  layerVoiceSetChangeListener = listener;
-  return () => { layerVoiceSetChangeListener = null; };
-}
-
-function notifyLayerVoiceSetChanged(): void {
-  layerVoiceSetChangeListener?.();
-}
-
-/** Exposed for test introspection only — fires the voice-set-changed notification without a real map mutation. */
-export const _notifyLayerVoiceSetChangedForTest = (): void => notifyLayerVoiceSetChanged();
-
-/** Keyed by layer ID. One GainNode per active layer, connects to its padGain. */
-const layerGainMap = new Map<string, GainNode>();
+// ---------------------------------------------------------------------------
+// Private state — fade tracking, progress, stop cleanup
+// ---------------------------------------------------------------------------
 
 /** Tracks the longest-duration voice per pad for playback progress display (buffer path). */
 const padProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
 
 /** Tracks per-layer progress info for buffer path voices. One entry per active layer. */
 const layerProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
-
-/** Remaining sounds to auto-chain after the current one ends (sequential/shuffled).
- *  Keyed by layer ID. Deleted when the chain is broken (stop/restart) or exhausted. */
-const layerChainQueue = new Map<string, Sound[]>();
-
-/** Cycle cursor: tracks the next index into the play order for layers with cycleMode=true.
- *  Keyed by layer ID. Persists across triggers so each trigger advances to the next sound.
- *  Deleted when the layer is stopped via stopAllPads or when cycleMode is toggled off. */
-const layerCycleIndex = new Map<string, number>();
-
-/** Layer IDs currently awaiting startLayerSound â€” guards against async race on rapid retrigger. */
-const layerPendingMap = new Set<string>();
-
-/** Counts consecutive `loadLayerVoice` failures per layer, used to short-circuit
- *  a failing chain (e.g. missing library) instead of spamming one toast per
- *  chained sound. Reset on a successful voice start or when the circuit trips. */
-const layerConsecutiveFailureMap = new Map<string, number>();
-
-/** Stores the original play order for a layer chain so skip-back can derive the previous sound.
- *  Keyed by layer ID. Set when a chain is started; cleared on stopAllPads / stopPad. */
-const layerPlayOrderMap = new Map<string, Sound[]>();
 
 /** Pending fade cleanup timeouts, keyed by pad ID. */
 const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -159,19 +137,11 @@ const fadingOutPadIds = new Set<string>();
 
 /**
  * Stores the fromVolume of each active gain ramp so reverseFade knows where to return to.
- * Reversing always goes back to where the fade started â€” this avoids direction assumptions
+ * Reversing always goes back to where the fade started — this avoids direction assumptions
  * that break when fadeTargetVol > pad.volume.
  * Cleared by cancelPadFade and clearAllFadeTracking.
  */
 const padFadeFromVolumes = new Map<string, number>();
-
-/**
- * AudioContext time after which all scheduled short gain ramps have settled.
- * Set by markGainRamp(); read by isAnyGainChanging() to short-circuit the
- * audioTick volume rebuild when no fade or ramp is in flight.
- * -Infinity means no ramp is pending (steady-state fast path skips the time check).
- */
-let gainRampDeadline = -Infinity;
 
 /**
  * Tracks pads that have started a fade-in but whose async triggerPad has not yet completed.
@@ -194,7 +164,7 @@ let _globalStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 const pendingStopCleanupTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
 // ---------------------------------------------------------------------------
-// Public query functions
+// Fade query functions
 // ---------------------------------------------------------------------------
 
 export function isPadFadingOut(padId: string): boolean {
@@ -206,30 +176,13 @@ export function isPadFading(padId: string): boolean {
 }
 
 /**
- * Record that a gain ramp lasting `durationS` seconds was just scheduled.
- * Called by gainManager.rampGainTo so the audioTick can continue reading
- * gain node values until the ramp settles.
- */
-export function markGainRamp(durationS: number): void {
-  // +5 ms safety margin absorbs AudioContext scheduling jitter: the audio rendering
-  // thread may commit the ramp slightly later than currentTime+durationS on loaded systems.
-  const deadline = getAudioContext().currentTime + durationS + 0.005;
-  if (deadline > gainRampDeadline) gainRampDeadline = deadline;
-}
-
-/**
  * Returns true when any fade or short gain ramp is currently in flight,
  * meaning gain node values may be changing this frame.
  * Used by audioTick to short-circuit the volume rebuild in steady state.
  */
 export function isAnyGainChanging(): boolean {
   if (fadePadTimeouts.size > 0 || fadingOutPadIds.size > 0 || fadingInPadIds.size > 0) return true;
-  if (gainRampDeadline === -Infinity) return false;
-  if (getAudioContext().currentTime >= gainRampDeadline) {
-    gainRampDeadline = -Infinity; // reclaim the steady-state fast path
-    return false;
-  }
-  return true;
+  return isGainRampPending();
 }
 
 export function getPadProgress(padId: string, currentTime?: number): number | null {
@@ -255,71 +208,16 @@ export function getPadProgress(padId: string, currentTime?: number): number | nu
 }
 
 /**
- * Get the GainNode for a pad, creating and connecting it to masterGain if it doesn't exist.
- * This is a get-or-create operation â€” it always returns a valid GainNode.
- * Only call this when the pad is active or about to become active.
- */
-export function getPadGain(padId: string): GainNode {
-  const existing = padGainMap.get(padId);
-  if (existing) return existing;
-  const ctx = getAudioContext();
-  const gain = ctx.createGain();
-  gain.gain.value = 1.0;
-  const limiter = createLimiterNode(ctx);
-  gain.connect(limiter);
-  limiter.connect(getMasterGain());
-  padLimiterMap.set(padId, limiter);
-  padGainMap.set(padId, gain);
-  return gain;
-}
-
-/**
- * Read the current gain value for a pad without creating a new gain node.
- * Returns undefined if no gain node exists for this pad yet.
- * Reads gain.gain.value directly from the GainNode — authoritative even during
- * chain transitions when padVolumes (the tick-sampled store) may be transiently cleared.
- */
-export function getLivePadVolume(padId: string): number | undefined {
-  return padGainMap.get(padId)?.gain.value;
-}
-
-/** Iterate active pad gain nodes — only pads currently in voiceMap (with active voices). */
-export function forEachActivePadGain(fn: (padId: string, gain: GainNode) => void): void {
-  for (const padId of voiceMap.keys()) {
-    const gain = padGainMap.get(padId);
-    if (gain) fn(padId, gain);
-  }
-}
-
-/** Return the number of pads with active voices. Used by the tick to self-terminate. */
-export function getActivePadCount(): number {
-  return voiceMap.size;
-}
-
-/** Iterate active layer gain nodes â€” only layers currently in layerVoiceMap. */
-export function forEachActiveLayerGain(fn: (layerId: string, gain: GainNode) => void): void {
-  for (const layerId of layerVoiceMap.keys()) {
-    const gain = layerGainMap.get(layerId);
-    if (gain) fn(layerId, gain);
-  }
-}
-
-/** Return the Set of currently active layer IDs (layers with at least one voice). */
-export function getActiveLayerIdSet(): Set<string> {
-  return new Set(layerVoiceMap.keys());
-}
-
-/**
  * Compute padProgress for all active pads in one pass.
- * Returns a Record<padId, progress 0â€“1>. Pads with no progress info are omitted.
- * Reads AudioContext.currentTime once and passes it to getPadProgress â€” mirrors computeAllLayerProgress.
+ * Returns a Record<padId, progress 0–1>. Pads with no progress info are omitted.
+ * Reads AudioContext.currentTime once and passes it to getPadProgress — mirrors computeAllLayerProgress.
  */
 export function computeAllPadProgress(): Record<string, number> {
-  const result: Record<string, number> = {};
-  if (voiceMap.size === 0) return result;
-  // Hoist a single currentTime read for all active pads â€” mirrors computeAllLayerProgress.
+  const activePadIds = getActivePadIds();
+  if (activePadIds.size === 0) return {};
   const currentTime = getAudioContext().currentTime;
-  for (const padId of voiceMap.keys()) {
+  const result: Record<string, number> = {};
+  for (const padId of activePadIds) {
     const progress = getPadProgress(padId, currentTime);
     if (progress !== null) result[padId] = progress;
   }
@@ -328,13 +226,13 @@ export function computeAllPadProgress(): Record<string, number> {
 
 /**
  * Compute layerProgress for all active layers in one pass.
- * Returns a Record<layerId, progress 0â€“1>.
+ * Returns a Record<layerId, progress 0–1>.
  * Buffer layers are tracked via layerProgressInfo; streaming layers via streamingAudioLifecycle.iterateBestLayers.
  */
 export function computeAllLayerProgress(): Record<string, number> {
   const result: Record<string, number> = {};
 
-  // Buffer layers â€” tracked in layerProgressInfo
+  // Buffer layers — tracked in layerProgressInfo
   if (layerProgressInfo.size > 0) {
     const ctx = getAudioContext();
     for (const [layerId, info] of layerProgressInfo) {
@@ -347,7 +245,7 @@ export function computeAllLayerProgress(): Record<string, number> {
     }
   }
 
-  // Streaming layers â€” use streamingAudioLifecycle.iterateBestLayers (O(1) lookup per layer)
+  // Streaming layers — use streamingAudioLifecycle.iterateBestLayers (O(1) lookup per layer)
   for (const [layerId, best] of iterateBestLayers()) {
     if (layerId in result) continue; // already from buffer path
     const d = best.duration;
@@ -358,35 +256,8 @@ export function computeAllLayerProgress(): Record<string, number> {
 }
 
 // ---------------------------------------------------------------------------
-// Bulk clear functions (test isolation + stopAllPads)
+// Fade tracking mutators
 // ---------------------------------------------------------------------------
-
-export function clearAllPadGains(): void {
-  for (const gain of padGainMap.values()) gain.disconnect();
-  padGainMap.clear();
-  for (const limiter of padLimiterMap.values()) limiter.disconnect();
-  padLimiterMap.clear();
-}
-
-export function clearAllLayerGains(): void {
-  for (const gain of layerGainMap.values()) gain.disconnect();
-  layerGainMap.clear();
-}
-
-export function clearAllLayerChains(): void {
-  layerChainQueue.clear();
-}
-
-export function clearAllLayerCycleIndexes(): void {
-  layerCycleIndex.clear();
-}
-
-export function clearAllVoices(): void {
-  voiceMap.clear();
-  layerVoiceMap.clear();
-  _padToLayerIds.clear();
-  notifyLayerVoiceSetChanged();
-}
 
 export function clearAllFadeTracking(): void {
   for (const id of fadePadTimeouts.values()) clearTimeout(id);
@@ -395,127 +266,6 @@ export function clearAllFadeTracking(): void {
   fadingInPadIds.clear();
   padFadeFromVolumes.clear();
 }
-
-// ---------------------------------------------------------------------------
-// Scoped cleanup helpers — prevent the stopAllPads post-ramp timeout from
-// touching pads/voices that arrived during the race window after the ramp started.
-// ---------------------------------------------------------------------------
-
-/** Snapshot the IDs of all pads with active voices. */
-export function getActivePadIds(): Set<string> {
-  return new Set(voiceMap.keys());
-}
-
-/** Snapshot all currently active voice objects. */
-export function getAllVoices(): AudioVoice[] {
-  return [...voiceMap.values()].flat();
-}
-
-/** Collect the layer IDs owned by the given pad IDs, via the reverse index. */
-export function getLayerIdsForPads(padIds: ReadonlySet<string>): Set<string> {
-  const layerIds = new Set<string>();
-  for (const padId of padIds) {
-    const layers = _padToLayerIds.get(padId);
-    if (layers) for (const layerId of layers) layerIds.add(layerId);
-  }
-  return layerIds;
-}
-
-/**
- * Immediately disconnect pad gain nodes that have no active voices.
- * Called synchronously in stopAllPads before the ramp starts so stale entries
- * from previous natural stops don't linger into the race window.
- */
-export function clearInactivePadGains(): void {
-  for (const padId of [...padGainMap.keys()]) {
-    if (!voiceMap.has(padId)) {
-      padGainMap.get(padId)!.disconnect();
-      padGainMap.delete(padId);
-      const limiter = padLimiterMap.get(padId);
-      if (limiter) {
-        limiter.disconnect();
-        padLimiterMap.delete(padId);
-      }
-    }
-  }
-}
-
-/** Disconnect and remove pad gain nodes only for the specified pad IDs. */
-export function clearPadGainsForIds(padIds: ReadonlySet<string>): void {
-  for (const padId of padIds) {
-    const gain = padGainMap.get(padId);
-    if (gain) {
-      gain.disconnect();
-      padGainMap.delete(padId);
-    }
-    const limiter = padLimiterMap.get(padId);
-    if (limiter) {
-      limiter.disconnect();
-      padLimiterMap.delete(padId);
-    }
-  }
-}
-
-/** Disconnect and remove layer gain nodes only for the specified layer IDs. */
-export function clearLayerGainsForIds(layerIds: ReadonlySet<string>): void {
-  for (const layerId of layerIds) {
-    const gain = layerGainMap.get(layerId);
-    if (gain) {
-      gain.disconnect();
-      layerGainMap.delete(layerId);
-    }
-  }
-}
-
-function removeVoicesFromLayers(padId: string, voiceSet: Set<AudioVoice>): void {
-  const padLayers = _padToLayerIds.get(padId);
-  if (!padLayers) return;
-  for (const layerId of [...padLayers]) {
-    const layerVoices = layerVoiceMap.get(layerId) ?? [];
-    const remaining = layerVoices.filter(v => !voiceSet.has(v));
-    if (remaining.length === 0) {
-      layerVoiceMap.delete(layerId);
-      padLayers.delete(layerId);
-    } else {
-      layerVoiceMap.set(layerId, remaining);
-    }
-  }
-  if (padLayers.size === 0) _padToLayerIds.delete(padId);
-}
-
-/**
- * Stop only the voice objects in the snapshot, scoped to the given pad IDs.
- * Voices added to those pads after the snapshot was taken (new triggers during
- * the ramp window) are left intact in voiceMap and layerVoiceMap.
- *
- * @returns The subset of stoppedPadIds whose voiceMap entry reached zero.
- *   Callers must mirror these to usePlaybackStore.getState().removePlayingPad() —
- *   this function does not write to playbackStore (see module INVARIANT).
- */
-export function stopSpecificVoices(voices: readonly AudioVoice[], stoppedPadIds: ReadonlySet<string>): Set<string> {
-  const fullyStopped = new Set<string>();
-  const voiceSet = new Set<AudioVoice>(voices);
-  for (const padId of stoppedPadIds) {
-    const padVoices = voiceMap.get(padId) ?? [];
-    const remaining = padVoices.filter(v => !voiceSet.has(v));
-    if (remaining.length === 0) {
-      voiceMap.delete(padId);
-      fullyStopped.add(padId);
-    } else {
-      voiceMap.set(padId, remaining);
-    }
-    removeVoicesFromLayers(padId, voiceSet);
-  }
-  notifyLayerVoiceSetChanged();
-  for (const voice of voices) {
-    try { voice.stop(); } catch { /* already ended */ }
-  }
-  return fullyStopped;
-}
-
-// ---------------------------------------------------------------------------
-// Fade tracking functions (used internally by padPlayer fade operations)
-// ---------------------------------------------------------------------------
 
 /**
  * Cancel all fade-related resources for a pad: pending timeout, fadingOut tracking,
@@ -583,38 +333,6 @@ export function deleteFadePadTimeout(padId: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Layer gain functions
-// ---------------------------------------------------------------------------
-
-/**
- * Get or create a GainNode for the given layer, connecting it to `padGain`.
- *
- * @param normalizedVolume - Normalized gain in [0,1]. Non-finite values (NaN, Infinity) clamp to 1.
- */
-export function getOrCreateLayerGain(layerId: string, normalizedVolume: number, padGain: GainNode): GainNode {
-  const clamped = Number.isFinite(normalizedVolume) ? Math.max(0, Math.min(1, normalizedVolume)) : 1;
-  const ctx = getAudioContext();
-  const existing = layerGainMap.get(layerId);
-  if (existing) {
-    // Sync cached gain to the current layer.volume in case it was changed via the config dialog.
-    // cancelScheduledValues clears any pending reset from a previous ramp-stop timeout.
-    existing.gain.cancelScheduledValues(ctx.currentTime);
-    existing.gain.setValueAtTime(clamped, ctx.currentTime);
-    return existing;
-  }
-  const gain = ctx.createGain();
-  gain.gain.value = clamped;
-  gain.connect(padGain);
-  layerGainMap.set(layerId, gain);
-  return gain;
-}
-
-/** Get a layer gain node by ID. Returns undefined if not active. */
-export function getLayerGain(layerId: string): GainNode | undefined {
-  return layerGainMap.get(layerId);
-}
-
-// ---------------------------------------------------------------------------
 // Pad progress tracking
 // ---------------------------------------------------------------------------
 
@@ -630,7 +348,6 @@ export function clearPadProgressInfo(padId: string): void {
   padProgressInfo.delete(padId);
 }
 
-/** Clear all pad progress info. */
 export function clearAllPadProgressInfo(): void {
   padProgressInfo.clear();
 }
@@ -653,244 +370,6 @@ export function clearLayerProgressInfo(layerId: string): void {
 
 export function clearAllLayerProgressInfo(): void {
   layerProgressInfo.clear();
-}
-
-// ---------------------------------------------------------------------------
-// Layer pending tracking
-// ---------------------------------------------------------------------------
-
-export function isLayerPending(layerId: string): boolean {
-  return layerPendingMap.has(layerId);
-}
-
-export function setLayerPending(layerId: string): void {
-  layerPendingMap.add(layerId);
-}
-
-export function clearLayerPending(layerId: string): void {
-  layerPendingMap.delete(layerId);
-}
-
-export function clearAllLayerPending(): void {
-  layerPendingMap.clear();
-}
-
-// ---------------------------------------------------------------------------
-// Layer consecutive failure tracking (circuit-breaker for chain load failures)
-// ---------------------------------------------------------------------------
-
-/** Read the current consecutive-failure count for a layer (0 when absent). */
-export function getLayerConsecutiveFailures(layerId: string): number {
-  return layerConsecutiveFailureMap.get(layerId) ?? 0;
-}
-
-/** Increment the consecutive-failure count for a layer and return the new value. */
-export function incrementLayerConsecutiveFailures(layerId: string): number {
-  const next = (layerConsecutiveFailureMap.get(layerId) ?? 0) + 1;
-  layerConsecutiveFailureMap.set(layerId, next);
-  return next;
-}
-
-/** Reset the consecutive-failure count for a layer (call after a successful start). */
-export function resetLayerConsecutiveFailures(layerId: string): void {
-  layerConsecutiveFailureMap.delete(layerId);
-}
-
-/** Clear all consecutive-failure state (called from clearAllAudioState). */
-function clearAllLayerConsecutiveFailures(): void {
-  layerConsecutiveFailureMap.clear();
-}
-
-// ---------------------------------------------------------------------------
-// Layer chain queue
-// ---------------------------------------------------------------------------
-
-export function getLayerChain(layerId: string): Sound[] | undefined {
-  return layerChainQueue.get(layerId);
-}
-
-export function setLayerChain(layerId: string, chain: Sound[]): void {
-  layerChainQueue.set(layerId, chain);
-}
-
-export function deleteLayerChain(layerId: string): void {
-  layerChainQueue.delete(layerId);
-}
-
-// ---------------------------------------------------------------------------
-// Layer cycle index (cycleMode: one sound per trigger)
-// ---------------------------------------------------------------------------
-
-export function getLayerCycleIndex(layerId: string): number | undefined {
-  return layerCycleIndex.get(layerId);
-}
-
-export function setLayerCycleIndex(layerId: string, index: number): void {
-  layerCycleIndex.set(layerId, index);
-}
-
-export function deleteLayerCycleIndex(layerId: string): void {
-  layerCycleIndex.delete(layerId);
-}
-
-// ---------------------------------------------------------------------------
-// Voice tracking
-// ---------------------------------------------------------------------------
-
-export function isPadActive(padId: string): boolean {
-  return (voiceMap.get(padId)?.length ?? 0) > 0;
-}
-
-export function isLayerActive(layerId: string): boolean {
-  return (layerVoiceMap.get(layerId)?.length ?? 0) > 0;
-}
-
-export function recordVoice(padId: string, voice: AudioVoice): void {
-  voiceMap.set(padId, [...(voiceMap.get(padId) ?? []), voice]);
-}
-
-export function clearVoice(padId: string, voice: AudioVoice): void {
-  const updated = (voiceMap.get(padId) ?? []).filter((v) => v !== voice);
-  if (updated.length === 0) {
-    voiceMap.delete(padId);
-  } else {
-    voiceMap.set(padId, updated);
-  }
-}
-
-export function stopPadVoices(padId: string): void {
-  const voices = voiceMap.get(padId) ?? [];
-  const stoppedSet = new Set(voices);
-  voiceMap.delete(padId);
-  // Use reverse index to touch only layers belonging to this pad â€” O(layers_in_pad).
-  // Per invariant, every layer voice is also a pad voice, so stoppedSet covers all
-  // voices in every tracked layer. The `remaining.length > 0` branch is dead under
-  // normal operation but kept defensively; when triggered, the layer stays in the
-  // index so the reverse-index remains consistent.
-  const padLayers = _padToLayerIds.get(padId);
-  if (padLayers) {
-    for (const layerId of padLayers) {
-      const remaining = (layerVoiceMap.get(layerId) ?? []).filter((v) => !stoppedSet.has(v));
-      if (remaining.length === 0) {
-        layerVoiceMap.delete(layerId);
-        padLayers.delete(layerId);
-      } else {
-        layerVoiceMap.set(layerId, remaining);
-      }
-    }
-    if (padLayers.size === 0) _padToLayerIds.delete(padId);
-  }
-  notifyLayerVoiceSetChanged();
-  for (const voice of voices) {
-    try { voice.stop(); } catch { /* already ended */ }
-  }
-}
-
-export function stopAllVoices(): void {
-  // NOTE: Always call padPlayer.stopAllPads() instead of this directly.
-  // stopAllPads() ensures chain queues, fade tracking, and gain ramps are
-  // handled before voices are stopped.
-  const allVoices = [...voiceMap.values()].flat();
-  voiceMap.clear();
-  layerVoiceMap.clear();
-  _padToLayerIds.clear();
-  notifyLayerVoiceSetChanged();
-  for (const voice of allVoices) {
-    try { voice.stop(); } catch { /* already ended */ }
-  }
-}
-
-export function recordLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
-  layerVoiceMap.set(layerId, [...(layerVoiceMap.get(layerId) ?? []), voice]);
-  let padLayers = _padToLayerIds.get(padId);
-  if (!padLayers) {
-    padLayers = new Set();
-    _padToLayerIds.set(padId, padLayers);
-  }
-  padLayers.add(layerId);
-  notifyLayerVoiceSetChanged();
-  recordVoice(padId, voice);
-}
-
-export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
-  const updated = (layerVoiceMap.get(layerId) ?? []).filter((v) => v !== voice);
-  if (updated.length === 0) {
-    layerVoiceMap.delete(layerId);
-    const padLayers = _padToLayerIds.get(padId);
-    if (padLayers) {
-      padLayers.delete(layerId);
-      if (padLayers.size === 0) _padToLayerIds.delete(padId);
-    }
-  } else {
-    layerVoiceMap.set(layerId, updated);
-  }
-  notifyLayerVoiceSetChanged();
-  clearVoice(padId, voice);
-}
-
-export function stopLayerVoices(padId: string, layerId: string): void {
-  const voices = layerVoiceMap.get(layerId) ?? [];
-  const stoppedSet = new Set(voices);
-
-  // Clean up maps BEFORE calling stop() â€” wrapStreamingElement.stop()
-  // fires onended synchronously, so clearing first makes clearLayerVoice a safe no-op.
-  layerVoiceMap.delete(layerId);
-  const padLayers = _padToLayerIds.get(padId);
-  if (padLayers) {
-    padLayers.delete(layerId);
-    if (padLayers.size === 0) _padToLayerIds.delete(padId);
-  }
-  notifyLayerVoiceSetChanged();
-  const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
-  if (padVoices.length === 0) {
-    voiceMap.delete(padId);
-  } else {
-    voiceMap.set(padId, padVoices);
-  }
-
-  for (const voice of voices) {
-    try { voice.stop(); } catch { /* already ended */ }
-  }
-}
-
-export function getLayerVoices(layerId: string): readonly AudioVoice[] {
-  return layerVoiceMap.get(layerId) ?? [];
-}
-
-export function nullAllOnEnded(): void {
-  for (const voices of voiceMap.values()) {
-    for (const voice of voices) {
-      voice.setOnEnded(null);
-    }
-  }
-}
-
-/** Null onended callbacks for all voices belonging to a specific pad. */
-export function nullPadOnEnded(padId: string): void {
-  const voices = voiceMap.get(padId) ?? [];
-  for (const voice of voices) {
-    voice.setOnEnded(null);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Layer play order tracking (for skip-back)
-// ---------------------------------------------------------------------------
-
-export function setLayerPlayOrder(layerId: string, sounds: Sound[]): void {
-  layerPlayOrderMap.set(layerId, sounds);
-}
-
-export function getLayerPlayOrder(layerId: string): Sound[] | undefined {
-  return layerPlayOrderMap.get(layerId);
-}
-
-export function deleteLayerPlayOrder(layerId: string): void {
-  layerPlayOrderMap.delete(layerId);
-}
-
-export function clearAllLayerPlayOrders(): void {
-  layerPlayOrderMap.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -921,7 +400,7 @@ export function addStopCleanupTimeout(id: ReturnType<typeof setTimeout>): void {
   pendingStopCleanupTimeouts.add(id);
 }
 
-/** Remove a stop cleanup timeout from tracking â€” called when the timeout fires naturally. */
+/** Remove a stop cleanup timeout from tracking — called when the timeout fires naturally. */
 export function deleteStopCleanupTimeout(id: ReturnType<typeof setTimeout>): void {
   pendingStopCleanupTimeouts.delete(id);
 }
@@ -933,11 +412,11 @@ function clearAllStopCleanupTimeouts(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Consolidated cleanup â€” instant, no gain ramp (for project close)
+// Consolidated cleanup — instant, no gain ramp (for project close)
 // ---------------------------------------------------------------------------
 
 /**
- * Instantly release all audio engine state â€” no gain ramp.
+ * Instantly release all audio engine state — no gain ramp.
  * Use on project close / component unmount where a click is acceptable.
  * For graceful in-session stopping (with gain ramp), use padPlayer.stopAllPads() instead.
  *
@@ -947,16 +426,14 @@ function clearAllStopCleanupTimeouts(): void {
  *   3. Voices stopped, then gains cleared
  */
 export function clearAllAudioState(): void {
+  // Reset gain ramp deadline first so isAnyGainChanging() reports false during teardown,
+  // letting the audioTick fast-path skip stale samples while the rest of the state unwinds.
+  resetGainRampDeadline();
   // Cancel any pending stopAllPads post-ramp setTimeout to prevent cross-session contamination.
   cancelGlobalStopTimeout();
   clearAllStopCleanupTimeouts();
-  gainRampDeadline = -Infinity;
   clearAllFadeTracking();
-  clearAllLayerChains();
-  clearAllLayerCycleIndexes();
-  clearAllLayerPlayOrders();
-  clearAllLayerPending();
-  clearAllLayerConsecutiveFailures();
+  clearAllChainCycleState();
   nullAllOnEnded();
   clearAllStreamingAudio();
   clearAllPadProgressInfo();
@@ -964,9 +441,8 @@ export function clearAllAudioState(): void {
   // Stop voices BEFORE disconnecting gain nodes so onended callbacks (already nulled above)
   // do not fire against disconnected nodes, and voice.stop() completes with a valid graph.
   stopAllVoices();
-  clearAllLayerGains();
-  clearAllPadGains();
+  clearAllGainRegistry();
   // Note: audio buffer / streaming element caches are cleared by the caller
-  // (MainPage) â€” audioState is a pure state container and does not import the
+  // (MainPage) — audioState is a pure state container and does not import the
   // cache modules to keep the dependency graph clean.
 }

@@ -1,6 +1,7 @@
 // src/lib/audio/gainManager.ts
 import { getAudioContext } from "./audioContext";
-import { getPadGain, getLayerGain, cancelPadFade, markGainRamp } from "./audioState";
+import { cancelPadFade } from "./audioState";
+import { getPadGain, getLayerGain, markGainRamp } from "./gainRegistry";
 import { usePlaybackStore } from "@/state/playbackStore";
 
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */

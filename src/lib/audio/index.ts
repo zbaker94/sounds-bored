@@ -54,6 +54,9 @@ export {
 } from "./gainManager";
 
 // ── Audio state queries ───────────────────────────────────────────────────────
+// Re-exported from audioState which proxies to the focused sub-modules
+// (voiceRegistry / gainRegistry / chainCycleState). External consumers and
+// test mocks targeting "@/lib/audio/audioState" continue to work.
 export {
   isPadFading,
   isLayerActive,
