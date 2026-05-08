@@ -23,6 +23,7 @@ describe("analysisStore", () => {
       expect(getState().errors).toEqual({});
       expect(getState().currentSoundId).toBeNull();
       expect(getState().pendingQueue).toEqual([]);
+      expect([...getState().completedIds]).toEqual([]);
     });
   });
 
@@ -49,21 +50,6 @@ describe("analysisStore", () => {
     });
   });
 
-  describe("recordStarted", () => {
-    it("sets currentSoundId", () => {
-      getState().startAnalysis(makeQueue(2));
-      getState().recordStarted("s1");
-      expect(getState().currentSoundId).toBe("s1");
-    });
-
-    it("updates currentSoundId when called again", () => {
-      getState().startAnalysis(makeQueue(2));
-      getState().recordStarted("s1");
-      getState().recordStarted("s2");
-      expect(getState().currentSoundId).toBe("s2");
-    });
-  });
-
   describe("recordComplete", () => {
     it("increments completedCount and decrements analyzingCount", () => {
       getState().startAnalysis(makeQueue(3));
@@ -71,6 +57,7 @@ describe("analysisStore", () => {
       expect(getState().completedCount).toBe(1);
       expect(getState().analyzingCount).toBe(2);
       expect(getState().status).toBe("running");
+      expect([...getState().completedIds]).toContain("s1");
     });
 
     it("sets status to completed when all sounds are done", () => {
@@ -83,7 +70,7 @@ describe("analysisStore", () => {
 
     it("clears currentSoundId when the last sound completes", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().recordStarted("s1");
+      getState().advance();
       getState().recordComplete("s1");
       expect(getState().currentSoundId).toBeNull();
     });
@@ -96,6 +83,7 @@ describe("analysisStore", () => {
       expect(getState().errors).toEqual({ s1: "decode failed" });
       expect(getState().completedCount).toBe(1);
       expect(getState().analyzingCount).toBe(2);
+      expect([...getState().completedIds]).toContain("s1");
     });
 
     it("sets status to completed when all sounds errored", () => {
@@ -113,51 +101,66 @@ describe("analysisStore", () => {
 
     it("clears currentSoundId when the last sound errors", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().recordStarted("s1");
+      getState().advance();
       getState().recordError("s1", "bad");
       expect(getState().currentSoundId).toBeNull();
     });
   });
 
-  describe("dequeueNext", () => {
-    it("returns the first item and removes it from pendingQueue", () => {
+  describe("advance", () => {
+    it("returns first item, sets currentSoundId, removes from pendingQueue", () => {
       const queue = makeQueue(2);
       getState().startAnalysis(queue);
-      const next = getState().dequeueNext();
+      const next = getState().advance();
       expect(next).toEqual({ id: "s1", path: "/a1.wav" });
+      expect(getState().currentSoundId).toBe("s1");
       expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav" }]);
     });
 
     it("returns undefined when queue is empty", () => {
-      expect(getState().dequeueNext()).toBeUndefined();
+      expect(getState().advance()).toBeUndefined();
     });
 
     it("empties the queue after all items are dequeued", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().dequeueNext();
+      getState().advance();
       expect(getState().pendingQueue).toEqual([]);
-      expect(getState().dequeueNext()).toBeUndefined();
+      expect(getState().advance()).toBeUndefined();
+    });
+
+    it("returns undefined and does not mutate state when idle", () => {
+      expect(getState().advance()).toBeUndefined();
+      expect(getState().currentSoundId).toBeNull();
+      expect(getState().pendingQueue).toEqual([]);
+    });
+
+    it("returns undefined and does not mutate state when completed", () => {
+      getState().startAnalysis(makeQueue(1));
+      getState().advance();
+      getState().recordComplete("s1");
+      expect(getState().status).toBe("completed");
+      const result = getState().advance();
+      expect(result).toBeUndefined();
+      expect(getState().currentSoundId).toBeNull();
     });
   });
 
   describe("cancelQueue", () => {
     it("clears pendingQueue and shrinks queueLength to allow progress to reach 100%", () => {
       getState().startAnalysis(makeQueue(5));
-      getState().dequeueNext(); // s1 dispatched to Rust
-      getState().recordStarted("s1");
+      getState().advance(); // s1 dispatched and set as currentSoundId atomically
       getState().recordComplete("s1");
-      getState().dequeueNext(); // s2 dispatched to Rust (simulates dispatchNextFromQueue in completion handler)
-      getState().recordStarted("s2"); // s2 in-flight
+      getState().advance(); // s2 dispatched and set as currentSoundId atomically
       getState().cancelQueue();
       expect(getState().pendingQueue).toEqual([]);
-      // queueLength shrinks to completedCount (1) + inFlight (1, because currentSoundId is set)
+      // queueLength shrinks to completedCount (1) + inFlight (1, because advance() set currentSoundId atomically)
       expect(getState().queueLength).toBe(2);
       expect(getState().analyzingCount).toBe(1);
     });
 
     it("reaches completed status after the in-flight item finishes post-cancel", () => {
       getState().startAnalysis(makeQueue(3));
-      getState().dequeueNext();
+      getState().advance();
       getState().recordComplete("s1");
       getState().cancelQueue();
       // simulate the one remaining in-flight sound completing
@@ -182,8 +185,7 @@ describe("analysisStore", () => {
 
     it("works when pendingQueue is already empty (single in-flight item)", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().dequeueNext(); // s1 dispatched to Rust
-      getState().recordStarted("s1"); // mark s1 as in-flight
+      getState().advance(); // s1 dispatched and set as currentSoundId atomically
       expect(getState().pendingQueue).toEqual([]);
       getState().cancelQueue(); // should still update queueLength (currentSoundId is set)
       expect(getState().pendingQueue).toEqual([]);
@@ -195,7 +197,7 @@ describe("analysisStore", () => {
 
     it("handles cancel followed by recordError for in-flight item", () => {
       getState().startAnalysis(makeQueue(4));
-      getState().dequeueNext();
+      getState().advance();
       getState().recordComplete("s1");
       getState().cancelQueue();
       getState().recordError("s2", "decode failed");
@@ -224,7 +226,24 @@ describe("analysisStore", () => {
 
     it("deduplicates currentSoundId (in-flight item)", () => {
       getState().startAnalysis(makeQueue(2));
-      getState().recordStarted("s1");
+      getState().advance(); // s1 dequeued and set as currentSoundId
+      getState().appendToQueue([{ id: "s1", path: "/a1.wav" }]);
+      expect(getState().queueLength).toBe(2); // s1 not re-added
+    });
+
+    it("deduplicates sounds already in completedIds", () => {
+      getState().startAnalysis(makeQueue(2));
+      getState().advance(); // s1 in-flight
+      getState().recordComplete("s1"); // s1 now in completedIds
+      // try to append s1 again
+      getState().appendToQueue([{ id: "s1", path: "/a1.wav" }]);
+      expect(getState().queueLength).toBe(2); // s1 not re-added
+    });
+
+    it("deduplicates sounds in completedIds added via recordError", () => {
+      getState().startAnalysis(makeQueue(2));
+      getState().advance(); // s1 in-flight
+      getState().recordError("s1", "decode failed"); // s1 now in completedIds
       getState().appendToQueue([{ id: "s1", path: "/a1.wav" }]);
       expect(getState().queueLength).toBe(2); // s1 not re-added
     });
@@ -278,6 +297,8 @@ describe("analysisStore", () => {
       getState().recordComplete("s1");
       getState().reset();
       expect(getState()).toMatchObject(initialAnalysisState);
+      expect([...getState().completedIds]).toEqual([]);
+      expect(getState().completedIds).not.toBe(initialAnalysisState.completedIds);
     });
   });
 });

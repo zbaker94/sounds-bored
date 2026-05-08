@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where sounds already analyzed could be re-queued and re-analyzed during an active normalization run, wasting time and resources.
+- Analysis queue advancement is now atomic — dispatching a sound and marking it in-flight happen in a single step, reducing edge cases where progress tracking could stall.
+- The analysis in-flight flag is now cleared more reliably when a new sound starts processing, even if the event payload is malformed.
 - Internal audio engine refactoring: streaming audio lifecycle tracking extracted into its own module for improved maintainability — no change to playback behavior
 - Progress bar tracking for large/streaming audio files remains fully accurate across all retrigger modes and multi-layer pads
 - Fixed a bug where editing a layer's config would clear the pad's mute group and mute target settings
