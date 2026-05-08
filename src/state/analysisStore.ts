@@ -16,6 +16,8 @@ interface AnalysisState {
 
 interface AnalysisActions {
   startAnalysis: (queue: AnalysisEntry[]) => void;
+  /** Append entries mid-flight; deduplicates against pendingQueue + currentSoundId. No-op if idle. Re-activates status if completed (race). */
+  appendToQueue: (entries: AnalysisEntry[]) => void;
   recordStarted: (soundId: string) => void;
   recordComplete: (soundId: string) => void;
   recordError: (soundId: string, error: string) => void;
@@ -46,6 +48,35 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
       errors: {},
       pendingQueue: queue,
       currentSoundId: null,
+    }),
+
+  appendToQueue: (entries) =>
+    set((state) => {
+      if (state.status === "idle") return state;
+      const existingIds = new Set([
+        ...state.pendingQueue.map((e) => e.id),
+        ...(state.currentSoundId ? [state.currentSoundId] : []),
+      ]);
+      const newEntries = entries.filter((e) => !existingIds.has(e.id));
+      if (newEntries.length === 0) return state;
+      // Re-activating from "completed" (race: last item finished just before append).
+      // Start a clean batch so prior errors and progress don't bleed into the new run.
+      if (state.status === "completed") {
+        return {
+          pendingQueue: newEntries,
+          queueLength: newEntries.length,
+          analyzingCount: newEntries.length,
+          completedCount: 0,
+          errors: {},
+          status: "running",
+        };
+      }
+      return {
+        pendingQueue: [...state.pendingQueue, ...newEntries],
+        queueLength: state.queueLength + newEntries.length,
+        analyzingCount: state.analyzingCount + newEntries.length,
+        status: "running",
+      };
     }),
 
   recordStarted: (soundId) => set({ currentSoundId: soundId }),

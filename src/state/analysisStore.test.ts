@@ -200,6 +200,75 @@ describe("analysisStore", () => {
     });
   });
 
+  describe("appendToQueue", () => {
+    it("appends entries to pendingQueue and bumps counts when running", () => {
+      getState().startAnalysis(makeQueue(2));
+      getState().appendToQueue([{ id: "s3", path: "/a3.wav" }]);
+      expect(getState().pendingQueue).toContainEqual({ id: "s3", path: "/a3.wav" });
+      expect(getState().queueLength).toBe(3);
+      expect(getState().analyzingCount).toBe(3);
+      expect(getState().status).toBe("running");
+    });
+
+    it("deduplicates entries already in pendingQueue", () => {
+      getState().startAnalysis(makeQueue(2));
+      // s2 is still in pendingQueue
+      getState().appendToQueue([{ id: "s2", path: "/a2.wav" }, { id: "s3", path: "/a3.wav" }]);
+      expect(getState().queueLength).toBe(3); // only s3 added
+      expect(getState().pendingQueue.filter((e) => e.id === "s2")).toHaveLength(1);
+    });
+
+    it("deduplicates currentSoundId (in-flight item)", () => {
+      getState().startAnalysis(makeQueue(2));
+      getState().recordStarted("s1");
+      getState().appendToQueue([{ id: "s1", path: "/a1.wav" }]);
+      expect(getState().queueLength).toBe(2); // s1 not re-added
+    });
+
+    it("is a no-op when status is idle", () => {
+      getState().appendToQueue([{ id: "s1", path: "/a1.wav" }]);
+      expect(getState().queueLength).toBe(0);
+      expect(getState().pendingQueue).toEqual([]);
+    });
+
+    it("is a no-op when entries list is empty", () => {
+      getState().startAnalysis(makeQueue(2));
+      getState().appendToQueue([]);
+      expect(getState().queueLength).toBe(2);
+    });
+
+    it("re-activates as a clean batch when called in completed state (race condition)", () => {
+      getState().startAnalysis(makeQueue(1));
+      getState().recordError("s1", "bad");
+      expect(getState().status).toBe("completed");
+      getState().appendToQueue([{ id: "s2", path: "/a2.wav" }]);
+      expect(getState().status).toBe("running");
+      expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav" }]);
+      expect(getState().queueLength).toBe(1);
+      expect(getState().analyzingCount).toBe(1);
+      expect(getState().completedCount).toBe(0);
+      expect(getState().errors).toEqual({});
+    });
+
+    it("preserves the original path when an id collision occurs in dedup", () => {
+      getState().startAnalysis([{ id: "s1", path: "/original.wav" }]);
+      getState().appendToQueue([{ id: "s1", path: "/new.wav" }]);
+      const entry = getState().pendingQueue.find((e) => e.id === "s1");
+      expect(entry?.path).toBe("/original.wav");
+    });
+
+    it("appended sounds are processed after current queue empties", () => {
+      getState().startAnalysis(makeQueue(2));
+      getState().appendToQueue([{ id: "s3", path: "/a3.wav" }]);
+      getState().recordComplete("s1");
+      getState().recordComplete("s2");
+      expect(getState().status).toBe("running");
+      getState().recordComplete("s3");
+      expect(getState().status).toBe("completed");
+      expect(getState().completedCount).toBe(3);
+    });
+  });
+
   describe("reset", () => {
     it("returns store to initial state", () => {
       getState().startAnalysis(makeQueue(5));

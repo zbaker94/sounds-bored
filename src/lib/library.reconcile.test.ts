@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed, scheduleAnalysisForSounds } from "./library.reconcile";
 import { mockFs, mockPath, mockCore } from "@/test/tauri-mocks";
 import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
@@ -1075,5 +1075,136 @@ describe("scheduleAnalysisForUnanalyzed", () => {
 
     expect(useAnalysisStore.getState().status).toBe("completed");
     expect(useAnalysisStore.getState().errors).toEqual({ s1: "Failed to start analysis" });
+  });
+
+  it("appends unanalyzed sounds to queue when analysis is already running", async () => {
+    useAnalysisStore.setState({
+      ...initialAnalysisState,
+      status: "running",
+      queueLength: 1,
+      analyzingCount: 1,
+      pendingQueue: [],
+      currentSoundId: "s1",
+    });
+    const sounds = [
+      createMockSound({ id: "s1", filePath: "/music/a.wav" }), // in-flight — should be skipped
+      createMockSound({ id: "s2", filePath: "/music/b.wav" }), // unanalyzed — should be appended
+    ];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+    expect(useAnalysisStore.getState().pendingQueue).toContainEqual({ id: "s2", path: "/music/b.wav" });
+    expect(useAnalysisStore.getState().queueLength).toBe(2);
+    expect(useAnalysisStore.getState().status).toBe("running");
+  });
+
+  it("kicks dispatch when appending and no item is in-flight (race: last item just completed)", async () => {
+    useAnalysisStore.setState({
+      ...initialAnalysisState,
+      status: "running",
+      queueLength: 1,
+      analyzingCount: 0,
+      completedCount: 1,
+      pendingQueue: [],
+      currentSoundId: null,
+    });
+    const sounds = [createMockSound({ id: "s2", filePath: "/music/b.wav" })];
+
+    await scheduleAnalysisForUnanalyzed(sounds);
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
+      entries: [{ id: "s2", path: "/music/b.wav" }],
+    });
+  });
+});
+
+describe("scheduleAnalysisForSounds", () => {
+  beforeEach(() => {
+    useAnalysisStore.setState({ ...initialAnalysisState });
+    mockCore.invoke.mockResolvedValue(undefined);
+  });
+
+  it("starts a fresh analysis when status is idle", async () => {
+    const sounds = [
+      createMockSound({ id: "s1", filePath: "/music/a.wav", fileSizeBytes: 2_000_000 }),
+      createMockSound({ id: "s2", filePath: "/music/b.wav", fileSizeBytes: 1_000_000 }),
+    ];
+
+    await scheduleAnalysisForSounds(sounds);
+
+    expect(mockCore.invoke).toHaveBeenCalledTimes(1);
+    expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
+      entries: [{ id: "s2", path: "/music/b.wav" }],
+    });
+    expect(useAnalysisStore.getState().queueLength).toBe(2);
+    expect(useAnalysisStore.getState().status).toBe("running");
+  });
+
+  it("is a no-op when no sounds have a filePath", async () => {
+    await scheduleAnalysisForSounds([createMockSound({ id: "s1" })]);
+    expect(mockCore.invoke).not.toHaveBeenCalled();
+    expect(useAnalysisStore.getState().status).toBe("idle");
+  });
+
+  it("appends to queue when analysis is already running", async () => {
+    useAnalysisStore.setState({
+      ...initialAnalysisState,
+      status: "running",
+      queueLength: 2,
+      analyzingCount: 2,
+      pendingQueue: [{ id: "s2", path: "/music/b.wav" }],
+      currentSoundId: "s1",
+    });
+    const newSounds = [createMockSound({ id: "s3", filePath: "/music/c.wav" })];
+
+    await scheduleAnalysisForSounds(newSounds);
+
+    expect(mockCore.invoke).not.toHaveBeenCalled(); // no second dispatch while s1 in-flight
+    expect(useAnalysisStore.getState().pendingQueue).toContainEqual({ id: "s3", path: "/music/c.wav" });
+    expect(useAnalysisStore.getState().queueLength).toBe(3);
+    expect(useAnalysisStore.getState().status).toBe("running");
+  });
+
+  it("does not re-add sounds already in the queue when appending", async () => {
+    useAnalysisStore.setState({
+      ...initialAnalysisState,
+      status: "running",
+      queueLength: 2,
+      analyzingCount: 2,
+      pendingQueue: [{ id: "s2", path: "/music/b.wav" }],
+      currentSoundId: "s1",
+    });
+    const sounds = [
+      createMockSound({ id: "s1", filePath: "/music/a.wav" }), // in-flight
+      createMockSound({ id: "s2", filePath: "/music/b.wav" }), // already pending
+      createMockSound({ id: "s3", filePath: "/music/c.wav" }), // new
+    ];
+
+    await scheduleAnalysisForSounds(sounds);
+
+    expect(useAnalysisStore.getState().queueLength).toBe(3); // only s3 added
+    expect(useAnalysisStore.getState().pendingQueue.filter((e) => e.id === "s2")).toHaveLength(1);
+  });
+
+  it("kicks dispatch when appending and no item is in-flight (race: last item just completed)", async () => {
+    // Simulate the race: status is still "running" when we enter, but currentSoundId is null
+    // (last item completed but our status check ran before the state update)
+    useAnalysisStore.setState({
+      ...initialAnalysisState,
+      status: "running",
+      queueLength: 1,
+      analyzingCount: 0,
+      completedCount: 1,
+      pendingQueue: [],
+      currentSoundId: null,
+    });
+    const sounds = [createMockSound({ id: "s2", filePath: "/music/b.wav" })];
+
+    await scheduleAnalysisForSounds(sounds);
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
+      entries: [{ id: "s2", path: "/music/b.wav" }],
+    });
   });
 });
