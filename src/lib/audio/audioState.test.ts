@@ -41,11 +41,19 @@ function makeMockCompressor() {
 
 import {
   getPadProgress,
-  cancelPadFade,
-  clearAllFadeTracking,
   clearAllPadProgressInfo,
   clearAllLayerProgressInfo,
   setPadProgressInfo,
+  computeAllPadProgress,
+  computeAllLayerProgress,
+  setLayerProgressInfo,
+  isAnyGainChanging,
+  clearAllAudioState,
+  markGainRamp,
+} from "./audioState";
+import {
+  cancelPadFade,
+  clearAllFadeTracking,
   isPadFadingOut,
   isPadFading,
   addFadingOutPad,
@@ -54,13 +62,7 @@ import {
   setFadePadTimeout,
   setPadFadeFromVolume,
   getPadFadeFromVolume,
-  computeAllPadProgress,
-  computeAllLayerProgress,
-  setLayerProgressInfo,
-  isAnyGainChanging,
-  clearAllAudioState,
-  markGainRamp,
-} from "./audioState";
+} from "./fadeCoordinator";
 import { register as registerStreaming, clearAll as clearAllStreaming, dispose as disposeStreaming, isPadStreaming } from "./streamingAudioLifecycle";
 import { recordLayerVoice, clearAll as clearAllVoiceRegistry } from "./voiceRegistry";
 import { clearAll as clearAllGainRegistry } from "./gainRegistry";

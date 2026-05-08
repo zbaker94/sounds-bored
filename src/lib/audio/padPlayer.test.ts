@@ -3461,13 +3461,12 @@ describe("skipLayerForward", () => {
     expect(isPadFadingOut(pad.id)).toBe(false);
   });
 
-  // Note: a fake-timer "voice survives" test (as in PR #248's triggerPad analog) is
+  // Note: a fake-timer “voice survives” test (as in PR #248’s triggerPad analog) is
   // not included here because skipLayerForward is synchronous â€” its internal async
   // chain (ensureResumed â†’ loadBuffer â†’ createBufferSource) has multiple microtask
   // hops that cannot be awaited externally. The isPadFadingOut assertions above prove
-  // clearPadFadeTracking() is called (which calls cancelPadFade internally, clearing the
-  // stale setTimeout via clearTimeout()). The cancelPadFade unit tests in audioState.test.ts
-  // verify that behaviour directly.
+  // cancelFade() is called (clearing the stale setTimeout and fadingOut tracking).
+  // The cancelFade unit tests in fadeCoordinator.test.ts verify that behaviour directly.
 
   it("reports an error via emitAudioError when ensureResumed rejects during skip (chained mode)", async () => {
     const { ensureResumed } = await import("./audioContext");
@@ -3715,9 +3714,9 @@ describe("skipLayerBack", () => {
     expect(isPadFadingOut(pad.id)).toBe(false);
   });
 
-  // Note: a fake-timer "voice survives" test is not included â€” same reasoning as
+  // Note: a fake-timer “voice survives” test is not included â€” same reasoning as
   // the equivalent comment in skipLayerForward above. The isPadFadingOut assertions
-  // prove cancelPadFade() is invoked; audioState.test.ts verifies it clears the timeout.
+  // prove cancelFade() is invoked; fadeCoordinator.test.ts verifies it clears the timeout.
 
   it("reports an error via emitAudioError when ensureResumed rejects during skip (chained mode)", async () => {
     const { ensureResumed } = await import("./audioContext");
@@ -4769,7 +4768,7 @@ describe("pending leak guards", () => {
   });
 });
 
-// â”€â”€â”€ playbackStore fade-flag clearing on clearPadFadeTracking call sites â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ playbackStore fade-flag clearing on cancelFade call sites â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("playbackStore fade flags cleared from padPlayer call sites", () => {
   it("stopFade clears fadingPadIds and fadingOutPadIds in playbackStore", async () => {
@@ -4842,7 +4841,7 @@ describe("playbackStore fade flags cleared from padPlayer call sites", () => {
     expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
   });
 
-  it("triggerLayer clears fade flags synchronously via clearPadFadeTracking before starting new sound", async () => {
+  it("triggerLayer clears fade flags synchronously via cancelFade before starting new sound", async () => {
     vi.useFakeTimers();
     mockLoadBuffer.mockResolvedValue({ duration: 1.0, numberOfChannels: 1, sampleRate: 44100 });
     const sound = createMockSound({ filePath: "a.wav" });

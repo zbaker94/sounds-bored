@@ -1,16 +1,12 @@
 // src/lib/audio/fadeMixer.ts
 import { getAudioContext } from "./audioContext";
 import {
-  cancelPadFade,
-  addFadingOutPad,
-  addFadingInPad,
-  removeFadingInPad,
-  isPadFadingIn,
-  isPadFadingOut,
-  setFadePadTimeout,
-  deleteFadePadTimeout,
-  setPadFadeFromVolume,
-} from "./audioState";
+  startFade,
+  cancelFade,
+  addFadingIn,
+  removeFadingIn,
+  isFadingIn,
+} from "./fadeCoordinator";
 import { getPadGain } from "./gainRegistry";
 import { nullPadOnEnded, stopPadVoices } from "./voiceRegistry";
 import {
@@ -23,39 +19,15 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
 
 /**
- * Cancel all fade tracking for a pad on both audioState (local) and
- * playbackStore (reactive UI signals). Idempotent — safe to call when no fade is active.
- *
- * Clears: local fadePadTimeouts, fadingOutPadIds, padFadeFromVolumes (via cancelPadFade),
- * and playbackStore fadingPadIds + fadingOutPadIds.
- * Use this at every point where a pad's fade lifecycle ends or is pre-empted.
- */
-export function clearPadFadeTracking(padId: string): void {
-  cancelPadFade(padId);
-  usePlaybackStore.getState().removeFadingPad(padId);
-  usePlaybackStore.getState().removeFadingOutPad(padId);
-}
-
-/**
- * Mark a pad as fading out on both audioState (local) and playbackStore (reactive UI).
- * Symmetric counterpart to the removal path in clearPadFadeTracking.
- */
-function markPadFadingOut(padId: string): void {
-  addFadingOutPad(padId);
-  usePlaybackStore.getState().addFadingOutPad(padId);
-}
-
-/**
  * Freeze a pad's gain at its current value — cancels any in-progress ramp
  * so the pad stays at whatever volume it was at when called.
  *
- * Also clears fade tracking on both audioState and playbackStore — equivalent to
- * clearPadFadeTracking for store purposes.
+ * Also clears fade tracking on both audioState and playbackStore via cancelFade.
  */
 export function freezePadAtCurrentVolume(padId: string): void {
   const ctx = getAudioContext();
   const gain = getPadGain(padId);
-  clearPadFadeTracking(padId);
+  cancelFade(padId);
   // Cancel scheduled values BEFORE reading so the held value is the ramp's
   // current interpolated position, not the last setValueAtTime anchor.
   gain.gain.cancelScheduledValues(ctx.currentTime);
@@ -95,37 +67,27 @@ export function stopPadInternal(pad: Pad): void {
  */
 export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number): void {
   usePlaybackStore.getState().removeReversingPad(pad.id);
-  // Clear any in-progress fade state on both audioState and playbackStore
-  // before scheduling a new ramp.
-  clearPadFadeTracking(pad.id);
-  removeFadingInPad(pad.id);
-  usePlaybackStore.getState().addFadingPad(pad.id);
-
-  const gain = getPadGain(pad.id);
   const fadingDown = toVolume < fromVolume;
 
   if (fadingDown) {
     // Null onended callbacks so chained voices don't restart at the faded-down level.
     nullPadOnEnded(pad.id);
-    markPadFadingOut(pad.id);
   }
 
-  rampGainTo(gain.gain, toVolume, durationMs / 1000, fromVolume);
-  setPadFadeFromVolume(pad.id, fromVolume);
+  rampGainTo(getPadGain(pad.id).gain, toVolume, durationMs / 1000, fromVolume);
 
-  const timeoutId = setTimeout(() => {
-    deleteFadePadTimeout(pad.id);
-    // Guard: if pad is no longer fading out (e.g. re-triggered), skip cleanup.
-    if (fadingDown && !isPadFadingOut(pad.id)) return;
-    // Clear fade state on both audioState and playbackStore now that the
-    // ramp has completed.
-    clearPadFadeTracking(pad.id);
-    if (fadingDown && toVolume === 0) {
-      stopPadInternal(pad);
-      resetPadGain(pad.id);
-    }
-  }, durationMs + 5);
-  setFadePadTimeout(pad.id, timeoutId);
+  startFade(
+    pad.id,
+    fromVolume,
+    fadingDown,
+    durationMs,
+    fadingDown && toVolume === 0
+      ? () => {
+          stopPadInternal(pad);
+          resetPadGain(pad.id);
+        }
+      : undefined,
+  );
 }
 
 export async function fadePadIn(
@@ -134,24 +96,23 @@ export async function fadePadIn(
   durationMs: number,
   startPad: (pad: Pad) => Promise<void>,
 ): Promise<void> {
-  clearPadFadeTracking(pad.id);
-  addFadingInPad(pad.id);
+  cancelFade(pad.id);
+  // addFadingIn is local-only — playbackStore mirror happens inside startFade after await resolves.
+  addFadingIn(pad.id);
 
   await startPad(pad);
 
   // If pre-empted during the await, bail without overwriting the interleaved ramp.
-  if (!isPadFadingIn(pad.id)) return;
-  removeFadingInPad(pad.id);
-  usePlaybackStore.getState().addFadingPad(pad.id);
+  if (!isFadingIn(pad.id)) return;
+  removeFadingIn(pad.id);
 
-  const gain = getPadGain(pad.id);
-  rampGainTo(gain.gain, toVolume, durationMs / 1000, 0);
-  setPadFadeFromVolume(pad.id, 0);
+  rampGainTo(getPadGain(pad.id).gain, toVolume, durationMs / 1000, 0);
 
-  const timeoutId = setTimeout(() => {
-    deleteFadePadTimeout(pad.id);
-    clearPadFadeTracking(pad.id);
-    if (toVolume === 0) stopPadInternal(pad);
-  }, durationMs + 5);
-  setFadePadTimeout(pad.id, timeoutId);
+  startFade(
+    pad.id,
+    0,
+    false,
+    durationMs,
+    toVolume === 0 ? () => stopPadInternal(pad) : undefined,
+  );
 }

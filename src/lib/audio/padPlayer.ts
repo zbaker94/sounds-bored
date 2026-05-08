@@ -14,16 +14,19 @@ import {
   addStopCleanupTimeout,
   deleteStopCleanupTimeout,
   cancelGlobalStopTimeout,
-  clearAllFadeTracking,
   clearAllPadProgressInfo,
   clearAllLayerProgressInfo,
   clearPadProgressInfo,
-  isPadFading,
-  isPadFadingOut,
-  isPadFadingIn,
   setGlobalStopTimeout,
-  getPadFadeFromVolume,
 } from "./audioState";
+import {
+  cancelFade,
+  clearAllFades,
+  getFadeFromVolume,
+  isFading,
+  isFadingIn,
+  isFadingOut,
+} from "./fadeCoordinator";
 import {
   getActivePadIds,
   getAllVoices,
@@ -58,7 +61,6 @@ import {
   fadePad,
   fadePadIn,
   stopPadInternal,
-  clearPadFadeTracking,
 } from "./fadeMixer";
 
 import { rampGainTo } from "./gainManager";
@@ -82,9 +84,9 @@ export async function triggerAndFade(pad: Pad, toVolume: number, durationMs: num
  * - Fading up (gain at or below fadeTargetVol): stops the pad.
  */
 export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
-  if (!isPadFading(pad.id)) return;
+  if (!isFading(pad.id)) return;
   const duration = resolveFadeDuration(pad, globalFadeDurationMs);
-  const reverseTarget = getPadFadeFromVolume(pad.id);
+  const reverseTarget = getFadeFromVolume(pad.id);
   if (reverseTarget === undefined) return;
 
   const currentVol = getLivePadVolume(pad.id) ?? reverseTarget;
@@ -106,9 +108,9 @@ export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurat
 }
 
 function reverseActiveFade(pad: Pad, highVol: number, lowVol: number, duration: number): void {
-  const reverseTarget = getPadFadeFromVolume(pad.id);
+  const reverseTarget = getFadeFromVolume(pad.id);
   const currentVol = getLivePadVolume(pad.id) ?? (reverseTarget ?? highVol);
-  const targetVol = reverseTarget ?? (isPadFadingOut(pad.id) ? highVol : lowVol);
+  const targetVol = reverseTarget ?? (isFadingOut(pad.id) ? highVol : lowVol);
   fadePad(pad, currentVol, targetVol, duration);
 }
 
@@ -126,7 +128,7 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
   const highVol = (pad.volume ?? 100) / 100;
 
   if (isPadActive(pad.id)) {
-    if (isPadFadingOut(pad.id) || isPadFadingIn(pad.id) || isPadFading(pad.id)) {
+    if (isFadingOut(pad.id) || isFadingIn(pad.id) || isFading(pad.id)) {
       reverseActiveFade(pad, highVol, lowVol, duration);
     } else {
       const currentVol = getPadGain(pad.id).gain.value;
@@ -136,7 +138,7 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
     return Promise.resolve();
   }
 
-  if (isPadFadingIn(pad.id) || isPadFading(pad.id)) return Promise.resolve();
+  if (isFadingIn(pad.id) || isFading(pad.id)) return Promise.resolve();
 
   return triggerAndFade(pad, lowVol, duration);
 }
@@ -155,7 +157,7 @@ export function stopFade(pad: Pad): void {
   const gain = getPadGain(pad.id);
   gain.gain.cancelScheduledValues(ctx.currentTime);
   gain.gain.setValueAtTime(currentVol, ctx.currentTime);
-  clearPadFadeTracking(pad.id);
+  cancelFade(pad.id);
 }
 
 /**
@@ -190,7 +192,7 @@ export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDuratio
 
 /** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
 export function stopPad(pad: Pad): void {
-  clearPadFadeTracking(pad.id);
+  cancelFade(pad.id);
   stopPadInternal(pad);
   // stopPadInternal removes the pad from the playing-pads set; clear its
   // metadata overlay in lockstep so a stopped pad never displays stale info.
@@ -212,7 +214,7 @@ export function stopScene(scene: Scene): void {
  * zero before stopping voices.
  */
 export function stopAllPads(): void {
-  clearAllFadeTracking();
+  clearAllFades();
   clearAllLayerChains();
   clearAllLayerCycleIndexes();
   clearAllLayerPlayOrders();
@@ -295,7 +297,7 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
     : ((pad.volume ?? 100) / 100));
   // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
   // that are about to be started below.
-  clearPadFadeTracking(pad.id);
+  cancelFade(pad.id);
   padGain.gain.cancelScheduledValues(ctx.currentTime);
   padGain.gain.setValueAtTime(startVol, ctx.currentTime);
   // Signal the tick to re-sample on the next frame so any stale padVolumes entry
@@ -354,7 +356,7 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
     const padGain = getPadGain(pad.id);
     // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
     // that are about to be started below (same fix as triggerPad).
-    clearPadFadeTracking(pad.id);
+    cancelFade(pad.id);
     // Signal the tick to re-sample stale padVolumes entries (same as triggerPad).
     startAudioTick();
 
@@ -366,7 +368,7 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
           deleteStopCleanupTimeout(timeoutId);
           if (!isPadActive(pad.id)) {
             usePlaybackStore.getState().removePlayingPad(pad.id);
-            clearPadFadeTracking(pad.id);
+            cancelFade(pad.id);
             // Safety net: rampStopLayerVoices already handles removePlayingPad at STOP_RAMP_S+5ms;
             // this fires at +10ms and is idempotent if the ramp already cleaned up.
           }

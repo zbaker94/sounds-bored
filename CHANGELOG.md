@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed: Re-triggering a pad mid-fade no longer risks the stale fade timeout stopping the newly active pad
+- Fixed: Fading-out UI indicators now clear correctly when a fade is cancelled, preventing ghost "fading" state in the interface
+- Improved: Fade start and cancel are now atomic operations, eliminating edge cases where a partially-cancelled fade could interfere with playback
 - Loop and hold playback now uses the sound configuration captured at the moment a pad is triggered, so changing a layer's arrangement, selection, or playback mode during playback takes effect on the next trigger rather than the current loop cycle.
 - Errors during loop restarts and chain continuations now emit through the standard audio error system instead of being silently swallowed.
 - Internal audio engine refactored: voice tracking, gain node management, and layer chain/cycle state each extracted into focused sub-modules (`voiceRegistry`, `gainRegistry`, `chainCycleState`) — no change to playback behavior

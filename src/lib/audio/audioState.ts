@@ -1,10 +1,9 @@
 /**
- * audioState.ts — Non-serializable audio engine runtime state (fade + progress + stop tracking).
+ * audioState.ts — Non-serializable audio engine runtime state (progress + stop tracking).
  *
- * After the issue #425 extraction, this module owns only the state that did not
+ * After the issue #423 extraction, this module owns only the state that did not
  * fit naturally into one of the focused sub-modules:
  *
- *   - Fade tracking: fadePadTimeouts, fadingOutPadIds, fadingInPadIds, padFadeFromVolumes
  *   - Pad/layer progress info (buffer-path startedAt/duration/isLooping)
  *   - Stop cleanup timeouts (post-ramp setTimeout IDs from stopAllPads / rampStopLayerVoices)
  *
@@ -13,6 +12,7 @@
  *   - gainRegistry   — pad/layer GainNode tracking, gain-ramp deadline
  *   - chainCycleState — chain queue, cycle index, play order, pending, consecutive failures
  *   - streamingAudioLifecycle — streaming audio elements + best-element cache
+ *   - fadeCoordinator — fade timeouts, fadingOut/fadingIn membership, fromVolume snapshots
  *
  * ============================================================================
  * COORDINATION WITH playbackStore
@@ -32,9 +32,13 @@
  *   layerChain. This module MUST NOT write these fields — doing so bypasses the
  *   tick's diff logic and can create race conditions with the RAF loop.
  *
- * INVARIANT: This module does NOT import playbackStore. It is a pure local
- *   state container; all coordination with the reactive store happens at the
- *   caller (padPlayer / fadeMixer / layerTrigger / gainManager / audioTick).
+ * INVARIANT: This module does not directly import playbackStore. It is a pure
+ *   local state container; all coordination with the reactive store happens at
+ *   the caller (padPlayer / fadeMixer / layerTrigger / gainManager / audioTick).
+ *   Note: fadeCoordinator (which this module imports) writes playbackStore on
+ *   its own behalf via the atomic startFade/cancelFade API — clearAllFades
+ *   used by clearAllAudioState is the local-only teardown variant and does
+ *   NOT propagate that direct dependency.
  *
  * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
  *   fade tracking. Reason: voice.stop() fires onended synchronously, which reads
@@ -52,6 +56,7 @@ import { getBestForPad, iterateBestLayers, clearAll as clearAllStreamingAudio } 
 import { isGainRampPending, clearAll as clearAllGainRegistry, resetGainRampDeadline } from "./gainRegistry";
 import { getActivePadIds, nullAllOnEnded, stopAllVoices } from "./voiceRegistry";
 import { clearAll as clearAllChainCycleState } from "./chainCycleState";
+import { clearAllFades, isAnyFadeActive } from "./fadeCoordinator";
 
 // ---------------------------------------------------------------------------
 // Backward-compat re-exports — imported from sub-modules.
@@ -119,8 +124,24 @@ export {
   resetLayerConsecutiveFailures,
 } from "./chainCycleState";
 
+export {
+  isPadFadingOut,
+  isPadFading,
+  isPadFadingIn,
+  cancelPadFade,
+  addFadingOutPad,
+  removeFadingOutPad,
+  addFadingInPad,
+  removeFadingInPad,
+  setPadFadeFromVolume,
+  getPadFadeFromVolume,
+  setFadePadTimeout,
+  deleteFadePadTimeout,
+  clearAllFadeTracking,
+} from "./fadeCoordinator";
+
 // ---------------------------------------------------------------------------
-// Private state — fade tracking, progress, stop cleanup
+// Private state — progress, stop cleanup
 // ---------------------------------------------------------------------------
 
 /** Tracks the longest-duration voice per pad for playback progress display (buffer path). */
@@ -128,27 +149,6 @@ const padProgressInfo = new Map<string, { startedAt: number; duration: number; i
 
 /** Tracks per-layer progress info for buffer path voices. One entry per active layer. */
 const layerProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
-
-/** Pending fade cleanup timeouts, keyed by pad ID. */
-const fadePadTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-
-/** Tracks pads that are actively fading out (gain -> 0). Cleared when fade completes or is cancelled. */
-const fadingOutPadIds = new Set<string>();
-
-/**
- * Stores the fromVolume of each active gain ramp so reverseFade knows where to return to.
- * Reversing always goes back to where the fade started — this avoids direction assumptions
- * that break when fadeTargetVol > pad.volume.
- * Cleared by cancelPadFade and clearAllFadeTracking.
- */
-const padFadeFromVolumes = new Map<string, number>();
-
-/**
- * Tracks pads that have started a fade-in but whose async triggerPad has not yet completed.
- * Set synchronously before `await triggerPad` in triggerAndFade; cleared by cancelPadFade.
- * Lets triggerAndFade detect post-await that it was pre-empted by a reverse-fade call during the gap.
- */
-const fadingInPadIds = new Set<string>();
 
 /**
  * The timeout ID from stopAllPads()'s post-ramp cleanup setTimeout.
@@ -164,16 +164,8 @@ let _globalStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 const pendingStopCleanupTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
 // ---------------------------------------------------------------------------
-// Fade query functions
+// Gain-state queries
 // ---------------------------------------------------------------------------
-
-export function isPadFadingOut(padId: string): boolean {
-  return fadingOutPadIds.has(padId);
-}
-
-export function isPadFading(padId: string): boolean {
-  return fadePadTimeouts.has(padId);
-}
 
 /**
  * Returns true when any fade or short gain ramp is currently in flight,
@@ -181,7 +173,7 @@ export function isPadFading(padId: string): boolean {
  * Used by audioTick to short-circuit the volume rebuild in steady state.
  */
 export function isAnyGainChanging(): boolean {
-  if (fadePadTimeouts.size > 0 || fadingOutPadIds.size > 0 || fadingInPadIds.size > 0) return true;
+  if (isAnyFadeActive()) return true;
   return isGainRampPending();
 }
 
@@ -253,83 +245,6 @@ export function computeAllLayerProgress(): Record<string, number> {
   }
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Fade tracking mutators
-// ---------------------------------------------------------------------------
-
-export function clearAllFadeTracking(): void {
-  for (const id of fadePadTimeouts.values()) clearTimeout(id);
-  fadePadTimeouts.clear();
-  fadingOutPadIds.clear();
-  fadingInPadIds.clear();
-  padFadeFromVolumes.clear();
-}
-
-/**
- * Cancel all fade-related resources for a pad: pending timeout, fadingOut tracking,
- * and fromVolume. Clears local fade state only.
- * Safe to call even if no fade is registered — all operations are idempotent.
- *
- * Note: fadingInPadIds is NOT cleared here — triggerPad calls cancelPadFade internally
- * and must not accidentally pre-empt a triggerAndFade that is still in flight.
- * Only fadePad (explicit reversal) and clearAllFadeTracking clear fadingInPadIds.
- */
-export function cancelPadFade(padId: string): void {
-  const tId = fadePadTimeouts.get(padId);
-  if (tId !== undefined) {
-    clearTimeout(tId);
-    fadePadTimeouts.delete(padId);
-  }
-  fadingOutPadIds.delete(padId);
-  padFadeFromVolumes.delete(padId);
-}
-
-/**
- * Mark a pad as fading out in local audioState.
- * Symmetric counterpart to the removal path in cancelPadFade.
- */
-export function addFadingOutPad(padId: string): void {
-  fadingOutPadIds.add(padId);
-}
-
-/** Remove a pad from fading-out tracking. */
-export function removeFadingOutPad(padId: string): void {
-  fadingOutPadIds.delete(padId);
-}
-
-/** Mark a pad as starting a fade-in (set before await in triggerAndFade to cover the async gap). */
-export function addFadingInPad(padId: string): void {
-  fadingInPadIds.add(padId);
-}
-
-/** Remove a pad from fading-in tracking. */
-export function removeFadingInPad(padId: string): void {
-  fadingInPadIds.delete(padId);
-}
-
-/** True while a fade-in is starting (async gap) or its timeout is registered. */
-export function isPadFadingIn(padId: string): boolean {
-  return fadingInPadIds.has(padId);
-}
-
-export function setPadFadeFromVolume(padId: string, fromVolume: number): void {
-  padFadeFromVolumes.set(padId, fromVolume);
-}
-
-export function getPadFadeFromVolume(padId: string): number | undefined {
-  return padFadeFromVolumes.get(padId);
-}
-
-/** Store a fade timeout for a pad (so cancelPadFade can cancel it). */
-export function setFadePadTimeout(padId: string, timeoutId: ReturnType<typeof setTimeout>): void {
-  fadePadTimeouts.set(padId, timeoutId);
-}
-
-/** Delete a fade timeout entry for a pad. */
-export function deleteFadePadTimeout(padId: string): void {
-  fadePadTimeouts.delete(padId);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +347,7 @@ export function clearAllAudioState(): void {
   // Cancel any pending stopAllPads post-ramp setTimeout to prevent cross-session contamination.
   cancelGlobalStopTimeout();
   clearAllStopCleanupTimeouts();
-  clearAllFadeTracking();
+  clearAllFades();
   clearAllChainCycleState();
   nullAllOnEnded();
   clearAllStreamingAudio();

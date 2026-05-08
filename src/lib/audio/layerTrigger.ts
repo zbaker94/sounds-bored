@@ -18,7 +18,7 @@ import { usePlaybackStore } from "@/state/playbackStore";
 import { usePadDisplayStore } from "@/state/padDisplayStore";
 import { clampGain01 } from "./gainManager";
 import { normalizedVoiceGain } from "./gainNormalization";
-import { clearPadFadeTracking } from "./fadeMixer";
+import { cancelFade } from "./fadeCoordinator";
 import { loadBuffer, MissingFileError } from "./bufferCache";
 import { checkIsLargeFile, getOrCreateStreamingElement } from "./streamingCache";
 import { wrapBufferSource, wrapStreamingElement, STOP_RAMP_S } from "./audioVoice";
@@ -792,7 +792,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
     deleteStopCleanupTimeout(stopCleanupId);
     if (!isPadActive(pad.id)) {
       usePlaybackStore.getState().removePlayingPad(pad.id);
-      clearPadFadeTracking(pad.id);
+      cancelFade(pad.id);
     }
   }, STOP_RAMP_S * 1000 + 10);
   addStopCleanupTimeout(stopCleanupId);
@@ -802,7 +802,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
 function startSoundInLayer(pad: Pad, layer: Layer, sound: Sound, resolved: Sound[]): void {
   // The previous voice was stopped externally (no natural onended), so clear stale display.
   usePadDisplayStore.getState().clearPadDisplay(pad.id);
-  clearPadFadeTracking(pad.id);
+  cancelFade(pad.id);
   ensureResumed().then((ctx) => {
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);

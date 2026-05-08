@@ -1,7 +1,7 @@
 import { useRef, useMemo, useState, useEffect } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
-import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isPadFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, getLivePadVolume, emitAudioError } from "@/lib/audio";
+import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, getLivePadVolume, emitAudioError } from "@/lib/audio";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useRafThrottledState } from "./useRafThrottledState";
 
@@ -104,7 +104,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
     function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
       if (e.button !== 0) return;
-      const fadeCancelled = isPadFading(padRef.current.id);
+      const fadeCancelled = isFading(padRef.current.id);
       if (fadeCancelled) freezePadAtCurrentVolume(padRef.current.id);
 
       e.currentTarget.setPointerCapture(e.pointerId);

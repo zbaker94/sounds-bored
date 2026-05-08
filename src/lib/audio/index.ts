@@ -57,8 +57,9 @@ export {
 // Re-exported from audioState which proxies to the focused sub-modules
 // (voiceRegistry / gainRegistry / chainCycleState). External consumers and
 // test mocks targeting "@/lib/audio/audioState" continue to work.
+export { isFading } from "./fadeCoordinator";
+
 export {
-  isPadFading,
   isLayerActive,
   isPadActive,
   getLivePadVolume,
