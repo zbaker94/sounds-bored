@@ -131,7 +131,7 @@ export function useBootLoader(): { ready: boolean } {
           });
         }
 
-        // Schedule background loudness/genre/mood analysis for unanalyzed sounds.
+        // Schedule background loudness analysis for unanalyzed sounds.
         if (settings.autoAnalysis) {
           void scheduleAnalysisForUnanalyzed(useLibraryStore.getState().sounds);
         }

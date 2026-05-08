@@ -6,7 +6,7 @@ import { AUDIO_EXTENSIONS } from "./constants";
 import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAnalysisStore, AnalysisType } from "@/state/analysisStore";
+import { useAnalysisStore } from "@/state/analysisStore";
 import { logError } from "@/lib/logger";
 
 /**
@@ -374,18 +374,18 @@ export async function dispatchNextFromQueue(): Promise<void> {
 }
 
 /**
- * Queue analysis of the given type for an explicit list of sounds. Sorted
+ * Queue loudness analysis for an explicit list of sounds. Sorted
  * smallest-first. Used for on-demand "Analyze selected" triggered by the user.
  *
  * No-op if analysis is already running — callers must wait for completion
  * before scheduling a new batch to avoid clobbering the in-flight state.
  */
-export async function scheduleAnalysisForSounds(sounds: Sound[], type: AnalysisType): Promise<void> {
+export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> {
   if (useAnalysisStore.getState().status === "running") return;
   const queue = sounds
     .filter((s) => s.filePath)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath!, analysisType: type }));
+    .map((s) => ({ id: s.id, path: s.filePath! }));
   if (queue.length === 0) return;
   useAnalysisStore.getState().startAnalysis(queue);
   await dispatchNextFromQueue();
@@ -397,7 +397,6 @@ export async function scheduleAnalysisForSounds(sounds: Sound[], type: AnalysisT
  * a time, smallest first, to bound memory usage. Fire-and-forget.
  *
  * Used exclusively for auto-analysis on boot and after folder reconcile.
- * Genre/mood analysis is always user-initiated.
  *
  * No-op if all sounds are already analyzed, no sounds have a filePath, or
  * analysis is already running.
@@ -407,7 +406,7 @@ export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<vo
   const queue = sounds
     .filter((s) => s.filePath && s.loudnessLufs === undefined)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath!, analysisType: "loudness" as const }));
+    .map((s) => ({ id: s.id, path: s.filePath! }));
   if (queue.length === 0) return;
   useAnalysisStore.getState().startAnalysis(queue);
   await dispatchNextFromQueue();

@@ -6,7 +6,7 @@ function getState() {
 }
 
 function makeQueue(count: number) {
-  return Array.from({ length: count }, (_, i) => ({ id: `s${i + 1}`, path: `/a${i + 1}.wav`, analysisType: "loudness" as const }));
+  return Array.from({ length: count }, (_, i) => ({ id: `s${i + 1}`, path: `/a${i + 1}.wav` }));
 }
 
 describe("analysisStore", () => {
@@ -52,14 +52,14 @@ describe("analysisStore", () => {
   describe("recordStarted", () => {
     it("sets currentSoundId", () => {
       getState().startAnalysis(makeQueue(2));
-      getState().recordStarted("s1", "loudness");
+      getState().recordStarted("s1");
       expect(getState().currentSoundId).toBe("s1");
     });
 
     it("updates currentSoundId when called again", () => {
       getState().startAnalysis(makeQueue(2));
-      getState().recordStarted("s1", "loudness");
-      getState().recordStarted("s2", "loudness");
+      getState().recordStarted("s1");
+      getState().recordStarted("s2");
       expect(getState().currentSoundId).toBe("s2");
     });
   });
@@ -83,7 +83,7 @@ describe("analysisStore", () => {
 
     it("clears currentSoundId when the last sound completes", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().recordStarted("s1", "loudness");
+      getState().recordStarted("s1");
       getState().recordComplete("s1");
       expect(getState().currentSoundId).toBeNull();
     });
@@ -113,7 +113,7 @@ describe("analysisStore", () => {
 
     it("clears currentSoundId when the last sound errors", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().recordStarted("s1", "loudness");
+      getState().recordStarted("s1");
       getState().recordError("s1", "bad");
       expect(getState().currentSoundId).toBeNull();
     });
@@ -124,8 +124,8 @@ describe("analysisStore", () => {
       const queue = makeQueue(2);
       getState().startAnalysis(queue);
       const next = getState().dequeueNext();
-      expect(next).toEqual({ id: "s1", path: "/a1.wav", analysisType: "loudness" });
-      expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav", analysisType: "loudness" }]);
+      expect(next).toEqual({ id: "s1", path: "/a1.wav" });
+      expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav" }]);
     });
 
     it("returns undefined when queue is empty", () => {

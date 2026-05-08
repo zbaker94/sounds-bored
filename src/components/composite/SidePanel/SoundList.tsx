@@ -170,11 +170,6 @@ const SoundListItem = memo(function SoundListItem({
           )}
         </div>
         <SoundListItemTags soundTagIds={sound.tags} allTags={allTags} />
-        {!isMissing && (sound.genre || sound.mood) && (
-          <p className="text-xs text-white/40 truncate">
-            {[sound.genre, sound.mood].filter(Boolean).join(" · ")}
-          </p>
-        )}
         {isPreviewing && <PreviewProgressBar />}
       </ItemContent>
       <ItemActions>
@@ -294,8 +289,6 @@ export function SoundList({
       const q = searchQuery.toLowerCase();
       return sounds.filter((s) => {
         if (s.name.toLowerCase().includes(q)) return true;
-        if (s.genre?.toLowerCase().includes(q)) return true;
-        if (s.mood?.toLowerCase().includes(q)) return true;
         return tags
           .filter((t) => s.tags.includes(t.id))
           .some((t) => t.name.toLowerCase().includes(q));

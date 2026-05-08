@@ -1,6 +1,12 @@
 # Changelog
 
 ## Current Changes
+- Genre and mood analysis has been removed; the "Genre/Mood" analyze button is no longer available in the sound library panel.
+- Sound list items no longer display detected genre or mood labels.
+- Search no longer matches sounds by genre or mood — only name and tags are searched.
+- The auto-analyze setting now measures loudness only (genre/mood extraction has been dropped).
+- Existing genre and mood data stored in library files will be silently discarded on next load.
+- Removed genre and mood analysis (#417): the classifier was slow and produced unreliable results. Any genre/mood labels previously stored in library.json are silently discarded on next save.
 - Fixed auto-analysis not re-triggering after a completed analysis run when toggled off then back on
 - Fixed stale closure bug in sound list where toggling selection after a re-render could lose previously selected sounds
 - Sound list and sound selector rendering optimized — large libraries with background analysis no longer cause unnecessary UI re-renders

@@ -1519,7 +1519,7 @@ describe("SoundSchema — coverArtDataUrl", () => {
   });
 });
 
-describe("SoundSchema — analysis fields (loudnessLufs, genre, mood)", () => {
+describe("SoundSchema — loudnessLufs field", () => {
   const base = { id: "s1", name: "Kick", tags: [], sets: [] };
 
   it("accepts a sound without loudnessLufs (field absent)", () => {
@@ -1543,26 +1543,12 @@ describe("SoundSchema — analysis fields (loudnessLufs, genre, mood)", () => {
     expect(SoundSchema.safeParse({ ...base, loudnessLufs: -Infinity }).success).toBe(false);
   });
 
-  it("accepts optional genre and mood strings", () => {
-    expect(SoundSchema.safeParse({ ...base, genre: "hip-hop", mood: "energetic" }).success).toBe(true);
-  });
-
-  it("accepts sound without genre/mood", () => {
-    expect(SoundSchema.safeParse(base).success).toBe(true);
-  });
-
-  it("rejects non-string genre", () => {
-    expect(SoundSchema.safeParse({ ...base, genre: 42 }).success).toBe(false);
-  });
-
   it("round-trips through JSON serialization", () => {
-    const sound = { ...base, loudnessLufs: -18.7, genre: "jazz", mood: "calm" };
+    const sound = { ...base, loudnessLufs: -18.7 };
     const parsed = SoundSchema.safeParse(JSON.parse(JSON.stringify(sound)));
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.loudnessLufs).toBeCloseTo(-18.7);
-      expect(parsed.data.genre).toBe("jazz");
-      expect(parsed.data.mood).toBe("calm");
     }
   });
 });

@@ -268,7 +268,7 @@ function PlaybackTab() {
             Auto-analyze sounds
           </Label>
           <p className="text-xs text-muted-foreground">
-            Automatically measure loudness and extract genre/mood for new sounds.
+            Automatically measure loudness for new sounds.
           </p>
         </div>
       </div>

@@ -3081,21 +3081,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oximedia-mir"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daf49094473d968f9f87196d1cda3b7cfac68d64aee29efbf3646c50c504c6f7"
-dependencies = [
- "bitflags 2.11.1",
- "oxifft",
- "oximedia-audio",
- "oximedia-core",
- "rayon",
- "serde",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "oximedia-normalize"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4268,7 +4253,6 @@ dependencies = [
  "base64 0.22.1",
  "lofty",
  "oximedia-metering",
- "oximedia-mir",
  "oximedia-normalize",
  "serde",
  "serde_json",

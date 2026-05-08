@@ -1047,18 +1047,10 @@ pub fn extract_cover_art(path: String) -> Result<Option<String>, String> {
 const ANALYSIS_EVENT: &str = "audio::analysis::complete";
 const ANALYSIS_STARTED_EVENT: &str = "audio::analysis::started";
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum AnalysisType {
-    Loudness,
-    Genre,
-}
-
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisStartedEvent {
     pub sound_id: String,
-    pub analysis_type: AnalysisType,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -1066,7 +1058,6 @@ pub struct AnalysisStartedEvent {
 pub struct AnalysisEntry {
     pub id: String,
     pub path: String,
-    pub analysis_type: AnalysisType,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -1074,10 +1065,7 @@ pub struct AnalysisEntry {
 pub struct AnalysisCompleteEvent {
     pub sound_id: String,
     pub loudness_lufs: Option<f64>,
-    pub genre: Option<String>,
-    pub mood: Option<String>,
     pub error: Option<String>,
-    pub analysis_type: AnalysisType,
 }
 
 fn decode_audio_to_f32(abs_path: &str) -> Result<(Vec<f32>, u32, usize), String> {
@@ -1163,23 +1151,6 @@ fn measure_loudness(samples: &[f32], sample_rate: u32, channels: usize) -> Resul
     Ok(analyzer.result().integrated_lufs)
 }
 
-fn extract_mir(samples: &[f32], sample_rate: u32) -> Result<(Option<String>, Option<String>), String> {
-    use oximedia_mir::{MirAnalyzer, MirConfig};
-    let analyzer = MirAnalyzer::new(MirConfig::default());
-    let result = analyzer
-        .analyze(samples, sample_rate as f32)
-        .map_err(|e| format!("mir: {e}"))?;
-
-    let genre = result.genre.map(|g| g.top_genre_name);
-    let mood = result.mood.and_then(|m| {
-        m.moods
-            .into_iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(label, _)| label)
-    });
-
-    Ok((genre, mood))
-}
 
 #[tauri::command]
 pub async fn start_audio_analysis(app: AppHandle, entries: Vec<AnalysisEntry>) -> Result<(), String> {
@@ -1188,61 +1159,23 @@ pub async fn start_audio_analysis(app: AppHandle, entries: Vec<AnalysisEntry>) -
             validate_grant_path(&entry.path).unwrap_or_default();
             let _ = app.emit(ANALYSIS_STARTED_EVENT, AnalysisStartedEvent {
                 sound_id: entry.id.clone(),
-                analysis_type: entry.analysis_type.clone(),
             });
 
-            let event = match entry.analysis_type {
-                AnalysisType::Genre => {
-                    let result = (|| -> Result<(Option<String>, Option<String>), String> {
-                        let (samples, sample_rate, _) = decode_audio_to_f32(&entry.path)?;
-                        extract_mir(&samples, sample_rate)
-                    })();
-                    match result {
-                        Ok((genre, mood)) => AnalysisCompleteEvent {
-                            sound_id: entry.id.clone(),
-                            loudness_lufs: None,
-                            genre,
-                            mood,
-                            error: None,
-                            analysis_type: entry.analysis_type,
-                        },
-                        Err(e) => AnalysisCompleteEvent {
-                            sound_id: entry.id.clone(),
-                            loudness_lufs: None,
-                            genre: None,
-                            mood: None,
-                            error: Some(e),
-                            analysis_type: entry.analysis_type,
-                        },
-                    }
-                }
-                AnalysisType::Loudness => {
-                    // TODO: if a future "full" analysis type (loudness + genre) is added,
-                    // the decode step here can be shared with the genre branch to avoid
-                    // reading the file twice.
-                    let result = (|| -> Result<f64, String> {
-                        let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
-                        measure_loudness(&samples, sample_rate, channels)
-                    })();
-                    match result {
-                        Ok(lufs) => AnalysisCompleteEvent {
-                            sound_id: entry.id.clone(),
-                            loudness_lufs: Some(lufs),
-                            genre: None,
-                            mood: None,
-                            error: None,
-                            analysis_type: entry.analysis_type,
-                        },
-                        Err(e) => AnalysisCompleteEvent {
-                            sound_id: entry.id.clone(),
-                            loudness_lufs: None,
-                            genre: None,
-                            mood: None,
-                            error: Some(e),
-                            analysis_type: entry.analysis_type,
-                        },
-                    }
-                }
+            let result = (|| -> Result<f64, String> {
+                let (samples, sample_rate, channels) = decode_audio_to_f32(&entry.path)?;
+                measure_loudness(&samples, sample_rate, channels)
+            })();
+            let event = match result {
+                Ok(lufs) => AnalysisCompleteEvent {
+                    sound_id: entry.id.clone(),
+                    loudness_lufs: Some(lufs),
+                    error: None,
+                },
+                Err(e) => AnalysisCompleteEvent {
+                    sound_id: entry.id.clone(),
+                    loudness_lufs: None,
+                    error: Some(e),
+                },
             };
 
             let _ = app.emit(ANALYSIS_EVENT, event);
