@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { useAnalysisStore } from "@/state/analysisStore";
 import { useImportSounds } from "@/hooks/useImportSounds";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { scheduleAnalysisForSounds } from "@/lib/library.reconcile";
@@ -46,7 +45,6 @@ export function SoundsPanel() {
   const [analysisWarningOpen, setAnalysisWarningOpen] = useState(false);
 
   const sounds = useLibraryStore((s) => s.sounds);
-  const analysisStatus = useAnalysisStore((s) => s.status);
 
   const selectedSounds = useMemo(
     () => sounds.filter((s) => selectedSoundIds.has(s.id)),
@@ -132,7 +130,6 @@ export function SoundsPanel() {
             variant="secondary"
             size="sm"
             onClick={() => handleAnalyzeSelected()}
-            disabled={analysisStatus === "running"}
           >
             <HugeiconsIcon icon={AudioWave01Icon} size={14} />
             Loudness ({selectedSoundIds.size})

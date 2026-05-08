@@ -6,7 +6,7 @@ import { AUDIO_EXTENSIONS } from "./constants";
 import { basename, nameFromFilename } from "@/lib/utils";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useAnalysisStore } from "@/state/analysisStore";
+import { useAnalysisStore, type AnalysisEntry } from "@/state/analysisStore";
 import { logError } from "@/lib/logger";
 
 /**
@@ -374,21 +374,43 @@ export async function dispatchNextFromQueue(): Promise<void> {
 }
 
 /**
+ * Append `queue` to the active analysis run, or start a fresh run if idle/completed.
+ * If status is "running", appends non-duplicate entries; the existing dispatch loop
+ * picks them up naturally. If the last in-flight item completed just before append,
+ * appendToQueue re-activates status and we kick dispatch manually. Double-dispatch
+ * is not possible: JS is single-threaded, so useAudioAnalysis's completion-event
+ * handler (which calls dispatchNextFromQueue on an empty queue) always completes
+ * before appendToQueue populates the queue and our kick fires.
+ */
+async function enqueueOrStart(queue: AnalysisEntry[]): Promise<void> {
+  if (queue.length === 0) return;
+  const snapshot = useAnalysisStore.getState();
+  if (snapshot.status === "running") {
+    snapshot.appendToQueue(queue);
+    // Kick dispatch only when no item is in-flight (race: last item completed just before append)
+    const after = useAnalysisStore.getState();
+    if (!after.currentSoundId && after.pendingQueue.length > 0) {
+      await dispatchNextFromQueue();
+    }
+    return;
+  }
+  snapshot.startAnalysis(queue);
+  await dispatchNextFromQueue();
+}
+
+/**
  * Queue loudness analysis for an explicit list of sounds. Sorted
  * smallest-first. Used for on-demand "Analyze selected" triggered by the user.
  *
- * No-op if analysis is already running — callers must wait for completion
- * before scheduling a new batch to avoid clobbering the in-flight state.
+ * If analysis is already running, appends non-duplicate entries to the live queue
+ * instead of starting a new batch.
  */
 export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> {
-  if (useAnalysisStore.getState().status === "running") return;
   const queue = sounds
     .filter((s) => s.filePath)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
     .map((s) => ({ id: s.id, path: s.filePath! }));
-  if (queue.length === 0) return;
-  useAnalysisStore.getState().startAnalysis(queue);
-  await dispatchNextFromQueue();
+  await enqueueOrStart(queue);
 }
 
 /**
@@ -398,18 +420,15 @@ export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> 
  *
  * Used exclusively for auto-analysis on boot and after folder reconcile.
  *
- * No-op if all sounds are already analyzed, no sounds have a filePath, or
- * analysis is already running.
+ * If analysis is already running, appends unanalyzed sounds that are not already
+ * queued. No-op if all sounds are already analyzed or no sounds have a filePath.
  */
 export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<void> {
-  if (useAnalysisStore.getState().status === "running") return;
   const queue = sounds
     .filter((s) => s.filePath && s.loudnessLufs === undefined)
     .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
     .map((s) => ({ id: s.id, path: s.filePath! }));
-  if (queue.length === 0) return;
-  useAnalysisStore.getState().startAnalysis(queue);
-  await dispatchNextFromQueue();
+  await enqueueOrStart(queue);
 }
 
 /**

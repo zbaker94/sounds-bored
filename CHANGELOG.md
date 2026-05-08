@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- The "Loudness" analysis button is no longer disabled while analysis is running — you can queue additional sounds mid-analysis
+- Triggering loudness analysis while another batch is in progress now appends sounds to the active queue instead of being silently ignored
 - Genre and mood analysis has been removed; the "Genre/Mood" analyze button is no longer available in the sound library panel.
 - Sound list items no longer display detected genre or mood labels.
 - Search no longer matches sounds by genre or mood — only name and tags are searched.
