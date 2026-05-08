@@ -44,9 +44,6 @@ vi.mock("@/state/libraryStore", () => ({
 vi.mock("@/state/appSettingsStore", () => ({
   useAppSettingsStore: { getState: vi.fn(() => ({ settings: null })) },
 }));
-vi.mock("@/state/projectStore", () => ({
-  useProjectStore: { getState: vi.fn(() => ({ project: null })) },
-}));
 
 function makeMockGain() {
   return {
@@ -1110,14 +1107,12 @@ describe("startLayerSound circuit-breaker", () => {
     const { loadBuffer } = await import("./bufferCache");
     const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
     const { startLayerSound } = await import("./layerTrigger");
-    const { useLibraryStore } = await import("@/state/libraryStore");
 
     const s1 = createMockSound({
       id: "s1",
       name: arrangement === "sequential" ? "loopSound" : "simSound",
       filePath: "s1.wav",
     });
-    vi.mocked(useLibraryStore.getState).mockReturnValue({ sounds: [s1] } as ReturnType<typeof useLibraryStore.getState>);
 
     const pad = createMockPad({ id: padId });
     const layer = createMockLayer({
@@ -2083,6 +2078,234 @@ describe("onended chain continuation — happy path", () => {
 
     // Chain was undefined — onended should not advance.
     expect(loadBuffer).not.toHaveBeenCalled();
+  });
+
+  it("loop restart uses captured allSounds snapshot, not live library state", async () => {
+    mockEmitAudioError.mockClear();
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { useLibraryStore } = await import("@/state/libraryStore");
+
+    // Live library contains a DIFFERENT sound (sZ) that is NOT in the captured
+    // allSounds. If restartLoopChain consulted the live library, sZ could leak
+    // into the restart; if it uses the captured snapshot, only sA/sB load.
+    const liveOnlySound = createMockSound({ id: "sZ", name: "live-only", filePath: "z.wav" });
+    vi.mocked(useLibraryStore.getState).mockReturnValue(
+      { sounds: [liveOnlySound] } as unknown as ReturnType<typeof useLibraryStore.getState>,
+    );
+
+    const pad = createMockPad({ id: "snap-allsounds-pad" });
+    const layer = createMockLayer({
+      id: "snap-allsounds-layer",
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [
+        { id: "i1", soundId: "sA", volume: 100 },
+        { id: "i2", soundId: "sB", volume: 100 },
+      ]},
+    });
+    const soundA = createMockSound({ id: "sA", name: "captured-A", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sB", name: "captured-B", filePath: "b.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    // Capture allSounds at trigger time as [soundA, soundB]; chain begins with soundB queued.
+    setLayerChain(layer.id, [soundB]);
+    await startLayerSound(pad, layer, soundA, mockCtx as unknown as AudioContext, layerGain, 1.0, [soundA, soundB]);
+
+    // Drain soundB through the chain so the next onended triggers the loop restart.
+    capturedOnEnded[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(capturedOnEnded.length).toBeGreaterThan(1);
+    vi.mocked(loadBuffer).mockClear();
+
+    // Chain exhausted naturally → restartLoopChain runs with captured [soundA, soundB]
+    // even though the live library is empty.
+    capturedOnEnded[capturedOnEnded.length - 1]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Loop restart must replay soundA from the captured snapshot. The live
+    // library's sZ must NOT leak into the restart — proves captured allSounds
+    // drives the restart, not the live library.
+    expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "sA" }));
+    expect(loadBuffer).not.toHaveBeenCalledWith(expect.objectContaining({ id: "sZ" }));
+    expect(mockEmitAudioError).not.toHaveBeenCalled();
+  });
+
+  it("loop restart uses captured layer.playbackMode, not live store state", async () => {
+    mockEmitAudioError.mockClear();
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { useProjectStore, initialProjectState } = await import("@/state/projectStore");
+    const { createMockProject, createMockScene, createMockHistoryEntry } = await import("@/test/factories");
+
+    // Captured layer has playbackMode: "loop" — restart must honor this.
+    const layerId = "snap-mode-layer";
+    const padId = "snap-mode-pad";
+    const layer = createMockLayer({
+      id: layerId,
+      arrangement: "sequential",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
+    });
+    const pad = createMockPad({ id: padId, layers: [layer] });
+
+    // Live store contains the SAME pad/layer ID but with playbackMode: "one-shot".
+    // If the restart consulted live state, it would see "one-shot" and skip.
+    // The captured layer's "loop" mode must drive the restart.
+    const liveLayer = { ...layer, playbackMode: "one-shot" as const };
+    const livePad = { ...pad, layers: [liveLayer] };
+    useProjectStore.getState().loadProject(
+      createMockHistoryEntry(),
+      createMockProject({ scenes: [createMockScene({ pads: [livePad] })] }),
+      false,
+    );
+
+    try {
+      const s1 = createMockSound({ id: "s1", name: "looper", filePath: "s1.wav" });
+      const padGain = getPadGain(pad.id);
+      const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+      const capturedOnEnded: Array<() => void> = [];
+      const voiceMock = {
+        setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn(),
+        stopWithRamp: vi.fn(),
+      };
+      const voiceModule = await import("./audioVoice");
+      vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+        voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+      );
+
+      vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+      // Empty chain — chain will exhaust naturally on first onended.
+      setLayerChain(layer.id, []);
+      await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+      expect(capturedOnEnded.length).toBeGreaterThan(0);
+      vi.mocked(loadBuffer).mockClear();
+
+      // The captured `layer` object the closure holds onto has playbackMode: "loop",
+      // so the restart fires even though the live store says "one-shot".
+      capturedOnEnded[0]();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Loop restarted using captured playbackMode — s1 was reloaded.
+      expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }));
+      expect(mockEmitAudioError).not.toHaveBeenCalled();
+    } finally {
+      useProjectStore.setState({ ...initialProjectState });
+    }
+  });
+
+  it("hold playbackMode also triggers loop restart on chain exhaustion", async () => {
+    mockEmitAudioError.mockClear();
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+
+    const pad = createMockPad({ id: "snap-hold-pad" });
+    // Captured layer has playbackMode: "hold" — restart should still fire on exhaustion.
+    const layer = createMockLayer({
+      id: "snap-hold-layer",
+      arrangement: "sequential",
+      playbackMode: "hold",
+      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
+    });
+    const s1 = createMockSound({ id: "s1", name: "holder", filePath: "s1.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    setLayerChain(layer.id, []);
+    await startLayerSound(pad, layer, s1, mockCtx as unknown as AudioContext, layerGain, 1.0, [s1]);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+    vi.mocked(loadBuffer).mockClear();
+
+    // Chain exhausted on hold-mode layer → restart fires (matches loop-mode behavior).
+    capturedOnEnded[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }));
+    expect(mockEmitAudioError).not.toHaveBeenCalled();
+  });
+
+  it("simultaneous + loop: restart reloads ALL sounds in captured allSounds", async () => {
+    mockEmitAudioError.mockClear();
+    const { loadBuffer } = await import("./bufferCache");
+    const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+
+    const pad = createMockPad({ id: "snap-sim-pad" });
+    const layer = createMockLayer({
+      id: "snap-sim-layer",
+      arrangement: "simultaneous",
+      playbackMode: "loop",
+      selection: { type: "assigned", instances: [
+        { id: "i1", soundId: "sA", volume: 100 },
+        { id: "i2", soundId: "sB", volume: 100 },
+      ]},
+    });
+    const soundA = createMockSound({ id: "sA", name: "sim-A", filePath: "a.wav" });
+    const soundB = createMockSound({ id: "sB", name: "sim-B", filePath: "b.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    const capturedOnEnded: Array<() => void> = [];
+    const voiceMock = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { if (cb) capturedOnEnded.push(cb); }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+    };
+    const voiceModule = await import("./audioVoice");
+    vi.spyOn(voiceModule, "wrapBufferSource").mockReturnValue(
+      voiceMock as unknown as ReturnType<typeof voiceModule.wrapBufferSource>,
+    );
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    // Empty chain on a simultaneous-arrangement layer: first onended triggers the
+    // restart's else branch (non-chained), which reloads ALL sounds in allSounds.
+    setLayerChain(layer.id, []);
+    await startLayerSound(pad, layer, soundA, mockCtx as unknown as AudioContext, layerGain, 1.0, [soundA, soundB]);
+    expect(capturedOnEnded.length).toBeGreaterThan(0);
+    vi.mocked(loadBuffer).mockClear();
+
+    capturedOnEnded[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Both sounds in the captured allSounds were reloaded simultaneously.
+    expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "sA" }));
+    expect(loadBuffer).toHaveBeenCalledWith(expect.objectContaining({ id: "sB" }));
+    expect(loadBuffer).toHaveBeenCalledTimes(2);
+    expect(mockEmitAudioError).not.toHaveBeenCalled();
   });
 });
 

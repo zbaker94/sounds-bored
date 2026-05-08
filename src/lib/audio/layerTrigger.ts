@@ -1,7 +1,7 @@
 // src/lib/audio/layerTrigger.ts
 //
 // Extracted layer trigger helpers used by padPlayer.ts:
-//   - resolveSounds / liveLayerField / getVoiceVolume / shouldLayerLoopNatively — private utilities
+//   - resolveSounds / getVoiceVolume / shouldLayerLoopNatively — private utilities
 //   - rampStopLayerVoices / stopLayerWithRampInternal — ramped layer stop primitives
 //   - loadLayerVoice — voice creation (streaming vs buffer), separated from lifecycle
 //   - startLayerSound — onended chain-continuation lifecycle (calls loadLayerVoice)
@@ -26,7 +26,6 @@ import type { AudioVoice } from "./audioVoice";
 import { buildPlayOrder, isChained } from "./arrangement";
 import { resolveLayerSounds, snapshotSounds, type SoundSnapshot } from "./resolveSounds";
 import { useLibraryStore } from "@/state/libraryStore";
-import { useProjectStore } from "@/state/projectStore";
 import type { Layer, LayerSelection, Pad, Sound } from "@/lib/schemas";
 import { emitAudioError } from "./audioEvents";
 import { startAudioTick } from "./audioTick";
@@ -79,24 +78,6 @@ const CHAIN_FAILURE_THRESHOLD = 3;
 // ---------------------------------------------------------------------------
 // Private utilities
 // ---------------------------------------------------------------------------
-
-/** Read a field from the live project store for a layer. Falls back to `captured`
- *  if the pad/layer is not found (e.g. deleted mid-playback or project cleared). */
-function liveLayerField<K extends keyof Layer>(
-  padId: string,
-  layerId: string,
-  field: K,
-  captured: Layer[K],
-): Layer[K] {
-  const project = useProjectStore.getState().project;
-  if (project) {
-    for (const scene of project.scenes) {
-      const pad = scene.pads.find((p) => p.id === padId);
-      if (pad) return pad.layers.find((l) => l.id === layerId)?.[field] ?? captured;
-    }
-  }
-  return captured;
-}
 
 /** Returns the 0–1 gain value for a specific sound within a layer.
  *  For "assigned" selections, reads SoundInstance.volume (0–100 scale).
@@ -229,21 +210,13 @@ async function loadLayerVoice(
 // startLayerSound — voice lifecycle + onended chain continuation
 // ---------------------------------------------------------------------------
 
-function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: GainNode): void {
-  const liveArr = liveLayerField(pad.id, layer.id, "arrangement", layer.arrangement);
-  const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
-  const liveSelection = liveLayerField(pad.id, layer.id, "selection", layer.selection);
-  const liveLayerSnap = { ...layer, arrangement: liveArr, playbackMode: liveMode, selection: liveSelection };
-  // Intentional live-store read: loop restart deliberately picks up config changes made during
-  // playback (arrangement, selection, playback mode) so they take effect on the next cycle.
-  // snapshotSounds() captures the library at this exact moment for the duration of this restart.
-  const liveSounds = resolveSounds(liveLayerSnap, snapshotSounds(useLibraryStore.getState().sounds));
+function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: GainNode, allSounds: Sound[]): void {
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
   startAudioTick();
   usePadDisplayStore.getState().shiftVoice(pad.id);
-  if (isChained(liveArr)) {
-    const newOrder = buildPlayOrder(liveArr, liveSounds);
+  if (isChained(layer.arrangement)) {
+    const newOrder = buildPlayOrder(layer.arrangement, allSounds);
     if (newOrder.length === 0) {
       deleteLayerChain(layer.id);
       if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
@@ -251,18 +224,18 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
     }
     const [first, ...rest] = newOrder;
     setLayerChain(layer.id, rest);
-    startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(liveLayerSnap, first), liveSounds).catch(
-      (err) => { console.error("[layerTrigger] chain loop-restart failed:", err); },
+    startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), allSounds).catch(
+      (err) => emitAudioError(err, {}),
     );
   } else {
     deleteLayerChain(layer.id);
-    if (liveSounds.length === 0) {
+    if (allSounds.length === 0) {
       if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
       return;
     }
-    for (const snd of liveSounds) {
-      startLayerSound(pad, liveLayerSnap, snd, ctx, layerGain, getVoiceVolume(liveLayerSnap, snd), liveSounds).catch(
-        (err) => { console.error("[layerTrigger] simultaneous loop-restart failed:", err); },
+    for (const snd of allSounds) {
+      startLayerSound(pad, layer, snd, ctx, layerGain, getVoiceVolume(layer, snd), allSounds).catch(
+        (err) => emitAudioError(err, {}),
       );
     }
   }
@@ -319,20 +292,17 @@ export async function startLayerSound(
       // `remaining === undefined` means the queue was cleared externally (stop/reset).
       // `remaining.length === 0` means the chain ran to completion naturally.
       const remaining = getLayerChain(layer.id);
-      const liveMode = liveLayerField(pad.id, layer.id, "playbackMode", layer.playbackMode);
 
       if (remaining !== undefined && remaining.length > 0) {
         // Chain continues — defer removePlayingPad until the next voice starts so
         // the pad doesn't briefly flash as "not playing" between chained sounds.
         const [next, ...rest] = remaining;
         continueLayerChain(pad, layer, ctx, layerGain, next, rest, allSounds).catch(
-          (err) => { console.error("[layerTrigger] chain continuation failed:", err); },
+          (err) => emitAudioError(err, {}),
         );
-      } else if (remaining !== undefined && (liveMode === "loop" || liveMode === "hold")) {
-        // Chain exhausted naturally — restart using live store values so mid-playback
-        // config changes (arrangement, playback mode, selection) take effect.
-        // removePlayingPad is deferred to restartLoopChain (handles failure edges).
-        restartLoopChain(pad, layer, ctx, layerGain);
+      } else if (remaining !== undefined && (layer.playbackMode === "loop" || layer.playbackMode === "hold")) {
+        // Chain exhausted naturally — restart using captured snapshot; config changes take effect next trigger.
+        restartLoopChain(pad, layer, ctx, layerGain, allSounds);
       } else {
         // Chain exhausted (one-shot) or cleared externally (stop/reset).
         if (remaining !== undefined) deleteLayerChain(layer.id);
@@ -696,8 +666,10 @@ export function selectionsEqual(a: LayerSelection, b: LayerSelection): boolean {
  * flag is irrelevant (onended drives restart), so we clear the chain queue.
  * When the current voice ends, `onended` sees `remaining === undefined` and
  * skips the restart. Transitions *into* a looping mode on chained arrangements
- * take effect at the next natural chain boundary — the onended closure reads
- * playbackMode from the live store rather than the captured layer object.
+ * do NOT take effect at the next natural chain boundary — they apply only on
+ * the next user trigger. The onended closure reads `layer.playbackMode` from
+ * the captured layer object (snapshot semantics), so a live config update to
+ * "loop" is ignored until a new trigger captures the updated layer.
  *
  * No-op if the layer has no active voices.
  */

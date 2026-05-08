@@ -2029,7 +2029,7 @@ describe("syncLayerPlaybackMode", () => {
     expect(createdSources).toHaveLength(2);
   });
 
-  it("sequential+one-shot â†’ loop: chain restarts after all sounds play through", async () => {
+  it("sequential+one-shot â†’ loop: chain does NOT restart on exhaustion (uses captured playbackMode snapshot from trigger time)", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -2046,7 +2046,6 @@ describe("syncLayerPlaybackMode", () => {
     await triggerPad(pad);
     await tick();
 
-    // Simulate updatePad: store now reflects the new playbackMode
     const updatedLayer = { ...layer, playbackMode: "loop" as const };
     const scene = createMockScene({ pads: [{ ...pad, layers: [updatedLayer] }] });
     useProjectStore.getState().loadProject(
@@ -2056,15 +2055,15 @@ describe("syncLayerPlaybackMode", () => {
     );
     syncLayerPlaybackMode(updatedLayer);
 
-    // Sound A ends â†’ advances to B (remaining was non-empty)
     createdSources[0].simulateEnd();
     await tick();
     expect(createdSources).toHaveLength(2);
 
-    // Sound B ends â†’ chain exhausted â†’ live lookup returns "loop" â†’ restarts
+    // Snapshot semantics: restartLoopChain reads the captured layer (playbackMode="one-shot"),
+    // not the live store. Chain exhausts naturally without restarting.
     createdSources[1].simulateEnd();
     await tick();
-    expect(createdSources).toHaveLength(3);
+    expect(createdSources).toHaveLength(2);
   });
 });
 
@@ -2099,7 +2098,7 @@ describe("syncLayerArrangement", () => {
     expect(createdSources).toHaveLength(1);
   });
 
-  it("sequential â†’ simultaneous + loop: current voice plays out, then all sounds restart simultaneously with loop", async () => {
+  it("sequential â†’ simultaneous + loop: chain restart uses captured arrangement snapshot (sequential), not live arrangement", async () => {
     const { triggerPad } = await import("./padPlayer");
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -2114,7 +2113,6 @@ describe("syncLayerArrangement", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
-    // Simulate updatePad: store reflects the new simultaneous+loop arrangement
     const updatedLayer = { ...layer, arrangement: "simultaneous" as const };
     const scene = createMockScene({ pads: [{ ...pad, layers: [updatedLayer] }] });
     useProjectStore.getState().loadProject(
@@ -2126,23 +2124,20 @@ describe("syncLayerArrangement", () => {
     await triggerPad(pad);
     await tick();
 
-    // Chained loop â€” source.loop stays false (chain handles looping)
     expect(createdSources[0].loop).toBe(false);
 
     syncLayerArrangement(updatedLayer);
 
-    // source.loop is still false â€” current voice plays out naturally, not looping
     expect(createdSources[0].loop).toBe(false);
 
-    // Current voice ends â€” onended reads liveArrangement="simultaneous", liveMode="loop"
-    // and starts all sounds simultaneously with source.loop=true
     createdSources[0].simulateEnd();
     await tick();
 
-    // Both sounds started simultaneously (2 new sources)
-    expect(createdSources).toHaveLength(3);
-    expect(createdSources[1].loop).toBe(true);
-    expect(createdSources[2].loop).toBe(true);
+    // Snapshot semantics: restartLoopChain reads the captured layer (arrangement="sequential"),
+    // so the loop restart rebuilds a chained play order rather than starting all sounds simultaneously.
+    // Only the first sound of the rebuilt chain starts; loop=false because chained loops use the chain queue.
+    expect(createdSources).toHaveLength(2);
+    expect(createdSources[1].loop).toBe(false);
   });
 
   it("shuffled â†’ sequential: rebuilds chain with new arrangement so onended continues", async () => {
@@ -2311,7 +2306,7 @@ describe("syncLayerSelection", () => {
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
   });
 
-  it("sequential + loop: loop restart reads live selection from store when chain exhausts", async () => {
+  it("sequential + loop: loop restart uses captured selection snapshot, ignoring later live-store selection changes", async () => {
     const { triggerPad } = await import("./padPlayer");
     const soundA = createMockSound({ id: "sound-a", filePath: "a.wav" });
     const soundB = createMockSound({ id: "sound-b", filePath: "b.wav" });
@@ -2330,7 +2325,6 @@ describe("syncLayerSelection", () => {
     await triggerPad(pad);
     await tick();
 
-    // A is playing, queue is empty (only one sound). Change selection to [B] in the store.
     const newLayer = {
       ...layer,
       selection: {
@@ -2345,13 +2339,14 @@ describe("syncLayerSelection", () => {
       false,
     );
 
-    // A ends â†’ chain exhausted â†’ loop restart re-resolves from store â†’ B plays
     createdSources[0].simulateEnd();
     await tick();
 
+    // Snapshot semantics: restartLoopChain uses the allSounds captured at trigger time
+    // (which resolved to [A] only). Live-store selection change to [B] is ignored.
     expect(createdSources).toHaveLength(2);
     const loadedIds = mockLoadBuffer.mock.calls.map((c: unknown[]) => (c[0] as { id: string }).id);
-    expect(loadedIds[1]).toBe(soundB.id);
+    expect(loadedIds[1]).toBe(soundA.id);
   });
 });
 
