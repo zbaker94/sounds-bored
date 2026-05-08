@@ -216,6 +216,21 @@ describe("fadeMixer", () => {
 
       expect(resetPadGain).not.toHaveBeenCalled();
     });
+
+    it("mirrors fading-out state to playbackStore", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain } = await import("./audioState");
+      getPadGain("pad-store-mirror");
+      const { fadePad } = await import("./fadeMixer");
+      const { usePlaybackStore } = await import("@/state/playbackStore");
+      const pad = createMockPad({ id: "pad-store-mirror" });
+
+      fadePad(pad, 1.0, 0, 1000);
+
+      expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(true);
+      expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(true);
+    });
   });
 
   describe("fadePad — fading up", () => {
