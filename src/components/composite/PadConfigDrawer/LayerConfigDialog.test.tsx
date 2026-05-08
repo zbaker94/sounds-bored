@@ -8,7 +8,7 @@ import { createMockHistoryEntry, createMockProject, createMockScene, createMockP
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LayerConfigDialog } from "./LayerConfigDialog";
 import { syncLayerVolume, syncLayerConfig } from "@/lib/audio";
-import type { Layer } from "@/lib/schemas";
+import type { Layer, Pad } from "@/lib/schemas";
 
 vi.mock("./SoundSelector", () => ({
   SoundSelector: () => <div data-testid="sound-selector" />,
@@ -32,12 +32,13 @@ function renderDialog(props: {
   layerIndex?: number;
   onClose?: () => void;
   layer?: Layer;
+  padOverrides?: Partial<Pad>;
 } = {}) {
   const layer = props.layer ?? createMockLayer({
     id: "layer-1",
     selection: { type: "assigned", instances: [{ id: "inst-1", soundId: "s1", volume: 100 }] },
   });
-  const pad = createMockPad({ id: props.padId ?? "pad-1", name: "Test Pad", layers: [layer] });
+  const pad = createMockPad({ id: props.padId ?? "pad-1", name: "Test Pad", layers: [layer], ...props.padOverrides });
   const scene = createMockScene({ id: props.sceneId ?? "scene-1", pads: [pad] });
   useProjectStore.getState().loadProject(
     createMockHistoryEntry(),
@@ -170,6 +171,25 @@ describe("LayerConfigDialog", () => {
     });
     expect(vi.mocked(syncLayerVolume)).toHaveBeenCalled();
     expect(vi.mocked(syncLayerConfig)).toHaveBeenCalled();
+  });
+
+  it("preserves muteTargetPadIds and muteGroupId through form submission", async () => {
+    const onClose = vi.fn();
+    renderDialog({
+      onClose,
+      padOverrides: { muteTargetPadIds: ["pad-other"], muteGroupId: "group-1" },
+    });
+    openDialog();
+
+    await userEvent.click(screen.getByRole("button", { name: /save layer/i }));
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    const pad = useProjectStore.getState().project?.scenes[0].pads[0];
+    expect(pad?.muteTargetPadIds).toEqual(["pad-other"]);
+    expect(pad?.muteGroupId).toBe("group-1");
   });
 
   it("shows validation error and does not call updatePad when tag selection matches no sounds", async () => {
