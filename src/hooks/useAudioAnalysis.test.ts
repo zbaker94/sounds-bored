@@ -12,6 +12,7 @@ const mockDispatchNextFromQueue = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/library.reconcile", () => ({
   dispatchNextFromQueue: mockDispatchNextFromQueue,
+  clearDispatchInFlight: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -106,17 +107,18 @@ describe("useAudioAnalysis", () => {
     expect(mockDispatchNextFromQueue).toHaveBeenCalled();
   });
 
-  it("ignores a malformed complete payload", async () => {
+  it("recovers from a malformed complete payload by advancing the queue", async () => {
     useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
 
     const { useAudioAnalysis } = await import("./useAudioAnalysis");
     renderHook(() => useAudioAnalysis());
     await act(async () => {});
 
+    // payload has no soundId — can't record error, but queue still advances
     act(() => emitComplete({ unexpected: true }));
 
     expect(useAnalysisStore.getState().completedCount).toBe(0);
-    expect(mockDispatchNextFromQueue).not.toHaveBeenCalled();
+    expect(mockDispatchNextFromQueue).toHaveBeenCalled();
   });
 
   it("calls dispatchNextFromQueue after each completed event", async () => {
@@ -130,5 +132,19 @@ describe("useAudioAnalysis", () => {
     await act(async () => {});
 
     expect(mockDispatchNextFromQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls unlisten functions on unmount (listener cleanup)", async () => {
+    const mockUnlisten = vi.fn();
+    mockEvent.listen.mockReturnValue(Promise.resolve(mockUnlisten));
+
+    const { useAudioAnalysis } = await import("./useAudioAnalysis");
+    const { unmount } = renderHook(() => useAudioAnalysis());
+    await act(async () => {});
+
+    unmount();
+
+    // Both started and complete listeners should have been unregistered
+    expect(mockUnlisten).toHaveBeenCalledTimes(2);
   });
 });

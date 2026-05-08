@@ -237,7 +237,7 @@ function AssignedSection({
         instances: [...value.instances, ...newInstances],
       });
     }
-  }, [selectedIds, value.instances, globalFolders, onChange, soundsRef]);
+  }, [selectedIds, value.instances, globalFolders, onChange]);
 
   if (sounds.length === 0) {
     return <p className="text-sm text-muted-foreground">No sounds in library yet.</p>;

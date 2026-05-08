@@ -165,7 +165,7 @@ const SoundListItem = memo(function SoundListItem({
           >
             {sound.name}
           </ItemTitle>
-          {!isMissing && sound.loudnessLufs !== undefined && (
+          {!isMissing && sound.loudnessLufs != null && (
             <NormalizationPill lufs={sound.loudnessLufs} />
           )}
         </div>

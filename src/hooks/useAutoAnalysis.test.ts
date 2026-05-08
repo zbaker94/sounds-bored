@@ -58,7 +58,7 @@ describe("useAutoAnalysis", () => {
     expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalledTimes(1);
   });
 
-  it("does not schedule analysis when toggled on but analysis is already running", async () => {
+  it("schedules analysis when toggled on even if analysis is already running (dedup handled inside)", async () => {
     const { useAutoAnalysis } = await import("./useAutoAnalysis");
     useAppSettingsStore.setState({
       ...initialAppSettingsState,
@@ -74,7 +74,8 @@ describe("useAutoAnalysis", () => {
     });
     await act(async () => {});
 
-    expect(mockScheduleAnalysisForUnanalyzed).not.toHaveBeenCalled();
+    // scheduleAnalysisForUnanalyzed is always called — enqueueOrStart deduplicates internally
+    expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalled();
   });
 
   it("schedules analysis when toggled on after a prior analysis completed", async () => {

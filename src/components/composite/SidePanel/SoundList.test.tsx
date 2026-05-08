@@ -289,6 +289,27 @@ describe("SoundList", () => {
     expect(screen.getByText("Snare")).toBeInTheDocument();
   });
 
+  it("search by name matches expected sounds", () => {
+    const kick = createMockSound({ id: "s1", name: "Kick Drum" });
+    const snare = createMockSound({ id: "s2", name: "Snare Hit" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [kick, snare] });
+
+    renderList({ searchQuery: "kick" });
+
+    expect(screen.getByText("Kick Drum")).toBeInTheDocument();
+    expect(screen.queryByText("Snare Hit")).not.toBeInTheDocument();
+  });
+
+  it("search does not error on sounds with legacy genre/mood data absent from schema (regression: v1.6.0 removal)", () => {
+    // Prior to v1.6.0, sounds could have genre/mood. After schema strip they are absent,
+    // but the search filter must still work without throwing.
+    const sound = createMockSound({ id: "s1", name: "Rock Loop" });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+    expect(() => renderList({ searchQuery: "rock" })).not.toThrow();
+    expect(screen.getByText("Rock Loop")).toBeInTheDocument();
+  });
+
   it("Select All calls onSelectionChange with every selectable sound id", async () => {
     const a = createMockSound({ id: "a", name: "A" });
     const b = createMockSound({ id: "b", name: "B" });

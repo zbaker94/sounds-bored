@@ -71,7 +71,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       audio.src = url;
       const sourceNode = ctx.createMediaElementSource(audio);
       const previewGain = ctx.createGain();
-      previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
+      previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs ?? undefined);
       const previewLimiter = createLimiterNode(ctx);
       sourceNode.connect(previewGain);
       previewGain.connect(previewLimiter);
@@ -120,7 +120,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       const previewGain = ctx.createGain();
-      previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs);
+      previewGain.gain.value = normalizedVoiceGain(1.0, sound.loudnessLufs ?? undefined);
       const previewLimiter = createLimiterNode(ctx);
       source.connect(previewGain);
       previewGain.connect(previewLimiter);

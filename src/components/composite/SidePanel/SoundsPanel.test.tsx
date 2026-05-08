@@ -6,6 +6,7 @@ import { SoundsPanel } from "./SoundsPanel";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
+import { useAnalysisStore, initialAnalysisState } from "@/state/analysisStore";
 import {
   createMockSound,
   createMockGlobalFolder,
@@ -42,6 +43,8 @@ vi.mock("@/lib/import", () => ({
   copyFilesToFolder: vi.fn(() => Promise.resolve([])),
 }));
 
+const mockScheduleAnalysisForSounds = vi.fn(() => Promise.resolve());
+
 vi.mock("@/lib/library.reconcile", () => ({
   reconcileGlobalLibrary: vi.fn(() =>
     Promise.resolve({ sounds: [], changed: false, inaccessibleFolderIds: [] })
@@ -53,6 +56,7 @@ vi.mock("@/lib/library.reconcile", () => ({
     })
   ),
   refreshMissingState: vi.fn(() => Promise.resolve()),
+  scheduleAnalysisForSounds: vi.fn((...args: unknown[]) => mockScheduleAnalysisForSounds(...(args as []))),
 }));
 
 vi.mock("@/lib/audio/cacheUtils", () => ({
@@ -110,6 +114,8 @@ beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useProjectStore.setState({ ...initialProjectState });
   useAppSettingsStore.setState({ ...initialAppSettingsState, settings: createMockAppSettings() });
+  useAnalysisStore.setState({ ...initialAnalysisState });
+  mockScheduleAnalysisForSounds.mockClear();
   mockOnFileDropEvent.mockClear();
   mockOnFileDropEvent.mockReturnValue(Promise.resolve(() => {}));
   mockPickFiles.mockReset();
@@ -676,6 +682,72 @@ describe("SoundsPanel", () => {
       // saveLibrary (mockMutateAsync) should have been invoked to persist
       // the library after deletion.
       expect(mockMutateAsync).toHaveBeenCalled();
+    });
+  });
+
+  describe("Loudness analysis button", () => {
+    function setupFolderWithSound(loudnessLufs?: number) {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sound = createMockSound({
+        id: "s1",
+        name: "Kick",
+        filePath: "/music/kick.wav",
+        folderId: "f1",
+        loudnessLufs,
+      });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+      useAppSettingsStore.setState({
+        ...initialAppSettingsState,
+        settings: createMockAppSettings({
+          globalFolders: [folder],
+          importFolderId: folder.id,
+        }),
+      });
+      return { folder, sound };
+    }
+
+    it("Loudness button is hidden when no sounds are selected", () => {
+      setupFolderWithSound();
+      renderPanel();
+      expect(screen.queryByRole("button", { name: /loudness/i })).not.toBeInTheDocument();
+    });
+
+    it("Loudness button appears after selecting a sound and schedules analysis without warning when sound is unanalyzed", async () => {
+      setupFolderWithSound(); // no loudnessLufs → unanalyzed
+      renderPanel();
+
+      const checkbox = screen.getByRole("checkbox");
+      await act(async () => { fireEvent.click(checkbox); });
+
+      const btn = screen.getByRole("button", { name: /loudness/i });
+      await act(async () => { fireEvent.click(btn); });
+
+      expect(mockScheduleAnalysisForSounds).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: "s1" })]),
+      );
+    });
+
+    it("schedules analysis while another analysis is already running (queueing, issue #418)", async () => {
+      setupFolderWithSound();
+      // Simulate an already-running analysis (the core fix for #418)
+      useAnalysisStore.setState({
+        ...initialAnalysisState,
+        status: "running",
+        queueLength: 5,
+        analyzingCount: 4,
+        completedCount: 1,
+      });
+
+      renderPanel();
+
+      const checkbox = screen.getByRole("checkbox");
+      await act(async () => { fireEvent.click(checkbox); });
+
+      const btn = screen.getByRole("button", { name: /loudness/i });
+      await act(async () => { fireEvent.click(btn); });
+
+      // scheduleAnalysisForSounds must be called even when analysis is running
+      expect(mockScheduleAnalysisForSounds).toHaveBeenCalled();
     });
   });
 });

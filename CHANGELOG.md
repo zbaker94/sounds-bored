@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed loudness analysis not queuing correctly when another analysis was already in progress (issue #418)
+- Fixed analysis queue getting stuck after a malformed or failed analysis event — the queue now advances automatically on error
+- Fixed sounds returning `null` loudness being re-analyzed repeatedly on every app boot
+- Old project files containing legacy genre/mood data now load cleanly without errors (fields silently removed)
 - The "Loudness" analysis button is no longer disabled while analysis is running — you can queue additional sounds mid-analysis
 - Triggering loudness analysis while another batch is in progress now appends sounds to the active queue instead of being silently ignored
 - Genre and mood analysis has been removed; the "Genre/Mood" analyze button is no longer available in the sound library panel.

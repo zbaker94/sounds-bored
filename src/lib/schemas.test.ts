@@ -1551,4 +1551,37 @@ describe("SoundSchema — loudnessLufs field", () => {
       expect(parsed.data.loudnessLufs).toBeCloseTo(-18.7);
     }
   });
+
+  it("accepts null loudnessLufs (analysis ran but produced no value)", () => {
+    const parsed = SoundSchema.safeParse({ ...base, loudnessLufs: null });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.loudnessLufs).toBeNull();
+  });
+});
+
+describe("SoundSchema — backward compatibility (legacy field removal)", () => {
+  const base = { id: "s1", name: "Kick", tags: [], sets: [] };
+
+  it("silently strips legacy genre field (removed in v1.6.0)", () => {
+    const parsed = SoundSchema.safeParse({ ...base, genre: "Rock" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect("genre" in parsed.data).toBe(false);
+  });
+
+  it("silently strips legacy mood field (removed in v1.6.0)", () => {
+    const parsed = SoundSchema.safeParse({ ...base, mood: "Calm" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect("mood" in parsed.data).toBe(false);
+  });
+
+  it("parses successfully when both genre and mood are present (old project.json round-trip)", () => {
+    const oldSound = { ...base, genre: "Electronic", mood: "Energetic", loudnessLufs: -14 };
+    const parsed = SoundSchema.safeParse(oldSound);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect("genre" in parsed.data).toBe(false);
+      expect("mood" in parsed.data).toBe(false);
+      expect(parsed.data.loudnessLufs).toBe(-14);
+    }
+  });
 });

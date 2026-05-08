@@ -103,7 +103,7 @@ export function getVoiceVolume(layer: Layer, sound: Sound): number {
     layer.selection.type === "assigned"
       ? clampGain01((layer.selection.instances.find((i) => i.soundId === sound.id)?.volume ?? 100) / 100)
       : 1.0;
-  return normalizedVoiceGain(rawGain, sound.loudnessLufs);
+  return normalizedVoiceGain(rawGain, sound.loudnessLufs ?? undefined);
 }
 
 /** Convert Layer.volume (schema: 0–100) to a Web Audio gain value (0–1).

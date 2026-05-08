@@ -43,7 +43,7 @@ interface LibraryActions {
   /** Like assignTagsToSounds but bypasses the system tag guard. For internal use (import, bootloader). */
   systemAssignTagsToSounds: (soundIds: string[], tagIds: string[]) => void;
   /** Update analysis results for a single sound. Persisted via isDirty. */
-  updateSoundAnalysis: (soundId: string, data: { loudnessLufs?: number }) => void;
+  updateSoundAnalysis: (soundId: string, data: { loudnessLufs?: number | null }) => void;
   /** Update runtime missing-file state. Not persisted. */
   setMissingState: (
     missingSoundIds: Set<string>,
@@ -244,8 +244,10 @@ export const useLibraryStore = create<LibraryStore>()(
       set((draft) => {
         const sound = draft.sounds.find((s) => s.id === soundId);
         if (!sound) return;
-        if (data.loudnessLufs !== undefined) sound.loudnessLufs = data.loudnessLufs;
-        draft.isDirty = true;
+        if (data.loudnessLufs !== undefined) {
+          sound.loudnessLufs = data.loudnessLufs;
+          draft.isDirty = true;
+        }
       }),
 
     // Plain set — Immer + Set can be finicky, and missing state is simple runtime data

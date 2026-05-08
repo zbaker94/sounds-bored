@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { z } from "zod";
 import { useAnalysisStore } from "@/state/analysisStore";
 import { useLibraryStore } from "@/state/libraryStore";
-import { dispatchNextFromQueue } from "@/lib/library.reconcile";
+import { dispatchNextFromQueue, clearDispatchInFlight } from "@/lib/library.reconcile";
 import { logError } from "@/lib/logger";
 import { ANALYSIS_COMPLETE_EVENT, ANALYSIS_STARTED_EVENT } from "@/lib/constants";
 
@@ -29,13 +29,23 @@ export function useAudioAnalysis() {
     register(listen<unknown>(ANALYSIS_STARTED_EVENT, (event) => {
       const parsed = AnalysisStartedPayloadSchema.safeParse(event.payload);
       if (parsed.success) {
+        clearDispatchInFlight();
         useAnalysisStore.getState().recordStarted(parsed.data.soundId);
       }
     }));
 
     register(listen<unknown>(ANALYSIS_COMPLETE_EVENT, (event) => {
       const parsed = AnalysisCompletePayloadSchema.safeParse(event.payload);
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        logError("Malformed analysis complete event", { payload: event.payload });
+        // Best-effort recovery: record an error so the batch counter advances.
+        const soundIdResult = z.object({ soundId: z.string() }).safeParse(event.payload);
+        if (soundIdResult.success) {
+          useAnalysisStore.getState().recordError(soundIdResult.data.soundId, "malformed analysis event");
+        }
+        void dispatchNextFromQueue();
+        return;
+      }
 
       const { soundId, loudnessLufs, error } = parsed.data;
 
@@ -43,9 +53,10 @@ export function useAudioAnalysis() {
         logError("Audio analysis failed", { soundId, error });
         useAnalysisStore.getState().recordError(soundId, error);
       } else {
-        useLibraryStore.getState().updateSoundAnalysis(soundId, {
-          loudnessLufs: loudnessLufs ?? undefined,
-        });
+        // Pass loudnessLufs as-is: null = analysis ran but produced no value (prevents
+        // infinite re-analysis on next boot); undefined path can't occur here since the
+        // schema above returns number | null.
+        useLibraryStore.getState().updateSoundAnalysis(soundId, { loudnessLufs });
         useAnalysisStore.getState().recordComplete(soundId);
       }
 

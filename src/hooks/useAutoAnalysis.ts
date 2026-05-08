@@ -19,18 +19,13 @@ export function useAutoAnalysis() {
       // Settings just loaded — boot-time analysis is handled by useBootLoader.
       // Skipping this run is StrictMode-safe: if the double-mount fires again,
       // prev will be a real boolean (not null), so the toggle logic below runs.
-      // scheduleAnalysisForUnanalyzed guards against running status internally,
+      // scheduleAnalysisForUnanalyzed deduplicates entries already queued/in-flight,
       // so a spurious second trigger from StrictMode double-mount is harmless.
       return;
     }
 
     if (autoAnalysis && !prev) {
-      // status never resets to "idle" after a batch completes — it stays at
-      // "completed". Using === "idle" would silently block re-triggers after
-      // the first run. See analysisStore.ts — only startAnalysis() resets state.
-      if (useAnalysisStore.getState().status !== "running") {
-        void scheduleAnalysisForUnanalyzed(useLibraryStore.getState().sounds);
-      }
+      void scheduleAnalysisForUnanalyzed(useLibraryStore.getState().sounds);
     } else if (!autoAnalysis && prev) {
       useAnalysisStore.getState().cancelQueue();
     }

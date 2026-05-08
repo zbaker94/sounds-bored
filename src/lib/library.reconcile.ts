@@ -354,6 +354,17 @@ export async function checkMissingStatus(
 // These functions read from / write to Zustand stores directly.
 // Pure reconciliation and detection logic remains above.
 
+// True between the IPC invoke call and the Rust `started` event arriving in JS.
+// Prevents a concurrent appendToQueue kick from firing a second dispatch before
+// currentSoundId is set (the started event is async, so currentSoundId is transiently
+// null even while a Rust task is in flight).
+let _dispatchInFlight = false;
+
+/** Called by useAudioAnalysis when the started event arrives to clear the in-flight flag. */
+export function clearDispatchInFlight(): void {
+  _dispatchInFlight = false;
+}
+
 /**
  * Dispatch the next queued sound for analysis. Called once per completed file
  * to keep exactly one file in-flight in Rust at a time. Iterates until a
@@ -363,10 +374,12 @@ export async function dispatchNextFromQueue(): Promise<void> {
   while (true) {
     const next = useAnalysisStore.getState().dequeueNext();
     if (!next) return;
+    _dispatchInFlight = true;
     try {
       await invoke<void>("start_audio_analysis", { entries: [next] });
-      return; // success — wait for the complete event to drive the next dispatch
+      return; // success — wait for the started event (which clears _dispatchInFlight) then the complete event
     } catch (err) {
+      _dispatchInFlight = false;
       logError("start_audio_analysis failed", { soundId: next.id, err: String(err) });
       useAnalysisStore.getState().recordError(next.id, "Failed to start analysis");
     }
@@ -376,26 +389,33 @@ export async function dispatchNextFromQueue(): Promise<void> {
 /**
  * Append `queue` to the active analysis run, or start a fresh run if idle/completed.
  * If status is "running", appends non-duplicate entries; the existing dispatch loop
- * picks them up naturally. If the last in-flight item completed just before append,
- * appendToQueue re-activates status and we kick dispatch manually. Double-dispatch
- * is not possible: JS is single-threaded, so useAudioAnalysis's completion-event
- * handler (which calls dispatchNextFromQueue on an empty queue) always completes
- * before appendToQueue populates the queue and our kick fires.
+ * picks them up naturally. The kick below handles the race where the last in-flight
+ * item's complete event fired before this append — currentSoundId is null, pendingQueue
+ * is non-empty, and nothing is driving dispatch. We also guard against _dispatchInFlight
+ * to avoid double-invoking Rust in the window between invoke returning and the started
+ * event setting currentSoundId.
  */
 async function enqueueOrStart(queue: AnalysisEntry[]): Promise<void> {
   if (queue.length === 0) return;
   const snapshot = useAnalysisStore.getState();
   if (snapshot.status === "running") {
     snapshot.appendToQueue(queue);
-    // Kick dispatch only when no item is in-flight (race: last item completed just before append)
+    // Kick dispatch only when no Rust task is in-flight and the queue has items.
     const after = useAnalysisStore.getState();
-    if (!after.currentSoundId && after.pendingQueue.length > 0) {
+    if (!after.currentSoundId && !_dispatchInFlight && after.pendingQueue.length > 0) {
       await dispatchNextFromQueue();
     }
     return;
   }
   snapshot.startAnalysis(queue);
   await dispatchNextFromQueue();
+}
+
+function buildAnalysisQueue(sounds: Sound[], filter: (s: Sound) => boolean): AnalysisEntry[] {
+  return sounds
+    .filter((s) => s.filePath && filter(s))
+    .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
+    .map((s) => ({ id: s.id, path: s.filePath! }));
 }
 
 /**
@@ -406,11 +426,7 @@ async function enqueueOrStart(queue: AnalysisEntry[]): Promise<void> {
  * instead of starting a new batch.
  */
 export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> {
-  const queue = sounds
-    .filter((s) => s.filePath)
-    .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath! }));
-  await enqueueOrStart(queue);
+  await enqueueOrStart(buildAnalysisQueue(sounds, () => true));
 }
 
 /**
@@ -424,11 +440,7 @@ export async function scheduleAnalysisForSounds(sounds: Sound[]): Promise<void> 
  * queued. No-op if all sounds are already analyzed or no sounds have a filePath.
  */
 export async function scheduleAnalysisForUnanalyzed(sounds: Sound[]): Promise<void> {
-  const queue = sounds
-    .filter((s) => s.filePath && s.loudnessLufs === undefined)
-    .sort((a, b) => (a.fileSizeBytes ?? Infinity) - (b.fileSizeBytes ?? Infinity))
-    .map((s) => ({ id: s.id, path: s.filePath! }));
-  await enqueueOrStart(queue);
+  await enqueueOrStart(buildAnalysisQueue(sounds, (s) => s.loudnessLufs === undefined));
 }
 
 /**

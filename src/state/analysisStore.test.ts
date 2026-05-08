@@ -143,11 +143,14 @@ describe("analysisStore", () => {
   describe("cancelQueue", () => {
     it("clears pendingQueue and shrinks queueLength to allow progress to reach 100%", () => {
       getState().startAnalysis(makeQueue(5));
-      getState().dequeueNext(); // simulate one dispatched
+      getState().dequeueNext(); // s1 dispatched to Rust
+      getState().recordStarted("s1");
       getState().recordComplete("s1");
+      getState().dequeueNext(); // s2 dispatched to Rust (simulates dispatchNextFromQueue in completion handler)
+      getState().recordStarted("s2"); // s2 in-flight
       getState().cancelQueue();
       expect(getState().pendingQueue).toEqual([]);
-      // queueLength shrinks to completedCount (1) + inFlight (1)
+      // queueLength shrinks to completedCount (1) + inFlight (1, because currentSoundId is set)
       expect(getState().queueLength).toBe(2);
       expect(getState().analyzingCount).toBe(1);
     });
@@ -179,9 +182,10 @@ describe("analysisStore", () => {
 
     it("works when pendingQueue is already empty (single in-flight item)", () => {
       getState().startAnalysis(makeQueue(1));
-      getState().dequeueNext(); // queue now empty, item is in-flight
+      getState().dequeueNext(); // s1 dispatched to Rust
+      getState().recordStarted("s1"); // mark s1 as in-flight
       expect(getState().pendingQueue).toEqual([]);
-      getState().cancelQueue(); // should still update queueLength
+      getState().cancelQueue(); // should still update queueLength (currentSoundId is set)
       expect(getState().pendingQueue).toEqual([]);
       expect(getState().queueLength).toBe(1);
       // item completes → reaches completed
@@ -237,17 +241,16 @@ describe("analysisStore", () => {
       expect(getState().queueLength).toBe(2);
     });
 
-    it("re-activates as a clean batch when called in completed state (race condition)", () => {
+    it("is a no-op when status is completed", () => {
       getState().startAnalysis(makeQueue(1));
       getState().recordError("s1", "bad");
       expect(getState().status).toBe("completed");
+      const queueBefore = getState().pendingQueue;
+      // appendToQueue only operates when running; completed→running transition
+      // is handled by startAnalysis (called by enqueueOrStart in library.reconcile)
       getState().appendToQueue([{ id: "s2", path: "/a2.wav" }]);
-      expect(getState().status).toBe("running");
-      expect(getState().pendingQueue).toEqual([{ id: "s2", path: "/a2.wav" }]);
-      expect(getState().queueLength).toBe(1);
-      expect(getState().analyzingCount).toBe(1);
-      expect(getState().completedCount).toBe(0);
-      expect(getState().errors).toEqual({});
+      expect(getState().status).toBe("completed");
+      expect(getState().pendingQueue).toEqual(queueBefore);
     });
 
     it("preserves the original path when an id collision occurs in dedup", () => {

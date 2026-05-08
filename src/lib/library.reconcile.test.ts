@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed, scheduleAnalysisForSounds } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed, scheduleAnalysisForSounds, clearDispatchInFlight } from "./library.reconcile";
 import { mockFs, mockPath, mockCore } from "@/test/tauri-mocks";
 import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
@@ -1003,6 +1003,7 @@ describe("scheduleAnalysisForUnanalyzed", () => {
   beforeEach(() => {
     useAnalysisStore.setState({ ...initialAnalysisState });
     mockCore.invoke.mockResolvedValue(undefined);
+    clearDispatchInFlight();
   });
 
   it("is a no-op when all sounds are already analyzed", async () => {
@@ -1123,6 +1124,7 @@ describe("scheduleAnalysisForSounds", () => {
   beforeEach(() => {
     useAnalysisStore.setState({ ...initialAnalysisState });
     mockCore.invoke.mockResolvedValue(undefined);
+    clearDispatchInFlight();
   });
 
   it("starts a fresh analysis when status is idle", async () => {

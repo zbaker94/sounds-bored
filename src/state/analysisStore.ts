@@ -16,7 +16,7 @@ interface AnalysisState {
 
 interface AnalysisActions {
   startAnalysis: (queue: AnalysisEntry[]) => void;
-  /** Append entries mid-flight; deduplicates against pendingQueue + currentSoundId. No-op if idle. Re-activates status if completed (race). */
+  /** Append entries mid-flight; deduplicates against pendingQueue + currentSoundId. No-op unless status is "running". */
   appendToQueue: (entries: AnalysisEntry[]) => void;
   recordStarted: (soundId: string) => void;
   recordComplete: (soundId: string) => void;
@@ -52,37 +52,31 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
 
   appendToQueue: (entries) =>
     set((state) => {
-      if (state.status === "idle") return state;
+      if (state.status !== "running") return state;
+      // Dedup against pending + in-flight only. Already-completed entries are intentionally
+      // allowed through (callers filter upstream via scheduleAnalysisForUnanalyzed).
       const existingIds = new Set([
         ...state.pendingQueue.map((e) => e.id),
         ...(state.currentSoundId ? [state.currentSoundId] : []),
       ]);
       const newEntries = entries.filter((e) => !existingIds.has(e.id));
       if (newEntries.length === 0) return state;
-      // Re-activating from "completed" (race: last item finished just before append).
-      // Start a clean batch so prior errors and progress don't bleed into the new run.
-      if (state.status === "completed") {
-        return {
-          pendingQueue: newEntries,
-          queueLength: newEntries.length,
-          analyzingCount: newEntries.length,
-          completedCount: 0,
-          errors: {},
-          status: "running",
-        };
-      }
       return {
         pendingQueue: [...state.pendingQueue, ...newEntries],
         queueLength: state.queueLength + newEntries.length,
         analyzingCount: state.analyzingCount + newEntries.length,
-        status: "running",
       };
     }),
 
-  recordStarted: (soundId) => set({ currentSoundId: soundId }),
+  recordStarted: (soundId) =>
+    set((state) => {
+      if (state.status !== "running") return state;
+      return { currentSoundId: soundId };
+    }),
 
   recordComplete: (_soundId) =>
     set((state) => {
+      if (state.status !== "running") return state;
       const completedCount = state.completedCount + 1;
       const analyzingCount = Math.max(0, state.analyzingCount - 1);
       const done = completedCount >= state.queueLength;
@@ -96,6 +90,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
 
   recordError: (soundId, error) =>
     set((state) => {
+      if (state.status !== "running") return state;
       const completedCount = state.completedCount + 1;
       const analyzingCount = Math.max(0, state.analyzingCount - 1);
       const done = completedCount >= state.queueLength;
@@ -111,8 +106,8 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
   dequeueNext: () => {
     const { pendingQueue } = get();
     if (pendingQueue.length === 0) return undefined;
-    const [next, ...rest] = pendingQueue;
-    set({ pendingQueue: rest });
+    const next = pendingQueue[0];
+    set({ pendingQueue: pendingQueue.slice(1) });
     return next;
   },
 
@@ -122,7 +117,7 @@ export const useAnalysisStore = create<AnalysisState & AnalysisActions>((set, ge
       // Shrink the queue to just what's already completed + the one in-flight,
       // so the progress UI reaches 100% naturally when the current file finishes.
       // Pending sounds are dropped; the in-flight Rust task will complete on its own.
-      const inFlight = 1;
+      const inFlight = state.currentSoundId ? 1 : 0;
       return {
         pendingQueue: [],
         queueLength: state.completedCount + inFlight,

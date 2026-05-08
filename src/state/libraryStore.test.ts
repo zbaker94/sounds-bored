@@ -442,13 +442,14 @@ describe("libraryStore", () => {
       expect(getState().isDirty).toBe(true);
     });
 
-    it("does not overwrite loudnessLufs when called without that field", () => {
+    it("does not overwrite loudnessLufs when called without that field and does not mark dirty", () => {
       const sound = createMockSound({ id: "s1", loudnessLufs: -12 });
-      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [sound], isDirty: false });
 
       getState().updateSoundAnalysis("s1", {});
 
       expect(getState().sounds[0].loudnessLufs).toBe(-12);
+      expect(getState().isDirty).toBe(false);
     });
 
     it("is a no-op for an unknown soundId", () => {
