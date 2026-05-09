@@ -25,9 +25,12 @@ vi.mock("@/lib/library", async () => {
 
 const mockReconcile = vi.fn();
 const mockRefreshMissingState = vi.fn(() => Promise.resolve());
+const mockScheduleAnalysisForUnanalyzed = vi.fn((..._args: unknown[]) => Promise.resolve());
 vi.mock("@/lib/library.reconcile", () => ({
   reconcileGlobalLibrary: (...args: unknown[]) => mockReconcile(...args),
   refreshMissingState: () => mockRefreshMissingState(),
+  scheduleAnalysisForUnanalyzed: (...args: unknown[]) =>
+    mockScheduleAnalysisForUnanalyzed(...args),
 }));
 
 const mockSaveCurrentLibrarySync = vi.fn();
@@ -63,6 +66,7 @@ beforeEach(() => {
   mockLoadGlobalLibrary.mockReset();
   mockReconcile.mockReset();
   mockRefreshMissingState.mockReset();
+  mockScheduleAnalysisForUnanalyzed.mockReset();
   mockSaveCurrentLibrarySync.mockReset();
   mockRestorePathScope.mockReset();
 
@@ -70,6 +74,7 @@ beforeEach(() => {
   mockLoadGlobalLibrary.mockResolvedValue(defaultLibrary);
   mockReconcile.mockResolvedValue({ changed: false, sounds: [], inaccessibleFolderIds: [] });
   mockRefreshMissingState.mockResolvedValue(undefined);
+  mockScheduleAnalysisForUnanalyzed.mockResolvedValue(undefined);
   // Simplified sync mock: real mutate() is async but act() flushes microtasks,
   // so the timing difference does not affect any current assertion.
   mockSaveCurrentLibrarySync.mockImplementation(() => {
@@ -369,5 +374,66 @@ describe("useBootLoader", () => {
     });
 
     expect(mockRestorePathScope).not.toHaveBeenCalled();
+  });
+});
+
+describe("useBootLoader — analysis scheduling", () => {
+  it("schedules analysis on boot when autoAnalysis is true", async () => {
+    mockLoadAppSettings.mockResolvedValue(
+      createMockAppSettings({ autoAnalysis: true, globalFolders: [] }),
+    );
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not schedule analysis on boot when autoAnalysis is false", async () => {
+    mockLoadAppSettings.mockResolvedValue(
+      createMockAppSettings({ autoAnalysis: false, globalFolders: [] }),
+    );
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(mockScheduleAnalysisForUnanalyzed).not.toHaveBeenCalled();
+  });
+
+  it("does not schedule analysis when settings fail to load", async () => {
+    mockLoadAppSettings.mockRejectedValue(new Error("disk read failed"));
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(mockScheduleAnalysisForUnanalyzed).not.toHaveBeenCalled();
+  });
+
+  it("schedules analysis with sounds from the post-reconcile store state", async () => {
+    const unanalyzed = createMockSound({
+      id: "unanalyzed-1",
+      filePath: "/a/kick.wav",
+      loudnessLufs: undefined,
+    });
+    mockLoadAppSettings.mockResolvedValue(
+      createMockAppSettings({ autoAnalysis: true, globalFolders: [] }),
+    );
+    mockReconcile.mockResolvedValue({
+      changed: true,
+      sounds: [unanalyzed],
+      inaccessibleFolderIds: [],
+    });
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalledTimes(1);
+    // Reads from the store post-reconcile, so it sees the reconciled sound
+    const passedSounds = mockScheduleAnalysisForUnanalyzed.mock.calls[0][0] as Array<{ id: string }>;
+    expect(passedSounds.some((s) => s.id === "unanalyzed-1")).toBe(true);
   });
 });

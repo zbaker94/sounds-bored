@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed: pad sound volume settings no longer reset when switching tags, match mode, or sound sets in the pad config drawer
+- Fixed: missing or empty sound file paths now raise a specific error type, enabling clearer error messages when sounds can't be loaded
+- Fixed: auto-save now correctly triggers on the next interval after edits made post-mount, not just on initial load
+- Improved reliability of project file migration from older formats (1.2.0), ensuring pad volume fields are correctly renamed and rescaled
 - Improved error reporting when a project fails to open — the underlying cause (corrupt JSON, schema mismatch, version conflict) is now preserved and surfaced in diagnostics
 - Projects saved by a newer version of the app now produce a clearer "newer version" error message when opened in an older version
 - Improved reliability when opening older project and library files — migration logic is now shared and consistent between both
