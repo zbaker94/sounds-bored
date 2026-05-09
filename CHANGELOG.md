@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved error reporting when a project fails to open — the underlying cause (corrupt JSON, schema mismatch, version conflict) is now preserved and surfaced in diagnostics
+- Projects saved by a newer version of the app now produce a clearer "newer version" error message when opened in an older version
 - Improved reliability when opening older project and library files — migration logic is now shared and consistent between both
 - Fixed edge case where items without an `id` field could cause duplicate-detection to behave incorrectly during library migration
 - Migration warnings now appear in app log files instead of only the developer console

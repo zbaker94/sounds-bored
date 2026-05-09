@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { migrateProject, CURRENT_VERSION } from "./migrations";
+import { migrateProject, CURRENT_VERSION, MigrationError } from "./migrations";
 import { ProjectSchema } from "./schemas";
+import { DocumentValidationError } from "@/lib/errors";
 import {
   ProjectNotFoundError,
   ProjectValidationError,
@@ -239,6 +240,44 @@ describe("loadProjectFile", () => {
 
     expect(mockFs.readDir).toHaveBeenCalledWith("/test/path");
     expect(mockFs.remove).toHaveBeenCalledWith(`/test/path/project.json.${uuid}.tmp`);
+  });
+
+  it("ProjectValidationError is instanceof DocumentValidationError and exposes docKind", async () => {
+    mockFs.readTextFile.mockResolvedValue("invalid json {");
+
+    const error = await expectToReject(
+      loadProjectFile("/test/path/project.json"),
+      ProjectValidationError
+    ) as ProjectValidationError;
+
+    expect(error).toBeInstanceOf(DocumentValidationError);
+    expect(error.docKind).toBe("project");
+    expect(error.name).toBe("ProjectValidationError");
+  });
+
+  it("ZodError branch also produces DocumentValidationError instance", async () => {
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify({ version: "1.0.0" }));
+
+    const error = await expectToReject(
+      loadProjectFile("/test/path/project.json"),
+      ProjectValidationError
+    );
+
+    expect(error).toBeInstanceOf(DocumentValidationError);
+  });
+
+  it("preserves MigrationError as cause when wrapping as ProjectValidationError", async () => {
+    // Feed a future-version project to trigger the real future-version guard in migrateProject.
+    mockFs.readTextFile.mockResolvedValue(JSON.stringify({ name: "Test", version: "99.0.0" }));
+
+    const error = await expectToReject(
+      loadProjectFile("/test/path/project.json"),
+      ProjectValidationError
+    );
+
+    expect(error).toBeInstanceOf(DocumentValidationError);
+    expect(error.cause).toBeInstanceOf(MigrationError);
+    expect(error.message).toContain("newer version");
   });
 
   it("should default scenes and favoritedSetIds to empty arrays after migration", () => {
