@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where cancelling a fade-out mid-transition left the pad incorrectly marked as "fading out"
+- Fixed a bug where triggering a pad again after `Stop All` during an active fade would incorrectly stop the newly triggered sound
 - Reduced unnecessary re-renders on pad buttons — playback progress bars no longer re-render when unrelated project changes (pad color, name, etc.) occur during playback
 - Improved audio engine efficiency: redundant per-frame progress updates are now suppressed when values haven't meaningfully changed, reducing unnecessary UI re-renders during playback.
 - Internal refactor only: tooltip text and helper functions moved to a dedicated module with no change to UI behavior or copy.

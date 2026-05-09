@@ -39,6 +39,10 @@ function makeMockGain(initialValue = 1.0) {
   };
 }
 
+function makeMockVoice() {
+  return { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
+}
+
 describe("fadeMixer", () => {
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -156,8 +160,8 @@ describe("fadeMixer", () => {
       mockCtx.createGain.mockReturnValue(mockGain);
       const { getPadGain, recordLayerVoice } = await import("./audioState");
       getPadGain("pad-null-ended");
-      const mockVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() };
-      recordLayerVoice("pad-null-ended", "layer-null-ended", mockVoice as unknown as import("./audioVoice").AudioVoice);
+      const mockVoice = makeMockVoice();
+      recordLayerVoice("pad-null-ended", "layer-null-ended", mockVoice);
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-null-ended" });
 
@@ -215,6 +219,24 @@ describe("fadeMixer", () => {
       vi.advanceTimersByTime(600);
 
       expect(resetPadGain).not.toHaveBeenCalled();
+    });
+
+    it("cancelFade on a partial-fade clears the fading-out flag", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain, isPadFadingOut } = await import("./audioState");
+      const { cancelFade } = await import("./fadeCoordinator");
+      getPadGain("pad-partial-retrigger");
+      const { fadePad } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-partial-retrigger" });
+
+      fadePad(pad, 1.0, 0.3, 500);
+      expect(isPadFadingOut("pad-partial-retrigger")).toBe(true);
+
+      cancelFade("pad-partial-retrigger");
+      vi.advanceTimersByTime(600);
+
+      expect(isPadFadingOut("pad-partial-retrigger")).toBe(false);
     });
 
     it("mirrors fading-out state to playbackStore", async () => {
@@ -357,6 +379,29 @@ describe("fadeMixer", () => {
 
       // Chain should remain — stopPadInternal was not called
       expect(getLayerChain("layer-fpi-nonzero")).toEqual([]);
+    });
+
+    it("does not call stopPadInternal if pad fade-in is cancelled before timeout fires", async () => {
+      const mockGain = makeMockGain(0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer = createMockLayer({ id: "layer-fpi-cancel" });
+      const { getPadGain, recordLayerVoice, setLayerChain, getLayerChain } = await import("./audioState");
+      const { cancelFade } = await import("./fadeCoordinator");
+      getPadGain("pad-fpi-cancel");
+      const mockVoice = makeMockVoice();
+      recordLayerVoice("pad-fpi-cancel", "layer-fpi-cancel", mockVoice);
+      setLayerChain("layer-fpi-cancel", []);
+      const { fadePadIn } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-fpi-cancel", layers: [layer] });
+      const startPad = vi.fn().mockResolvedValue(undefined);
+
+      await fadePadIn(pad, 0, 500, startPad);
+
+      cancelFade("pad-fpi-cancel");
+      vi.advanceTimersByTime(600);
+
+      expect(mockVoice.stop).not.toHaveBeenCalled();
+      expect(getLayerChain("layer-fpi-cancel")).toEqual([]);
     });
   });
 });

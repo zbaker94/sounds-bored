@@ -1,7 +1,7 @@
 ﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
-import { isLayerActive, isPadFading, isLayerPending, clearAllFadeTracking, getPadProgress, getPadGain, clearAllAudioState } from "./audioState";
+import { isLayerActive, isPadFading, isPadFadingOut, isLayerPending, clearAllFadeTracking, getPadProgress, getPadGain, clearAllAudioState } from "./audioState";
 import { isPadStreaming } from "./streamingAudioLifecycle";
 import { fadePad, resolveFadeDuration, freezePadAtCurrentVolume } from "./fadeMixer";
 import { resetPadGain, setLayerVolume } from "./gainManager";
@@ -2612,6 +2612,43 @@ describe("stopAllPads clears fade tracking", () => {
 
     stopAllPads();
     expect(isPadFading(pad.id)).toBe(false);
+
+    clearAllFadeTracking();
+    vi.useRealTimers();
+  });
+
+  it("stopAllPads during active fade-out clears fade state so re-triggered pad plays cleanly", async () => {
+    vi.useFakeTimers();
+    const { triggerPad, stopAllPads } = await import("./padPlayer");
+
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layer = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 100 }] },
+    });
+    const pad = createMockPad({ id: "stop-then-retrigger-pad", layers: [layer] });
+
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+
+    fadePad(pad, 1.0, 0, 500);
+    expect(isPadFadingOut(pad.id)).toBe(true);
+
+    stopAllPads();
+
+    const voiceCountBefore = createdSources.length;
+    await triggerPad(pad);
+    await vi.runAllTimersAsync();
+    expect(createdSources.length).toBeGreaterThan(voiceCountBefore);
+    const newVoice = createdSources[voiceCountBefore];
+
+    vi.advanceTimersByTime(600);
+
+    expect(newVoice.stop).not.toHaveBeenCalled();
+    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
+    expect(isLayerActive(layer.id)).toBe(true);
 
     clearAllFadeTracking();
     vi.useRealTimers();
