@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this update — internal audio engine tests improved for reliability.
 - Fixed a bug where cancelling a fade-out mid-transition left the pad incorrectly marked as "fading out"
 - Fixed a bug where triggering a pad again after `Stop All` during an active fade would incorrectly stop the newly triggered sound
 - Reduced unnecessary re-renders on pad buttons — playback progress bars no longer re-render when unrelated project changes (pad color, name, etc.) occur during playback
