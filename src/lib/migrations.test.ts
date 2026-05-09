@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { migrateProject, migrateLibrary, CURRENT_VERSION, MigrationError } from "./migrations";
 import { CURRENT_LIBRARY_VERSION, CURRENT_PROJECT_VERSION, DEFAULT_PROJECT_VERSION } from "./constants";
+import * as logger from "@/lib/logger";
 
 describe("version constant sync", () => {
   it("CURRENT_VERSION (migrations) equals CURRENT_PROJECT_VERSION (constants) — single source of truth", () => {
@@ -35,6 +36,16 @@ describe("migrateProject", () => {
 });
 
 describe("migrateProject — 1.0.0 → 1.1.0", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(logger, "logWarn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
   it("should strip sounds, tags, sets and add favoritedSetIds", () => {
     const raw = {
       name: "My Project",
@@ -69,7 +80,6 @@ describe("migrateProject — 1.0.0 → 1.1.0", () => {
   });
 
   it("should warn when stripping non-empty sounds/tags/sets", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const raw = {
       name: "My Project",
       version: "1.0.0",
@@ -79,21 +89,16 @@ describe("migrateProject — 1.0.0 → 1.1.0", () => {
     };
     migrateProject(raw);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("1 sound"));
-    warnSpy.mockRestore();
   });
 
   it("should not warn when sounds/tags/sets are empty arrays", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     migrateProject({ name: "My Project", version: "1.0.0", sounds: [], tags: [], sets: [] });
     expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it("should not warn when sounds/tags/sets are absent", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     migrateProject({ name: "My Project", version: "1.0.0" });
     expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 });
 
@@ -677,6 +682,7 @@ describe("migrateLibrary", () => {
     const tags = result.tags as unknown[];
     // Non-objects pass the filter (they lack a name field check that would catch them)
     // but the valid tag is kept
+    expect(tags).toHaveLength(4);
     expect((tags as Array<Record<string, unknown>>).some((t) => t?.id === "t1")).toBe(true);
   });
 
