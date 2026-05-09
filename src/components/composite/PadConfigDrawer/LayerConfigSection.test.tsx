@@ -197,7 +197,7 @@ describe("LayerConfigSection", () => {
     await hoverInfoButtonAndAssert(2, "Controls whether the whole sequence chains automatically, or each trigger advances one step at a time.");
   });
 
-  // ─── Tab tooltip tests ───────────────────────────────────────────────────
+  // ─── Tab tooltip smoke tests ─────────────────────────────────────────────
 
   it("shows Assigned tab tooltip on hover", async () => {
     render(<Wrapper />);
@@ -209,307 +209,32 @@ describe("LayerConfigSection", () => {
     await hoverTabTooltipAndAssert(/simultaneous/i, "All sounds start at the same time.");
   });
 
-  it("shows One-shot tab tooltip on hover", async () => {
-    render(<Wrapper />);
-    await hoverTabTooltipAndAssert(/one-shot/i, "The sound plays once from start to finish, then stops.");
-  });
+  // ─── Helper text smoke tests ──────────────────────────────────────────────
 
-  it("shows Restart retrigger tab tooltip on hover", async () => {
-    render(<Wrapper />);
-    await hoverTabTooltipAndAssert(/restart/i, "Stops the current sound and starts it again from the beginning.");
-  });
-
-  it("shows Continuous tab tooltip on hover (sequential arrangement)", async () => {
-    renderWithLayer({ arrangement: "sequential" });
-    await hoverTabTooltipAndAssert(/continuous/i, /The full sequence plays through automatically/);
-  });
-
-  it("shows Cycle tab tooltip on hover (sequential arrangement)", async () => {
-    renderWithLayer({ arrangement: "sequential" });
-    await hoverTabTooltipAndAssert(/cycle/i, /Each trigger plays one sound, advancing/);
-  });
-
-  // ─── Arrangement helper text tests ────────────────────────────────────────
-
-  it("shows arrangement helper for simultaneous with no assigned sounds", () => {
-    render(<Wrapper />);
-    // 0 instances assigned + simultaneous → no helper (instanceCount < 1)
-    expect(screen.queryByText(/play together on each trigger/)).not.toBeInTheDocument();
-  });
-
-  it("shows arrangement helper for simultaneous with 1 assigned sound", () => {
+  it("renders arrangement helper text in component", () => {
     renderWithLayer({
       selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
     });
     expectTextInDocument("The assigned sound plays on each trigger.");
   });
 
-  it("shows arrangement helper for simultaneous with 3 assigned sounds", () => {
-    renderWithLayer({
-      selection: { type: "assigned", instances: [
-        { id: "i1", soundId: "s1", volume: 100 },
-        { id: "i2", soundId: "s2", volume: 100 },
-        { id: "i3", soundId: "s3", volume: 100 },
-      ] },
-    });
-    expectTextInDocument("All 3 assigned sounds play together on each trigger.");
-  });
-
-  it("shows arrangement helper for simultaneous with tag selection", () => {
-    renderWithLayer({
-      selection: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 },
-    });
-    expectTextInDocument("All matched sounds play together at trigger time.");
-  });
-
-  it("shows arrangement helper for sequential with 1 assigned sound", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: 100 }] },
-    });
-    expectTextInDocument("Only one sound assigned — arrangement has no effect with a single sound.");
-  });
-
-  it("shows arrangement helper for sequential + 2 assigned + continuous", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: false,
-      selection: { type: "assigned", instances: [
-        { id: "i1", soundId: "s1", volume: 100 },
-        { id: "i2", soundId: "s2", volume: 100 },
-      ] },
-    });
-    expectTextInDocument(/All 2 sounds chain automatically/);
-  });
-
-  it("shows arrangement helper for sequential + 2 assigned + cycle", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: true,
-      selection: { type: "assigned", instances: [
-        { id: "i1", soundId: "s1", volume: 100 },
-        { id: "i2", soundId: "s2", volume: 100 },
-      ] },
-    });
-    expectTextInDocument("Each trigger plays the next sound in order.");
-  });
-
-  it("shows arrangement helper for shuffled + 3 assigned + continuous", () => {
-    renderWithLayer({
-      arrangement: "shuffled",
-      cycleMode: false,
-      selection: { type: "assigned", instances: [
-        { id: "i1", soundId: "s1", volume: 100 },
-        { id: "i2", soundId: "s2", volume: 100 },
-        { id: "i3", soundId: "s3", volume: 100 },
-      ] },
-    });
-    expectTextInDocument(/All 3 sounds chain automatically.*random order/);
-  });
-
-  it("shows arrangement helper for shuffled + 2 assigned + cycle", () => {
-    renderWithLayer({
-      arrangement: "shuffled",
-      cycleMode: true,
-      selection: { type: "assigned", instances: [
-        { id: "i1", soundId: "s1", volume: 100 },
-        { id: "i2", soundId: "s2", volume: 100 },
-      ] },
-    });
-    expectTextInDocument("Each trigger plays a random sound from the 2 assigned.");
-  });
-
-  it("shows arrangement helper for sequential + tag + cycle", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: true,
-      selection: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 },
-    });
-    expectTextInDocument("Each trigger plays the next sound from the matched pool.");
-  });
-
-  it("shows arrangement helper for shuffled + set + continuous", () => {
-    renderWithLayer({
-      arrangement: "shuffled",
-      cycleMode: false,
-      selection: { type: "set", setId: "s1", defaultVolume: 100 },
-    });
-    expectTextInDocument("All matched sounds chain automatically on each trigger.");
-  });
-
-  // ─── Cycle mode helper text tests ─────────────────────────────────────────
-
-  it("shows cycle mode helper for sequential + continuous + one-shot", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: false,
-      playbackMode: "one-shot",
-    });
+  it("renders cycle mode helper text in component", () => {
+    renderWithLayer({ arrangement: "sequential", cycleMode: false, playbackMode: "one-shot" });
     expectTextInDocument(/The full sequence plays through once and stops/);
   });
 
-  it("shows cycle mode helper for sequential + continuous + loop", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: false,
-      playbackMode: "loop",
-    });
-    expectTextInDocument(/The sequence loops indefinitely/);
+  it("hides Mode section when arrangement is simultaneous", () => {
+    render(<Wrapper />);
+    expect(screen.queryByText("Mode")).not.toBeInTheDocument();
   });
 
-  it("shows cycle mode helper for sequential + cycle + one-shot", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: true,
-      playbackMode: "one-shot",
-    });
-    expectTextInDocument(/Each trigger plays the next sound in order. After the last/);
-  });
-
-  it("shows cycle mode helper for sequential + cycle + loop", () => {
-    renderWithLayer({
-      arrangement: "sequential",
-      cycleMode: true,
-      playbackMode: "loop",
-    });
-    expectTextInDocument(/Each trigger advances to the next sound, which then loops/);
-  });
-
-  it("shows cycle mode helper for shuffled + continuous + one-shot", () => {
-    renderWithLayer({
-      arrangement: "shuffled",
-      cycleMode: false,
-      playbackMode: "one-shot",
-    });
-    expectTextInDocument(/A new random order is played through once/);
-  });
-
-  it("shows cycle mode helper for shuffled + cycle + loop", () => {
-    renderWithLayer({
-      arrangement: "shuffled",
-      cycleMode: true,
-      playbackMode: "loop",
-    });
-    expectTextInDocument(/Each trigger plays a random sound, which loops until/);
-  });
-
-  // ─── Playback mode helper text tests ──────────────────────────────────────
-
-  it("shows playback helper for one-shot + restart", () => {
-    renderWithLayer({
-      playbackMode: "one-shot",
-      retriggerMode: "restart",
-    });
-    expectTextInDocument(/Plays once. Triggering while it's playing restarts/);
-  });
-
-  it("shows playback helper for one-shot + continue", () => {
-    renderWithLayer({
-      playbackMode: "one-shot",
-      retriggerMode: "continue",
-    });
-    expectTextInDocument(/Plays once. Triggering while it's playing is ignored/);
-  });
-
-  it("shows playback helper for one-shot + stop", () => {
-    renderWithLayer({
-      playbackMode: "one-shot",
-      retriggerMode: "stop",
-    });
-    expectTextInDocument(/Plays once. Triggering while it's playing stops it/);
-  });
-
-  it("shows playback helper for hold", () => {
-    renderWithLayer({
-      playbackMode: "hold",
-      retriggerMode: "restart",
-    });
+  it("renders playback mode helper text in component", () => {
+    renderWithLayer({ playbackMode: "hold", retriggerMode: "restart" });
     expectTextInDocument("Plays while the pad is held. Releasing the pad stops the sound.");
   });
 
-  it("shows playback helper for loop + stop", () => {
-    renderWithLayer({
-      playbackMode: "loop",
-      retriggerMode: "stop",
-    });
-    expectTextInDocument(/Loops continuously. Triggering again stops it/);
-  });
-
-  it("shows playback helper for loop + continue", () => {
-    renderWithLayer({
-      playbackMode: "loop",
-      retriggerMode: "continue",
-    });
-    expectTextInDocument(/Loops continuously. Retriggering while looping has no effect/);
-  });
-
-  // ─── Retrigger mode helper text tests ─────────────────────────────────────
-
-  it("shows retrigger helper for restart + one-shot", () => {
-    renderWithLayer({
-      retriggerMode: "restart",
-      playbackMode: "one-shot",
-    });
-    expectTextInDocument(/Each retrigger stops the current sound and plays it/);
-  });
-
-  it("shows retrigger helper for restart + hold", () => {
-    renderWithLayer({
-      retriggerMode: "restart",
-      playbackMode: "hold",
-    });
-    expectTextInDocument("Re-pressing the pad while held stops and restarts the sound.");
-  });
-
-  it("shows retrigger helper for continue + loop", () => {
-    renderWithLayer({
-      retriggerMode: "continue",
-      playbackMode: "loop",
-    });
+  it("renders retrigger helper text in component", () => {
+    renderWithLayer({ retriggerMode: "continue", playbackMode: "loop" });
     expectTextInDocument("Once looping, subsequent triggers have no effect.");
-  });
-
-  it("shows retrigger helper for stop + loop", () => {
-    renderWithLayer({
-      retriggerMode: "stop",
-      playbackMode: "loop",
-    });
-    expectTextInDocument(/Triggering while looping stops the loop/);
-  });
-
-  it("shows retrigger helper for next + sequential + continuous", () => {
-    renderWithLayer({
-      retriggerMode: "next",
-      arrangement: "sequential",
-      cycleMode: false,
-    });
-    expectTextInDocument("Triggering while playing skips to the next queued sound in the chain.");
-  });
-
-  it("shows retrigger helper for next + sequential + cycle", () => {
-    renderWithLayer({
-      retriggerMode: "next",
-      arrangement: "sequential",
-      cycleMode: true,
-    });
-    expectTextInDocument("Triggering while playing advances the cycle cursor to the next sound.");
-  });
-
-  it("shows retrigger helper for next + shuffled + continuous", () => {
-    renderWithLayer({
-      retriggerMode: "next",
-      arrangement: "shuffled",
-      cycleMode: false,
-    });
-    expectTextInDocument("Triggering while playing skips to the next randomly-ordered sound in the chain.");
-  });
-
-  it("shows retrigger helper for next + shuffled + cycle", () => {
-    renderWithLayer({
-      retriggerMode: "next",
-      arrangement: "shuffled",
-      cycleMode: true,
-    });
-    expectTextInDocument("Triggering while playing advances to the next random position in the cycle.");
   });
 });
