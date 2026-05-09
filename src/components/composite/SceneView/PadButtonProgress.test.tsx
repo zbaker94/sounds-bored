@@ -2,13 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
-import { createMockLayer } from "@/test/factories";
-import { PadButtonProgress } from "./PadButtonProgress";
+import { PadButtonProgress, arePropsEqual } from "./PadButtonProgress";
 
 const PAD_ID = "pad-1";
-const LAYER_A = createMockLayer({ id: "layer-a" });
-const LAYER_B = createMockLayer({ id: "layer-b" });
-const LAYERS = [LAYER_A, LAYER_B];
+const LAYER_A_ID = "layer-a";
+const LAYER_B_ID = "layer-b";
+const LAYER_IDS = [LAYER_A_ID, LAYER_B_ID];
 
 beforeEach(() => {
   usePlaybackStore.setState({ ...initialPlaybackState });
@@ -17,7 +16,7 @@ beforeEach(() => {
 
 describe("PadButtonProgress", () => {
   it("renders nothing when pad is not playing", () => {
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    const { container } = render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -30,7 +29,20 @@ describe("PadButtonProgress", () => {
       ...initialLayerMetricsState,
       activeLayerIds: new Set(),
     });
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    const { container } = render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("renders nothing when playing but layerIds is empty", () => {
+    usePlaybackStore.setState({
+      ...initialPlaybackState,
+      playingPadIds: new Set([PAD_ID]),
+    });
+    useLayerMetricsStore.setState({
+      ...initialLayerMetricsState,
+      activeLayerIds: new Set([LAYER_A_ID]),
+    });
+    const { container } = render(<PadButtonProgress padId={PAD_ID} layerIds={[]} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -41,11 +53,10 @@ describe("PadButtonProgress", () => {
     });
     useLayerMetricsStore.setState({
       ...initialLayerMetricsState,
-      activeLayerIds: new Set([LAYER_A.id, LAYER_B.id]),
-      layerProgress: { [LAYER_A.id]: 0.25, [LAYER_B.id]: 0.75 },
+      activeLayerIds: new Set([LAYER_A_ID, LAYER_B_ID]),
+      layerProgress: { [LAYER_A_ID]: 0.25, [LAYER_B_ID]: 0.75 },
     });
-    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
-    // One progress bar div per active layer
+    render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
     const bars = screen.getAllByTestId("pad-layer-progress-bar");
     expect(bars).toHaveLength(2);
   });
@@ -57,10 +68,10 @@ describe("PadButtonProgress", () => {
     });
     useLayerMetricsStore.setState({
       ...initialLayerMetricsState,
-      activeLayerIds: new Set([LAYER_A.id]),
-      layerProgress: { [LAYER_A.id]: 0.5 },
+      activeLayerIds: new Set([LAYER_A_ID]),
+      layerProgress: { [LAYER_A_ID]: 0.5 },
     });
-    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
     const bar = screen.getByTestId("pad-layer-progress-bar") as HTMLElement;
     expect(bar.style.width).toBe("50%");
   });
@@ -72,26 +83,26 @@ describe("PadButtonProgress", () => {
     });
     useLayerMetricsStore.setState({
       ...initialLayerMetricsState,
-      activeLayerIds: new Set([LAYER_A.id]),
+      activeLayerIds: new Set([LAYER_A_ID]),
       layerProgress: {},
     });
-    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
     const bar = screen.getByTestId("pad-layer-progress-bar") as HTMLElement;
     expect(bar.style.width).toBe("0%");
   });
 
   it("only renders bars for active layers, not all layers", () => {
-    // Only LAYER_A is active; LAYER_B is in the layers list but not active
+    // Only LAYER_A_ID is active; LAYER_B_ID is in the list but not active
     usePlaybackStore.setState({
       ...initialPlaybackState,
       playingPadIds: new Set([PAD_ID]),
     });
     useLayerMetricsStore.setState({
       ...initialLayerMetricsState,
-      activeLayerIds: new Set([LAYER_A.id]),
-      layerProgress: { [LAYER_A.id]: 0.3, [LAYER_B.id]: 0.6 },
+      activeLayerIds: new Set([LAYER_A_ID]),
+      layerProgress: { [LAYER_A_ID]: 0.3, [LAYER_B_ID]: 0.6 },
     });
-    render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
     const bars = screen.getAllByTestId("pad-layer-progress-bar");
     expect(bars).toHaveLength(1);
   });
@@ -103,9 +114,93 @@ describe("PadButtonProgress", () => {
     });
     useLayerMetricsStore.setState({
       ...initialLayerMetricsState,
-      activeLayerIds: new Set([LAYER_A.id]),
+      activeLayerIds: new Set([LAYER_A_ID]),
     });
-    const { container } = render(<PadButtonProgress padId={PAD_ID} layers={LAYERS} />);
+    const { container } = render(<PadButtonProgress padId={PAD_ID} layerIds={LAYER_IDS} />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("PadButtonProgress — React.memo", () => {
+  // $$typeof is a React internal — not part of the public API.
+  // Pragmatic: directly verifying memo wiring is cleaner than a render-count test.
+  // If this breaks on a React upgrade, replace with a render-count integration test.
+  it("is wrapped in React.memo with arePropsEqual as the comparator", () => {
+    expect((PadButtonProgress as unknown as { $$typeof: symbol }).$$typeof).toBe(
+      Symbol.for("react.memo"),
+    );
+    // Confirms arePropsEqual unit tests directly prove the re-render-prevention contract.
+    expect((PadButtonProgress as unknown as { compare: unknown }).compare).toBe(arePropsEqual);
+  });
+});
+
+describe("arePropsEqual", () => {
+  it("returns true for identical props", () => {
+    const props = { padId: PAD_ID, layerIds: LAYER_IDS };
+    expect(arePropsEqual(props, props)).toBe(true);
+  });
+
+  it(
+    "returns true when layerIds array reference changes but values match (regression guard for issue #238)",
+    () => {
+      const prev = { padId: PAD_ID, layerIds: [LAYER_A_ID, LAYER_B_ID] };
+      const next = { padId: PAD_ID, layerIds: [LAYER_A_ID, LAYER_B_ID] };
+      // Precondition: different references — this is the exact scenario that caused unnecessary re-renders.
+      expect(prev.layerIds).not.toBe(next.layerIds);
+      expect(arePropsEqual(prev, next)).toBe(true);
+    },
+  );
+
+  it("returns true via reference short-circuit when layerIds is the same array", () => {
+    const layerIds = [LAYER_A_ID, LAYER_B_ID];
+    expect(arePropsEqual({ padId: PAD_ID, layerIds }, { padId: PAD_ID, layerIds })).toBe(true);
+  });
+
+  it("returns true for empty layerIds arrays", () => {
+    const prev = { padId: PAD_ID, layerIds: [] };
+    const next = { padId: PAD_ID, layerIds: [] };
+    expect(arePropsEqual(prev, next)).toBe(true);
+  });
+
+  it("returns true for single-element layerIds with same value", () => {
+    const prev = { padId: PAD_ID, layerIds: [LAYER_A_ID] };
+    const next = { padId: PAD_ID, layerIds: [LAYER_A_ID] };
+    expect(arePropsEqual(prev, next)).toBe(true);
+  });
+
+  it("returns false when padId changes", () => {
+    const prev = { padId: PAD_ID, layerIds: LAYER_IDS };
+    const next = { padId: "other-pad", layerIds: LAYER_IDS };
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  it("returns false when padId changes regardless of layerIds", () => {
+    const prev = { padId: PAD_ID, layerIds: [] };
+    const next = { padId: "other-pad", layerIds: [] };
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  it("returns false when layerIds length changes", () => {
+    const prev = { padId: PAD_ID, layerIds: [LAYER_A_ID, LAYER_B_ID] };
+    const next = { padId: PAD_ID, layerIds: [LAYER_A_ID] };
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  it("returns false when a layer ID changes at the last position", () => {
+    const prev = { padId: PAD_ID, layerIds: [LAYER_A_ID, LAYER_B_ID] };
+    const next = { padId: PAD_ID, layerIds: [LAYER_A_ID, "layer-c"] };
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  it("returns false when a layer ID changes at the first position", () => {
+    const prev = { padId: PAD_ID, layerIds: [LAYER_A_ID, LAYER_B_ID] };
+    const next = { padId: PAD_ID, layerIds: ["layer-c", LAYER_B_ID] };
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  it("returns false when layer IDs are reordered", () => {
+    const prev = { padId: PAD_ID, layerIds: [LAYER_A_ID, LAYER_B_ID] };
+    const next = { padId: PAD_ID, layerIds: [LAYER_B_ID, LAYER_A_ID] };
+    expect(arePropsEqual(prev, next)).toBe(false);
   });
 });
