@@ -1,18 +1,18 @@
 import { CURRENT_PROJECT_VERSION, CURRENT_LIBRARY_VERSION } from "./constants";
+import { logWarn } from "@/lib/logger";
 
-type RawProject = Record<string, unknown>;
-type MigrationFn = (raw: RawProject) => RawProject;
+type RawDoc = Record<string, unknown>;
 
-interface Migration {
+interface VersionedMigration {
   fromVersion: string;
   toVersion: string;
-  migrate: MigrationFn;
+  migrate: (raw: RawDoc) => RawDoc;
 }
 
 // Re-exported for backward compatibility — canonical value lives in constants.ts.
 export const CURRENT_VERSION = CURRENT_PROJECT_VERSION;
 
-/** Thrown by migrateProject when the project version is unresolvable. */
+/** Thrown by migrateProject and migrateLibrary when a version is unresolvable. */
 export class MigrationError extends Error {
   constructor(message: string) {
     super(message);
@@ -54,7 +54,8 @@ function compareVersions(a: string, b: string): number {
   return aPat - bPat;
 }
 
-const MIGRATIONS: Migration[] = [
+// Project migrations
+const MIGRATIONS: VersionedMigration[] = [
   {
     // Seed migration: projects saved before versioning was introduced default to
     // UNVERSIONED_DEFAULT. Their data model is identical to 1.0.0, so we just
@@ -76,10 +77,8 @@ const MIGRATIONS: Migration[] = [
       const tagCount = Array.isArray(tags) ? tags.length : 0;
       const setCount = Array.isArray(sets) ? sets.length : 0;
 
-      // Deliberate diagnostic exception: migration console output helps trace data loss
-      // during version upgrades; this is not a user-facing message.
       if (soundCount > 0 || tagCount > 0 || setCount > 0) {
-        console.warn(
+        logWarn(
           `Migration 1.0.0 → 1.1.0: discarding ${soundCount} sound(s), ` +
           `${tagCount} tag(s), ${setCount} set(s) from project. ` +
           `These are now managed in the global sound library.`
@@ -188,55 +187,7 @@ const MIGRATIONS: Migration[] = [
   },
 ];
 
-export function migrateProject(raw: RawProject): RawProject {
-  let current = { ...raw };
-  // Guard against non-string version fields from malformed/untrusted disk data.
-  // An `as` cast would silently succeed and then crash inside compareVersions()
-  // when .split(".") is called on a non-string. Fall back to UNVERSIONED_DEFAULT.
-  let version = typeof current.version === "string" ? current.version : UNVERSIONED_DEFAULT;
-
-  // Future-version guard: refuse to open files from a newer app version to
-  // prevent silent data loss from Zod stripping unknown fields on next save.
-  if (compareVersions(version, CURRENT_VERSION) > 0) {
-    throw new MigrationError(
-      `This project was created with a newer version of SoundsBored (${version}). ` +
-      `Please update the app to open it.`
-    );
-  }
-
-  for (const migration of MIGRATIONS) {
-    if (version === migration.fromVersion) {
-      current = migration.migrate(current);
-      version = migration.toVersion;
-      current.version = version;
-    }
-  }
-
-  // If the version is still not current after running all applicable migrations,
-  // there is no migration path for this version (unknown past version).
-  if (version !== CURRENT_VERSION) {
-    throw new MigrationError(
-      `No migration path found for project version "${version}". ` +
-      `The project may be from an unsupported version of SoundsBored.`
-    );
-  }
-
-  return current;
-}
-
-// ---------------------------------------------------------------------------
-// Library migrations
-// ---------------------------------------------------------------------------
-
-type RawLibrary = Record<string, unknown>;
-type LibraryMigrationFn = (raw: RawLibrary) => RawLibrary;
-
-interface LibraryMigration {
-  fromVersion: string;
-  toVersion: string;
-  migrate: LibraryMigrationFn;
-}
-
+// Library migration helpers
 /**
  * Deduplicate items in an array by their `id` field, keeping the first
  * occurrence of each id. Non-array input is returned unchanged.
@@ -247,7 +198,7 @@ function dedupeById(value: unknown): unknown {
   const seen = new Set<unknown>();
   const result: unknown[] = [];
   for (const item of value) {
-    if (item && typeof item === "object" && "id" in item) {
+    if (item && typeof item === "object" && (item as { id?: unknown }).id !== undefined) {
       const id = (item as { id: unknown }).id;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -269,13 +220,14 @@ function stripInvalidNumeric(obj: Record<string, unknown>, field: string): void 
   }
 }
 
-const LIBRARY_MIGRATIONS: LibraryMigration[] = [
+// Library migrations
+const LIBRARY_MIGRATIONS: VersionedMigration[] = [
   {
     // Seed migration: legacy libraries saved before stricter GlobalLibrarySchema
     // constraints (PR #251) may contain duplicate ids or invalid numeric fields
     // on sounds. Sanitize so Zod parse does not fail on legacy files.
     fromVersion: UNVERSIONED_DEFAULT,
-    // toVersion must match CURRENT_LIBRARY_VERSION — update when adding new migrations
+    // The final migration's toVersion must equal CURRENT_LIBRARY_VERSION.
     toVersion: "1.0.0",
     migrate: (raw) => {
       const next = { ...raw };
@@ -330,38 +282,49 @@ const LIBRARY_MIGRATIONS: LibraryMigration[] = [
   },
 ];
 
-export function migrateLibrary(raw: RawLibrary): RawLibrary {
-  let current = { ...raw };
-  // Guard against non-string version fields from malformed/untrusted disk data.
-  // An `as` cast would silently succeed and then crash inside compareVersions()
-  // when .split(".") is called on a non-string. Fall back to UNVERSIONED_DEFAULT.
-  let version = typeof current.version === "string" ? current.version : UNVERSIONED_DEFAULT;
+// Runner
+function runMigrations(
+  raw: RawDoc,
+  chain: VersionedMigration[],
+  targetVersion: string,
+  docKind: "project" | "library"
+): RawDoc {
+  // Coerce non-string version to UNVERSIONED_DEFAULT.
+  let version = typeof raw.version === "string" ? raw.version : UNVERSIONED_DEFAULT;
 
-  // Future-version guard: refuse to open libraries from a newer app version to
+  let current = { ...raw };
+  current.version = version;
+
+  // Future-version guard: refuse to open files from a newer app version to
   // prevent silent data loss from Zod stripping unknown fields on next save.
-  if (compareVersions(version, CURRENT_LIBRARY_VERSION) > 0) {
+  if (compareVersions(version, targetVersion) > 0) {
     throw new MigrationError(
-      `This library was created with a newer version of SoundsBored (${version}). ` +
+      `This ${docKind} was created with a newer version of SoundsBored (${version}). ` +
       `Please update the app to open it.`
     );
   }
 
-  for (const migration of LIBRARY_MIGRATIONS) {
+  for (const migration of chain) {
     if (version === migration.fromVersion) {
-      current = migration.migrate(current);
+      current = { ...migration.migrate(current), version: migration.toVersion };
       version = migration.toVersion;
-      current.version = version;
     }
   }
 
-  // If the version is still not current after running all applicable migrations,
-  // there is no migration path for this version (unknown past version).
-  if (version !== CURRENT_LIBRARY_VERSION) {
+  if (version !== targetVersion) {
     throw new MigrationError(
-      `No migration path found for library version "${version}". ` +
-      `The library may be from an unsupported version of SoundsBored.`
+      `No migration path found for ${docKind} version "${version}". ` +
+      `The ${docKind} may be from an unsupported version of SoundsBored.`
     );
   }
 
   return current;
+}
+
+export function migrateProject(raw: RawDoc): RawDoc {
+  return runMigrations(raw, MIGRATIONS, CURRENT_VERSION, "project");
+}
+
+export function migrateLibrary(raw: RawDoc): RawDoc {
+  return runMigrations(raw, LIBRARY_MIGRATIONS, CURRENT_LIBRARY_VERSION, "library");
 }

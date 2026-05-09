@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Improved reliability when opening older project and library files — migration logic is now shared and consistent between both
+- Fixed edge case where items without an `id` field could cause duplicate-detection to behave incorrectly during library migration
+- Migration warnings now appear in app log files instead of only the developer console
 - No user-facing changes in this update — internal audio engine tests improved for reliability.
 - Fixed a bug where cancelling a fade-out mid-transition left the pad incorrectly marked as "fading out"
 - Fixed a bug where triggering a pad again after `Stop All` during an active fade would incorrectly stop the newly triggered sound
