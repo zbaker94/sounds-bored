@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved audio engine efficiency: redundant per-frame progress updates are now suppressed when values haven't meaningfully changed, reducing unnecessary UI re-renders during playback.
 - Internal refactor only: tooltip text and helper functions moved to a dedicated module with no change to UI behavior or copy.
 - Fixed: Re-triggering a pad mid-fade no longer risks the stale fade timeout stopping the newly active pad
 - Fixed: Fading-out UI indicators now clear correctly when a fade is cancelled, preventing ghost "fading" state in the interface

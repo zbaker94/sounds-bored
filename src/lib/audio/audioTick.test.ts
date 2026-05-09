@@ -466,6 +466,79 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
   });
 
+  describe("padProgress / layerProgress no-op diffing", () => {
+    it("does not call setPadMetrics when padProgress is unchanged between ticks", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.5 });
+      vi.mocked(computeAllLayerProgress).mockReturnValue({});
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now()); // tick 1: prevPadProgress={} → {pad-1:0.5} → changed
+
+      const setPadMetricsSpy = vi.spyOn(usePadMetricsStore.getState(), "setPadMetrics");
+      capturedCallback!(performance.now()); // tick 2: same value → progressEqual → no-op
+      expect(setPadMetricsSpy).not.toHaveBeenCalled();
+
+      setPadMetricsSpy.mockRestore();
+      rafSpy.mockRestore();
+    });
+
+    it("calls setPadMetrics with updated padProgress when progress changes beyond PROGRESS_EPSILON", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.5 });
+      vi.mocked(computeAllLayerProgress).mockReturnValue({});
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now()); // tick 1: pad-1=0.5
+
+      vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.6 }); // diff=0.1 > PROGRESS_EPSILON
+      const setPadMetricsSpy = vi.spyOn(usePadMetricsStore.getState(), "setPadMetrics");
+      capturedCallback!(performance.now()); // tick 2: changed → must emit
+      expect(setPadMetricsSpy).toHaveBeenCalledWith(expect.objectContaining({
+        padProgress: { "pad-1": 0.6 },
+      }));
+
+      setPadMetricsSpy.mockRestore();
+      rafSpy.mockRestore();
+    });
+
+    it("does not call setLayerMetrics when layerProgress changes are within PROGRESS_EPSILON", () => {
+      vi.mocked(getActivePadCount).mockReturnValue(1);
+      vi.mocked(computeAllPadProgress).mockReturnValue({});
+      vi.mocked(computeAllLayerProgress).mockReturnValue({ "layer-1": 0.5 });
+
+      let capturedCallback: FrameRequestCallback | null = null;
+      const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+        capturedCallback = cb;
+        return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+      });
+
+      startAudioTick();
+      capturedCallback!(performance.now()); // tick 1: layer-1=0.5
+
+      // 0.5007 is within PROGRESS_EPSILON (0.001) of 0.5 — should be suppressed
+      vi.mocked(computeAllLayerProgress).mockReturnValue({ "layer-1": 0.5007 });
+      const setLayerMetricsSpy = vi.spyOn(useLayerMetricsStore.getState(), "setLayerMetrics");
+      capturedCallback!(performance.now()); // tick 2: within epsilon → no-op
+      expect(setLayerMetricsSpy).not.toHaveBeenCalled();
+
+      setLayerMetricsSpy.mockRestore();
+      rafSpy.mockRestore();
+    });
+  });
+
   describe("layerPlayOrder / layerChain", () => {
     function mkSound(id: string) {
       return { id, name: id, filePath: `${id}.wav`, tags: [], sets: [] } as unknown as import("@/lib/schemas").Sound;
