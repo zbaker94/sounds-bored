@@ -7,6 +7,7 @@ import { APP_FOLDER, PROJECT_FILE_NAME, DEFAULT_PROJECT_VERSION, DEFAULT_PROJECT
 import { migrateProject, MigrationError } from "./migrations";
 import { pickFolder, restorePathScope } from "@/lib/scope";
 import { logInfo } from "@/lib/logger";
+import { ProjectNotFoundError, ProjectValidationError } from "./errors";
 
 /** Fallback folder/zip-base name used when sanitization yields an unusable result. */
 const FALLBACK_PROJECT_NAME = "project";
@@ -34,19 +35,7 @@ export function buildExportZipName(projectName: string): string {
   return `${sanitizeProjectName(projectName)}-export.zip`;
 }
 
-export class ProjectNotFoundError extends Error {
-  constructor() {
-    super(`${PROJECT_FILE_NAME} not found in the selected folder`);
-    this.name = "ProjectNotFoundError";
-  }
-}
-
-export class ProjectValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ProjectValidationError";
-  }
-}
+export { ProjectNotFoundError, ProjectValidationError } from "./errors";
 
 export async function selectProjectFolder(): Promise<string | null> {
   return pickFolder({ title: "Select Project Folder" });
@@ -90,15 +79,16 @@ export async function loadProjectFile(
     return project;
   } catch (error) {
     if (error instanceof SyntaxError) {
-      throw new ProjectValidationError(`Invalid JSON in ${PROJECT_FILE_NAME}`);
+      throw new ProjectValidationError(`Invalid JSON in ${PROJECT_FILE_NAME}`, { cause: error });
     }
     if (error instanceof ZodError) {
       throw new ProjectValidationError(
-        `${PROJECT_FILE_NAME} is missing required fields`
+        `${PROJECT_FILE_NAME} is missing required fields`,
+        { cause: error }
       );
     }
     if (error instanceof MigrationError) {
-      throw new ProjectValidationError(error.message);
+      throw new ProjectValidationError(error.message, { cause: error });
     }
     throw error;
   }

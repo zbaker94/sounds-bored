@@ -26,4 +26,5 @@ afterEach(() => {
   cleanup();
   resetTauriMocks();
   resetSceneCounter();
+  vi.restoreAllMocks();
 });
