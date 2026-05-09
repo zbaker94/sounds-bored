@@ -7,8 +7,13 @@ import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsSt
 import { useMultiFadeStore, initialMultiFadeState } from "@/state/multiFadeStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer, createMockSoundInstance } from "@/test/factories";
 import { PadButton } from "./PadButton";
+import { PadButtonProgress } from "./PadButtonProgress";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio";
+
+vi.mock("./PadButtonProgress", () => ({
+  PadButtonProgress: vi.fn(() => null),
+}));
 
 vi.mock("./PadBackFace", () => ({
   PadBackFace: ({ pad, onMultiFade }: { pad: { name: string }; onMultiFade?: () => void }) => (
@@ -425,5 +430,56 @@ describe("PadButton — React.memo", () => {
     expect((PadButton as unknown as { $$typeof: symbol }).$$typeof).toBe(
       Symbol.for("react.memo")
     );
+  });
+});
+
+describe("PadFrontFace — layerIds useMemo", () => {
+  it("reuses the same layerIds reference when pad re-renders with non-layer change", () => {
+    const MockProgress = vi.mocked(PadButtonProgress);
+    MockProgress.mockClear();
+
+    const layer = createMockLayer({ id: "layer-1" });
+    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    const entry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+
+    const { rerender } = render(<PadButton pad={pad} sceneId="scene-1" />);
+    const firstCall = MockProgress.mock.calls.at(-1)?.[0];
+    expect(firstCall?.layerIds).toBeDefined();
+
+    // Simulate a non-layer mutation: new pad object reference, same pad.layers reference.
+    // In real usage this happens when Immer updates an unrelated pad field (color, name, etc.)
+    // and structural sharing preserves the layers array reference.
+    const mutatedPad = { ...pad, color: "#ff0000" };
+    rerender(<PadButton pad={mutatedPad} sceneId="scene-1" />);
+    const secondCall = MockProgress.mock.calls.at(-1)?.[0];
+
+    // useMemo([pad.layers]) returns the cached array when pad.layers reference is unchanged.
+    expect(secondCall?.layerIds).toBe(firstCall?.layerIds);
+  });
+
+  it("produces a new layerIds reference when pad.layers changes", () => {
+    const MockProgress = vi.mocked(PadButtonProgress);
+    MockProgress.mockClear();
+
+    const layer = createMockLayer({ id: "layer-1" });
+    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer] });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    const entry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+
+    const { rerender } = render(<PadButton pad={pad} sceneId="scene-1" />);
+    const firstLayerIds = MockProgress.mock.calls.at(-1)?.[0]?.layerIds;
+    expect(firstLayerIds).toBeDefined();
+
+    // Simulate adding a layer — pad.layers gets a new array reference
+    const newLayer = createMockLayer({ id: "layer-2" });
+    const padWithNewLayers = { ...pad, layers: [layer, newLayer] };
+    rerender(<PadButton pad={padWithNewLayers} sceneId="scene-1" />);
+    const secondLayerIds = MockProgress.mock.calls.at(-1)?.[0]?.layerIds;
+
+    expect(secondLayerIds).not.toBe(firstLayerIds);
+    expect(secondLayerIds).toEqual(["layer-1", "layer-2"]);
   });
 });

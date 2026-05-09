@@ -148,6 +148,10 @@ function PadFrontFace({
 }: PadFrontFaceProps) {
   const currentVoice = usePadDisplayStore((s) => s.currentVoice[pad.id] ?? null);
   const hasCoverArt = !!currentVoice?.coverArtDataUrl;
+  // Memoized so Immer reference churn on pad.layers (any project mutation) doesn't
+  // create a new array reference when layer IDs are unchanged — arePropsEqual can then
+  // short-circuit via reference equality instead of element-wise walk.
+  const layerIds = useMemo(() => pad.layers.map((l) => l.id), [pad.layers]);
 
   return (
     <div className="absolute inset-0 [backface-visibility:hidden]" aria-hidden={isFlipped || undefined}>
@@ -173,9 +177,8 @@ function PadFrontFace({
             transition={{ duration: volumeExiting ? 0.22 : 0.15 }}
           />
         )}
-        {/* Playback progress — one bar per active layer, split vertically.
-            Isolated in PadButtonProgress so 60Hz RAF ticks do not re-render PadButton. */}
-        <PadButtonProgress padId={pad.id} layers={pad.layers} />
+        {/* Isolated so 60Hz RAF ticks do not re-render PadButton. */}
+        <PadButtonProgress padId={pad.id} layerIds={layerIds} />
         {/* Pad name / sound metadata — crossfade between them via AnimatePresence */}
         <div className="relative z-10 flex flex-col items-center gap-0.5">
           <AnimatePresence mode="wait">

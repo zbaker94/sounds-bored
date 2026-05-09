@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Reduced unnecessary re-renders on pad buttons — playback progress bars no longer re-render when unrelated project changes (pad color, name, etc.) occur during playback
 - Improved audio engine efficiency: redundant per-frame progress updates are now suppressed when values haven't meaningfully changed, reducing unnecessary UI re-renders during playback.
 - Internal refactor only: tooltip text and helper functions moved to a dedicated module with no change to UI behavior or copy.
 - Fixed: Re-triggering a pad mid-fade no longer risks the stale fade timeout stopping the newly active pad
