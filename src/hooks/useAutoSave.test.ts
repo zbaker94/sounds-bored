@@ -323,6 +323,24 @@ describe("useAutoSave", () => {
     expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
   });
 
+  it("fires library save at the interval boundary when library becomes dirty after mount", () => {
+    seedDirtyPermanentProject();
+    useLibraryStore.setState({ ...initialLibraryState, isDirty: false });
+
+    renderHook(() => useAutoSave(30_000));
+
+    // Mount fires immediately — library not dirty yet, no save
+    expect(mockSaveCurrentLibraryAndClearDirty).not.toHaveBeenCalled();
+
+    // Library becomes dirty after mount
+    act(() => { useLibraryStore.setState({ isDirty: true }); });
+
+    // Advance to the interval tick
+    act(() => { vi.advanceTimersByTime(30_000); });
+
+    expect(mockSaveCurrentLibraryAndClearDirty).toHaveBeenCalledTimes(1);
+  });
+
   it("shows an error toast when library save fails", async () => {
     seedDirtyPermanentProject();
     useLibraryStore.setState({ ...initialLibraryState, isDirty: true });
