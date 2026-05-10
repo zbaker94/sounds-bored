@@ -1,5 +1,6 @@
 // src/lib/audio/gainManager.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { _CLICK_FREE_RAMP_S } from "./gainManager";
 
 const mockCtx = {
   currentTime: 0,
@@ -51,7 +52,7 @@ describe("gainManager", () => {
       setPadVolume("pad-1", 0.5);
 
       expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalledWith(0);
-      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 0.016);
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, _CLICK_FREE_RAMP_S);
     });
 
     it("clamps volume above 1 to 1", async () => {

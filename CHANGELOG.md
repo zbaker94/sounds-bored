@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine test improvements; no user-facing behavior changed.
 - No user-facing changes (internal test coverage improvement only)
 - Added test coverage for bulk-deleting selected sounds from the library (confirmation dialog and store update verification)
 - Improved internal test coverage for the "Add to Set" dialog flow in the sounds library panel (no user-facing changes)
