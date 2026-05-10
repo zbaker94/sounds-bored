@@ -311,33 +311,6 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
   });
 
-  it("skips forEachActivePadGain and forEachActiveLayerGain when isAnyGainChanging returns false and gainSampleNeeded is false", () => {
-    vi.mocked(getActivePadCount).mockReturnValue(1);
-    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.5 });
-    vi.mocked(computeAllLayerProgress).mockReturnValue({});
-    vi.mocked(isAnyGainChanging).mockReturnValue(false);
-
-    let capturedCallback: FrameRequestCallback | null = null;
-    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
-      capturedCallback = cb;
-      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
-    });
-
-    startAudioTick();
-    // Tick 1: gainSampleNeeded=true (from resetTrackers in stopAudioTick afterEach) — samples even though
-    // isAnyGainChanging is false. This clears gainSampleNeeded.
-    capturedCallback!(performance.now());
-    vi.mocked(forEachActivePadGain).mockClear();
-    vi.mocked(forEachActiveLayerGain).mockClear();
-
-    // Tick 2: gainSampleNeeded=false and isAnyGainChanging=false — must skip sampling
-    capturedCallback!(performance.now());
-
-    expect(forEachActivePadGain).not.toHaveBeenCalled();
-    expect(forEachActiveLayerGain).not.toHaveBeenCalled();
-
-    rafSpy.mockRestore();
-  });
 
   it("samples gain nodes on first tick after self-terminate/restart even when isAnyGainChanging is false", () => {
     vi.mocked(getActivePadCount).mockReturnValue(1);
@@ -427,7 +400,7 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
   });
 
-  it("preserves previous padVolumes and layerVolumes in the store when isAnyGainChanging returns false", () => {
+  it("skips gain sampling and preserves previous volumes when isAnyGainChanging returns false", () => {
     vi.mocked(getActivePadCount).mockReturnValue(1);
     vi.mocked(computeAllPadProgress).mockReturnValue({});
     vi.mocked(computeAllLayerProgress).mockReturnValue({});
@@ -460,6 +433,8 @@ describe("audioTick", () => {
 
     capturedCallback!(performance.now()); // tick 2: short-circuit
 
+    expect(forEachActivePadGain).not.toHaveBeenCalled();
+    expect(forEachActiveLayerGain).not.toHaveBeenCalled();
     expect(usePadMetricsStore.getState().padVolumes["pad-1"]).toBe(0.5);
     expect(useLayerMetricsStore.getState().layerVolumes["layer-1"]).toBe(0.7);
 

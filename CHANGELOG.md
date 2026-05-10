@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal test improvements only)
 - Internal test suite refactored: streaming audio progress tests consolidated and helper function relocated for better organization (no user-facing behavior changes)
 - Improved error messages when a sound file can't be loaded — errors now include the sound's name to make it easier to identify which file caused the problem.
 - No user-facing changes; internal audio engine test coverage improved for gain node initialization behavior.
