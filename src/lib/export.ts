@@ -50,7 +50,7 @@ export function buildSoundMapJson(sounds: (Sound & { filePath: string })[]): {
   const collisions: string[] = [];
 
   for (const sound of sounds) {
-    const name = basename(sound.filePath, sound.filePath);
+    const name = basename(sound.filePath);
     if (seen.has(name)) {
       collisions.push(name);
     } else {

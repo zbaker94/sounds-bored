@@ -324,6 +324,14 @@ describe("buildSoundMapJson", () => {
     expect(collisions).toEqual([]);
   });
 
+  it("extracts only the filename from a project-relative subfolder path", () => {
+    const sound = { ...createMockSound({ id: "s1" }), filePath: "sounds/subfolder/kick.wav" } as Sound & { filePath: string };
+    const { json, collisions } = buildSoundMapJson([sound]);
+    const parsed = JSON.parse(json) as { version: string; soundMap: Record<string, string> };
+    expect(parsed.soundMap["s1"]).toBe("sounds/kick.wav");
+    expect(collisions).toEqual([]);
+  });
+
   it("maps sound.id to sounds/{basename} using backslash paths (Windows)", () => {
     const sound = { ...createMockSound({ id: "s1" }), filePath: "C:\\Users\\test\\sounds\\snare.wav" } as Sound & { filePath: string };
     const { json, collisions } = buildSoundMapJson([sound]);
