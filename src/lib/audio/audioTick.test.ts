@@ -311,6 +311,33 @@ describe("audioTick", () => {
     rafSpy.mockRestore();
   });
 
+  it("filters volume at exact 0.999 boundary: 0.999 excluded, 0.998 included", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(2);
+    vi.mocked(computeAllPadProgress).mockReturnValue({});
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set());
+    vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
+
+    vi.mocked(forEachActivePadGain).mockImplementation((_ids, fn) => {
+      fn("pad-below", { gain: { value: 0.998 } } as unknown as GainNode);
+      fn("pad-at",    { gain: { value: 0.999 } } as unknown as GainNode);
+    });
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now());
+
+    const padState = usePadMetricsStore.getState();
+    expect(padState.padVolumes["pad-below"]).toBe(0.998);
+    expect(padState.padVolumes["pad-at"]).toBeUndefined();
+
+    rafSpy.mockRestore();
+  });
 
   it("samples gain nodes on first tick after self-terminate/restart even when isAnyGainChanging is false", () => {
     vi.mocked(getActivePadCount).mockReturnValue(1);
