@@ -39,6 +39,10 @@ describe("SceneTabBar", () => {
     );
   }
 
+  function loadSingleScene() {
+    loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
+  }
+
   it("should render an add scene button", () => {
     renderWithTooltip(<SceneTabBar />);
     expect(screen.getByRole("button", { name: /add scene/i })).toBeInTheDocument();
@@ -98,7 +102,7 @@ describe("SceneTabBar", () => {
     expect(useProjectStore.getState().project?.scenes).toHaveLength(1);
   });
 
-  it("should update activeSceneId in the store when a tab is clicked", () => {
+  it("should update activeSceneId and visual indicator when a tab is clicked", () => {
     loadProject([
       createMockScene({ id: "s1", name: "Scene 1" }),
       createMockScene({ id: "s2", name: "Scene 2" }),
@@ -112,13 +116,11 @@ describe("SceneTabBar", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Scene 2" }));
 
     expect(useProjectStore.getState().activeSceneId).toBe("s2");
+    expect(screen.getByRole("tab", { name: "Scene 2" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: "Scene 1" })).toHaveAttribute("data-state", "inactive");
   });
 
   describe("inline scene rename", () => {
-    function loadSingleScene() {
-      loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
-    }
-
     function openRenameInput() {
       loadSingleScene();
       renderWithTooltip(<SceneTabBar />);
@@ -190,10 +192,6 @@ describe("SceneTabBar", () => {
   });
 
   describe("delete scene", () => {
-    function loadSingleScene() {
-      loadProject([createMockScene({ id: "s1", name: "Scene 1" })]);
-    }
-
     beforeEach(() => {
       vi.clearAllMocks();
     });
