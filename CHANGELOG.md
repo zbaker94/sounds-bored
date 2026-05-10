@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal test coverage improvements only)
 - Pads now show a warning indicator when some (but not all) assigned sounds are missing from the library
 - No user-facing changes in this update — all modifications are internal test suite improvements only.
 - No user-facing changes (internal test refactor only)
