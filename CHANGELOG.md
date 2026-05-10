@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal test coverage expanded for playback state (master volume, preview playback, preview progress); no user-facing behavior changed.
 - No user-facing changes; internal test coverage added for library reconciliation state management.
 - No user-facing changes in this release (internal test coverage improvements only)
 - No user-facing changes in this release.
