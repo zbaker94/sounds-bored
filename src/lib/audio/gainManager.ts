@@ -5,6 +5,8 @@ import { getPadGain, getLayerGain, markGainRamp } from "./gainRegistry";
 
 /** Short ramp duration (seconds) used to avoid zipper/click artifacts on gain changes. */
 const CLICK_FREE_RAMP_S = 0.016;
+/** Exposed for test introspection only. */
+export const _CLICK_FREE_RAMP_S = CLICK_FREE_RAMP_S;
 
 export function clampGain01(value: number, fallback = 0): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
