@@ -557,6 +557,13 @@ describe("migrateProject — 1.3.0 → 1.4.0 (pad volume scale 0–1 → 0–100
     const result = migrateProject(makePadProject({ volume: 0.5 }));
     expect(result.version).toBe("1.4.0");
   });
+
+  it("leaves pad.volume and pad.fadeTargetVol untouched when types are non-numeric", () => {
+    const result = migrateProject(makePadProject({ volume: "loud", fadeTargetVol: null }));
+    const pad = getPad(result);
+    expect(pad.volume).toBe("loud");
+    expect(pad.fadeTargetVol).toBeNull();
+  });
 });
 
 describe("migrateProject — future-version guard", () => {
