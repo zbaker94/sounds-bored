@@ -781,4 +781,47 @@ describe("SoundsPanel", () => {
       expect(mockScheduleAnalysisForSounds).toHaveBeenCalled();
     });
   });
+
+  describe("Add to Set dialog flow", () => {
+    function setupSoundsWithNoFolders(...names: string[]) {
+      const sounds = names.map((name) => createMockSound({ name }));
+      useLibraryStore.setState({ ...initialLibraryState, sounds });
+      useAppSettingsStore.setState({
+        ...initialAppSettingsState,
+        settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      });
+      return sounds;
+    }
+
+    it("clicking 'Add to Set' opens AddToSetDialog when one sound is selected", async () => {
+      const [sound] = setupSoundsWithNoFolders("Kick");
+      renderPanel();
+
+      const checkbox = screen.getByRole("checkbox");
+      await act(async () => { fireEvent.click(checkbox); });
+
+      expect(screen.queryByTestId("add-to-set-dialog")).not.toBeInTheDocument();
+
+      const addToSetBtn = screen.getByRole("button", { name: /add to set/i });
+      await act(async () => { fireEvent.click(addToSetBtn); });
+
+      expect(screen.getByTestId("add-to-set-dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("add-to-set-dialog").textContent).toContain("1 sounds");
+      void sound;
+    });
+
+    it("AddToSetDialog receives all selected sound IDs when multiple sounds are selected", async () => {
+      setupSoundsWithNoFolders("Kick", "Snare", "HiHat");
+      renderPanel();
+
+      const checkboxes = screen.getAllByRole("checkbox");
+      await act(async () => { fireEvent.click(checkboxes[0]); });
+      await act(async () => { fireEvent.click(checkboxes[1]); });
+
+      const addToSetBtn = screen.getByRole("button", { name: /add to set/i });
+      await act(async () => { fireEvent.click(addToSetBtn); });
+
+      expect(screen.getByTestId("add-to-set-dialog").textContent).toContain("2 sounds");
+    });
+  });
 });
