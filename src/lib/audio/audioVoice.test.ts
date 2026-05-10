@@ -78,13 +78,16 @@ describe("wrapBufferSource", () => {
     expect(source.stop).toHaveBeenCalledOnce();
   });
 
-  it("stop() does not throw if source.stop() throws (already ended)", () => {
+  it("stop() does not throw and still fires onended if source.stop() throws (already ended)", () => {
     const source = makeMockSource();
     source.stop.mockImplementation(() => { throw new Error("already ended"); });
     const ctx = makeMockCtx();
     const dest = makeMockDestination();
     const voice = wrapBufferSource(source as any, ctx as any, dest as any);
+    const cb = vi.fn();
+    voice.setOnEnded(cb);
     expect(() => voice.stop()).not.toThrow();
+    expect(cb).toHaveBeenCalledOnce();
   });
 
   it("setOnEnded wires callback to source.onended", () => {
