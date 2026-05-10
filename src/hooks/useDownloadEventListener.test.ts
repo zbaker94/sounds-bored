@@ -181,6 +181,39 @@ describe("useDownloadEventListener — sound creation with tags/sets", () => {
     });
   });
 
+  it("is idempotent — does not add a duplicate sound if the completion event fires twice", async () => {
+    const jobId = "job-idempotent";
+    mockJobs.current = {
+      [jobId]: {
+        id: jobId,
+        url: "https://example.com/video",
+        outputName: "my-clip",
+        status: "downloading",
+        percent: 50,
+        tags: [],
+        sets: [],
+      },
+    };
+
+    renderHook(() => useDownloadEventListener("folder-id"));
+    await waitFor(() => expect(mockListenToDownloadEvents).toHaveBeenCalled());
+
+    // First completion event — finalizes the download
+    emitEvent({ id: jobId, percent: 100, status: "completed", outputPath: "/downloads/my-clip.mp3" });
+    await waitFor(() => expect(mockUpdateLibrary).toHaveBeenCalledTimes(1));
+
+    // Simulate the store updating the job with a soundId (as updateJob would do in production)
+    mockJobs.current = {
+      [jobId]: { ...mockJobs.current[jobId], soundId: "sound-123", status: "completed" as const },
+    };
+
+    // Second completion event — should be a no-op
+    emitEvent({ id: jobId, percent: 100, status: "completed", outputPath: "/downloads/my-clip.mp3" });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(mockUpdateLibrary).toHaveBeenCalledTimes(1);
+  });
+
   it("creates a Sound with empty tags/sets when job has none (backward compat)", async () => {
     mockJobs.current = {
       "job-no-tags": {
