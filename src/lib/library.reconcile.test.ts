@@ -790,6 +790,11 @@ describe("coverArtDataUrl extraction", () => {
     expect(result.sounds).toHaveLength(20);
     // All 20 sounds should have been checked (sentinel stored)
     expect(result.sounds.every((s) => s.coverArtDataUrl === "")).toBe(true);
+    // One extract_cover_art invocation per sound (batch loop processes all 20)
+    const coverArtCalls = (mockCore.invoke.mock.calls as Array<[string, ...unknown[]]>).filter(
+      ([cmd]) => cmd === "extract_cover_art",
+    );
+    expect(coverArtCalls).toHaveLength(20);
   });
 });
 
