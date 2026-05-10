@@ -133,3 +133,56 @@ describe("cross-field isolation", () => {
   });
 });
 
+describe("setMasterVolume", () => {
+  it("updates masterVolume to the given value", () => {
+    usePlaybackStore.getState().setMasterVolume(0.5);
+    expect(usePlaybackStore.getState().masterVolume).toBe(0.5);
+  });
+
+  it("accepts boundary value 0", () => {
+    usePlaybackStore.getState().setMasterVolume(0);
+    expect(usePlaybackStore.getState().masterVolume).toBe(0);
+  });
+
+  it("accepts boundary value 1", () => {
+    usePlaybackStore.getState().setMasterVolume(1);
+    expect(usePlaybackStore.getState().masterVolume).toBe(1);
+  });
+});
+
+describe("setIsPreviewPlaying", () => {
+  it("sets isPreviewPlaying to true", () => {
+    usePlaybackStore.getState().setIsPreviewPlaying(true);
+    expect(usePlaybackStore.getState().isPreviewPlaying).toBe(true);
+  });
+
+  it("sets isPreviewPlaying to false", () => {
+    usePlaybackStore.setState({ isPreviewPlaying: true });
+    usePlaybackStore.getState().setIsPreviewPlaying(false);
+    expect(usePlaybackStore.getState().isPreviewPlaying).toBe(false);
+  });
+});
+
+describe("setPreviewProgress", () => {
+  it("updates previewProgress to a numeric value", () => {
+    usePlaybackStore.getState().setPreviewProgress(0.75);
+    expect(usePlaybackStore.getState().previewProgress).toBe(0.75);
+  });
+
+  it("clears previewProgress to null", () => {
+    usePlaybackStore.setState({ previewProgress: 0.5 });
+    usePlaybackStore.getState().setPreviewProgress(null);
+    expect(usePlaybackStore.getState().previewProgress).toBeNull();
+  });
+
+  it("accepts boundary value 0", () => {
+    usePlaybackStore.getState().setPreviewProgress(0);
+    expect(usePlaybackStore.getState().previewProgress).toBe(0);
+  });
+
+  it("accepts boundary value 1", () => {
+    usePlaybackStore.getState().setPreviewProgress(1);
+    expect(usePlaybackStore.getState().previewProgress).toBe(1);
+  });
+});
+
