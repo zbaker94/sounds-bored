@@ -1018,4 +1018,68 @@ describe("projectStore", () => {
       expect(pad?.volume).toBeUndefined();
     });
   });
+
+  describe("updateLayerVolume", () => {
+    function loadWithLayers() {
+      const layer1 = createMockLayer({ id: "layer-1", volume: 100 });
+      const layer2 = createMockLayer({ id: "layer-2", volume: 100 });
+      const pad = createMockPad({ id: "pad-1", layers: [layer1, layer2] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      const project = createMockProject({ scenes: [scene] });
+      getState().loadProject(createMockHistoryEntry(), project, false);
+    }
+
+    it("updates the target layer volume and marks isDirty", () => {
+      loadWithLayers();
+      getState().updateLayerVolume("layer-1", 0.5);
+      const layer = getState().project?.scenes[0].pads[0].layers.find((l) => l.id === "layer-1");
+      expect(layer?.volume).toBe(50);
+      expect(getState().isDirty).toBe(true);
+    });
+
+    it("does not modify other layers", () => {
+      loadWithLayers();
+      getState().updateLayerVolume("layer-1", 0.5);
+      const layer2 = getState().project?.scenes[0].pads[0].layers.find((l) => l.id === "layer-2");
+      expect(layer2?.volume).toBe(100);
+    });
+
+    it("clamps volume to [0, 100] range — 0 at bottom boundary", () => {
+      loadWithLayers();
+      getState().updateLayerVolume("layer-1", 0);
+      const layer = getState().project?.scenes[0].pads[0].layers.find((l) => l.id === "layer-1");
+      expect(layer?.volume).toBe(0);
+    });
+
+    it("clamps volume to [0, 100] range — 100 at top boundary", () => {
+      loadWithLayers();
+      getState().updateLayerVolume("layer-1", 1);
+      const layer = getState().project?.scenes[0].pads[0].layers.find((l) => l.id === "layer-1");
+      expect(layer?.volume).toBe(100);
+    });
+
+    it("is a no-op for an unknown layer ID", () => {
+      loadWithLayers();
+      getState().updateLayerVolume("nonexistent-layer", 0.5);
+      const layer1 = getState().project?.scenes[0].pads[0].layers.find((l) => l.id === "layer-1");
+      const layer2 = getState().project?.scenes[0].pads[0].layers.find((l) => l.id === "layer-2");
+      expect(layer1?.volume).toBe(100);
+      expect(layer2?.volume).toBe(100);
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("finds a layer across multiple scenes", () => {
+      const layer = createMockLayer({ id: "layer-remote", volume: 100 });
+      const pad = createMockPad({ id: "pad-remote", layers: [layer] });
+      const scene1 = createMockScene({ id: "scene-1", pads: [] });
+      const scene2 = createMockScene({ id: "scene-2", pads: [pad] });
+      const project = createMockProject({ scenes: [scene1, scene2] });
+      getState().loadProject(createMockHistoryEntry(), project, false);
+
+      getState().updateLayerVolume("layer-remote", 0.75);
+
+      const found = getState().project?.scenes[1].pads[0].layers[0];
+      expect(found?.volume).toBe(75);
+    });
+  });
 });
