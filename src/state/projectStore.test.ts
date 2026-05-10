@@ -1019,6 +1019,58 @@ describe("projectStore", () => {
     });
   });
 
+  describe("setPadName", () => {
+    function loadWithTwoPads() {
+      const pad1 = createMockPad({ id: "pad-1", name: "Kick" });
+      const pad2 = createMockPad({ id: "pad-2", name: "Snare" });
+      const scene = createMockScene({ id: "scene-1", pads: [pad1, pad2] });
+      getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      return { sceneId: scene.id };
+    }
+
+    it("updates the name of the target pad", () => {
+      const { sceneId } = loadWithTwoPads();
+      getState().setPadName(sceneId, "pad-1", "Bass Drum");
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.name).toBe("Bass Drum");
+    });
+
+    it("does not modify other pads", () => {
+      const { sceneId } = loadWithTwoPads();
+      getState().setPadName(sceneId, "pad-1", "Bass Drum");
+      const pad2 = getState().project?.scenes[0].pads[1];
+      expect(pad2?.name).toBe("Snare");
+    });
+
+    it("marks isDirty = true", () => {
+      const { sceneId } = loadWithTwoPads();
+      getState().setPadName(sceneId, "pad-1", "Bass Drum");
+      expect(getState().isDirty).toBe(true);
+    });
+  });
+
+  describe("setPadColor", () => {
+    function loadWithPad() {
+      const pad = createMockPad({ id: "pad-1", color: undefined });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+      return { sceneId: scene.id };
+    }
+
+    it("updates the color of the target pad", () => {
+      const { sceneId } = loadWithPad();
+      getState().setPadColor(sceneId, "pad-1", "#ff0000");
+      const pad = getState().project?.scenes[0].pads[0];
+      expect(pad?.color).toBe("#ff0000");
+    });
+
+    it("marks isDirty = true", () => {
+      const { sceneId } = loadWithPad();
+      getState().setPadColor(sceneId, "pad-1", "#00ff00");
+      expect(getState().isDirty).toBe(true);
+    });
+  });
+
   describe("updateLayerVolume", () => {
     function loadWithLayers() {
       const layer1 = createMockLayer({ id: "layer-1", volume: 100 });
