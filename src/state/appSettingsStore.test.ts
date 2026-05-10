@@ -43,7 +43,7 @@ describe("appSettingsStore", () => {
       expect(folders[folders.length - 1]?.name).toBe("Extra");
     });
 
-    it("should do nothing when settings is null", () => {
+    it("does not throw when settings is null", () => {
       expect(() => getState().addGlobalFolder(createMockGlobalFolder())).not.toThrow();
     });
   });
