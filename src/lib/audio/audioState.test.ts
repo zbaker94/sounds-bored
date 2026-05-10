@@ -100,6 +100,36 @@ function makeVoice(opts: { onStop?: () => void } = {}): AudioVoice {
   };
 }
 
+/** Create a mock audio element. Listeners registered via addEventListener are stored and
+ *  can be fired by calling el.dispatchEvent(new Event("loadedmetadata")) — matching the
+ *  real DOM API so the membership-guard and abort-cleanup paths can be exercised. */
+function makeAudio(duration: number, currentTime = 0): HTMLAudioElement {
+  const listeners = new Map<string, Array<(e: Event) => void>>();
+  return {
+    duration,
+    currentTime,
+    addEventListener: vi.fn((event: string, cb: (e: Event) => void, options?: AddEventListenerOptions | boolean) => {
+      const arr = listeners.get(event) ?? [];
+      arr.push(cb);
+      listeners.set(event, arr);
+      const signal = typeof options === 'object' ? options?.signal : undefined;
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          const current = listeners.get(event);
+          if (current) {
+            const idx = current.indexOf(cb);
+            if (idx >= 0) current.splice(idx, 1);
+          }
+        }, { once: true });
+      }
+    }),
+    dispatchEvent: vi.fn((e: Event) => {
+      for (const cb of (listeners.get(e.type) ?? []).slice()) cb(e);
+      return true;
+    }),
+  } as unknown as HTMLAudioElement;
+}
+
 // ── getPadProgress ───────────────────────────────────────────────────────────
 
 describe("getPadProgress", () => {
@@ -156,6 +186,17 @@ describe("getPadProgress", () => {
 
     registerStreaming("pad-1", "layer-1", audio);
     expect(getPadProgress("pad-1")).toBe(0);
+  });
+
+  it("updates progress when the best streaming element is unregistered", () => {
+    const long = makeAudio(20, 10); // progress 0.5
+    const short = makeAudio(5, 2);  // progress 0.4
+    registerStreaming("pad-1", "layer-1", short);
+    registerStreaming("pad-1", "layer-2", long);
+    expect(getPadProgress("pad-1")).toBeCloseTo(0.5); // uses long (best)
+
+    disposeStreaming("pad-1", "layer-2", long);
+    expect(getPadProgress("pad-1")).toBeCloseTo(0.4); // now uses short
   });
 
   it("uses the provided currentTime instead of calling getAudioContext()", () => {
@@ -311,60 +352,6 @@ describe("computeAllLayerProgress — streaming path uses cached best element", 
 
   it("returns empty object when no layers are active", () => {
     expect(computeAllLayerProgress()).toEqual({});
-  });
-});
-
-/** Create a mock audio element. Listeners registered via addEventListener are stored and
- *  can be fired by calling el.dispatchEvent(new Event("loadedmetadata")) — matching the
- *  real DOM API so the membership-guard and abort-cleanup paths can be exercised. */
-function makeAudio(duration: number, currentTime = 0): HTMLAudioElement {
-  const listeners = new Map<string, Array<(e: Event) => void>>();
-  return {
-    duration,
-    currentTime,
-    addEventListener: vi.fn((event: string, cb: (e: Event) => void, options?: AddEventListenerOptions | boolean) => {
-      const arr = listeners.get(event) ?? [];
-      arr.push(cb);
-      listeners.set(event, arr);
-      const signal = typeof options === 'object' ? options?.signal : undefined;
-      if (signal) {
-        signal.addEventListener('abort', () => {
-          const current = listeners.get(event);
-          if (current) {
-            const idx = current.indexOf(cb);
-            if (idx >= 0) current.splice(idx, 1);
-          }
-        }, { once: true });
-      }
-    }),
-    dispatchEvent: vi.fn((e: Event) => {
-      for (const cb of (listeners.get(e.type) ?? []).slice()) cb(e);
-      return true;
-    }),
-  } as unknown as HTMLAudioElement;
-}
-
-describe("getPadProgress — streaming path uses cached best element", () => {
-  it("returns correct progress from the cached best streaming element", () => {
-    const el = makeAudio(10, 3);
-    registerStreaming("pad-1", "layer-1", el);
-    expect(getPadProgress("pad-1")).toBeCloseTo(0.3);
-  });
-
-  it("returns 0 when cached element has NaN duration", () => {
-    registerStreaming("pad-1", "layer-1", makeAudio(NaN, 0));
-    expect(getPadProgress("pad-1")).toBe(0);
-  });
-
-  it("returns correct progress after cache is updated by unregistering the best element", () => {
-    const long = makeAudio(20, 10); // progress 0.5
-    const short = makeAudio(5, 2);  // progress 0.4
-    registerStreaming("pad-1", "layer-1", short);
-    registerStreaming("pad-1", "layer-2", long);
-    expect(getPadProgress("pad-1")).toBeCloseTo(0.5); // uses long (best)
-
-    disposeStreaming("pad-1", "layer-2", long);
-    expect(getPadProgress("pad-1")).toBeCloseTo(0.4); // now uses short
   });
 });
 
