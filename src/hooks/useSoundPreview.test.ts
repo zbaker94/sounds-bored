@@ -72,7 +72,7 @@ describe("useSoundPreview", () => {
 
     await act(async () => { await result.current.togglePreview(sound); });
 
-    expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining("not found"));
+    expect(mockToastError).toHaveBeenCalledWith(`"${sound.name}" not found — check the Sounds panel`);
     expect(mockRefreshMissingState).toHaveBeenCalled();
     expect(result.current.previewingId).toBeNull();
   });
