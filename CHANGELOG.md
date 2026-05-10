@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Sounds in the import folder are now automatically tagged with "Imported" on startup, even if they were added before this feature existed
 - No visible user-facing changes (internal test coverage improvement only)
 - Internal test coverage improved for pad gesture behavior; no user-facing changes.
 - Improved reliability of auto-save: the library now correctly saves when it becomes dirty after the app has already loaded.
