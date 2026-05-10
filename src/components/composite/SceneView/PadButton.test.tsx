@@ -423,13 +423,17 @@ describe("onMultiFade callback (handleMultiFade)", () => {
 });
 
 describe("PadButton — React.memo", () => {
-  // NOTE: $$typeof is a React internal — not part of the public API.
-  // Pragmatic approach: directly verifying memo wrapping is cleaner than a render-count test.
-  // If this breaks on a React upgrade, replace with a render-count integration test.
-  it("is wrapped in React.memo", () => {
-    expect((PadButton as unknown as { $$typeof: symbol }).$$typeof).toBe(
-      Symbol.for("react.memo")
-    );
+  it("does not re-render PadButtonProgress when pad and sceneId props are unchanged", () => {
+    const MockProgress = vi.mocked(PadButtonProgress);
+    MockProgress.mockClear();
+    const pad = loadPadInStore();
+
+    const { rerender } = render(<PadButton pad={pad} sceneId="scene-1" />);
+    const callsAfterMount = MockProgress.mock.calls.length;
+
+    // Re-render with identical props — memo should prevent child re-render
+    rerender(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
   });
 });
 

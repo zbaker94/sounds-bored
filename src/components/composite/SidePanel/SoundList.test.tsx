@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SoundList } from "./SoundList";
@@ -170,6 +171,7 @@ describe("SoundList", () => {
   });
 
   it("'Remove All' banner button opens the confirm-remove-missing-sounds overlay", async () => {
+    const user = userEvent.setup();
     const missing = createMockSound({ id: "missing-1", name: "Ghost" });
     useLibraryStore.setState({
       ...initialLibraryState,
@@ -185,14 +187,13 @@ describe("SoundList", () => {
     expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(false);
 
     const removeAllBtn = screen.getByRole("button", { name: /remove all/i });
-    await act(async () => {
-      fireEvent.click(removeAllBtn);
-    });
+    await user.click(removeAllBtn);
 
     expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_SOUNDS)(useUiStore.getState())).toBe(true);
   });
 
   it("clicking a missing sound opens the resolve dialog for that sound", async () => {
+    const user = userEvent.setup();
     const missing = createMockSound({ id: "missing-1", name: "Ghost" });
     useLibraryStore.setState({
       ...initialLibraryState,
@@ -207,9 +208,7 @@ describe("SoundList", () => {
     ).not.toBeInTheDocument();
 
     const row = screen.getByText("Ghost");
-    await act(async () => {
-      fireEvent.click(row);
-    });
+    await user.click(row);
 
     const dialog = screen.getByTestId("resolve-missing-dialog");
     expect(dialog).toBeInTheDocument();
@@ -217,6 +216,7 @@ describe("SoundList", () => {
   });
 
   it("clicking a sound row toggles selection via onSelectionChange", async () => {
+    const user = userEvent.setup();
     const kick = createMockSound({ id: "k", name: "Kick" });
     useLibraryStore.setState({
       ...initialLibraryState,
@@ -227,9 +227,7 @@ describe("SoundList", () => {
     renderList({ onSelectionChange });
 
     const row = screen.getByText("Kick");
-    await act(async () => {
-      fireEvent.click(row);
-    });
+    await user.click(row);
 
     expect(onSelectionChange).toHaveBeenCalledTimes(1);
     const nextSet = onSelectionChange.mock.calls[0][0] as Set<string>;
@@ -259,12 +257,13 @@ describe("SoundList", () => {
       </QueryClientProvider>
     );
 
+    const user = userEvent.setup();
     const { rerender } = render(buildJsx(new Set(["k"])));
     rerender(buildJsx(new Set(["k", "s"])));
 
     // Click kick — should deselect kick from {k, s}, leaving {s}
     const kickRow = screen.getByText("Kick");
-    await act(async () => { fireEvent.click(kickRow); });
+    await user.click(kickRow);
 
     expect(onSelectionChange).toHaveBeenCalledTimes(1);
     const result = onSelectionChange.mock.calls[0][0] as Set<string>;
@@ -311,6 +310,7 @@ describe("SoundList", () => {
   });
 
   it("Select All calls onSelectionChange with every selectable sound id", async () => {
+    const user = userEvent.setup();
     const a = createMockSound({ id: "a", name: "A" });
     const b = createMockSound({ id: "b", name: "B" });
     useLibraryStore.setState({
@@ -322,9 +322,7 @@ describe("SoundList", () => {
     renderList({ onSelectionChange });
 
     const selectAllBtn = screen.getByRole("button", { name: /select all/i });
-    await act(async () => {
-      fireEvent.click(selectAllBtn);
-    });
+    await user.click(selectAllBtn);
 
     expect(onSelectionChange).toHaveBeenCalledTimes(1);
     const nextSet = onSelectionChange.mock.calls[0][0] as Set<string>;
