@@ -255,6 +255,37 @@ describe("fadeMixer", () => {
     });
   });
 
+  describe("fadePad — fromVolume === toVolume", () => {
+    it("completes without error and does not null onended callbacks", async () => {
+      const mockGain = makeMockGain(0.5);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain, recordLayerVoice } = await import("./audioState");
+      getPadGain("pad-equal-vol");
+      const mockVoice = makeMockVoice();
+      recordLayerVoice("pad-equal-vol", "layer-equal-vol", mockVoice);
+      const { fadePad } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-equal-vol" });
+
+      expect(() => fadePad(pad, 0.5, 0.5, 1000)).not.toThrow();
+
+      // fadingDown = (0.5 < 0.5) = false → nullPadOnEnded must not be called
+      expect(mockVoice.setOnEnded).not.toHaveBeenCalledWith(null);
+    });
+
+    it("still schedules a gain ramp when volumes are equal", async () => {
+      const mockGain = makeMockGain(0.5);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const { getPadGain } = await import("./audioState");
+      getPadGain("pad-equal-ramp");
+      const { fadePad } = await import("./fadeMixer");
+      const pad = createMockPad({ id: "pad-equal-ramp" });
+
+      fadePad(pad, 0.5, 0.5, 1000);
+
+      expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
+    });
+  });
+
   describe("fadePad — fading up", () => {
     it("ramps gain up from provided fromVolume to 1.0", async () => {
       const mockGain = makeMockGain();

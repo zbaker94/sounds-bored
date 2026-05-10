@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; internal test coverage improvements only.
 - Improved internal test coverage for audio layer chain isolation (no user-facing behavior changes)
 - Internal audio engine test improvements; no user-facing behavior changed.
 - No user-facing changes (internal test coverage improvement only)
