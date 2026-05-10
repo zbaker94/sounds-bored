@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal test suite improvements; no user-facing changes.
 - Sounds in the import folder are now automatically tagged with "Imported" on startup, even if they were added before this feature existed
 - No visible user-facing changes (internal test coverage improvement only)
 - Internal test coverage improved for pad gesture behavior; no user-facing changes.

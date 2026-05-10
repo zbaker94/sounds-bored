@@ -473,8 +473,9 @@ describe("useBootLoader — analysis scheduling", () => {
     });
 
     expect(mockScheduleAnalysisForUnanalyzed).toHaveBeenCalledTimes(1);
-    // Reads from the store post-reconcile, so it sees the reconciled sound
+    // Must be called with exactly the post-reconcile store state — not pre-reconcile or empty
     const passedSounds = mockScheduleAnalysisForUnanalyzed.mock.calls[0][0] as Array<{ id: string }>;
-    expect(passedSounds.some((s) => s.id === "unanalyzed-1")).toBe(true);
+    expect(passedSounds).toHaveLength(1);
+    expect(passedSounds[0].id).toBe("unanalyzed-1");
   });
 });
