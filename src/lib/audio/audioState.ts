@@ -177,6 +177,9 @@ export function isAnyGainChanging(): boolean {
   return isGainRampPending();
 }
 
+/** Returns playback progress for a pad in [0, 1], or null if not playing.
+ *  Pass `currentTime` when computing progress for multiple pads in a single RAF frame
+ *  so all calculations share the same AudioContext reference point. */
 export function getPadProgress(padId: string, currentTime?: number): number | null {
   const info = padProgressInfo.get(padId);
   if (info) {
