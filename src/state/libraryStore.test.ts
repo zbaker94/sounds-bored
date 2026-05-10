@@ -234,6 +234,53 @@ describe("libraryStore", () => {
     });
   });
 
+  describe("deleteSet", () => {
+    it("removes an existing set from the sets array", () => {
+      const set1 = createMockSet({ id: "set-1", name: "Drums" });
+      const set2 = createMockSet({ id: "set-2", name: "FX" });
+      useLibraryStore.setState({ sets: [set1, set2] });
+
+      getState().deleteSet("set-1");
+
+      expect(getState().sets).toHaveLength(1);
+      expect(getState().sets[0].id).toBe("set-2");
+    });
+
+    it("clears the setId from all associated sounds", () => {
+      const set1 = createMockSet({ id: "set-1" });
+      const sound1 = createMockSound({ id: "sound-1", sets: ["set-1"] });
+      const sound2 = createMockSound({ id: "sound-2", sets: ["set-1", "set-2"] });
+      const sound3 = createMockSound({ id: "sound-3", sets: ["set-2"] });
+      useLibraryStore.setState({ sets: [set1], sounds: [sound1, sound2, sound3] });
+
+      getState().deleteSet("set-1");
+
+      expect(getState().sounds.find((s) => s.id === "sound-1")!.sets).toEqual([]);
+      expect(getState().sounds.find((s) => s.id === "sound-2")!.sets).toEqual(["set-2"]);
+      expect(getState().sounds.find((s) => s.id === "sound-3")!.sets).toEqual(["set-2"]);
+    });
+
+    it("is a no-op when the set does not exist", () => {
+      const set1 = createMockSet({ id: "set-1" });
+      const sound1 = createMockSound({ id: "sound-1", sets: ["set-1"] });
+      useLibraryStore.setState({ sets: [set1], sounds: [sound1], isDirty: false });
+
+      getState().deleteSet("nonexistent-id");
+
+      expect(getState().sets).toHaveLength(1);
+      expect(getState().sounds[0].sets).toEqual(["set-1"]);
+    });
+
+    it("marks isDirty = true", () => {
+      const set1 = createMockSet({ id: "set-1" });
+      useLibraryStore.setState({ sets: [set1], isDirty: false });
+
+      getState().deleteSet("set-1");
+
+      expect(getState().isDirty).toBe(true);
+    });
+  });
+
   describe("addSoundsToSet", () => {
     it("should add the setId to each sound's sets array", () => {
       const sound1 = createMockSound({ id: "sound-1", sets: [] });
