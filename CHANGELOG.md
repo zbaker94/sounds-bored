@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved accessibility of the tag match mode info button with a descriptive label for screen readers
 - Internal test refactoring only; no user-facing changes.
 - Added test coverage for the Settings "About" tab, including app version display, update checking, download progress, install, and restart flows
 - Internal test refactoring only — no user-facing changes in this release.

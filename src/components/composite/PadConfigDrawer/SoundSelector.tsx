@@ -309,7 +309,7 @@ function TagModeSection({ value, onChange, sounds, tagCountMap }: TagModeSection
         <Label variant="section">Match Mode</Label>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" tabIndex={-1}
+            <button type="button" tabIndex={-1} aria-label="Match mode info"
               className="inline-flex items-center text-muted-foreground hover:text-foreground cursor-help">
               <HugeiconsIcon icon={InformationCircleIcon} size={14} />
             </button>

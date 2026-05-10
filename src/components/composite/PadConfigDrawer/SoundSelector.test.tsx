@@ -216,47 +216,58 @@ describe("SoundSelector — tag mode", () => {
     expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
-  it("shows 'No tags in library yet.' when tag list is empty", () => {
+  it("renders tag search input when tag list is empty", () => {
     useLibraryStore.setState({ sounds: [], tags: [], sets: [], isDirty: false });
     renderSelector({
       value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 100 },
       onChange: vi.fn(),
     });
-    // Combobox empty state is rendered inside a portal — only visible after opening
-    // We verify the chips input renders (the combobox is present)
     expect(screen.getByPlaceholderText(/search.*tags/i)).toBeInTheDocument();
   });
 
-  it("renders AND/OR toggle in tag mode", () => {
-    renderBasicTagSelector();
-    expect(screen.getByRole("tab", { name: /any/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /all/i })).toBeInTheDocument();
-  });
-
-  it("AND/OR toggle defaults to Any selected", () => {
-    renderBasicTagSelector();
-    const anyTab = screen.getByRole("tab", { name: /any/i });
-    expect(anyTab).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("clicking All calls onChange with matchMode all", async () => {
-    const onChange = vi.fn();
-    const tag = createMockTag({ name: "Percussion" });
-    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
-    renderSelector({
-      value: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 },
-      onChange,
+  describe("matchMode toggle", () => {
+    it("renders both Any and All tabs", () => {
+      renderBasicTagSelector();
+      expect(screen.getByRole("tab", { name: /any/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /all/i })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole("tab", { name: /all/i }));
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "tag", matchMode: "all" })
-    );
-  });
 
-  it("renders Match Mode label with info icon tooltip", () => {
-    renderBasicTagSelector();
-    expect(screen.getByText("Match Mode")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "" })).toBeInTheDocument(); // info icon button
+    it("renders Match Mode label and info icon button", () => {
+      renderBasicTagSelector();
+      expect(screen.getByText("Match Mode")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /match mode info/i })).toBeInTheDocument();
+    });
+
+    it.each([
+      { mode: "any" as const, tabRegex: /any/i, otherRegex: /all/i },
+      { mode: "all" as const, tabRegex: /all/i, otherRegex: /any/i },
+    ])("shows $mode tab as selected when matchMode is $mode", ({ mode, tabRegex, otherRegex }) => {
+      const tag = createMockTag({ name: "Percussion" });
+      useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+      renderSelector({
+        value: { type: "tag", tagIds: [], matchMode: mode, defaultVolume: 100 },
+        onChange: vi.fn(),
+      });
+      expect(screen.getByRole("tab", { name: tabRegex })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: otherRegex })).toHaveAttribute("aria-selected", "false");
+    });
+
+    it.each([
+      { from: "any" as const, to: "all" as const, toRegex: /all/i },
+      { from: "all" as const, to: "any" as const, toRegex: /any/i },
+    ])("clicking $to tab calls onChange with matchMode $to", async ({ from, to, toRegex }) => {
+      const onChange = vi.fn();
+      const tag = createMockTag({ name: "Percussion" });
+      useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+      renderSelector({
+        value: { type: "tag", tagIds: [], matchMode: from, defaultVolume: 100 },
+        onChange,
+      });
+      await userEvent.click(screen.getByRole("tab", { name: toRegex }));
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "tag", matchMode: to, tagIds: [] })
+      );
+    });
   });
 
   it("shows helper text prompting to select tags when none are selected", () => {
@@ -264,16 +275,21 @@ describe("SoundSelector — tag mode", () => {
     expect(screen.getByText("Select tags above to filter which sounds are eligible.")).toBeInTheDocument();
   });
 
-  it("shows match count with mode when tags are selected and sounds match", () => {
-    const tag = createMockTag({ id: "t1", name: "Percussion" });
-    const kick = createMockSound({ name: "Kick", tags: ["t1"], filePath: "sounds/kick.wav" });
+  it.each([
+    { matchMode: "any" as const, expectedText: "2 sound(s) match any of these tags." },
+    { matchMode: "all" as const, expectedText: "1 sound(s) match all of these tags." },
+  ])("shows correct match count for $matchMode mode", ({ matchMode, expectedText }) => {
+    const tag1 = createMockTag({ id: "t1", name: "Percussion" });
+    const tag2 = createMockTag({ id: "t2", name: "Rhythm" });
+    // kick has both tags → matches any mode; snare has only t1 → matches "any" but not "all"
+    const kick = createMockSound({ name: "Kick", tags: ["t1", "t2"], filePath: "sounds/kick.wav" });
     const snare = createMockSound({ name: "Snare", tags: ["t1"], filePath: "sounds/snare.wav" });
-    useLibraryStore.setState({ sounds: [kick, snare], tags: [tag], sets: [], isDirty: false });
+    useLibraryStore.setState({ sounds: [kick, snare], tags: [tag1, tag2], sets: [], isDirty: false });
     renderSelector({
-      value: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 100 },
+      value: { type: "tag", tagIds: ["t1", "t2"], matchMode, defaultVolume: 100 },
       onChange: vi.fn(),
     });
-    expect(screen.getByText("2 sound(s) match any of these tags.")).toBeInTheDocument();
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
   it("shows no-match helper text when tags are selected but no sounds match", () => {
