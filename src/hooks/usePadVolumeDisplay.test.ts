@@ -225,6 +225,8 @@ describe("usePadVolumeDisplay", () => {
       });
       // Wait for full linger + hide (450ms + 220ms) — resets lastVolumeRef to 1.0
       act(() => { vi.advanceTimersByTime(450 + 220); });
+      // Flush any pending state updates triggered by the timeout callbacks
+      act(() => {});
       expect(result.current.showVolumeDisplay).toBe(false);
       // Session B: pad retriggers at full volume (liveVolume still absent — gain at 1.0)
       // The bar is NOT actively showing, but if it were to show, displayVolume should be
