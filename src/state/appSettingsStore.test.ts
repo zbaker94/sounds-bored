@@ -106,6 +106,30 @@ describe("appSettingsStore", () => {
     });
   });
 
+  describe("setAutoAnalysis", () => {
+    it("sets autoAnalysis to true", () => {
+      getState().loadSettings(createMockAppSettings({ autoAnalysis: false }));
+      getState().setAutoAnalysis(true);
+      expect(getState().settings!.autoAnalysis).toBe(true);
+    });
+
+    it("sets autoAnalysis to false", () => {
+      getState().loadSettings(createMockAppSettings({ autoAnalysis: true }));
+      getState().setAutoAnalysis(false);
+      expect(getState().settings!.autoAnalysis).toBe(false);
+    });
+
+    it("toggles autoAnalysis from true to false", () => {
+      getState().loadSettings(createMockAppSettings({ autoAnalysis: true }));
+      getState().setAutoAnalysis(false);
+      expect(getState().settings!.autoAnalysis).toBe(false);
+    });
+
+    it("does nothing when settings is null", () => {
+      expect(() => getState().setAutoAnalysis(true)).not.toThrow();
+    });
+  });
+
   describe("updateSettings", () => {
     it("should apply an immer updater to settings", () => {
       getState().loadSettings(createMockAppSettings());
