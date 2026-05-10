@@ -100,6 +100,12 @@ describe("migrateProject — 1.0.0 → 1.1.0", () => {
     migrateProject({ name: "My Project", version: "1.0.0" });
     expect(warnSpy).not.toHaveBeenCalled();
   });
+
+  it("adds favoritedSetIds: [] when the field is absent from a 1.0.0 project", () => {
+    const raw = { name: "My Project", version: "1.0.0", scenes: [] };
+    const result = migrateProject(raw);
+    expect(result.favoritedSetIds).toEqual([]);
+  });
 });
 
 describe("migrateProject — 1.1.0 → 1.2.0", () => {
