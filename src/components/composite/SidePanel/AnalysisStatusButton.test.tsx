@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AnalysisStatusButton } from "./AnalysisStatusButton";
 import { useAnalysisStore, initialAnalysisState } from "@/state/analysisStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
@@ -40,6 +41,7 @@ describe("AnalysisStatusButton", () => {
   });
 
   it("shows 'Analyzing loudness…' label in popover when running", async () => {
+    const user = userEvent.setup();
     useAnalysisStore.setState({
       ...initialAnalysisState,
       status: "running",
@@ -49,14 +51,13 @@ describe("AnalysisStatusButton", () => {
     });
     render(<AnalysisStatusButton />);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /analysis status/i }));
-    });
+    await user.click(screen.getByRole("button", { name: /analysis status/i }));
 
     expect(screen.getByText("Analyzing loudness…")).toBeInTheDocument();
   });
 
   it("shows 'Analysis complete' label in popover when completed", async () => {
+    const user = userEvent.setup();
     useAnalysisStore.setState({
       ...initialAnalysisState,
       status: "completed",
@@ -65,14 +66,13 @@ describe("AnalysisStatusButton", () => {
     });
     render(<AnalysisStatusButton />);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /analysis status/i }));
-    });
+    await user.click(screen.getByRole("button", { name: /analysis status/i }));
 
     expect(screen.getByText("Analysis complete")).toBeInTheDocument();
   });
 
   it("shows currently-analyzing sound name in popover when running", async () => {
+    const user = userEvent.setup();
     const sound = createMockSound({ id: "s1", name: "Kick Drum" });
     useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
     useAnalysisStore.setState({
@@ -85,14 +85,13 @@ describe("AnalysisStatusButton", () => {
     });
     render(<AnalysisStatusButton />);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /analysis status/i }));
-    });
+    await user.click(screen.getByRole("button", { name: /analysis status/i }));
 
     expect(screen.getByText("Kick Drum")).toBeInTheDocument();
   });
 
   it("cancel button calls cancelQueue", async () => {
+    const user = userEvent.setup();
     const cancelSpy = vi.spyOn(useAnalysisStore.getState(), "cancelQueue");
     useAnalysisStore.setState({
       ...initialAnalysisState,
@@ -103,12 +102,10 @@ describe("AnalysisStatusButton", () => {
     });
     render(<AnalysisStatusButton />);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /analysis status/i }));
-    });
+    await user.click(screen.getByRole("button", { name: /analysis status/i }));
 
     const cancelBtn = screen.getByText(/cancel pending/i);
-    await act(async () => { fireEvent.click(cancelBtn); });
+    await user.click(cancelBtn);
 
     expect(cancelSpy).toHaveBeenCalled();
   });

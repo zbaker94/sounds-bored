@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DownloadItem } from "./DownloadItem";
 import { useCancelDownload } from "@/lib/ytdlp.queries";
@@ -114,9 +115,10 @@ describe("DownloadItem", () => {
     },
   );
 
-  it("calls cancelDownload with the correct job id when cancel button clicked", () => {
+  it("calls cancelDownload with the correct job id when cancel button clicked", async () => {
+    const user = userEvent.setup();
     renderItem(makeJob({ id: "job-42", status: "downloading", percent: 50 }));
-    fireEvent.click(screen.getByRole("button"));
+    await user.click(screen.getByRole("button"));
     expect(mockCancelMutate).toHaveBeenCalledWith("job-42");
   });
 

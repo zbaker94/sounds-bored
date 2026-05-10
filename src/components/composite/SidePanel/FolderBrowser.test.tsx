@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { FolderBrowser } from "./FolderBrowser";
@@ -157,6 +158,7 @@ describe("FolderBrowser", () => {
   });
 
   it("'Remove All' banner button opens the confirm-remove-missing-folders overlay", async () => {
+    const user = userEvent.setup();
     const folder = createMockGlobalFolder({ id: "missing-f", name: "Missing Folder" });
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings: { ...createMockAppSettings(), globalFolders: [folder] } });
     useLibraryStore.setState({
@@ -173,14 +175,13 @@ describe("FolderBrowser", () => {
     expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(false);
 
     const removeAllBtn = screen.getByRole("button", { name: /remove all/i });
-    await act(async () => {
-      fireEvent.click(removeAllBtn);
-    });
+    await user.click(removeAllBtn);
 
     expect(selectIsOverlayOpen(OVERLAY_ID.CONFIRM_REMOVE_MISSING_FOLDERS)(useUiStore.getState())).toBe(true);
   });
 
   it("'Review →' button opens the folder dialog queue", async () => {
+    const user = userEvent.setup();
     const folder = createMockGlobalFolder({
       id: "missing-f",
       name: "Missing Folder",
@@ -198,9 +199,7 @@ describe("FolderBrowser", () => {
     ).not.toBeInTheDocument();
 
     const reviewBtn = screen.getByRole("button", { name: /review/i });
-    await act(async () => {
-      fireEvent.click(reviewBtn);
-    });
+    await user.click(reviewBtn);
 
     const dialog = screen.getByTestId("resolve-missing-folder-dialog");
     expect(dialog).toBeInTheDocument();
@@ -208,6 +207,7 @@ describe("FolderBrowser", () => {
   });
 
   it("clicking a missing folder in the list opens the resolve dialog for that folder", async () => {
+    const user = userEvent.setup();
     const folder = createMockGlobalFolder({
       id: "missing-f",
       name: "Missing Folder",
@@ -221,9 +221,7 @@ describe("FolderBrowser", () => {
     renderBrowser();
 
     const row = screen.getByText("Missing Folder");
-    await act(async () => {
-      fireEvent.click(row);
-    });
+    await user.click(row);
 
     const dialog = screen.getByTestId("resolve-missing-folder-dialog");
     expect(dialog).toBeInTheDocument();
@@ -245,6 +243,7 @@ describe("FoldersPanel — error paths", () => {
   });
 
   it("shows toast with error description when openPath throws in handleOpenFolderInExplorer", async () => {
+    const user = userEvent.setup();
     const folder = createMockGlobalFolder({ id: "f1", name: "Sounds", path: "/music/sounds" });
     useAppSettingsStore.setState({
       ...initialAppSettingsState,
@@ -256,9 +255,7 @@ describe("FoldersPanel — error paths", () => {
     renderBrowser({ selectedId: "f1" });
 
     const openBtn = screen.getByRole("button", { name: /^open$/i });
-    await act(async () => {
-      fireEvent.click(openBtn);
-    });
+    await user.click(openBtn);
 
     expect(mockToastError).toHaveBeenCalledWith("Failed to open folder", {
       description: "permission denied",
@@ -266,6 +263,7 @@ describe("FoldersPanel — error paths", () => {
   });
 
   it("shows toast with error description when saveSettings throws in handleDeleteFolderFromDisk", async () => {
+    const user = userEvent.setup();
     const folder = createMockGlobalFolder({ id: "f1", name: "Sounds", path: "/music/sounds" });
     const settings = createMockAppSettings({
       globalFolders: [folder],
@@ -278,12 +276,8 @@ describe("FoldersPanel — error paths", () => {
 
     renderBrowser({ selectedId: "f1" });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /delete from disk/i }));
-    });
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+    await user.click(screen.getByRole("button", { name: /delete from disk/i }));
 
     expect(mockToastError).toHaveBeenCalledWith("Failed to delete folder from disk", {
       description: "disk full",

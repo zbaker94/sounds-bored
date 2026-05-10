@@ -122,14 +122,8 @@ describe("PadButtonProgress", () => {
 });
 
 describe("PadButtonProgress — React.memo", () => {
-  // $$typeof is a React internal — not part of the public API.
-  // Pragmatic: directly verifying memo wiring is cleaner than a render-count test.
-  // If this breaks on a React upgrade, replace with a render-count integration test.
-  it("is wrapped in React.memo with arePropsEqual as the comparator", () => {
-    expect((PadButtonProgress as unknown as { $$typeof: symbol }).$$typeof).toBe(
-      Symbol.for("react.memo"),
-    );
-    // Confirms arePropsEqual unit tests directly prove the re-render-prevention contract.
+  it("uses arePropsEqual as the memoization comparator", () => {
+    // arePropsEqual unit tests (below) prove the re-render-prevention contract.
     expect((PadButtonProgress as unknown as { compare: unknown }).compare).toBe(arePropsEqual);
   });
 });
