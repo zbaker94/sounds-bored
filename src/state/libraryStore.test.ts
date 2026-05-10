@@ -143,6 +143,36 @@ describe("libraryStore", () => {
     });
   });
 
+  describe("setIsReconciling", () => {
+    it("sets isReconciling to true", () => {
+      useLibraryStore.setState({ isReconciling: false });
+      getState().setIsReconciling(true);
+      expect(getState().isReconciling).toBe(true);
+    });
+
+    it("sets isReconciling to false", () => {
+      useLibraryStore.setState({ isReconciling: true });
+      getState().setIsReconciling(false);
+      expect(getState().isReconciling).toBe(false);
+    });
+  });
+
+  describe("tryStartReconciling", () => {
+    it("returns true and sets isReconciling when not already reconciling", () => {
+      useLibraryStore.setState({ isReconciling: false });
+      const result = getState().tryStartReconciling();
+      expect(result).toBe(true);
+      expect(getState().isReconciling).toBe(true);
+    });
+
+    it("returns false and does not change state when already reconciling", () => {
+      useLibraryStore.setState({ isReconciling: true });
+      const result = getState().tryStartReconciling();
+      expect(result).toBe(false);
+      expect(getState().isReconciling).toBe(true);
+    });
+  });
+
   describe("addSet", () => {
     it("should create a set with the given name", () => {
       getState().addSet("My Set");

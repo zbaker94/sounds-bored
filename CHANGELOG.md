@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; internal test coverage added for library reconciliation state management.
 - No user-facing changes in this release (internal test coverage improvements only)
 - No user-facing changes in this release.
 - No user-facing changes (internal test improvement only)
