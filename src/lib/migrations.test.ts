@@ -298,6 +298,216 @@ describe("migrateProject — 1.1.0 → 1.2.0 malformed-input guards", () => {
   });
 });
 
+describe("migrateProject — 1.2.0 → 1.3.0", () => {
+  // Note: migrateProject chains all migrations through CURRENT_VERSION (1.4.0+),
+  // so pad.volume / pad.fadeTargetVol values are subsequently rescaled 0–1 → 0–100
+  // by the 1.3.0 → 1.4.0 migration. Expectations below reflect the post-chain values.
+  it("renames fadeHighVol to volume on each pad", () => {
+    const raw = {
+      name: "My Project",
+      version: "1.2.0",
+      scenes: [{
+        id: "scene-1",
+        name: "Scene 1",
+        pads: [{
+          id: "pad-1",
+          name: "Kick",
+          layers: [],
+          muteTargetPadIds: [],
+          fadeHighVol: 0.8,
+        }],
+      }],
+    };
+    const result = migrateProject(raw);
+    expect(result.version).toBe("1.4.0");
+    const scene = (result.scenes as Array<Record<string, unknown>>)[0];
+    const pad = (scene.pads as Array<Record<string, unknown>>)[0];
+    // 0.8 renamed to volume, then rescaled by 1.3.0 → 1.4.0 to 80
+    expect(pad.volume).toBe(80);
+    expect(pad.fadeHighVol).toBeUndefined();
+  });
+
+  it("renames fadeLowVol to fadeTargetVol on each pad", () => {
+    const raw = {
+      name: "My Project",
+      version: "1.2.0",
+      scenes: [{
+        id: "scene-1",
+        name: "Scene 1",
+        pads: [{
+          id: "pad-1",
+          name: "Kick",
+          layers: [],
+          muteTargetPadIds: [],
+          fadeLowVol: 0.3,
+        }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scene = (result.scenes as Array<Record<string, unknown>>)[0];
+    const pad = (scene.pads as Array<Record<string, unknown>>)[0];
+    // 0.3 renamed to fadeTargetVol, then rescaled by 1.3.0 → 1.4.0 to 30
+    expect(pad.fadeTargetVol).toBe(30);
+    expect(pad.fadeLowVol).toBeUndefined();
+  });
+
+  it("renames both fields when both are present", () => {
+    const raw = {
+      name: "My Project",
+      version: "1.2.0",
+      scenes: [{
+        id: "scene-1",
+        name: "Scene 1",
+        pads: [{
+          id: "pad-1",
+          name: "Kick",
+          layers: [],
+          muteTargetPadIds: [],
+          fadeHighVol: 0.9,
+          fadeLowVol: 0.1,
+        }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scene = (result.scenes as Array<Record<string, unknown>>)[0];
+    const pad = (scene.pads as Array<Record<string, unknown>>)[0];
+    // Renamed by 1.2.0 → 1.3.0, then rescaled by 1.3.0 → 1.4.0
+    expect(pad.volume).toBe(90);
+    expect(pad.fadeTargetVol).toBe(10);
+    expect(pad.fadeHighVol).toBeUndefined();
+    expect(pad.fadeLowVol).toBeUndefined();
+  });
+
+  it("leaves fields missing when not present on pad", () => {
+    const raw = {
+      name: "My Project",
+      version: "1.2.0",
+      scenes: [{
+        id: "scene-1",
+        name: "Scene 1",
+        pads: [{
+          id: "pad-1",
+          name: "Kick",
+          layers: [],
+          muteTargetPadIds: [],
+        }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scene = (result.scenes as Array<Record<string, unknown>>)[0];
+    const pad = (scene.pads as Array<Record<string, unknown>>)[0];
+    expect("volume" in pad).toBe(false);
+    expect("fadeTargetVol" in pad).toBe(false);
+    expect("fadeHighVol" in pad).toBe(false);
+    expect("fadeLowVol" in pad).toBe(false);
+    expect(result.version).toBe("1.4.0");
+  });
+
+  it("migrates all pads across all scenes", () => {
+    const raw = {
+      name: "My Project",
+      version: "1.2.0",
+      scenes: [
+        {
+          id: "scene-1",
+          name: "Scene 1",
+          pads: [
+            { id: "pad-1", name: "P1", layers: [], muteTargetPadIds: [], fadeHighVol: 0.5, fadeLowVol: 0.1 },
+            { id: "pad-2", name: "P2", layers: [], muteTargetPadIds: [], fadeHighVol: 0.6, fadeLowVol: 0.2 },
+          ],
+        },
+        {
+          id: "scene-2",
+          name: "Scene 2",
+          pads: [
+            { id: "pad-3", name: "P3", layers: [], muteTargetPadIds: [], fadeHighVol: 0.7, fadeLowVol: 0.3 },
+            { id: "pad-4", name: "P4", layers: [], muteTargetPadIds: [], fadeHighVol: 0.8, fadeLowVol: 0.4 },
+          ],
+        },
+      ],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const allPads = scenes.flatMap((s) => s.pads as Array<Record<string, unknown>>);
+    expect(allPads).toHaveLength(4);
+    for (const pad of allPads) {
+      expect(pad.fadeHighVol).toBeUndefined();
+      expect(pad.fadeLowVol).toBeUndefined();
+      expect(typeof pad.volume).toBe("number");
+      expect(typeof pad.fadeTargetVol).toBe("number");
+    }
+  });
+
+  it("passes through project with no scenes unchanged", () => {
+    const raw = {
+      name: "My Project",
+      version: "1.2.0",
+    };
+    const result = migrateProject(raw);
+    expect(result.version).toBe("1.4.0");
+    expect(result.scenes).toBeUndefined();
+  });
+});
+
+describe("migrateProject — 1.2.0 → 1.3.0 malformed-input guards", () => {
+  it("skips non-object entries in scenes array without crashing", () => {
+    const raw = {
+      name: "X",
+      version: "1.2.0",
+      scenes: [null, 42, "bad", [1, 2, 3], { id: "s1", pads: [] }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as unknown[];
+    expect(scenes).toHaveLength(5);
+    expect(scenes[0]).toBeNull();
+    expect(scenes[1]).toBe(42);
+    expect(scenes[2]).toBe("bad");
+    expect(Array.isArray(scenes[3])).toBe(true);
+    expect((scenes[4] as Record<string, unknown>).id).toBe("s1");
+  });
+
+  it("skips non-object entries in pads array without crashing", () => {
+    const raw = {
+      name: "X",
+      version: "1.2.0",
+      scenes: [{
+        id: "s1",
+        pads: [null, 42, "bad", [1, 2], { id: "p1", fadeHighVol: 0.5 }],
+      }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    const pads = scenes[0].pads as unknown[];
+    expect(pads).toHaveLength(5);
+    expect(pads[0]).toBeNull();
+    // Only the object pad gets its field renamed and scaled
+    const objPad = pads[4] as Record<string, unknown>;
+    expect(objPad.fadeHighVol).toBeUndefined();
+    expect(objPad.volume).toBe(50); // 0.5 renamed then rescaled ×100
+  });
+
+  it("passes through when scenes is not an array", () => {
+    const raw = {
+      name: "X",
+      version: "1.2.0",
+      scenes: "not-an-array",
+    };
+    const result = migrateProject(raw);
+    expect(result.scenes).toBe("not-an-array");
+  });
+
+  it("passes through when pads is not an array", () => {
+    const raw = {
+      name: "X",
+      version: "1.2.0",
+      scenes: [{ id: "s1", pads: "not-an-array" }],
+    };
+    const result = migrateProject(raw);
+    const scenes = result.scenes as Array<Record<string, unknown>>;
+    expect(scenes[0].pads).toBe("not-an-array");
+  });
+});
+
 describe("migrateProject — 1.3.0 → 1.4.0 (pad volume scale 0–1 → 0–100)", () => {
   function makePadProject(pad: Record<string, unknown>): Record<string, unknown> {
     return {

@@ -19,6 +19,17 @@ describe("shuffleArray", () => {
     shuffleArray(arr);
     expect(arr).toEqual([1, 2, 3]);
   });
+
+  it("produces at least one non-identity ordering across 50 trials", () => {
+    const arr = [1, 2, 3, 4, 5, 6, 7, 8];
+    const results = Array.from({ length: 50 }, () => shuffleArray(arr));
+    expect(results.some((r) => !r.every((v, i) => v === arr[i]))).toBe(true);
+  });
+
+  it("produces no duplicate elements", () => {
+    const result = shuffleArray([1, 2, 3, 4, 5]);
+    expect(new Set(result).size).toBe(result.length);
+  });
 });
 
 describe("buildPlayOrder", () => {

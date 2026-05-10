@@ -305,6 +305,59 @@ describe("SoundSelector — tag mode", () => {
       expect.objectContaining({ type: "tag", matchMode: "all" })
     );
   });
+
+  it("tag selection defaultVolume is preserved when updating tag selection", async () => {
+    const onChange = vi.fn();
+    const tag = createMockTag({ id: "t1", name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    renderSelector({
+      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 75 },
+      onChange,
+    });
+
+    // Open the combobox and select a tag — triggers the TagPicker onChange path
+    await userEvent.click(screen.getByPlaceholderText(/search.*tags/i));
+    const option = await screen.findByRole("option", { name: /percussion/i });
+    await userEvent.click(option);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tag", defaultVolume: 75 })
+    );
+  });
+
+  it("tag selection preserves defaultVolume of 0 (falsy value not defaulted)", async () => {
+    const onChange = vi.fn();
+    const tag = createMockTag({ id: "t1", name: "Kick" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    renderSelector({
+      value: { type: "tag", tagIds: [], matchMode: "any", defaultVolume: 0 },
+      onChange,
+    });
+
+    await userEvent.click(screen.getByPlaceholderText(/search.*tags/i));
+    const option = await screen.findByRole("option", { name: /kick/i });
+    await userEvent.click(option);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tag", defaultVolume: 0 })
+    );
+  });
+
+  it("tag selection defaultVolume is preserved when matchMode is changed", async () => {
+    const onChange = vi.fn();
+    const tag = createMockTag({ id: "t1", name: "Percussion" });
+    useLibraryStore.setState({ sounds: [], tags: [tag], sets: [], isDirty: false });
+    renderSelector({
+      value: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 42 },
+      onChange,
+    });
+
+    await userEvent.click(screen.getByRole("tab", { name: /all/i }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tag", matchMode: "all", defaultVolume: 42 })
+    );
+  });
 });
 
 describe("SoundSelector — set mode", () => {
@@ -341,5 +394,24 @@ describe("SoundSelector — set mode", () => {
       onChange: vi.fn(),
     });
     expect(screen.getByText(/Sounds are drawn from this set at trigger time/)).toBeInTheDocument();
+  });
+
+  it("set selection defaultVolume is preserved when updating set selection", async () => {
+    const onChange = vi.fn();
+    const set = createMockSet({ id: "s1", name: "My Drums" });
+    useLibraryStore.setState({ sounds: [], tags: [], sets: [set], isDirty: false });
+    renderSelector({
+      value: { type: "set", setId: "", defaultVolume: 75 },
+      onChange,
+    });
+
+    // Open the combobox and select the set — triggers the Combobox onValueChange path
+    await userEvent.click(screen.getByPlaceholderText(/search sets/i));
+    const option = await screen.findByRole("option", { name: /my drums/i });
+    await userEvent.click(option);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "set", setId: "s1", defaultVolume: 75 })
+    );
   });
 });

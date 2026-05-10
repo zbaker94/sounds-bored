@@ -10,7 +10,7 @@ export async function loadBuffer(sound: Sound): Promise<AudioBuffer> {
   const cached = cache.get(sound.id);
   if (cached) return cached;
 
-  if (!sound.filePath) throw new Error(`Sound "${sound.name}" has no file path`);
+  if (!sound.filePath) throw new MissingFileError(`Sound "${sound.name}" has no file path`);
 
   const ctx = getAudioContext();
   const url = convertFileSrc(sound.filePath);

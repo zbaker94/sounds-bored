@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { loadBuffer, evictBuffer, clearAllBuffers } from "./bufferCache";
+import { loadBuffer, evictBuffer, clearAllBuffers, MissingFileError } from "./bufferCache";
 import { createMockSound } from "@/test/factories";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -69,21 +69,27 @@ describe("bufferCache", () => {
     it("throws MissingFileError when sound has no filePath", async () => {
       const sound = createMockSound({ filePath: undefined });
 
-      await expect(loadBuffer(sound)).rejects.toThrow();
+      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
+    });
+
+    it("throws MissingFileError when sound has an empty filePath", async () => {
+      const sound = createMockSound({ filePath: "" });
+
+      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
     });
 
     it("throws MissingFileError when fetch returns non-ok response", async () => {
       const sound = createMockSound({ filePath: "sounds/missing.wav" });
       mockFetch.mockResolvedValue({ ok: false, status: 404 } as Response);
 
-      await expect(loadBuffer(sound)).rejects.toThrow();
+      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
     });
 
     it("throws MissingFileError when fetch throws (network error)", async () => {
       const sound = createMockSound({ filePath: "sounds/network-err.wav" });
       mockFetch.mockRejectedValue(new Error("network error"));
 
-      await expect(loadBuffer(sound)).rejects.toThrow();
+      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
     });
   });
 

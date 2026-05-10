@@ -451,4 +451,26 @@ describe("useAutoSave", () => {
     expect(mockSaveProject).toHaveBeenCalled();
     expect(mockRefreshMissingState).not.toHaveBeenCalled();
   });
+
+  // ── Interval-driven saves ───────────────────────────────────────────────────
+
+  it("saves on the next interval tick when project becomes dirty after mount", () => {
+    seedDirtyPermanentProject();
+    useProjectStore.getState().clearDirtyFlag(); // start clean — no initial save
+
+    renderHook(() => useAutoSave(30_000));
+
+    // No save on mount (isDirty=false)
+    expect(mockSaveProject).not.toHaveBeenCalled();
+
+    // User edits project — isDirty becomes true
+    act(() => {
+      useProjectStore.getState().updateProject(useProjectStore.getState().project!);
+    });
+
+    // Advance one interval — save should fire
+    act(() => { vi.advanceTimersByTime(30_000); });
+
+    expect(mockSaveProject).toHaveBeenCalledTimes(1);
+  });
 });

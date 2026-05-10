@@ -172,3 +172,112 @@ describe("useProjectLifecycle — unexpected unload guard", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 });
+
+describe("useProjectLifecycle — close dialog handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDiscardTemporaryProject.mockResolvedValue(undefined);
+    useProjectStore.setState({ ...initialProjectState });
+  });
+
+  it("handleSaveAndClose closes the overlay and requests save-then-close", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+
+    const { result } = renderHook(() => useProjectLifecycle());
+
+    act(() => {
+      result.current.handleSaveAndClose();
+    });
+
+    expect(mockCloseOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG");
+    expect(mockRequestSaveAndThen).toHaveBeenCalledTimes(1);
+    expect(mockRequestSaveAndThen).toHaveBeenCalledWith(expect.any(Function));
+
+    // Verify the passed callback triggers window close
+    const callback = mockRequestSaveAndThen.mock.calls[0][0] as () => void;
+    callback();
+    expect(mockAllowClose).toHaveBeenCalled();
+  });
+
+  it("handleDiscardAndClose calls discardTemporaryProject for a temporary project", async () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry({ path: "/some/path" });
+    useProjectStore.getState().loadProject(historyEntry, project, true);
+
+    const { result } = renderHook(() => useProjectLifecycle());
+
+    await act(async () => {
+      await result.current.handleDiscardAndClose();
+    });
+
+    expect(mockDiscardTemporaryProject).toHaveBeenCalledWith("/some/path");
+    expect(mockAllowClose).toHaveBeenCalled();
+    expect(mockCloseOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG");
+  });
+
+  it("handleDiscardAndClose skips discardTemporaryProject for a permanent project", async () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+
+    const { result } = renderHook(() => useProjectLifecycle());
+
+    await act(async () => {
+      await result.current.handleDiscardAndClose();
+    });
+
+    expect(mockDiscardTemporaryProject).not.toHaveBeenCalled();
+    expect(mockAllowClose).toHaveBeenCalled();
+    expect(mockCloseOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG");
+  });
+
+  it("handleDiscardAndClose skips discardTemporaryProject when folderPath is null", async () => {
+    const project = createMockProject();
+    // Set isTemporary=true but folderPath=null directly via setState
+    // (ProjectHistoryEntry.path is non-nullable in the schema)
+    useProjectStore.setState({ ...initialProjectState, project, isTemporary: true, folderPath: null });
+
+    const { result } = renderHook(() => useProjectLifecycle());
+
+    await act(async () => {
+      await result.current.handleDiscardAndClose();
+    });
+
+    expect(mockDiscardTemporaryProject).not.toHaveBeenCalled();
+    expect(mockAllowClose).toHaveBeenCalled(); // closeWindow still runs
+  });
+
+  it("handleDiscardAndClose still calls closeWindow when discardTemporaryProject rejects", async () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry({ path: "/some/path" });
+    useProjectStore.getState().loadProject(historyEntry, project, true);
+    mockDiscardTemporaryProject.mockRejectedValue(new Error("Cannot delete"));
+
+    const { result } = renderHook(() => useProjectLifecycle());
+
+    await act(async () => {
+      await result.current.handleDiscardAndClose();
+    });
+
+    expect(mockDiscardTemporaryProject).toHaveBeenCalledWith("/some/path");
+    expect(mockAllowClose).toHaveBeenCalled(); // closeWindow still runs despite rejection
+  });
+
+  it("handleCancelClose closes the overlay without any other action", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+
+    const { result } = renderHook(() => useProjectLifecycle());
+
+    act(() => {
+      result.current.handleCancelClose();
+    });
+
+    expect(mockCloseOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG");
+    expect(mockRequestSaveAndThen).not.toHaveBeenCalled();
+    expect(mockDiscardTemporaryProject).not.toHaveBeenCalled();
+  });
+});
