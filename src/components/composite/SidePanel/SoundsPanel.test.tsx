@@ -41,7 +41,11 @@ vi.mock("@tauri-apps/api/window", () => ({
 // Mock import helpers so no real FS calls happen
 vi.mock("@/lib/import", () => ({
   copyFilesToFolder: vi.fn(() => Promise.resolve([])),
+  tagImportedSounds: vi.fn(),
 }));
+
+import { copyFilesToFolder } from "@/lib/import";
+const mockCopyFilesToFolder = copyFilesToFolder as ReturnType<typeof vi.fn>;
 
 const mockScheduleAnalysisForSounds = vi.fn(() => Promise.resolve());
 
@@ -124,6 +128,8 @@ beforeEach(() => {
   mockPickFolder.mockResolvedValue(null);
   mockGrantDroppedPaths.mockReset();
   mockGrantDroppedPaths.mockResolvedValue(undefined);
+  mockCopyFilesToFolder.mockReset();
+  mockCopyFilesToFolder.mockResolvedValue([]);
   mockMutateAsync.mockClear();
   vi.mocked(fsRemove).mockReset();
   vi.mocked(fsRemove).mockResolvedValue(undefined);
@@ -293,6 +299,31 @@ describe("SoundsPanel", () => {
       await fileDropCallback!({ payload: { type: "leave", paths: [] } });
     });
     expect(screen.queryByText(/drop audio files to import/i)).not.toBeInTheDocument();
+  });
+
+  // 7c. Dropping files invokes the import handler with the dropped paths
+  it("invokes the import handler with dropped paths when a file-drop 'drop' event fires", async () => {
+    let fileDropCallback: ((event: { payload: { type: string; paths: string[] } }) => Promise<void>) | null = null;
+
+    mockOnFileDropEvent.mockImplementationOnce(((cb: (event: { payload: { type: string; paths: string[] } }) => Promise<void>) => {
+      fileDropCallback = cb;
+      return Promise.resolve(() => {});
+    }) as any);
+
+    const droppedPaths = ["/audio/kick.mp3", "/audio/snare.wav"];
+    mockCopyFilesToFolder.mockReset();
+    mockCopyFilesToFolder.mockResolvedValue([]);
+
+    renderPanel();
+    await act(async () => { await Promise.resolve(); });
+
+    expect(fileDropCallback).not.toBeNull();
+
+    await act(async () => {
+      await fileDropCallback!({ payload: { type: "drop", paths: droppedPaths } });
+    });
+
+    expect(mockGrantDroppedPaths).toHaveBeenCalledWith(droppedPaths);
   });
 
   // ---------- Sets UI tests ----------
