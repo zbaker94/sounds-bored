@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal test improvements only)
 - Improved error message when previewing a missing sound — now shows the sound name and directs you to the Sounds panel
 - No user-facing changes in this release (internal test improvement only).
 - No user-facing changes in this release.
