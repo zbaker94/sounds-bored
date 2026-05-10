@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved error messages when a sound file can't be loaded — errors now include the sound's name to make it easier to identify which file caused the problem.
 - No user-facing changes; internal audio engine test coverage improved for gain node initialization behavior.
 - No user-facing changes in this release (internal test improvements only)
 - No user-facing changes in this release (internal test improvements only)

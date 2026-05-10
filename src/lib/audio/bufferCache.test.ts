@@ -75,21 +75,27 @@ describe("bufferCache", () => {
     it("throws MissingFileError when sound has an empty filePath", async () => {
       const sound = createMockSound({ filePath: "" });
 
-      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
+      const err = await loadBuffer(sound).catch(e => e);
+      expect(err).toBeInstanceOf(MissingFileError);
+      expect(err.message).toContain(sound.name);
     });
 
     it("throws MissingFileError when fetch returns non-ok response", async () => {
       const sound = createMockSound({ filePath: "sounds/missing.wav" });
       mockFetch.mockResolvedValue({ ok: false, status: 404 } as Response);
 
-      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
+      const err = await loadBuffer(sound).catch(e => e);
+      expect(err).toBeInstanceOf(MissingFileError);
+      expect(err.message).toContain(sound.name);
     });
 
     it("throws MissingFileError when fetch throws (network error)", async () => {
       const sound = createMockSound({ filePath: "sounds/network-err.wav" });
       mockFetch.mockRejectedValue(new Error("network error"));
 
-      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
+      const err = await loadBuffer(sound).catch(e => e);
+      expect(err).toBeInstanceOf(MissingFileError);
+      expect(err.message).toContain(sound.name);
     });
   });
 
