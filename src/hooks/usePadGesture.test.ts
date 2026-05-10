@@ -386,6 +386,27 @@ describe("usePadGesture — drag phase", () => {
 
     expect(stopPad).not.toHaveBeenCalled();
   });
+
+  it("triggers pad with volume 0 when entering drag phase with deltaY > 0 on a non-playing one-shot pad", () => {
+    vi.mocked(triggerPad).mockClear();
+    // playingPadIds is empty (set in beforeEach) — wasPlayingAtStart will be false
+    // oneShotPad has no hold layers — hasHoldLayer is false
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(150); // enter hold phase
+    });
+
+    // Move 10px up (clientY decreases) — deltaY = 300 - 290 = +10 > DRAG_PX(4), deltaY > 0
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+
+    expect(triggerPad).toHaveBeenCalledWith(oneShotPad, 0);
+  });
 });
 
 // ─── Hold-mode layer pads ─────────────────────────────────────────────────────
