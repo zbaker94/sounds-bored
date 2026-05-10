@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { useUiStore, initialUiState } from "@/state/uiStore";
+import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
@@ -234,6 +236,40 @@ describe("PadButton", () => {
       // padVolumes is cleared by audioTick in production when gain returns to baseline).
       expect(screen.getByTestId("pad-name")).toHaveTextContent("Kick");
     });
+  });
+});
+
+describe("partial-warning overlay", () => {
+  beforeEach(() => {
+    useLibraryStore.setState({ ...initialLibraryState });
+    useUiStore.setState({ ...initialUiState });
+    useProjectStore.setState({ ...initialProjectState });
+    usePlaybackStore.setState({ ...initialPlaybackState });
+    useMultiFadeStore.setState({ ...initialMultiFadeState });
+    usePadMetricsStore.setState({ ...initialPadMetricsState });
+  });
+
+  it("shows warning icon when pad has partial sound state (some sounds missing)", () => {
+    const okInst = createMockSoundInstance({ id: "inst-ok", soundId: "sound-ok" });
+    const missingInst = createMockSoundInstance({ id: "inst-bad", soundId: "sound-missing" });
+    const layer1 = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [okInst] } });
+    const layer2 = createMockLayer({ id: "layer-2", selection: { type: "assigned", instances: [missingInst] } });
+    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer1, layer2] });
+    const scene = createMockScene({ id: "scene-1", pads: [pad] });
+    useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+    // Mark one sound as missing
+    useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set(["sound-missing"]) });
+
+    const { container } = render(<TooltipProvider><PadButton pad={pad} sceneId="scene-1" /></TooltipProvider>);
+
+    // The partial-warning renders an amber-colored SVG icon via the TooltipTrigger span
+    expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
+  });
+
+  it("does not show warning icon when no sounds are missing", () => {
+    const pad = loadPlayablePadInStore();
+    render(<PadButton pad={pad} sceneId="scene-1" />);
+    expect(screen.queryByText(/some assigned sounds are missing/i)).not.toBeInTheDocument();
   });
 });
 
