@@ -60,6 +60,11 @@ describe("DownloadItem", () => {
     expect(screen.getByText("Fallback")).toBeInTheDocument();
   });
 
+  it("shows green checkmark icon for completed status", () => {
+    const { container } = renderItem(makeJob({ status: "completed", percent: 100, outputPath: "/sounds/kick.mp3" }));
+    expect(container.querySelector(".text-green-500")).toBeInTheDocument();
+  });
+
   it("shows progress bar and percent for downloading status", () => {
     renderItem(makeJob({ status: "downloading", percent: 42, speed: "1.2 MB/s" }));
     expect(screen.getByText(/42%/)).toBeInTheDocument();
