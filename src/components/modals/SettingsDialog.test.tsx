@@ -3,6 +3,7 @@ import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
+import { useUpdaterStore } from "@/state/updaterStore";
 import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories";
 import { SettingsDialog } from "./SettingsDialog";
 import { StartScreen } from "@/components/screens/start/StartScreen";
@@ -11,9 +12,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@/lib/scope", () => ({
   pickFolder: vi.fn(),
-  pickFile: vi.fn(),
-  pickFiles: vi.fn(),
-  restorePathScope: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/contexts/ProjectActionsContext", () => ({
@@ -49,6 +47,9 @@ vi.mock("@/lib/appSettings.queries", () => ({
   useSaveAppSettings: vi.fn(() => ({ mutate: mockSaveSettings })),
 }));
 
+vi.mock("@tauri-apps/api/app", () => ({ getVersion: vi.fn().mockResolvedValue("1.2.3") }));
+vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn().mockResolvedValue(undefined) }));
+
 import { pickFolder } from "@/lib/scope";
 const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
 
@@ -57,6 +58,18 @@ const mockOpenPath = openPath as ReturnType<typeof vi.fn>;
 
 import { toast } from "sonner";
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
+
+import { getVersion } from "@tauri-apps/api/app";
+const mockGetVersion = getVersion as unknown as ReturnType<typeof vi.fn>;
+
+import { relaunch } from "@tauri-apps/plugin-process";
+const mockRelaunch = relaunch as unknown as ReturnType<typeof vi.fn>;
+
+// Capture original store actions before any test can override them via setState
+const originalUpdaterActions = {
+  checkForUpdates: useUpdaterStore.getState().checkForUpdates,
+  install: useUpdaterStore.getState().install,
+};
 
 function renderDialog() {
   return render(
@@ -75,11 +88,21 @@ function openDialog() {
 beforeEach(() => {
   useUiStore.setState({ ...initialUiState });
   useAppSettingsStore.setState({ ...initialAppSettingsState });
+  useUpdaterStore.setState({
+    status: "idle",
+    availableVersion: null,
+    progress: null,
+    hasChecked: false,
+    _pendingUpdate: null,
+    ...originalUpdaterActions,
+  });
   mockSaveSettings.mockClear();
   mockPickFolder.mockReset();
   mockOpenPath.mockReset();
   mockOpenPath.mockResolvedValue(undefined);
   mockToastError.mockClear();
+  mockGetVersion.mockClear();
+  mockRelaunch.mockClear();
 });
 
 describe("SettingsDialog — shell", () => {
@@ -444,5 +467,105 @@ describe("SettingsDialog — Open In Explorer error path", () => {
     expect(mockToastError).toHaveBeenCalledWith("Could not open folder in file explorer.", {
       description: "permission denied",
     });
+  });
+});
+
+describe("SettingsDialog — AboutTab", () => {
+  async function openAboutTab(user = userEvent.setup()) {
+    renderDialog();
+    openDialog();
+    await user.click(screen.getByRole("tab", { name: /about/i }));
+    await screen.findByText(/1\.2\.3/); // flush async getVersion effect
+  }
+
+  it("displays app version from getVersion", async () => {
+    await openAboutTab();
+    expect(screen.getByText(/version 1\.2\.3/i)).toBeInTheDocument();
+  });
+
+  it("falls back to '…' when getVersion rejects", async () => {
+    mockGetVersion.mockRejectedValueOnce(new Error("tauri error"));
+    renderDialog();
+    openDialog();
+    await userEvent.setup().click(screen.getByRole("tab", { name: /about/i }));
+    await act(async () => {}); // flush the rejected promise and catch handler
+    expect(screen.queryByText("1.2.3")).not.toBeInTheDocument();
+  });
+
+  it("shows Check for updates button when idle and not yet checked", async () => {
+    await openAboutTab();
+    expect(screen.getByRole("button", { name: /check for updates/i })).toBeInTheDocument();
+  });
+
+  it("clicking Check for updates button calls checkForUpdates", async () => {
+    const user = userEvent.setup();
+    const mockCheck = vi.fn();
+    useUpdaterStore.setState({ checkForUpdates: mockCheck });
+    await openAboutTab(user);
+    await user.click(screen.getByRole("button", { name: /check for updates/i }));
+    expect(mockCheck).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows 'Up to date' text after a successful check with no update available", async () => {
+    useUpdaterStore.setState({ hasChecked: true });
+    await openAboutTab();
+    expect(screen.getByText("Up to date")).toBeInTheDocument();
+  });
+
+  it("shows checking spinner when status is checking", async () => {
+    useUpdaterStore.setState({ status: "checking" });
+    await openAboutTab();
+    expect(screen.getByText(/checking for updates/i)).toBeInTheDocument();
+  });
+
+  it("shows download progress when status is downloading with progress", async () => {
+    useUpdaterStore.setState({ status: "downloading", progress: 42 });
+    await openAboutTab();
+    expect(screen.getByText("Downloading… 42%")).toBeInTheDocument();
+  });
+
+  it("shows download text without percentage when status is downloading and progress is null", async () => {
+    useUpdaterStore.setState({ status: "downloading", progress: null });
+    await openAboutTab();
+    expect(screen.getByText("Downloading…")).toBeInTheDocument();
+  });
+
+  it("shows available version and Install button when update is available", async () => {
+    useUpdaterStore.setState({ status: "available", availableVersion: "2.0.0", hasChecked: true });
+    await openAboutTab();
+    expect(screen.getByText(/2\.0\.0 available/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /install now/i })).toBeInTheDocument();
+  });
+
+  it("clicking Install button calls install", async () => {
+    const user = userEvent.setup();
+    const mockInstall = vi.fn();
+    useUpdaterStore.setState({ status: "available", availableVersion: "2.0.0", hasChecked: true, install: mockInstall });
+    await openAboutTab(user);
+    await user.click(screen.getByRole("button", { name: /install now/i }));
+    expect(mockInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Restart now button and calls relaunch when status is ready", async () => {
+    const user = userEvent.setup();
+    useUpdaterStore.setState({ status: "ready" });
+    await openAboutTab(user);
+    await user.click(screen.getByRole("button", { name: /restart now/i }));
+    expect(mockRelaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Retry button when update check errors", async () => {
+    useUpdaterStore.setState({ status: "error", hasChecked: true });
+    await openAboutTab();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it("clicking Retry button calls checkForUpdates", async () => {
+    const user = userEvent.setup();
+    const mockCheck = vi.fn();
+    useUpdaterStore.setState({ status: "error", hasChecked: true, checkForUpdates: mockCheck });
+    await openAboutTab(user);
+    await user.click(screen.getByRole("button", { name: /retry/i }));
+    expect(mockCheck).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Added test coverage for the Settings "About" tab, including app version display, update checking, download progress, install, and restart flows
 - Internal test refactoring only — no user-facing changes in this release.
 - Fixed: pad sound volume settings no longer reset when switching tags, match mode, or sound sets in the pad config drawer
 - Fixed: missing or empty sound file paths now raise a specific error type, enabling clearer error messages when sounds can't be loaded
