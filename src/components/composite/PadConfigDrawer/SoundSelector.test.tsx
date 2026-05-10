@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
-import { useAppSettingsStore } from "@/state/appSettingsStore";
+import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { createMockSound, createMockTag, createMockSet } from "@/test/factories";
+import { createMockSound, createMockTag, createMockSet, createMockGlobalFolder, createMockAppSettings } from "@/test/factories";
 import { SoundSelector } from "./SoundSelector";
 import type { LayerSelection } from "@/lib/schemas";
 
@@ -429,5 +429,75 @@ describe("SoundSelector — set mode", () => {
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ type: "set", setId: "s1", defaultVolume: 75 })
     );
+  });
+});
+
+describe("SoundSelector — assigned mode — folder tree", () => {
+  const FOLDER_ID = "folder-1";
+  const FOLDER_NAME = "Drum Folder";
+
+  function setupFolderWithSounds() {
+    const folder = createMockGlobalFolder({ id: FOLDER_ID, name: FOLDER_NAME });
+    const sound = createMockSound({ id: "s-kick", name: "Kick Drum", folderId: FOLDER_ID });
+    useLibraryStore.setState({ sounds: [sound], tags: [], sets: [], isDirty: false });
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ globalFolders: [folder] }),
+    });
+    return { folder, sound };
+  }
+
+  beforeEach(() => {
+    useLibraryStore.setState({ ...initialLibraryState });
+    useAppSettingsStore.setState({ ...initialAppSettingsState });
+  });
+
+  it("renders the folder name as a collapsible trigger", () => {
+    setupFolderWithSounds();
+    renderSelector({ value: { type: "assigned", instances: [] }, onChange: vi.fn() });
+    expect(screen.getByRole("button", { name: new RegExp(FOLDER_NAME) })).toBeInTheDocument();
+  });
+
+  it("clicking the folder trigger reveals child sounds", async () => {
+    setupFolderWithSounds();
+    renderSelector({ value: { type: "assigned", instances: [] }, onChange: vi.fn() });
+
+    expect(screen.queryByText("Kick Drum")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(FOLDER_NAME) }));
+
+    expect(screen.getByText("Kick Drum")).toBeInTheDocument();
+  });
+
+  it("clicking the folder trigger a second time hides child sounds", async () => {
+    setupFolderWithSounds();
+    renderSelector({ value: { type: "assigned", instances: [] }, onChange: vi.fn() });
+
+    const trigger = screen.getByRole("button", { name: new RegExp(FOLDER_NAME) });
+    await userEvent.click(trigger);
+    expect(screen.getByText("Kick Drum")).toBeInTheDocument();
+
+    await userEvent.click(trigger);
+    await waitFor(() => {
+      expect(screen.queryByText("Kick Drum")).not.toBeInTheDocument();
+    });
+  });
+
+  it("selecting a sound inside an expanded folder calls onChange with the correct soundId", async () => {
+    const onChange = vi.fn();
+    setupFolderWithSounds();
+    renderSelector({ value: { type: "assigned", instances: [] }, onChange });
+
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(FOLDER_NAME) }));
+    const checkbox = screen.getByRole("checkbox", { name: /Kick Drum/i });
+    await userEvent.click(checkbox);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const call = onChange.mock.calls[0][0] as LayerSelection;
+    expect(call.type).toBe("assigned");
+    if (call.type === "assigned") {
+      expect(call.instances).toHaveLength(1);
+      expect(call.instances[0].soundId).toBe("s-kick");
+    }
   });
 });
