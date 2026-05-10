@@ -117,17 +117,17 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
 
   it('registers "f" with enableOnFormTags: true so fade fires even when a slider or input is focused', () => {
     renderHook(() => useGlobalHotkeys());
-    expect(hotkeyRegistrations["f"]?.options).toMatchObject({ enableOnFormTags: true });
+    expect(hotkeyRegistrations["f"]?.options).toEqual({ enableOnFormTags: true });
   });
 
   it('registers "x" with enableOnFormTags: true so multi-fade fires even when a slider or input is focused', () => {
     renderHook(() => useGlobalHotkeys());
-    expect(hotkeyRegistrations["x"]?.options).toMatchObject({ enableOnFormTags: true });
+    expect(hotkeyRegistrations["x"]?.options).toEqual({ enableOnFormTags: true });
   });
 
   it('registers "esc" with enableOnFormTags: true (existing behaviour)', () => {
     renderHook(() => useGlobalHotkeys());
-    expect(hotkeyRegistrations["esc"]?.options).toMatchObject({ enableOnFormTags: true });
+    expect(hotkeyRegistrations["esc"]?.options).toEqual({ enableOnFormTags: true });
   });
 
   it("does not register alt+left/alt+right with enableOnFormTags (modifier guards against interactive-element conflicts)", () => {
