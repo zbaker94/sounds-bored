@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No visible user-facing changes (internal test coverage improvement only)
 - Internal test coverage improved for pad gesture behavior; no user-facing changes.
 - Improved reliability of auto-save: the library now correctly saves when it becomes dirty after the app has already loaded.
 - No user-facing changes in this release (internal test improvements only)
