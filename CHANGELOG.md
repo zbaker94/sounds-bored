@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal test refactoring only; no user-facing changes.
 - Added test coverage for the Settings "About" tab, including app version display, update checking, download progress, install, and restart flows
 - Internal test refactoring only — no user-facing changes in this release.
 - Fixed: pad sound volume settings no longer reset when switching tags, match mode, or sound sets in the pad config drawer
