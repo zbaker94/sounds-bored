@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal test coverage for the "Add to Set" dialog flow in the sounds library panel (no user-facing changes)
 - Improved test reliability for the audio file drag-and-drop import feature in the Sounds panel
 No user-facing changes — this diff is test coverage only (internal).
 - No user-facing changes (internal test coverage only)
