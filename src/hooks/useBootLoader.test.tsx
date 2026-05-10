@@ -377,6 +377,47 @@ describe("useBootLoader", () => {
   });
 });
 
+describe("useBootLoader — retroactive imported tag", () => {
+  it("assigns the 'imported' tag to sounds in the import folder that are missing it", async () => {
+    const settings = createMockAppSettings();
+    const importFolderId = settings.importFolderId;
+    const sound = createMockSound({ id: "pre-feature-sound", folderId: importFolderId, tags: [] });
+
+    mockLoadAppSettings.mockResolvedValue(settings);
+    mockLoadGlobalLibrary.mockResolvedValue({ sounds: [sound], tags: [], sets: [] });
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    const libState = useLibraryStore.getState();
+    const importedTag = libState.tags.find((t) => t.name.toLowerCase() === "imported");
+    expect(importedTag).toBeDefined();
+    const updated = libState.sounds.find((s) => s.id === "pre-feature-sound");
+    expect(updated?.tags).toContain(importedTag?.id);
+  });
+
+  it("does not create a duplicate imported tag if the sound already has it", async () => {
+    const settings = createMockAppSettings();
+    const importFolderId = settings.importFolderId;
+
+    // Pre-seed the store with an existing imported tag and a sound already tagged
+    const existingTag = { id: "tag-imported", name: "imported", color: undefined, isSystem: true };
+    const sound = createMockSound({ id: "already-tagged", folderId: importFolderId, tags: ["tag-imported"] });
+
+    mockLoadAppSettings.mockResolvedValue(settings);
+    mockLoadGlobalLibrary.mockResolvedValue({ sounds: [sound], tags: [existingTag], sets: [] });
+
+    await act(async () => {
+      renderHook(() => useBootLoader());
+    });
+
+    const libState = useLibraryStore.getState();
+    const importedTags = libState.tags.filter((t) => t.name.toLowerCase() === "imported");
+    expect(importedTags).toHaveLength(1);
+  });
+});
+
 describe("useBootLoader — analysis scheduling", () => {
   it("schedules analysis on boot when autoAnalysis is true", async () => {
     mockLoadAppSettings.mockResolvedValue(
