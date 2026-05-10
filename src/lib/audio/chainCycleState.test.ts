@@ -35,10 +35,21 @@ describe('layerChainQueue', () => {
     expect(getLayerChain('layer-1')).toBeUndefined();
   });
 
-  it('stores and retrieves a chain', () => {
+  it('stores and retrieves a chain by the correct key', () => {
     const chain = [createMockSound({ name: 'a' }), createMockSound({ name: 'b' })];
     setLayerChain('layer-1', chain);
     expect(getLayerChain('layer-1')).toBe(chain);
+    // Key isolation: a different layer ID must not return the stored chain
+    expect(getLayerChain('layer-2')).toBeUndefined();
+  });
+
+  it('isolates chains by layer id', () => {
+    const chainA = [createMockSound({ name: 'a' })];
+    const chainB = [createMockSound({ name: 'b' }), createMockSound({ name: 'c' })];
+    setLayerChain('layer-1', chainA);
+    setLayerChain('layer-2', chainB);
+    expect(getLayerChain('layer-1')).toBe(chainA);
+    expect(getLayerChain('layer-2')).toBe(chainB);
   });
 
   it('overwrites an existing chain', () => {

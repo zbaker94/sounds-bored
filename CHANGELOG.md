@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal test coverage for audio layer chain isolation (no user-facing behavior changes)
 - Internal audio engine test improvements; no user-facing behavior changed.
 - No user-facing changes (internal test coverage improvement only)
 - Added test coverage for bulk-deleting selected sounds from the library (confirmation dialog and store update verification)
