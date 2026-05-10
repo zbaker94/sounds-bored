@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal test improvement only).
 - No user-facing changes in this release.
 - No user-facing changes in this release (internal test improvements only)
 - Internal test suite refactored: streaming audio progress tests consolidated and helper function relocated for better organization (no user-facing behavior changes)
