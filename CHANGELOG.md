@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release.
 - Fixed a bug where sounds stored in subfolders exported with their full path instead of just the filename, causing broken sound maps.
 - Internal test coverage improvements; no user-facing changes.
 - No user-facing changes in this release (internal test coverage improvements only)
