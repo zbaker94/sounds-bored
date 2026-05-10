@@ -78,26 +78,37 @@ describe("DownloadStatusButton", () => {
     expect(screen.getByRole("button", { name: /download status/i }).querySelector("svg")).toHaveClass("animate-spin");
   });
 
-  it("shows active count badge when downloads are in progress", () => {
-    useDownloadStore.getState().addJob(makeJob("a", { status: "downloading", percent: 10 }));
-    useDownloadStore.getState().addJob(makeJob("b", { status: "processing", percent: 80 }));
-    renderButton();
-    expect(screen.getByText("2")).toBeInTheDocument();
-  });
-
-  it("shows 9+ badge when more than 9 active downloads", () => {
-    for (let i = 0; i < 10; i++) {
-      useDownloadStore.getState().addJob(makeJob(`j${i}`, { status: "downloading", percent: 0 }));
-    }
-    renderButton();
-    expect(screen.getByText("9+")).toBeInTheDocument();
-  });
-
-  it("hides badge when no active downloads", () => {
-    useDownloadStore.getState().addJob(makeJob("a", { status: "completed", percent: 100, outputPath: "/a.mp3" }));
-    renderButton();
-    expect(screen.queryByText("1")).not.toBeInTheDocument();
-  });
+  it.each([
+    {
+      label: "hides badge when no active downloads",
+      jobs: [makeJob("done", { status: "completed", percent: 100, outputPath: "/a.mp3" })],
+      expectedBadge: null,
+    },
+    {
+      label: "shows count for mixed active statuses",
+      jobs: [
+        makeJob("a", { status: "downloading", percent: 10 }),
+        makeJob("b", { status: "processing", percent: 80 }),
+      ],
+      expectedBadge: "2",
+    },
+    {
+      label: "caps badge at 9+ when more than 9 active",
+      jobs: Array.from({ length: 10 }, (_, i) => makeJob(`j${i}`, { status: "downloading", percent: 0 })),
+      expectedBadge: "9+",
+    },
+  ])(
+    "$label",
+    ({ jobs, expectedBadge }) => {
+      jobs.forEach((job) => useDownloadStore.getState().addJob(job));
+      renderButton();
+      if (expectedBadge === null) {
+        expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByText(expectedBadge)).toBeInTheDocument();
+      }
+    },
+  );
 
   it("does not apply animate-spin when all downloads are completed", () => {
     useDownloadStore.getState().addJob(makeJob("job-1", { status: "completed", percent: 100, outputPath: "/a.mp3" }));
