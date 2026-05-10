@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes (internal test refactor only)
 - Internal test improvements with no user-facing changes
 - No user-facing changes in this release (internal test coverage improvement only).
 - No user-facing changes in this release (internal test coverage improvement only)

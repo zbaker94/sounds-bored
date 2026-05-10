@@ -70,24 +70,15 @@ describe("useMissingSoundsNotification", () => {
     expect(mockToastWarning).not.toHaveBeenCalled();
   });
 
-  it("fires when one referenced sound is missing", () => {
+  it.each([
+    { missingIds: ["sound-1"], expected: "1 sound used in this project are missing. Check the Sounds panel." },
+    { missingIds: ["sound-1", "sound-2"], expected: "2 sounds used in this project are missing. Check the Sounds panel." },
+  ])("fires with correct wording for $missingIds.length missing sound(s)", ({ missingIds, expected }) => {
     loadProjectWithSounds(["sound-1", "sound-2"]);
-    setMissingSoundIds(["sound-1"]);
+    setMissingSoundIds(missingIds);
 
     renderHook(() => useMissingSoundsNotification());
-    expect(mockToastWarning).toHaveBeenCalledWith(
-      "1 sound used in this project are missing. Check the Sounds panel.",
-    );
-  });
-
-  it("uses plural wording when multiple referenced sounds are missing", () => {
-    loadProjectWithSounds(["sound-1", "sound-2"]);
-    setMissingSoundIds(["sound-1", "sound-2"]);
-
-    renderHook(() => useMissingSoundsNotification());
-    expect(mockToastWarning).toHaveBeenCalledWith(
-      "2 sounds used in this project are missing. Check the Sounds panel.",
-    );
+    expect(mockToastWarning).toHaveBeenCalledWith(expected);
   });
 
   it("does not fire a second time for the same load session (dedup)", () => {
