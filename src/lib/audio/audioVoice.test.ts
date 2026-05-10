@@ -131,6 +131,18 @@ describe("wrapBufferSource", () => {
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
+  it("stop() called twice fires onended exactly once", () => {
+    const source = makeMockSource();
+    const ctx = makeMockCtx();
+    const dest = makeMockDestination();
+    const voice = wrapBufferSource(source as any, ctx as any, dest as any);
+    const cb = vi.fn();
+    voice.setOnEnded(cb);
+    voice.stop();
+    voice.stop();
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
   it("setOnEnded can be re-registered — only the new callback fires", () => {
     const source = makeMockSource();
     const ctx = makeMockCtx();
@@ -303,6 +315,19 @@ describe("wrapStreamingElement", () => {
     voice.setOnEnded(cb);
     voice.stop();
     audio.simulateEnd();
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it("stop() called twice fires onended exactly once", () => {
+    const audio = makeMockAudio();
+    const sourceNode = makeMockSourceNode();
+    const ctx = makeMockCtx();
+    const dest = makeMockDestination();
+    const voice = wrapStreamingElement(audio as any, sourceNode as any, ctx as any, dest as any);
+    const cb = vi.fn();
+    voice.setOnEnded(cb);
+    voice.stop();
+    voice.stop();
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
