@@ -250,4 +250,17 @@ describe("uiStore", () => {
       expect(useUiStore.getState().pageByScene).toEqual({});
     });
   });
+
+  describe("setHoveredPadId", () => {
+    it("sets hoveredPadId to a pad ID", () => {
+      useUiStore.getState().setHoveredPadId("pad-1");
+      expect(useUiStore.getState().hoveredPadId).toBe("pad-1");
+    });
+
+    it("clears hoveredPadId to null", () => {
+      useUiStore.setState({ hoveredPadId: "pad-1" });
+      useUiStore.getState().setHoveredPadId(null);
+      expect(useUiStore.getState().hoveredPadId).toBeNull();
+    });
+  });
 });

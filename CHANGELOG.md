@@ -2,6 +2,7 @@
 
 ## Current Changes
 - No user-facing changes in this release (internal test coverage improvements only)
+- No user-facing changes in this release (internal test coverage improvements only)
 - Internal test coverage added for layer volume controls; no user-facing changes in this release.
 - Internal test coverage expanded for playback state (master volume, preview playback, preview progress); no user-facing behavior changed.
 - No user-facing changes; internal test coverage added for library reconciliation state management.
