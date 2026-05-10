@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved reliability of auto-save: the library now correctly saves when it becomes dirty after the app has already loaded.
 - No user-facing changes in this release (internal test improvements only)
 - Improved error message when previewing a missing sound — now shows the sound name and directs you to the Sounds panel
 - No user-facing changes in this release (internal test improvement only).
