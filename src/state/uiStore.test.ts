@@ -251,6 +251,26 @@ describe("uiStore", () => {
     });
   });
 
+  describe("setFadePopoverPadId", () => {
+    it("sets fadePopoverPadId to a pad ID", () => {
+      useUiStore.getState().setFadePopoverPadId("pad-1");
+      expect(useUiStore.getState().fadePopoverPadId).toBe("pad-1");
+    });
+
+    it("clears fadePopoverPadId and fadePopoverTarget when called with null", () => {
+      useUiStore.setState({ fadePopoverPadId: "pad-1", fadePopoverTarget: 42 });
+      useUiStore.getState().setFadePopoverPadId(null);
+      expect(useUiStore.getState().fadePopoverPadId).toBeNull();
+      expect(useUiStore.getState().fadePopoverTarget).toBeNull();
+    });
+
+    it("does not clear fadePopoverTarget when called with a non-null pad ID", () => {
+      useUiStore.setState({ fadePopoverTarget: 42 });
+      useUiStore.getState().setFadePopoverPadId("pad-1");
+      expect(useUiStore.getState().fadePopoverTarget).toBe(42);
+    });
+  });
+
   describe("setHoveredPadId", () => {
     it("sets hoveredPadId to a pad ID", () => {
       useUiStore.getState().setHoveredPadId("pad-1");
