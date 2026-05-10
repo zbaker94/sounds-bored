@@ -824,4 +824,53 @@ describe("SoundsPanel", () => {
       expect(screen.getByTestId("add-to-set-dialog").textContent).toContain("2 sounds");
     });
   });
+
+  describe("bulk delete selected sounds", () => {
+    function setupThreeSounds() {
+      const [s1, s2, s3] = [
+        createMockSound({ id: "s1", name: "Kick", filePath: "/music/kick.mp3" }),
+        createMockSound({ id: "s2", name: "Snare", filePath: "/music/snare.mp3" }),
+        createMockSound({ id: "s3", name: "HiHat", filePath: "/music/hihat.mp3" }),
+      ];
+      useLibraryStore.setState({ ...initialLibraryState, sounds: [s1, s2, s3] });
+      useAppSettingsStore.setState({
+        ...initialAppSettingsState,
+        settings: { ...createMockAppSettings(), globalFolders: [], importFolderId: "", downloadFolderId: "" },
+      });
+      return [s1, s2, s3] as const;
+    }
+
+    it("shows confirmation dialog when Delete from Disk is clicked with 2 sounds selected", async () => {
+      setupThreeSounds();
+      renderPanel();
+
+      const checkboxes = screen.getAllByRole("checkbox");
+      await act(async () => { fireEvent.click(checkboxes[0]); });
+      await act(async () => { fireEvent.click(checkboxes[1]); });
+
+      const deleteBtn = screen.getByRole("button", { name: /delete from disk/i });
+      await act(async () => { fireEvent.click(deleteBtn); });
+
+      expect(screen.getByRole("button", { name: /delete 2 sounds from disk/i })).toBeInTheDocument();
+    });
+
+    it("removes selected sounds from library store after confirming bulk delete", async () => {
+      setupThreeSounds();
+      renderPanel();
+
+      const checkboxes = screen.getAllByRole("checkbox");
+      await act(async () => { fireEvent.click(checkboxes[0]); });
+      await act(async () => { fireEvent.click(checkboxes[1]); });
+
+      const deleteBtn = screen.getByRole("button", { name: /delete from disk/i });
+      await act(async () => { fireEvent.click(deleteBtn); });
+
+      const confirmBtn = screen.getByRole("button", { name: /delete 2 sounds from disk/i });
+      await act(async () => { fireEvent.click(confirmBtn); });
+
+      const remainingSounds = useLibraryStore.getState().sounds;
+      expect(remainingSounds).toHaveLength(1);
+      expect(remainingSounds[0].name).toBe("HiHat");
+    });
+  });
 });
