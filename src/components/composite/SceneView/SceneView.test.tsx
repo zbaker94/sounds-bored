@@ -14,6 +14,7 @@ import {
   createMockSoundInstance,
 } from "@/test/factories";
 import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio";
+import { PADS_PER_PAGE } from "@/lib/constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SceneView } from "./SceneView";
 
@@ -115,6 +116,40 @@ describe("SceneView", () => {
     const pads = useProjectStore.getState().project?.scenes[0].pads;
     expect(pads).toHaveLength(1);
     expect(useUiStore.getState().editingPadId).toBe(pads![0].id);
+  });
+
+  describe("Add Pad pagination", () => {
+    it("navigates to next page when Add Pad is clicked on a full page", async () => {
+      const pads = Array.from({ length: PADS_PER_PAGE }, (_, i) =>
+        createMockPad({ id: `pad-${i}`, name: `Pad ${i}` }),
+      );
+      loadScene(pads);
+
+      renderSceneView();
+
+      await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
+      await act(async () => { await new Promise<void>(resolve => setTimeout(resolve, 0)); });
+
+      const updatedPads = useProjectStore.getState().project?.scenes[0].pads;
+      expect(updatedPads).toHaveLength(PADS_PER_PAGE + 1);
+      expect(useUiStore.getState().pageByScene["scene-1"]).toBe(1);
+    });
+
+    it("stays on page 0 when Add Pad is clicked and the page is not full", async () => {
+      const pads = Array.from({ length: PADS_PER_PAGE - 1 }, (_, i) =>
+        createMockPad({ id: `pad-${i}`, name: `Pad ${i}` }),
+      );
+      loadScene(pads);
+
+      renderSceneView();
+
+      await userEvent.click(screen.getByRole("button", { name: /add pad/i }));
+      await act(async () => { await new Promise<void>(resolve => setTimeout(resolve, 0)); });
+
+      const updatedPads = useProjectStore.getState().project?.scenes[0].pads;
+      expect(updatedPads).toHaveLength(PADS_PER_PAGE);
+      expect(useUiStore.getState().pageByScene["scene-1"] ?? 0).toBe(0);
+    });
   });
 
   describe("activeScene derivation", () => {
