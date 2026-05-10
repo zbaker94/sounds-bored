@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes; internal audio engine test coverage improved for gain node initialization behavior.
 - No user-facing changes in this release (internal test improvements only)
 - No user-facing changes in this release (internal test improvements only)
 - Improved accessibility of the tag match mode info button with a descriptive label for screen readers

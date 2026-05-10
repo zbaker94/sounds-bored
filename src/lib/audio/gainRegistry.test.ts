@@ -165,6 +165,12 @@ describe("getOrCreateLayerGain", () => {
     expect(layerGain.connect).toHaveBeenCalledWith(padGain);
   });
 
+  it("does not call cancelScheduledValues on first creation", () => {
+    const padGain = getPadGain("pad-gain-test");
+    const layerGain = getOrCreateLayerGain("layer-first-create", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    expect(layerGain.gain.cancelScheduledValues).not.toHaveBeenCalled();
+  });
+
   it("returns the cached gain node on subsequent calls for the same layerId", () => {
     const padGain = getPadGain("pad-gain-test");
     const countBefore = mockCtx.createGain.mock.calls.length;
