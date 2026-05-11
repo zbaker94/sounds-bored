@@ -4,7 +4,9 @@ import { useMultiFadeMode } from "./useMultiFadeMode";
 import { useMultiFadeStore, initialMultiFadeState } from "@/state/multiFadeStore";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
+import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { createMockProject, createMockScene, createMockPad, createMockHistoryEntry } from "@/test/factories";
+import * as audioLib from "@/lib/audio";
 
 // Mock audio functions
 vi.mock("@/lib/audio/padPlayer", () => ({
@@ -28,6 +30,7 @@ beforeEach(() => {
   useProjectStore.setState({ ...initialProjectState });
   useMultiFadeStore.setState({ ...initialMultiFadeState });
   useUiStore.setState({ ...initialUiState });
+  usePadMetricsStore.setState({ ...initialPadMetricsState });
   vi.clearAllMocks();
 });
 
@@ -215,6 +218,98 @@ describe("useMultiFadeMode — execute()", () => {
   });
 });
 
+
+describe("useMultiFadeMode — volume initialization from live gain", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it("enter() reads live padVolumes (not configured pad.volume) when pad is active mid-fade", () => {
+    // pad.volume=80 so assertion (30) differs from both configured (80) and full-volume fallback (100)
+    const pad = createMockPad({ id: "pad-live", volume: 80 });
+    const scene = createMockScene({ pads: [pad] });
+    useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
+    usePadMetricsStore.setState({ padVolumes: { [pad.id]: 0.3 } });
+    vi.spyOn(audioLib, "isPadActive").mockReturnValue(true);
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.enter(pad.id); });
+
+    const entry = useMultiFadeStore.getState().selectedPads.get(pad.id);
+    expect(entry?.levels[0]).toBeCloseTo(30);
+  });
+
+  it("enter() falls back to 100% when padVolumes has no entry (absent = full volume)", () => {
+    const pads = loadPadsInStore(1);
+    const pad = pads[0];
+    usePadMetricsStore.setState({ padVolumes: {} });
+    vi.spyOn(audioLib, "isPadActive").mockReturnValue(true);
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.enter(pad.id); });
+
+    const entry = useMultiFadeStore.getState().selectedPads.get(pad.id);
+    expect(entry?.levels[0]).toBeCloseTo(100);
+  });
+
+  it("enter() correctly handles zero gain (near-silent mid-fade)", () => {
+    const pads = loadPadsInStore(1);
+    const pad = pads[0];
+    usePadMetricsStore.setState({ padVolumes: { [pad.id]: 0 } });
+    vi.spyOn(audioLib, "isPadActive").mockReturnValue(true);
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.enter(pad.id); });
+
+    const entry = useMultiFadeStore.getState().selectedPads.get(pad.id);
+    expect(entry?.levels[0]).toBeCloseTo(0);
+  });
+
+  it("enter() yields 0 currentVol when pad is not active regardless of padVolumes", () => {
+    const pads = loadPadsInStore(1);
+    const pad = pads[0];
+    usePadMetricsStore.setState({ padVolumes: { [pad.id]: 0.7 } });
+    vi.spyOn(audioLib, "isPadActive").mockReturnValue(false);
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.enter(pad.id); });
+
+    const entry = useMultiFadeStore.getState().selectedPads.get(pad.id);
+    expect(entry?.levels[0]).toBeCloseTo(0);
+  });
+
+  it("togglePad() reads live padVolumes for a mid-fade active pad", () => {
+    const pads = loadPadsInStore(2);
+    const [originPad, targetPad] = pads;
+    usePadMetricsStore.setState({ padVolumes: { [targetPad.id]: 0.5 } });
+    vi.spyOn(audioLib, "isPadActive")
+      .mockImplementation((padId) => padId === targetPad.id);
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.enter(originPad.id); });
+    act(() => { result.current.togglePad(targetPad.id); });
+
+    const entry = useMultiFadeStore.getState().selectedPads.get(targetPad.id);
+    expect(entry?.levels[0]).toBeCloseTo(50);
+  });
+
+  it("togglePad() reads fresh padVolumes on each call", () => {
+    const pads = loadPadsInStore(2);
+    const [originPad, targetPad] = pads;
+    usePadMetricsStore.setState({ padVolumes: { [targetPad.id]: 0.5 } });
+    vi.spyOn(audioLib, "isPadActive")
+      .mockImplementation((padId) => padId === targetPad.id);
+
+    const { result } = renderHook(() => useMultiFadeMode());
+    act(() => { result.current.enter(originPad.id); });
+    act(() => { result.current.togglePad(targetPad.id); });
+    // Remove then re-toggle with updated live gain
+    act(() => { result.current.togglePad(targetPad.id); });
+    usePadMetricsStore.setState({ padVolumes: { [targetPad.id]: 0.2 } });
+    act(() => { result.current.togglePad(targetPad.id); });
+
+    const entry = useMultiFadeStore.getState().selectedPads.get(targetPad.id);
+    expect(entry?.levels[0]).toBeCloseTo(20);
+  });
+});
 
 describe("executeMultiFadeNow integration", () => {
   it("calls triggerPad for a non-playing origin pad with target=0 (not a silent no-op)", async () => {

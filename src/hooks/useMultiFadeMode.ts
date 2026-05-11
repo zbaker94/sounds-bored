@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
+import { usePadMetricsStore } from "@/state/padMetricsStore";
 import { executeFadeTap, triggerPad, isPadActive, emitAudioError } from "@/lib/audio";
 import { buildPadMap } from "@/lib/padDefaults";
 
@@ -66,7 +67,9 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
     const scenes = useProjectStore.getState().project?.scenes ?? [];
     const padMap = buildPadMap(scenes);
     const pad = padMap.get(padId);
-    const currentVol = isPadActive(padId) ? (pad?.volume ?? 100) : 0;
+    const padVolumes = usePadMetricsStore.getState().padVolumes;
+    const liveVol01 = padVolumes[padId] ?? 1;
+    const currentVol = isPadActive(padId) ? (liveVol01 * 100) : 0;
     enterMultiFade(padId, currentVol, pad?.fadeTargetVol ?? 0);
   }, [enterMultiFade]);
 
@@ -74,7 +77,9 @@ export function useMultiFadeMode(): UseMultiFadeModeReturn {
     const scenes = useProjectStore.getState().project?.scenes ?? [];
     const padMap = buildPadMap(scenes);
     const pad = padMap.get(padId);
-    const currentVol = isPadActive(padId) ? (pad?.volume ?? 100) : 0;
+    const padVolumes = usePadMetricsStore.getState().padVolumes;
+    const liveVol01 = padVolumes[padId] ?? 1;
+    const currentVol = isPadActive(padId) ? (liveVol01 * 100) : 0;
     toggleMultiFadePad(padId, currentVol, pad?.fadeTargetVol ?? 0);
   }, [toggleMultiFadePad]);
 
