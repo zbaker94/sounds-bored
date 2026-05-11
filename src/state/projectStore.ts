@@ -33,6 +33,7 @@ interface ProjectActions {
   addScene: (name?: string) => void;
   renameScene: (sceneId: string, name: string) => void;
   deleteScene: (sceneId: string) => void;
+  /** Silently rejects if `id` already exists in any scene — pad ids must be globally unique across scenes (used as keys in playback state, mute targets, UI selection, and `buildPadMap` lookups). */
   addPad: (sceneId: string, config: PadConfig, id?: string) => void;
   updatePad: (sceneId: string, padId: string, config: PadConfig) => void;
   deletePad: (sceneId: string, padId: string) => void;
@@ -167,6 +168,7 @@ export const useProjectStore = create<ProjectStore>()(
         if (!draft.project) return;
         const scene = draft.project.scenes.find((s) => s.id === sceneId);
         if (!scene) return;
+        if (id && draft.project.scenes.some((s) => s.pads.some((p) => p.id === id))) return;
         const newPad: Pad = {
           id: id ?? crypto.randomUUID(),
           ...config,

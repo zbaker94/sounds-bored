@@ -440,6 +440,47 @@ describe("projectStore", () => {
       getState().addPad(sceneId, config, "my-custom-id");
       expect(getState().project?.scenes[0].pads[0].id).toBe("my-custom-id");
     });
+
+    it("does not add pad if supplied id was already used in the same scene", () => {
+      const sceneId = loadWithScene();
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      getState().addPad(sceneId, config, "dup-id");
+      expect(getState().project?.scenes[0].pads).toHaveLength(1);
+      getState().addPad(sceneId, config, "dup-id");
+      expect(getState().project?.scenes[0].pads).toHaveLength(1);
+    });
+
+    it("does not add pad if supplied id already exists in a different scene", () => {
+      const entry = createMockHistoryEntry();
+      const existingPad = createMockPad({ id: "shared-id" });
+      const scene1 = createMockScene({ id: "scene-1", pads: [existingPad] });
+      const scene2 = createMockScene({ id: "scene-2", pads: [] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene1, scene2] }), false);
+      const config: PadConfig = { name: "Snare", layers: [], muteTargetPadIds: [] };
+      getState().addPad("scene-2", config, "shared-id");
+      expect(getState().project?.scenes[1].pads).toHaveLength(0);
+    });
+
+    it("does not mark project dirty when duplicate id is rejected", () => {
+      const entry = createMockHistoryEntry();
+      const existingPad = createMockPad({ id: "dup-id" });
+      const scene = createMockScene({ id: "scene-1", pads: [existingPad] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene] }), false);
+      const config: PadConfig = { name: "Kick", layers: [], muteTargetPadIds: [] };
+      getState().addPad("scene-1", config, "dup-id");
+      expect(getState().isDirty).toBe(false);
+    });
+
+    it("adds pad with supplied id when no collision exists across scenes", () => {
+      const entry = createMockHistoryEntry();
+      const existingPad = createMockPad({ id: "other-id" });
+      const scene1 = createMockScene({ id: "scene-1", pads: [existingPad] });
+      const scene2 = createMockScene({ id: "scene-2", pads: [] });
+      getState().loadProject(entry, createMockProject({ scenes: [scene1, scene2] }), false);
+      const config: PadConfig = { name: "Snare", layers: [], muteTargetPadIds: [] };
+      getState().addPad("scene-2", config, "fresh-id");
+      expect(getState().project?.scenes[1].pads[0].id).toBe("fresh-id");
+    });
   });
 
   describe("updatePad", () => {

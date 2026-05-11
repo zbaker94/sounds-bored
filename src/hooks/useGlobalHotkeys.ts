@@ -183,10 +183,10 @@ export function useGlobalHotkeys() {
     };
     addPad(activeSceneId, config, newId);
     const updatedScene = useProjectStore.getState().project?.scenes.find((s) => s.id === activeSceneId);
-    if (updatedScene) {
+    if (updatedScene?.pads.some((p) => p.id === newId)) {
       setScenePage(activeSceneId, Math.floor((updatedScene.pads.length - 1) / PADS_PER_PAGE));
+      setTimeout(() => setEditingPadId(newId), 0);
     }
-    setTimeout(() => setEditingPadId(newId), 0);
   }, { preventDefault: true });
 
   // 1-9: jump directly to scene by index.
