@@ -1,15 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window. Shell plugin (tauri-plugin-shell) is intentionally absent from this list — all sidecar spawn/kill operations are Rust-side only (see src-tauri/src/commands.rs). Do not add shell:allow-spawn or shell:allow-kill here.",
+  "description": "Capability for the main window. Follows strict least-privilege: only explicit allow-* entries, no :default umbrella permissions. Shell plugin (tauri-plugin-shell) is intentionally absent — all sidecar spawn/kill is Rust-side only (see src-tauri/src/commands.rs). Native dialogs go through Rust DialogExt and require no frontend IPC permission. core:event:default covers listen/unlisten (used by onCloseRequested, onDragDropEvent, and event bus); core:path:* is enumerated to the specific commands the frontend calls; core:app:allow-version is the only app command used. When adding a new plugin capability, enumerate only the specific allow-* commands the frontend actually invokes.",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "core:path:default",
-    "core:window:default",
+    "core:event:default",
+    "core:app:allow-version",
+    "core:path:allow-resolve-directory",
+    "core:path:allow-join",
+    "core:path:allow-basename",
+    "core:path:allow-dirname",
     "core:window:allow-close",
     "core:window:allow-destroy",
-    "opener:default",
     {
       "identifier": "opener:allow-open-path",
       "allow": [
@@ -21,7 +23,6 @@
         { "path": "$APPLOCALDATA/SoundsBored/**" }
       ]
     },
-    "dialog:default",
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-read-dir",
@@ -41,10 +42,8 @@
         { "path": "$APPLOCALDATA/SoundsBored/**" }
       ]
     },
-    "updater:default",
     "updater:allow-check",
     "updater:allow-download-and-install",
-    "process:default",
     "process:allow-restart"
   ]
 }
