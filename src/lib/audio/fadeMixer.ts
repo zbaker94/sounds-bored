@@ -11,7 +11,7 @@ import { getPadGain } from "./gainRegistry";
 import { nullPadOnEnded } from "./voiceRegistry";
 import { stopPad } from "./stopHandler";
 import { rampGainTo, resetPadGain } from "./gainManager";
-import { usePlaybackStore } from "@/state/playbackStore";
+import * as coordinator from './playbackStateCoordinator';
 import type { Pad } from "@/lib/schemas";
 
 /**
@@ -41,7 +41,7 @@ export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): nu
 
 export function stopPadInternal(pad: Pad): void {
   stopPad(pad);
-  usePlaybackStore.getState().removePlayingPad(pad.id);
+  coordinator.padStopped(pad.id);
 }
 
 /**
@@ -57,7 +57,7 @@ export function stopPadInternal(pad: Pad): void {
  *  - Fading up (toVolume >= fromVolume): reverses any in-progress fade-out.
  */
 export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number): void {
-  usePlaybackStore.getState().removeReversingPad(pad.id);
+  coordinator.padStoppedReversing(pad.id);
   const fadingDown = toVolume < fromVolume;
 
   if (fadingDown) {

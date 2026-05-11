@@ -14,8 +14,7 @@
 //   - skipLayerForward / skipLayerBack — chain/cycle navigation
 
 import { ensureResumed, getAudioContext } from "./audioContext";
-import { usePlaybackStore } from "@/state/playbackStore";
-import { usePadDisplayStore } from "@/state/padDisplayStore";
+import * as coordinator from './playbackStateCoordinator';
 import { clampGain01 } from "./gainManager";
 import { normalizedVoiceGain } from "./gainNormalization";
 import { cancelFade } from "./fadeCoordinator";
@@ -134,7 +133,7 @@ export function rampStopLayerVoices(
     deleteStopCleanupTimeout(timeoutId);
     for (const v of voices) clearLayerVoice(padId, layer.id, v);
     if (!isPadActive(padId)) {
-      usePlaybackStore.getState().removePlayingPad(padId);
+      coordinator.padStopped(padId);
     }
     if (gain) {
       const ctx = getAudioContext();
@@ -214,12 +213,12 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
   startAudioTick();
-  usePadDisplayStore.getState().shiftVoice(pad.id);
+  coordinator.voiceDequeued(pad.id);
   if (isChained(layer.arrangement)) {
     const newOrder = buildPlayOrder(layer.arrangement, allSounds);
     if (newOrder.length === 0) {
       deleteLayerChain(layer.id);
-      if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
+      if (!isPadActive(pad.id)) coordinator.padStopped(pad.id);
       return;
     }
     const [first, ...rest] = newOrder;
@@ -230,7 +229,7 @@ function restartLoopChain(pad: Pad, layer: Layer, ctx: AudioContext, layerGain: 
   } else {
     deleteLayerChain(layer.id);
     if (allSounds.length === 0) {
-      if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
+      if (!isPadActive(pad.id)) coordinator.padStopped(pad.id);
       return;
     }
     for (const snd of allSounds) {
@@ -262,7 +261,7 @@ async function continueLayerChain(
   clearLayerProgressInfo(layer.id);
   clearPadProgressInfo(pad.id);
   startAudioTick();
-  usePadDisplayStore.getState().shiftVoice(pad.id);
+  coordinator.voiceDequeued(pad.id);
   await startLayerSound(pad, layer, next, ctx, layerGain, getVoiceVolume(layer, next), allSounds);
 }
 
@@ -306,7 +305,7 @@ export async function startLayerSound(
       } else {
         // Chain exhausted (one-shot) or cleared externally (stop/reset).
         if (remaining !== undefined) deleteLayerChain(layer.id);
-        if (!isPadActive(pad.id)) usePlaybackStore.getState().removePlayingPad(pad.id);
+        if (!isPadActive(pad.id)) coordinator.padStopped(pad.id);
       }
     });
 
@@ -317,7 +316,7 @@ export async function startLayerSound(
     // enqueueVoice being called — after the stop cleanup runs, isPadActive
     // returns false and we skip the now-stale overlay enqueue.
     if (isPadActive(pad.id)) {
-      usePadDisplayStore.getState().enqueueVoice(pad.id, {
+      coordinator.voiceEnqueued(pad.id, {
         soundName: sound.name,
         layerName: layer.name,
         playbackMode: layer.playbackMode,
@@ -325,7 +324,7 @@ export async function startLayerSound(
         coverArtDataUrl: sound.coverArtDataUrl,
       });
     }
-    usePlaybackStore.getState().addPlayingPad(pad.id);
+    coordinator.padStarted(pad.id);
     // Voice fully started and recorded — clear the consecutive-failure counter so
     // a future failure starts from zero. Placed after recordLayerVoice so we only
     // count it as a real success once the voice is actually tracked in state.
@@ -345,7 +344,7 @@ export async function startLayerSound(
     // When a restart-mode retrigger stopped the current voice but failed to load
     // the new one, the pad must be removed from playingPadIds (no voices remain).
     if (!isPadActive(pad.id)) {
-      usePlaybackStore.getState().removePlayingPad(pad.id);
+      coordinator.padStopped(pad.id);
     }
 
     // Circuit-breaker: a chain of consecutive load failures (e.g. entire library
@@ -463,7 +462,7 @@ async function handleNextRetrigger(
   // Clear the metadata overlay: this voice's onended was nulled so shiftVoice will not
   // fire naturally. Explicit clear ensures the incoming sound's metadata becomes current
   // rather than queuing behind the still-displayed stopped voice.
-  usePadDisplayStore.getState().clearPadDisplay(pad.id);
+  coordinator.clearPadMetadata(pad.id);
 
   if (layer.cycleMode && isChained(layer.arrangement)) {
     return "proceed";
@@ -476,7 +475,7 @@ async function handleNextRetrigger(
     await loopBackToBeginning(pad, layer, ctx, layerGain, resolved);
   }
   if (!isPadActive(pad.id)) {
-    usePlaybackStore.getState().removePlayingPad(pad.id);
+    coordinator.padStopped(pad.id);
   }
   return "chain-advanced";
 }
@@ -791,7 +790,7 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
   const stopCleanupId = setTimeout(() => {
     deleteStopCleanupTimeout(stopCleanupId);
     if (!isPadActive(pad.id)) {
-      usePlaybackStore.getState().removePlayingPad(pad.id);
+      coordinator.padStopped(pad.id);
       cancelFade(pad.id);
     }
   }, STOP_RAMP_S * 1000 + 10);
@@ -801,13 +800,13 @@ export function stopLayerWithRamp(pad: Pad, layerId: string): void {
 /** Shared preamble for skip functions: cancel fade, resume context, start a single sound, record pad as playing. */
 function startSoundInLayer(pad: Pad, layer: Layer, sound: Sound, resolved: Sound[]): void {
   // The previous voice was stopped externally (no natural onended), so clear stale display.
-  usePadDisplayStore.getState().clearPadDisplay(pad.id);
+  coordinator.clearPadMetadata(pad.id);
   cancelFade(pad.id);
   ensureResumed().then((ctx) => {
     const padGain = getPadGain(pad.id);
     const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
     startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved).catch(emitAudioError);
-    usePlaybackStore.getState().addPlayingPad(pad.id);
+    coordinator.padStarted(pad.id);
   }).catch((err: unknown) => { emitAudioError(err); });
 }
 
