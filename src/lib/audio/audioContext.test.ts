@@ -80,6 +80,34 @@ describe("applyMasterVolume", () => {
     getMasterGain();        // constructs with queued 0.5
     expect(mockGainValue).toBe(0.5);
   });
+
+  it("clamps values above 100 to 1.0 gain", async () => {
+    const { getMasterGain, applyMasterVolume } = await import("./audioContext");
+    getMasterGain();
+    applyMasterVolume(200);
+    expect(mockGainValue).toBe(1);
+  });
+
+  it("clamps negative values to 0.0 gain", async () => {
+    const { getMasterGain, applyMasterVolume } = await import("./audioContext");
+    getMasterGain();
+    applyMasterVolume(-50);
+    expect(mockGainValue).toBe(0);
+  });
+
+  it("defaults NaN to 1.0 gain (full volume)", async () => {
+    const { getMasterGain, applyMasterVolume } = await import("./audioContext");
+    getMasterGain();
+    applyMasterVolume(NaN);
+    expect(mockGainValue).toBe(1);
+  });
+
+  it("defaults Infinity to 1.0 gain (full volume)", async () => {
+    const { getMasterGain, applyMasterVolume } = await import("./audioContext");
+    getMasterGain();
+    applyMasterVolume(Infinity);
+    expect(mockGainValue).toBe(1);
+  });
 });
 
 describe("ensureResumed", () => {

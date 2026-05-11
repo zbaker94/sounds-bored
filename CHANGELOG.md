@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Master volume control now handles invalid values (out-of-range, NaN, Infinity) safely — volume stays within 0–100% bounds instead of potentially breaking audio output.
 - Internal audio engine refactored to use a unified playback state coordinator — no user-facing behavior changes
 - Improved internal test coverage for audio playback state transitions
 - Improved reliability of sound stopping — audio engine teardown now follows a consistent, ordered sequence to prevent state from being left behind when a pad is stopped or faded out.
