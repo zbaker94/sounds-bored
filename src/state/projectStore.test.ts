@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useProjectStore, initialProjectState } from "./projectStore";
-import { useUiStore, initialUiState } from "./uiStore";
 import { createMockProject, createMockHistoryEntry, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import type { PadConfig } from "@/lib/schemas";
 
@@ -15,7 +14,6 @@ function getActiveSceneId() {
 describe("projectStore", () => {
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
-    useUiStore.setState({ ...initialUiState });
   });
 
   describe("initial state", () => {
