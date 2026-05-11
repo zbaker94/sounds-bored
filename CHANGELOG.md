@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stopping a pad could cause looped or chained sounds to briefly restart before fully stopping.
+- Stopping all pads now reliably cancels chain queues and fade tracking before audio voices are torn down, preventing sounds from retriggering during the stop ramp.
 - Improved internal test coverage for shuffled sound playback ordering (no user-facing behavior changes)
 - Internal test code refactored for consistency; no user-facing changes.
 - Audio analysis queue no longer hangs when a file is rejected before analysis begins (e.g. due to a path permission error)
