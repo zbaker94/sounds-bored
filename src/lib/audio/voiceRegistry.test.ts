@@ -622,14 +622,16 @@ describe('onLayerVoiceSetChanged', () => {
     recordLayerVoice('pad-1', 'layer-1', v1);
     recordLayerVoice('pad-1', 'layer-1', v2);
     let layerVoiceCountAtNotify: number | null = null;
-    let padActiveAtNotify: boolean | null = null;
+    let padVoiceCountAtNotify: number | null = null;
     const unsub = onLayerVoiceSetChanged(() => {
       layerVoiceCountAtNotify = getLayerVoices('layer-1').length;
-      padActiveAtNotify = isPadActive('pad-1');
+      padVoiceCountAtNotify = getAllVoices().length;
     });
     clearLayerVoice('pad-1', 'layer-1', v1);
+    // Both layerVoiceMap and voiceMap must be updated at notify time.
+    // Pre-fix: notify fired before clearVoice, so getAllVoices() would return 2 not 1.
     expect(layerVoiceCountAtNotify).toBe(1);
-    expect(padActiveAtNotify).toBe(true);
+    expect(padVoiceCountAtNotify).toBe(1);
     unsub();
   });
 

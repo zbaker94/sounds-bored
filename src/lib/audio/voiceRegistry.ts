@@ -16,6 +16,7 @@
  * to playbackStore at the call site.
  */
 
+import { logWarn } from "@/lib/logger";
 import type { AudioVoice } from "./audioVoice";
 
 const voiceMap = new Map<string, AudioVoice[]>();
@@ -38,8 +39,11 @@ function notifyLayerVoiceSetChanged(): void {
 /** Register a listener that fires whenever layerVoiceMap is mutated.
  *  Returns an unsubscribe function. Only one listener slot exists; registering
  *  a second listener replaces the first. This slot is owned exclusively by audioTick —
- *  any other registrant will silently evict it. */
+ *  any other registrant will evict it. */
 export function onLayerVoiceSetChanged(listener: LayerVoiceSetChangedListener): () => void {
+  if (layerVoiceSetChangeListener && layerVoiceSetChangeListener !== listener) {
+    logWarn("onLayerVoiceSetChanged: replacing existing listener — only audioTick should register here");
+  }
   layerVoiceSetChangeListener = listener;
   return () => { if (layerVoiceSetChangeListener === listener) layerVoiceSetChangeListener = null; };
 }
@@ -102,8 +106,12 @@ export function stopPadVoices(padId: string): void {
   // Use reverse index to touch only layers belonging to this pad — O(layers_in_pad).
   // Per invariant, every layer voice is also a pad voice, so stoppedSet covers all
   // voices in every tracked layer. The `remaining.length > 0` branch is dead under
-  // normal operation but kept defensively; when triggered, the layer stays in the
-  // index so the reverse-index remains consistent.
+  // normal operation but kept defensively; when triggered, the layer stays in
+  // layerVoiceMap while the pad entry in voiceMap is already deleted — this breaks
+  // the file-level invariant temporarily until the next mutation clears the layer.
+  // Notify fires after all map writes and before voice.stop() for the same re-entry
+  // safety reason as stopLayerVoices (synchronous onended → clearLayerVoice re-entry
+  // is a safe no-op because maps are already drained).
   const padLayers = padToLayerIds.get(padId);
   if (padLayers) {
     for (const layerId of padLayers) {
@@ -130,7 +138,9 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   // All three Maps are drained first. Notify fires after all writes so the listener
   // sees consistent state. Notify fires before voice.stop() because stop() can trigger
   // onended synchronously (wrapStreamingElement), re-entering clearLayerVoice — that
-  // re-entry is a safe no-op because the maps are already drained.
+  // re-entry is a safe no-op because the maps are already drained, but it does produce
+  // one additional notifyLayerVoiceSetChanged() call per reentrant voice; the audioTick
+  // listener tolerates redundant notifications.
   layerVoiceMap.delete(layerId);
   const padLayers = padToLayerIds.get(padId);
   if (padLayers) {
@@ -261,6 +271,7 @@ export function getActiveLayerIdSet(): Set<string> {
   return new Set(layerVoiceMap.keys());
 }
 
+/** Clears all voice state and notifies the listener. Preserves listener registration. */
 export function clearAllVoices(): void {
   voiceMap.clear();
   layerVoiceMap.clear();

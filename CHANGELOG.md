@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where stopping a sound could briefly report incorrect playback state, causing the UI to show a pad as still playing when it had already stopped.
+- Added a diagnostic warning when the audio engine's internal listener slot is unexpectedly replaced, improving debuggability for edge-case audio issues.
 - Internal audio engine fix: playback state is now guaranteed consistent when notifications fire, preventing rare edge cases where pad/layer active states could briefly appear out of sync.
 - Fixed audio state leak when pad layers are added or removed while a fade is in progress — cleanup now reflects the pad's current configuration at fade completion.
 - Fixed a bug where download-related error toasts could appear after navigating away from the download manager
