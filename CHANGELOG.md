@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Audio analysis queue no longer hangs when a file is rejected before analysis begins (e.g. due to a path permission error)
+- Invalid or out-of-scope file paths now surface a clear error in the analysis results instead of silently failing
+- Symbolic links are blocked in cover art extraction and audio analysis to prevent unexpected file access
+- Download, export, cover art, and audio analysis commands now enforce file-scope restrictions consistently
 - Fixed a bug where adding a new pad could open the wrong pad's config drawer when the pad failed to be created
 - Pad IDs are now enforced as globally unique across all scenes, preventing silent data collisions
 - Adding a pad via keyboard shortcut now correctly navigates to the new pad's page before opening its config
