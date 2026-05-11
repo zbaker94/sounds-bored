@@ -1,6 +1,6 @@
 // src/lib/audio/fadeMixer.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createMockPad, createMockLayer } from "@/test/factories";
+import { createMockPad, createMockLayer, createMockScene, createMockProject, createMockHistoryEntry } from "@/test/factories";
 
 const mockCtx = {
   currentTime: 0,
@@ -253,6 +253,109 @@ describe("fadeMixer", () => {
       expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(true);
       expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(true);
     });
+
+    it("uses live pad layers at fade completion — clears state for layer added mid-fade", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer1 = createMockLayer({ id: "layer-live-add-1" });
+      const layer2 = createMockLayer({ id: "layer-live-add-2" });
+      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { useProjectStore } = await import("@/state/projectStore");
+      getPadGain("pad-live-add");
+      setLayerChain("layer-live-add-1", []);
+      const pad = createMockPad({ id: "pad-live-add", layers: [layer1] });
+      const { fadePad } = await import("./fadeMixer");
+
+      const scene = createMockScene({ pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      fadePad(pad, 1.0, 0, 500);
+
+      // Simulate mid-fade: layer2 added to the live pad via updateProject (matches production path)
+      setLayerChain("layer-live-add-2", []);
+      useProjectStore.getState().updateProject(
+        createMockProject({ scenes: [{ ...scene, pads: [{ ...pad, layers: [layer1, layer2] }] }] }),
+      );
+
+      vi.advanceTimersByTime(600);
+
+      expect(getLayerChain("layer-live-add-1")).toBeUndefined();
+      expect(getLayerChain("layer-live-add-2")).toBeUndefined();
+    });
+
+    it("does not clear state for layer removed from live pad mid-fade", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer1 = createMockLayer({ id: "layer-live-rm-1" });
+      const layer2 = createMockLayer({ id: "layer-live-rm-2" });
+      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { useProjectStore } = await import("@/state/projectStore");
+      getPadGain("pad-live-rm");
+      setLayerChain("layer-live-rm-1", []);
+      setLayerChain("layer-live-rm-2", []);
+      const pad = createMockPad({ id: "pad-live-rm", layers: [layer1, layer2] });
+      const { fadePad } = await import("./fadeMixer");
+
+      const scene = createMockScene({ pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      fadePad(pad, 1.0, 0, 500);
+
+      // Simulate mid-fade: layer1 removed from live pad
+      useProjectStore.getState().updateProject(
+        createMockProject({ scenes: [{ ...scene, pads: [{ ...pad, layers: [layer2] }] }] }),
+      );
+
+      vi.advanceTimersByTime(600);
+
+      // layer2 is in live pad — cleared
+      expect(getLayerChain("layer-live-rm-2")).toBeUndefined();
+      // layer1 was removed from live pad — NOT cleared by this timeout
+      expect(getLayerChain("layer-live-rm-1")).toEqual([]);
+    });
+
+    it("falls back to captured pad when pad is removed from project mid-fade", async () => {
+      const mockGain = makeMockGain(1.0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer1 = createMockLayer({ id: "layer-live-del-1" });
+      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { useProjectStore } = await import("@/state/projectStore");
+      const { resetPadGain } = await import("./gainManager");
+      getPadGain("pad-live-del");
+      setLayerChain("layer-live-del-1", []);
+      const pad = createMockPad({ id: "pad-live-del", layers: [layer1] });
+      const { fadePad } = await import("./fadeMixer");
+
+      const scene = createMockScene({ pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      fadePad(pad, 1.0, 0, 500);
+
+      // Simulate mid-fade: pad removed from project
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [] }),
+        false,
+      );
+
+      vi.advanceTimersByTime(600);
+
+      // Fallback to captured pad — still runs full cleanup
+      expect(getLayerChain("layer-live-del-1")).toBeUndefined();
+      expect(resetPadGain).toHaveBeenCalledWith("pad-live-del");
+    });
   });
 
   describe("fadePad — fromVolume === toVolume", () => {
@@ -433,6 +536,40 @@ describe("fadeMixer", () => {
 
       expect(mockVoice.stop).not.toHaveBeenCalled();
       expect(getLayerChain("layer-fpi-cancel")).toEqual([]);
+    });
+
+    it("uses live pad layers at fade completion — clears state for layer added mid-fadePadIn", async () => {
+      const mockGain = makeMockGain(0);
+      mockCtx.createGain.mockReturnValue(mockGain);
+      const layer1 = createMockLayer({ id: "layer-fpi-live-1" });
+      const layer2 = createMockLayer({ id: "layer-fpi-live-2" });
+      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { useProjectStore } = await import("@/state/projectStore");
+      getPadGain("pad-fpi-live");
+      setLayerChain("layer-fpi-live-1", []);
+      const pad = createMockPad({ id: "pad-fpi-live", layers: [layer1] });
+      const { fadePadIn } = await import("./fadeMixer");
+      const startPad = vi.fn().mockResolvedValue(undefined);
+
+      const scene = createMockScene({ pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      await fadePadIn(pad, 0, 500, startPad);
+
+      // Simulate mid-fade: layer2 added to the live pad via updateProject
+      setLayerChain("layer-fpi-live-2", []);
+      useProjectStore.getState().updateProject(
+        createMockProject({ scenes: [{ ...scene, pads: [{ ...pad, layers: [layer1, layer2] }] }] }),
+      );
+
+      vi.advanceTimersByTime(600);
+
+      expect(getLayerChain("layer-fpi-live-1")).toBeUndefined();
+      expect(getLayerChain("layer-fpi-live-2")).toBeUndefined();
     });
   });
 });
