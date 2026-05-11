@@ -308,8 +308,15 @@ export async function triggerPad(pad: Pad, startVolume?: number): Promise<void> 
   // Cancel any in-progress fade-out so its cleanup setTimeout cannot kill voices
   // that are about to be started below.
   cancelFade(pad.id);
+  // Cancel any in-flight Web Audio ramp before reading param.value — ensures
+  // param.value reflects the frozen interpolated position, not the stale anchor.
   padGain.gain.cancelScheduledValues(ctx.currentTime);
-  padGain.gain.setValueAtTime(startVol, ctx.currentTime);
+  if (wasActive) {
+    // Active pad: ramp to avoid an audible click when retriggerering mid-fade.
+    rampGainTo(padGain.gain, startVol);
+  } else {
+    padGain.gain.setValueAtTime(startVol, ctx.currentTime);
+  }
   // Signal the tick to re-sample on the next frame so any stale padVolumes entry
   // (from a previous play session) is cleared before the buffer finishes loading.
   startAudioTick();
