@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window. Follows strict least-privilege: only explicit allow-* entries, no :default umbrella permissions. Shell plugin (tauri-plugin-shell) is intentionally absent — all sidecar spawn/kill is Rust-side only (see src-tauri/src/commands.rs). Native dialogs go through Rust DialogExt and require no frontend IPC permission. core:event:default covers listen/unlisten (used by onCloseRequested, onDragDropEvent, and event bus); core:path:* is enumerated to the specific commands the frontend calls; core:app:allow-version is the only app command used. When adding a new plugin capability, enumerate only the specific allow-* commands the frontend actually invokes.",
+  "description": "Capability for the main window. Follows strict least-privilege: only explicit allow-* entries, no :default umbrella permissions. Shell plugin (tauri-plugin-shell) is intentionally absent — all sidecar spawn/kill is Rust-side only (see src-tauri/src/commands.rs). Native dialogs go through Rust DialogExt and require no frontend IPC permission. opener:allow-open-path is intentionally absent — all open-in-explorer calls go through the Rust open_path_in_explorer command, which enforces validate_grant_path + fs-scope; do NOT add opener:* back here. core:event:default covers listen/unlisten (used by onCloseRequested, onDragDropEvent, and event bus); core:path:* is enumerated to the specific commands the frontend calls; core:app:allow-version is the only app command used. When adding a new plugin capability, enumerate only the specific allow-* commands the frontend actually invokes.",
   "windows": ["main"],
   "permissions": [
     "core:event:default",
@@ -12,17 +12,6 @@
     "core:path:allow-dirname",
     "core:window:allow-close",
     "core:window:allow-destroy",
-    {
-      "identifier": "opener:allow-open-path",
-      "allow": [
-        { "path": "$DOCUMENT/**" },
-        { "path": "$DOWNLOAD/**" },
-        { "path": "$DESKTOP/**" },
-        { "path": "$AUDIO/**" },
-        { "path": "$APPDATA/SoundsBored/**" },
-        { "path": "$APPLOCALDATA/SoundsBored/**" }
-      ]
-    },
     "fs:allow-read-text-file",
     "fs:allow-write-text-file",
     "fs:allow-read-dir",

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Opening project folders in the file explorer now works correctly for projects saved outside the default locations
+- Path validation is enforced before opening any folder in the OS file explorer, preventing unauthorized access
+- Error messages when "Open in Explorer" fails now include more detail to help diagnose the issue
 - Multi-fade volume now tracks the pad's actual live volume when added mid-fade, instead of using the configured static volume setting
 - Fixed a bug where registering a second listener for layer voice changes would silently evict the first — it now logs a warning, making misconfigured setups easier to diagnose
 - Fixed a bug where stopping a sound could briefly report incorrect playback state, causing the UI to show a pad as still playing when it had already stopped.

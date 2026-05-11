@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { exists, remove } from "@tauri-apps/plugin-fs";
+import { openPathInExplorer } from "@/lib/scope";
+import { logError } from "@/lib/logger";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -68,7 +69,7 @@ async function openFolderInExplorer(folderPath: string): Promise<void> {
     toast.error("Folder no longer exists on disk");
     return;
   }
-  await openPath(folderPath);
+  await openPathInExplorer(folderPath);
 }
 
 function isAssignedFolder(
@@ -171,7 +172,7 @@ export function FoldersPanel({
     try {
       await openFolderInExplorer(selectedFolder.path);
     } catch (err) {
-      console.error("[FoldersPanel] openFolderInExplorer:", err);
+      logError("[FoldersPanel] openFolderInExplorer", err instanceof Error ? err : new Error(String(err)));
       toast.error("Failed to open folder", {
         description: err instanceof Error ? err.message : undefined,
       });
@@ -201,7 +202,7 @@ export function FoldersPanel({
       onSelect(null);
       toast.success(`Folder "${folderName}" deleted from disk`);
     } catch (err) {
-      console.error("[FoldersPanel] deleteFolderFromDisk:", err);
+      logError("[FoldersPanel] deleteFolderFromDisk", err instanceof Error ? err : new Error(String(err)));
       toast.error("Failed to delete folder from disk", {
         description: err instanceof Error ? err.message : undefined,
       });

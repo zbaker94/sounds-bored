@@ -29,11 +29,6 @@ vi.mock("@tauri-apps/api/window", () => ({
   })),
 }));
 
-// opener + fs plugins used by handleOpenFolderInExplorer + delete flow
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openPath: vi.fn(() => Promise.resolve()),
-}));
-
 vi.mock("@tauri-apps/plugin-fs", () => ({
   exists: vi.fn(() => Promise.resolve(true)),
   remove: vi.fn(() => Promise.resolve()),
@@ -91,8 +86,7 @@ vi.mock("@/components/modals/ResolveMissingFolderDialog", () => ({
     ) : null,
 }));
 
-import { openPath } from "@tauri-apps/plugin-opener";
-const mockOpenPath = openPath as ReturnType<typeof vi.fn>;
+import { mockCore } from "@/test/tauri-mocks";
 
 import { toast } from "sonner";
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
@@ -132,8 +126,8 @@ beforeEach(() => {
   useUiStore.setState({ ...initialUiState });
   mockMutateAsync.mockClear();
   mockMutateAsync.mockResolvedValue(undefined);
-  mockOpenPath.mockReset();
-  mockOpenPath.mockResolvedValue(undefined);
+  mockCore.invoke.mockReset();
+  mockCore.invoke.mockResolvedValue(undefined);
   mockToastError.mockClear();
 });
 
@@ -242,15 +236,18 @@ describe("FoldersPanel — error paths", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows toast with error description when openPath throws in handleOpenFolderInExplorer", async () => {
+  it("shows toast with error description when openPathInExplorer throws in handleOpenFolderInExplorer", async () => {
     const user = userEvent.setup();
     const folder = createMockGlobalFolder({ id: "f1", name: "Sounds", path: "/music/sounds" });
     useAppSettingsStore.setState({
       ...initialAppSettingsState,
       settings: createMockAppSettings({ globalFolders: [folder] }),
     });
-    mockOpenPath.mockRejectedValueOnce(new Error("permission denied"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockCore.invoke.mockImplementation((cmd: string) =>
+      cmd === "open_path_in_explorer"
+        ? Promise.reject(new Error("permission denied"))
+        : Promise.resolve(undefined),
+    );
 
     renderBrowser({ selectedId: "f1" });
 
@@ -272,7 +269,6 @@ describe("FoldersPanel — error paths", () => {
     });
     useAppSettingsStore.setState({ ...initialAppSettingsState, settings });
     mockMutateAsync.mockRejectedValueOnce(new Error("disk full"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
 
     renderBrowser({ selectedId: "f1" });
 

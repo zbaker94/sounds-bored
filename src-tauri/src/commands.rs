@@ -1016,6 +1016,22 @@ pub fn restore_path_scope(app: AppHandle, path: String) -> Result<(), String> {
     apply_scope_grants(&app, &path)
 }
 
+/// Opens a path in the OS file explorer (Explorer, Finder, etc.). Routes through
+/// Rust so user-chosen project paths outside the static renderer capability
+/// allowlist work without broadening it. Validates via `validate_grant_path`
+/// and enforces the same fs-scope gate as `extract_cover_art`/`start_audio_analysis`.
+#[tauri::command]
+pub fn open_path_in_explorer(app: AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    use tauri_plugin_fs::FsExt;
+    validate_grant_path(&path)?;
+    if !app.fs_scope().is_allowed(&path) {
+        return Err(SCOPE_DENIED_ERR.to_string());
+    }
+    // SECURITY: `with` must stay None — never forward a program name from the renderer.
+    app.opener().open_path(&path, None::<&str>).map_err(|e| e.to_string())
+}
+
 const SCOPE_DENIED_ERR: &str = "Path not within granted scope";
 
 /// Extracts embedded cover art from an audio file and returns it as a base64

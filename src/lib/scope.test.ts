@@ -1,10 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { restorePathScope, pickFolder, pickFile, pickFiles, grantDroppedPaths } from "./scope";
+import { restorePathScope, pickFolder, pickFile, pickFiles, grantDroppedPaths, openPathInExplorer } from "./scope";
 import { mockCore, mockPath, resetTauriMocks } from "@/test/tauri-mocks";
 
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
+
+describe("openPathInExplorer", () => {
+  beforeEach(() => {
+    resetTauriMocks();
+    mockCore.invoke.mockResolvedValue(undefined);
+  });
+
+  it("invokes open_path_in_explorer with the provided path", async () => {
+    await openPathInExplorer("/some/folder");
+
+    expect(mockCore.invoke).toHaveBeenCalledTimes(1);
+    expect(mockCore.invoke).toHaveBeenCalledWith("open_path_in_explorer", {
+      path: "/some/folder",
+    });
+  });
+
+  it("propagates errors from invoke", async () => {
+    mockCore.invoke.mockRejectedValue(new Error("Path not within granted scope"));
+
+    await expect(openPathInExplorer("/some/folder")).rejects.toThrow("Path not within granted scope");
+  });
+});
 
 describe("restorePathScope", () => {
   beforeEach(() => {
