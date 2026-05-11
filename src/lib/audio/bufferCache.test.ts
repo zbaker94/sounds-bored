@@ -31,6 +31,11 @@ function okResponse(body: ArrayBuffer = new ArrayBuffer(8)): Response {
   } as unknown as Response;
 }
 
+async function expectMissingFileError(promise: Promise<unknown>, soundName: string): Promise<void> {
+  await expect(promise).rejects.toBeInstanceOf(MissingFileError);
+  await expect(promise).rejects.toThrow(soundName);
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("bufferCache", () => {
@@ -68,34 +73,24 @@ describe("bufferCache", () => {
 
     it("throws MissingFileError when sound has no filePath", async () => {
       const sound = createMockSound({ filePath: undefined });
-
-      await expect(loadBuffer(sound)).rejects.toThrow(MissingFileError);
+      await expectMissingFileError(loadBuffer(sound), sound.name);
     });
 
     it("throws MissingFileError when sound has an empty filePath", async () => {
       const sound = createMockSound({ filePath: "" });
-
-      const err = await loadBuffer(sound).catch(e => e);
-      expect(err).toBeInstanceOf(MissingFileError);
-      expect(err.message).toContain(sound.name);
+      await expectMissingFileError(loadBuffer(sound), sound.name);
     });
 
     it("throws MissingFileError when fetch returns non-ok response", async () => {
       const sound = createMockSound({ filePath: "sounds/missing.wav" });
       mockFetch.mockResolvedValue({ ok: false, status: 404 } as Response);
-
-      const err = await loadBuffer(sound).catch(e => e);
-      expect(err).toBeInstanceOf(MissingFileError);
-      expect(err.message).toContain(sound.name);
+      await expectMissingFileError(loadBuffer(sound), sound.name);
     });
 
     it("throws MissingFileError when fetch throws (network error)", async () => {
       const sound = createMockSound({ filePath: "sounds/network-err.wav" });
       mockFetch.mockRejectedValue(new Error("network error"));
-
-      const err = await loadBuffer(sound).catch(e => e);
-      expect(err).toBeInstanceOf(MissingFileError);
-      expect(err.message).toContain(sound.name);
+      await expectMissingFileError(loadBuffer(sound), sound.name);
     });
   });
 
