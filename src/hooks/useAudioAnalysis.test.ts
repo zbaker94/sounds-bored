@@ -137,6 +137,21 @@ describe("useAudioAnalysis", () => {
     expect(mockDispatchNextFromQueue).toHaveBeenCalledTimes(1);
   });
 
+  it("complete event clears dispatch in-flight flag even without a preceding started event", async () => {
+    useAnalysisStore.getState().startAnalysis([{ id: "s1", path: "/a.wav" }]);
+
+    const { useAudioAnalysis } = await import("./useAudioAnalysis");
+    renderHook(() => useAudioAnalysis());
+    await act(async () => {});
+
+    // Simulate a scope-rejection: COMPLETE fires without a preceding STARTED
+    act(() => emitComplete({ soundId: "s1", loudnessLufs: null, error: "Path not within granted scope" }));
+
+    expect(mockClearDispatchInFlight).toHaveBeenCalled();
+    expect(useAnalysisStore.getState().errors).toEqual({ s1: "Path not within granted scope" });
+    expect(mockDispatchNextFromQueue).toHaveBeenCalled();
+  });
+
   it("calls unlisten functions on unmount (listener cleanup)", async () => {
     const mockUnlisten = vi.fn();
     mockEvent.listen.mockReturnValue(Promise.resolve(mockUnlisten));

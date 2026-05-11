@@ -27,6 +27,7 @@ export function useAudioAnalysis() {
     }));
 
     register(listen<unknown>(ANALYSIS_COMPLETE_EVENT, (event) => {
+      clearDispatchInFlight();
       const parsed = AnalysisCompletePayloadSchema.safeParse(event.payload);
       if (!parsed.success) {
         logError("Malformed analysis complete event", { payload: event.payload });

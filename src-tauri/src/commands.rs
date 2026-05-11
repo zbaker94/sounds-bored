@@ -256,6 +256,12 @@ pub fn start_download(
     // Validate download_folder_path: must be absolute, traversal-free, and not a UNC device path.
     validate_grant_path(&download_folder_path)
         .map_err(|e| format!("download_folder_path: {}", e))?;
+    {
+        use tauri_plugin_fs::FsExt;
+        if !app.fs_scope().is_allowed(&download_folder_path) {
+            return Err(format!("download_folder_path: {SCOPE_DENIED_ERR}"));
+        }
+    }
 
     // Reject '%' in download_folder_path — yt-dlp interprets '%' as a template
     // placeholder directive; a path containing '%' would redirect output to an
@@ -489,6 +495,15 @@ pub fn export_project(
     // validate_grant_path covers is_absolute, '..', UNC device-namespace, and control chars.
     validate_grant_path(&dest_path).map_err(|e| format!("dest_path: {}", e))?;
     validate_grant_path(&source_path).map_err(|e| format!("source_path: {}", e))?;
+    {
+        use tauri_plugin_fs::FsExt;
+        if !app.fs_scope().is_allowed(&dest_path) {
+            return Err(format!("dest_path: {SCOPE_DENIED_ERR}"));
+        }
+        if !app.fs_scope().is_allowed(&source_path) {
+            return Err(format!("source_path: {SCOPE_DENIED_ERR}"));
+        }
+    }
 
     // SEC-1: Close the TOCTOU window between symlink validation and File::open by
     // pre-opening a File handle immediately after each extra_sound_paths entry
@@ -1001,16 +1016,25 @@ pub fn restore_path_scope(app: AppHandle, path: String) -> Result<(), String> {
     apply_scope_grants(&app, &path)
 }
 
+const SCOPE_DENIED_ERR: &str = "Path not within granted scope";
+
 /// Extracts embedded cover art from an audio file and returns it as a base64
 /// data URL (e.g. "data:image/jpeg;base64,..."), or null if none is present.
 /// Supports MP3 (ID3v2 APIC), FLAC (PICTURE block), OGG Vorbis, M4A (covr), WAV.
 #[tauri::command]
-pub fn extract_cover_art(path: String) -> Result<Option<String>, String> {
+pub fn extract_cover_art(app: AppHandle, path: String) -> Result<Option<String>, String> {
     use lofty::prelude::*;
     use lofty::probe::Probe;
     use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use tauri_plugin_fs::FsExt;
 
     validate_grant_path(&path)?;
+    if !app.fs_scope().is_allowed(&path) {
+        return Err(SCOPE_DENIED_ERR.to_string());
+    }
+    if std::fs::symlink_metadata(&path).map_or(false, |m| m.file_type().is_symlink()) {
+        return Err("Symbolic links are not permitted".to_string());
+    }
 
     let tagged_file = Probe::open(&path)
         .map_err(|e| e.to_string())?
@@ -1155,8 +1179,25 @@ fn measure_loudness(samples: &[f32], sample_rate: u32, channels: usize) -> Resul
 #[tauri::command]
 pub async fn start_audio_analysis(app: AppHandle, entries: Vec<AnalysisEntry>) -> Result<(), String> {
     tauri::async_runtime::spawn(async move {
+        use tauri_plugin_fs::FsExt;
         for entry in entries {
-            validate_grant_path(&entry.path).unwrap_or_default();
+            let gate_err: Option<String> = if let Err(e) = validate_grant_path(&entry.path) {
+                Some(format!("Invalid path: {e}"))
+            } else if !app.fs_scope().is_allowed(&entry.path) {
+                Some(SCOPE_DENIED_ERR.to_string())
+            } else if std::fs::symlink_metadata(&entry.path).map_or(false, |m| m.file_type().is_symlink()) {
+                Some("Symbolic links are not permitted".to_string())
+            } else {
+                None
+            };
+            if let Some(err) = gate_err {
+                let _ = app.emit(ANALYSIS_EVENT, AnalysisCompleteEvent {
+                    sound_id: entry.id.clone(),
+                    loudness_lufs: None,
+                    error: Some(err),
+                });
+                continue;
+            }
             let _ = app.emit(ANALYSIS_STARTED_EVENT, AnalysisStartedEvent {
                 sound_id: entry.id.clone(),
             });
@@ -1599,6 +1640,18 @@ mod tests {
     // The happy-path scope grants (pick_*_and_grant, restore_path_scope) require a
     // real AppHandle with the fs plugin initialized and cannot be unit-tested here.
     // Only the path-validation logic is covered below.
+    //
+    // extract_cover_art, start_audio_analysis, start_download, and export_project also
+    // call app.fs_scope().is_allowed() as a second gate after validate_grant_path.
+    // That gate enforces a distinct invariant ("path was previously granted at runtime")
+    // and requires a live AppHandle — it is not covered by the validate_grant_path tests
+    // above and is verified by manual smoke-testing during release verification.
+
+    #[test]
+    fn test_scope_denied_err_is_stable() {
+        // Pins the wire contract: frontend error-matching depends on this exact string.
+        assert_eq!(SCOPE_DENIED_ERR, "Path not within granted scope");
+    }
 
     #[test]
     fn test_validate_grant_path_rejects_empty() {
