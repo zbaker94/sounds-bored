@@ -21,7 +21,8 @@ export function getMasterGain(): GainNode {
 }
 
 export function applyMasterVolume(volumePct: number): void {
-  pendingVolume = volumePct / 100;
+  const clamped = Number.isFinite(volumePct) ? Math.max(0, Math.min(100, volumePct)) : 100;
+  pendingVolume = clamped / 100;
   if (masterGain) masterGain.gain.value = pendingVolume;
 }
 
