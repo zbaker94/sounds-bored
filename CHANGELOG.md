@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where registering a second listener for layer voice changes would silently evict the first — it now logs a warning, making misconfigured setups easier to diagnose
 - Fixed a bug where stopping a sound could briefly report incorrect playback state, causing the UI to show a pad as still playing when it had already stopped.
 - Added a diagnostic warning when the audio engine's internal listener slot is unexpectedly replaced, improving debuggability for edge-case audio issues.
 - Internal audio engine fix: playback state is now guaranteed consistent when notifications fire, preventing rare edge cases where pad/layer active states could briefly appear out of sync.

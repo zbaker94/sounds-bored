@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as logger from '@/lib/logger';
 import type { AudioVoice } from './audioVoice';
 import {
   onLayerVoiceSetChanged,
@@ -577,14 +578,17 @@ describe('onLayerVoiceSetChanged', () => {
   });
 
   it('registering a second listener replaces the first', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
     let first = 0;
     let second = 0;
     onLayerVoiceSetChanged(() => { first++; });
     const unsub = onLayerVoiceSetChanged(() => { second++; });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
     recordLayerVoice('pad-1', 'layer-1', makeVoice());
     expect(first).toBe(0);
     expect(second).toBe(1);
     unsub();
+    warnSpy.mockRestore();
   });
 
   it('recordLayerVoice: listener sees both voiceMap and layerVoiceMap updated', () => {
@@ -763,5 +767,36 @@ describe('clearAllVoices / clearAll', () => {
     recordLayerVoice('pad-1', 'layer-1', voice);
     clearAllVoices();
     expect(voice.stop).not.toHaveBeenCalled();
+  });
+});
+
+// ── onLayerVoiceSetChanged — listener eviction warning ──────────────────────
+
+describe('onLayerVoiceSetChanged — listener eviction warning', () => {
+  it('warns when a different listener replaces an existing one', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
+    const fn1 = () => {};
+    const fn2 = () => {};
+    onLayerVoiceSetChanged(fn1);
+    expect(warnSpy).not.toHaveBeenCalled();
+    onLayerVoiceSetChanged(fn2);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn on first registration (empty slot)', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
+    onLayerVoiceSetChanged(() => {});
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn when the same listener is re-registered', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
+    const fn = () => {};
+    onLayerVoiceSetChanged(fn);
+    onLayerVoiceSetChanged(fn);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

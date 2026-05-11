@@ -11,9 +11,9 @@
  * helper rather than incrementing a counter, so future mutation paths
  * automatically signal the listener.
  *
- * This module imports only from ./audioVoice — it does NOT depend on the
- * AudioContext, gain graph, or playbackStore. Callers mirror voice changes
- * to playbackStore at the call site.
+ * This module's only runtime dependencies are ./audioVoice (type) and @/lib/logger.
+ * It does NOT depend on the AudioContext, gain graph, or playbackStore. Callers
+ * mirror voice changes to playbackStore at the call site.
  */
 
 import { logWarn } from "@/lib/logger";
@@ -56,8 +56,9 @@ export function isLayerActive(layerId: string): boolean {
   return (layerVoiceMap.get(layerId)?.length ?? 0) > 0;
 }
 
-// Internal helpers — only called by recordLayerVoice / clearLayerVoice. External callers
-// that bypass the layer functions would break the voiceMap / layerVoiceMap invariant.
+// Internal helpers — only called by recordLayerVoice / clearLayerVoice. Exported for
+// test introspection (direct voiceMap coverage). Production callers must use the layer
+// functions to keep voiceMap / layerVoiceMap / padToLayerIds in sync.
 export function recordVoice(padId: string, voice: AudioVoice): void {
   voiceMap.set(padId, [...(voiceMap.get(padId) ?? []), voice]);
 }
@@ -110,8 +111,9 @@ export function stopPadVoices(padId: string): void {
   // layerVoiceMap while the pad entry in voiceMap is already deleted — this breaks
   // the file-level invariant temporarily until the next mutation clears the layer.
   // Notify fires after all map writes and before voice.stop() for the same re-entry
-  // safety reason as stopLayerVoices (synchronous onended → clearLayerVoice re-entry
-  // is a safe no-op because maps are already drained).
+  // safety reason as stopLayerVoices: synchronous onended → clearLayerVoice re-entry
+  // is a safe no-op because maps are already drained, but does produce one additional
+  // notifyLayerVoiceSetChanged() call per reentrant voice; audioTick tolerates this.
   const padLayers = padToLayerIds.get(padId);
   if (padLayers) {
     for (const layerId of padLayers) {
@@ -174,7 +176,8 @@ export function stopAllVoices(): void {
   }
 }
 
-// Caller MUST update voiceMap and call notifyLayerVoiceSetChanged() after invoking this helper.
+// Caller MUST update voiceMap (before or after this call) and call notifyLayerVoiceSetChanged()
+// once all map writes are complete.
 function removeVoicesFromLayers(padId: string, voiceSet: Set<AudioVoice>): void {
   const padLayers = padToLayerIds.get(padId);
   if (!padLayers) return;
@@ -281,7 +284,8 @@ export function clearAllVoices(): void {
 
 /**
  * Reset all voice registry state. For use in test setup only.
- * Does NOT fire the layerVoiceSetChanged listener — use clearAllVoices() in production code paths.
+ * Does NOT fire the layerVoiceSetChanged listener AND drops listener registration.
+ * Tests must re-subscribe after calling this. Use clearAllVoices() in production code paths.
  */
 export function clearAll(): void {
   voiceMap.clear();
