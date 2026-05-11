@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as logger from '@/lib/logger';
 import type { AudioVoice } from './audioVoice';
 import {
   onLayerVoiceSetChanged,
@@ -577,13 +578,155 @@ describe('onLayerVoiceSetChanged', () => {
   });
 
   it('registering a second listener replaces the first', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
     let first = 0;
     let second = 0;
     onLayerVoiceSetChanged(() => { first++; });
     const unsub = onLayerVoiceSetChanged(() => { second++; });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
     recordLayerVoice('pad-1', 'layer-1', makeVoice());
     expect(first).toBe(0);
     expect(second).toBe(1);
+    unsub();
+    warnSpy.mockRestore();
+  });
+
+  it('recordLayerVoice: listener sees both voiceMap and layerVoiceMap updated', () => {
+    const voice = makeVoice();
+    let padActiveAtNotify: boolean | null = null;
+    let layerActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layerActiveAtNotify = isLayerActive('layer-1');
+    });
+    recordLayerVoice('pad-1', 'layer-1', voice);
+    expect(padActiveAtNotify).toBe(true);
+    expect(layerActiveAtNotify).toBe(true);
+    unsub();
+  });
+
+  it('clearLayerVoice: listener sees both voiceMap and layerVoiceMap updated (last voice)', () => {
+    const voice = makeVoice();
+    recordLayerVoice('pad-1', 'layer-1', voice);
+    let padActiveAtNotify: boolean | null = null;
+    let layerActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layerActiveAtNotify = isLayerActive('layer-1');
+    });
+    clearLayerVoice('pad-1', 'layer-1', voice);
+    expect(padActiveAtNotify).toBe(false);
+    expect(layerActiveAtNotify).toBe(false);
+    unsub();
+  });
+
+  it('clearLayerVoice: listener sees both voiceMap and layerVoiceMap updated (partial clear)', () => {
+    const v1 = makeVoice();
+    const v2 = makeVoice();
+    recordLayerVoice('pad-1', 'layer-1', v1);
+    recordLayerVoice('pad-1', 'layer-1', v2);
+    let layerVoiceCountAtNotify: number | null = null;
+    let padVoiceCountAtNotify: number | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      layerVoiceCountAtNotify = getLayerVoices('layer-1').length;
+      padVoiceCountAtNotify = getAllVoices().length;
+    });
+    clearLayerVoice('pad-1', 'layer-1', v1);
+    // Both layerVoiceMap and voiceMap must be updated at notify time.
+    // Pre-fix: notify fired before clearVoice, so getAllVoices() would return 2 not 1.
+    expect(layerVoiceCountAtNotify).toBe(1);
+    expect(padVoiceCountAtNotify).toBe(1);
+    unsub();
+  });
+
+  it('stopLayerVoices: listener sees both voiceMap and layerVoiceMap updated (last layer)', () => {
+    recordLayerVoice('pad-1', 'layer-1', makeVoice());
+    let padActiveAtNotify: boolean | null = null;
+    let layerActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layerActiveAtNotify = isLayerActive('layer-1');
+    });
+    stopLayerVoices('pad-1', 'layer-1');
+    expect(padActiveAtNotify).toBe(false);
+    expect(layerActiveAtNotify).toBe(false);
+    unsub();
+  });
+
+  it('stopLayerVoices: listener sees consistent state when pad retains another layer', () => {
+    recordLayerVoice('pad-1', 'layer-1', makeVoice());
+    recordLayerVoice('pad-1', 'layer-2', makeVoice());
+    let padActiveAtNotify: boolean | null = null;
+    let layer1ActiveAtNotify: boolean | null = null;
+    let layer2ActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layer1ActiveAtNotify = isLayerActive('layer-1');
+      layer2ActiveAtNotify = isLayerActive('layer-2');
+    });
+    stopLayerVoices('pad-1', 'layer-1');
+    expect(padActiveAtNotify).toBe(true);
+    expect(layer1ActiveAtNotify).toBe(false);
+    expect(layer2ActiveAtNotify).toBe(true);
+    unsub();
+  });
+
+  it('stopPadVoices: listener sees both voiceMap and layerVoiceMap updated', () => {
+    recordLayerVoice('pad-1', 'layer-1', makeVoice());
+    recordLayerVoice('pad-1', 'layer-2', makeVoice());
+    let padActiveAtNotify: boolean | null = null;
+    let layer1ActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layer1ActiveAtNotify = isLayerActive('layer-1');
+    });
+    stopPadVoices('pad-1');
+    expect(padActiveAtNotify).toBe(false);
+    expect(layer1ActiveAtNotify).toBe(false);
+    unsub();
+  });
+
+  it('stopAllVoices: listener sees all maps cleared', () => {
+    recordLayerVoice('pad-1', 'layer-1', makeVoice());
+    recordLayerVoice('pad-2', 'layer-2', makeVoice());
+    let pad1ActiveAtNotify: boolean | null = null;
+    let pad2ActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      pad1ActiveAtNotify = isPadActive('pad-1');
+      pad2ActiveAtNotify = isPadActive('pad-2');
+    });
+    stopAllVoices();
+    expect(pad1ActiveAtNotify).toBe(false);
+    expect(pad2ActiveAtNotify).toBe(false);
+    unsub();
+  });
+
+  it('stopSpecificVoices: listener sees voiceMap and layerVoiceMap updated', () => {
+    const voice = makeVoice();
+    recordLayerVoice('pad-1', 'layer-1', voice);
+    let padActiveAtNotify: boolean | null = null;
+    let layerActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layerActiveAtNotify = isLayerActive('layer-1');
+    });
+    stopSpecificVoices([voice], new Set(['pad-1']));
+    expect(padActiveAtNotify).toBe(false);
+    expect(layerActiveAtNotify).toBe(false);
+    unsub();
+  });
+
+  it('clearAllVoices: listener sees all maps cleared', () => {
+    recordLayerVoice('pad-1', 'layer-1', makeVoice());
+    let padActiveAtNotify: boolean | null = null;
+    let layerActiveAtNotify: boolean | null = null;
+    const unsub = onLayerVoiceSetChanged(() => {
+      padActiveAtNotify = isPadActive('pad-1');
+      layerActiveAtNotify = isLayerActive('layer-1');
+    });
+    clearAllVoices();
+    expect(padActiveAtNotify).toBe(false);
+    expect(layerActiveAtNotify).toBe(false);
     unsub();
   });
 });
@@ -624,5 +767,36 @@ describe('clearAllVoices / clearAll', () => {
     recordLayerVoice('pad-1', 'layer-1', voice);
     clearAllVoices();
     expect(voice.stop).not.toHaveBeenCalled();
+  });
+});
+
+// ── onLayerVoiceSetChanged — listener eviction warning ──────────────────────
+
+describe('onLayerVoiceSetChanged — listener eviction warning', () => {
+  it('warns when a different listener replaces an existing one', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
+    const fn1 = () => {};
+    const fn2 = () => {};
+    onLayerVoiceSetChanged(fn1);
+    expect(warnSpy).not.toHaveBeenCalled();
+    onLayerVoiceSetChanged(fn2);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn on first registration (empty slot)', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
+    onLayerVoiceSetChanged(() => {});
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn when the same listener is re-registered', () => {
+    const warnSpy = vi.spyOn(logger, 'logWarn').mockImplementation(() => {});
+    const fn = () => {};
+    onLayerVoiceSetChanged(fn);
+    onLayerVoiceSetChanged(fn);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
