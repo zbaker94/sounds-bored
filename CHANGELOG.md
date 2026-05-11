@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where triggering a new pad while another pad was fading out could incorrectly interrupt the new pad's playback.
 - No user-facing changes (internal test cleanup only)
 - Tightened app permissions to least-privilege: replaced broad `core:default`, `core:path:default`, and `core:window:default` umbrella grants with only the specific commands the app actually uses.
 - Tightened app security permissions — removed broad default plugin permissions (`opener:default`, `dialog:default`, `updater:default`, `process:default`) in favor of explicit, minimal allow-only entries

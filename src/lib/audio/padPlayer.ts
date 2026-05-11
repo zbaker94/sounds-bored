@@ -14,9 +14,8 @@ import {
   addStopCleanupTimeout,
   deleteStopCleanupTimeout,
   cancelGlobalStopTimeout,
-  clearAllPadProgressInfo,
-  clearAllLayerProgressInfo,
   clearPadProgressInfo,
+  clearLayerProgressInfo,
   setGlobalStopTimeout,
 } from "./audioState";
 import {
@@ -54,7 +53,7 @@ import {
   isLayerPending,
   setLayerPending,
 } from "./chainCycleState";
-import { clearAll as clearAllStreaming, dispose as disposeStreaming } from "./streamingAudioLifecycle";
+import { dispose as disposeStreaming } from "./streamingAudioLifecycle";
 
 import {
   resolveFadeDuration,
@@ -228,6 +227,12 @@ export function stopAllPads(): void {
   // excluded from cleanup (their gain nodes and voices are left intact).
   const stoppedPadIds = getActivePadIds();
   const stoppedVoices = getAllVoices();
+  // Snapshot per-pad layer IDs alongside stoppedPadIds — avoids redundant
+  // per-padId registry walks inside the timeout.
+  const stoppedLayersByPad = new Map<string, Set<string>>();
+  for (const padId of stoppedPadIds) {
+    stoppedLayersByPad.set(padId, getLayerIdsForPads(new Set([padId])));
+  }
 
   // Immediately disconnect stale (inactive) pad gain nodes — they have no
   // voices so no ramp is needed; same-tick removal shrinks the race window.
@@ -241,9 +246,14 @@ export function stopAllPads(): void {
   // new audio session.
   const stopTimeoutId = setTimeout(() => {
     cancelGlobalStopTimeout(); // clear the tracker (timeout already fired)
-    clearAllStreaming();
-    clearAllPadProgressInfo();
-    clearAllLayerProgressInfo();
+    // Scoped to stoppedLayersByPad — pads triggered during the ramp window keep their streaming/progress state.
+    for (const [padId, layerIds] of stoppedLayersByPad) {
+      clearPadProgressInfo(padId);
+      for (const layerId of layerIds) {
+        clearLayerProgressInfo(layerId);
+        disposeStreaming(padId, layerId);
+      }
+    }
     clearLayerGainsForIds(getLayerIdsForPads(stoppedPadIds));
     clearPadGainsForIds(stoppedPadIds);
     const fullyStopped = stopSpecificVoices(stoppedVoices, stoppedPadIds);
