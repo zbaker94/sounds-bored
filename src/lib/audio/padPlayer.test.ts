@@ -1350,6 +1350,85 @@ describe("stopAllPads â€” ramped", () => {
     // padA's voice should be stopped normally
     expect(createdSources[0].stop).toHaveBeenCalledOnce();
   });
+
+  it("does not wipe streaming registration for a pad triggered during the ramp window", async () => {
+    const mod = await import("./streamingCache");
+    const checkIsLargeFileMock = mod.checkIsLargeFile as ReturnType<typeof vi.fn>;
+    const { triggerPad, stopAllPads } = await import("./padPlayer");
+    const sound = createMockSound({ filePath: "big.wav" });
+    setSounds([sound]);
+    const layerA = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const layerB = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const padA = createMockPad({ layers: [layerA] });
+    const padB = createMockPad({ layers: [layerB] });
+
+    checkIsLargeFileMock.mockResolvedValue(true);
+    try {
+      // padA uses streaming path so we can assert its registration IS cleared by cleanup
+      await triggerPad(padA);
+      await vi.runAllTimersAsync();
+      expect(isPadStreaming(padA.id)).toBe(true);
+
+      stopAllPads();
+
+      // Trigger padB via streaming path during the ramp window.
+      // No timer advancement — await resolves via microtasks (Promise mocks).
+      await triggerPad(padB);
+      expect(isPadStreaming(padB.id)).toBe(true);
+
+      vi.advanceTimersByTime(35);
+
+      // padA's streaming registration was cleared by the scoped cleanup
+      expect(isPadStreaming(padA.id)).toBe(false);
+      // padB's streaming registration was preserved
+      expect(isPadStreaming(padB.id)).toBe(true);
+    } finally {
+      checkIsLargeFileMock.mockResolvedValue(false);
+    }
+  });
+
+  it("does not wipe pad or layer progress info for a pad triggered during the ramp window", async () => {
+    const { triggerPad, stopAllPads } = await import("./padPlayer");
+    const { getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
+    const sound = createMockSound({ filePath: "a.wav" });
+    setSounds([sound]);
+    const layerA = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const layerB = createMockLayer({
+      arrangement: "simultaneous",
+      selection: { type: "assigned", instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const padA = createMockPad({ layers: [layerA] });
+    const padB = createMockPad({ layers: [layerB] });
+
+    await triggerPad(padA);
+    await vi.runAllTimersAsync();
+
+    stopAllPads();
+
+    // Buffer path — loadBuffer mock resolves immediately via microtask, no timer advance needed.
+    await triggerPad(padB);
+
+    expect(getPadProgressInfo(padB.id)).toBeDefined();
+    expect(getLayerProgressInfo(layerB.id)).toBeDefined();
+
+    vi.advanceTimersByTime(35);
+
+    // padA's progress info was cleared by the scoped cleanup
+    expect(getPadProgressInfo(padA.id)).toBeUndefined();
+    expect(getLayerProgressInfo(layerA.id)).toBeUndefined();
+    // padB's progress info was preserved
+    expect(getPadProgressInfo(padB.id)).toBeDefined();
+    expect(getLayerProgressInfo(layerB.id)).toBeDefined();
+  });
 });
 
 describe("releasePadHoldLayers", () => {
