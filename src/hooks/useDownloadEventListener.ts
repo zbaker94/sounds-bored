@@ -22,6 +22,7 @@ async function finalizeDownload(
   outputPath: string,
   downloadFolderIdRef: { current: string | undefined },
   updateJob: (id: string, update: DownloadJobUpdate) => void,
+  isCancelled: () => boolean,
 ): Promise<void> {
   const { jobs } = useDownloadStore.getState();
   const job = jobs[eventId];
@@ -29,6 +30,8 @@ async function finalizeDownload(
 
   const soundId = crypto.randomUUID();
   const fileSizeBytes = await getSoundFileSize(outputPath);
+  if (isCancelled()) return;
+
   const candidateSound = {
     id: soundId,
     name: job?.outputName ?? "Downloaded Sound",
@@ -101,10 +104,13 @@ export function useDownloadEventListener(downloadFolderId?: string) {
     let unlisten: (() => void) | undefined;
 
     listenToDownloadEvents((event) => {
+      if (cancelled) return;
+
       updateJob(event.id, buildJobUpdate(event));
 
       if (event.status === "completed" && event.outputPath) {
-        finalizeDownload(event.id, event.outputPath, downloadFolderIdRef, updateJob).catch((err: unknown) => {
+        finalizeDownload(event.id, event.outputPath, downloadFolderIdRef, updateJob, () => cancelled).catch((err: unknown) => {
+          if (cancelled) return;
           toast.error("Failed to finalize download", {
             description: err instanceof Error ? err.message : String(err),
           });
@@ -125,6 +131,7 @@ export function useDownloadEventListener(downloadFolderId?: string) {
         unlisten = fn;
       }
     }).catch((err: unknown) => {
+      if (cancelled) return;
       toast.error("Failed to start download listener", {
         description: err instanceof Error ? err.message : String(err),
       });
