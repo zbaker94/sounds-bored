@@ -35,6 +35,7 @@ function makeMockSource() {
     start: vi.fn(),
     stop: vi.fn(),
     connect: vi.fn(),
+    disconnect: vi.fn(),
     loop: false,
     get onended() { return endedCb; },
     set onended(cb: ((ev: Event) => any) | null) { endedCb = cb; },
@@ -88,6 +89,49 @@ describe("wrapBufferSource", () => {
     voice.setOnEnded(cb);
     expect(() => voice.stop()).not.toThrow();
     expect(cb).toHaveBeenCalledOnce();
+  });
+
+  it("stop() does not throw if source.disconnect() or voiceGain.disconnect() throws", () => {
+    const source = makeMockSource();
+    source.disconnect.mockImplementation(() => { throw new Error("already disconnected"); });
+    const ctx = makeMockCtx();
+    ctx._gain.disconnect.mockImplementation(() => { throw new Error("already disconnected"); });
+    const dest = makeMockDestination();
+    const voice = wrapBufferSource(source as any, ctx as any, dest as any);
+    expect(() => voice.stop()).not.toThrow();
+  });
+
+  it("stop() disconnects voiceGain and source from the audio graph", () => {
+    const source = makeMockSource();
+    const ctx = makeMockCtx();
+    const dest = makeMockDestination();
+    wrapBufferSource(source as any, ctx as any, dest as any).stop();
+    expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
+    expect(source.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("stop() called twice disconnects voiceGain and source exactly once", () => {
+    const source = makeMockSource();
+    const ctx = makeMockCtx();
+    const dest = makeMockDestination();
+    const voice = wrapBufferSource(source as any, ctx as any, dest as any);
+    voice.stop();
+    voice.stop();
+    expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
+    expect(source.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("natural end (source.onended fires) disconnects voiceGain and source", () => {
+    const source = makeMockSource();
+    const ctx = makeMockCtx();
+    const dest = makeMockDestination();
+    const cb = vi.fn();
+    const voice = wrapBufferSource(source as any, ctx as any, dest as any);
+    voice.setOnEnded(cb);
+    source.onended?.(new Event("ended"));
+    expect(cb).toHaveBeenCalledOnce();
+    expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
+    expect(source.disconnect).toHaveBeenCalledOnce();
   });
 
   it("setOnEnded wires callback to source.onended", () => {
@@ -241,6 +285,18 @@ describe("wrapBufferSource", () => {
       voice.stopWithRamp(0.025);
       expect(() => vi.advanceTimersByTime(30)).not.toThrow();
     });
+
+    it("disconnects voiceGain and source after ramp completes", () => {
+      const source = makeMockSource();
+      const ctx = makeMockCtx();
+      const dest = makeMockDestination();
+      wrapBufferSource(source as any, ctx as any, dest as any, 1.0).stopWithRamp(0.025);
+      expect(ctx._gain.disconnect).not.toHaveBeenCalled();
+      expect(source.disconnect).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(30);
+      expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
+      expect(source.disconnect).toHaveBeenCalledOnce();
+    });
   });
 });
 
@@ -305,6 +361,7 @@ describe("wrapStreamingElement", () => {
     const ctx = makeMockCtx();
     const dest = makeMockDestination();
     wrapStreamingElement(audio as any, sourceNode as any, ctx as any, dest as any).stop();
+    // sourceNode is cached/reused by streamingCache — only voiceGain is disconnected here
     expect(ctx._gain.disconnect).toHaveBeenCalledOnce();
   });
 

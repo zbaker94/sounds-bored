@@ -31,8 +31,11 @@ interface PlayableSource {
   setNativeOnEnded(cb: (() => void) | null): void;
   /** Update the loop flag on the underlying source. */
   setLoop(v: boolean): void;
-  /** Optional post-stop cleanup called after every stop (hard or ramped).
-   *  Used by the streaming adapter to disconnect the voiceGain from the graph. */
+  /** Optional post-stop cleanup called after every stop (hard, ramped, or natural end).
+   *  Implementations disconnect nodes they own from the audio graph.
+   *  The buffer adapter disconnects both the single-use source and voiceGain;
+   *  the streaming adapter disconnects only voiceGain because its sourceNode
+   *  is cached and reused across triggers (see streamingCache.ts). */
   cleanup?(voiceGain: GainNode): void;
 }
 
@@ -84,7 +87,7 @@ function createVoice(
     },
     setOnEnded(cb) {
       endedCb = cb;
-      source.setNativeOnEnded(cb ? () => { endedCb = null; cb(); } : null);
+      source.setNativeOnEnded(cb ? () => doStop() : null);
     },
     setLoop: (v) => source.setLoop(v),
   };
@@ -102,6 +105,10 @@ export function wrapBufferSource(
     stop: () => { try { source.stop(); } catch { /* already ended */ } },
     setNativeOnEnded: (cb) => { source.onended = cb; },
     setLoop: (v) => { source.loop = v; },
+    cleanup: (voiceGain) => {
+      try { source.disconnect(); } catch { /* already disconnected */ }
+      try { voiceGain.disconnect(); } catch { /* already disconnected */ }
+    },
   };
   return createVoice(adapter, ctx, destination, initialVolume);
 }
@@ -119,6 +126,7 @@ export function wrapStreamingElement(
     stop: () => { audio.pause(); audio.currentTime = 0; },
     setNativeOnEnded: (cb) => { audio.onended = cb; },
     setLoop: (v) => { audio.loop = v; },
+    // sourceNode is cached and reused across triggers (see streamingCache.ts); caller disconnects it before next trigger
     cleanup: (voiceGain) => voiceGain.disconnect(),
   };
   return createVoice(adapter, ctx, destination, initialVolume);

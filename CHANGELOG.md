@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a memory/resource leak where audio nodes were not disconnected from the Web Audio graph after sounds finished playing or were stopped, which could cause audio glitches or increased memory usage over time.
 - Fixed a memory leak where the audio gain node was not properly cleaned up after a failed sound preview attempt.
 - Master volume control now handles invalid values (out-of-range, NaN, Infinity) safely — volume stays within 0–100% bounds instead of potentially breaking audio output.
 - Internal audio engine refactored to use a unified playback state coordinator — no user-facing behavior changes
