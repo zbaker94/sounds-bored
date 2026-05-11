@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where adding a new pad could open the wrong pad's config drawer when the pad failed to be created
+- Pad IDs are now enforced as globally unique across all scenes, preventing silent data collisions
+- Adding a pad via keyboard shortcut now correctly navigates to the new pad's page before opening its config
 - Retriggering an active pad no longer causes an audible click — volume now ramps smoothly instead of snapping instantly
 - Fixed a bug where triggering a new pad while another pad was fading out could incorrectly interrupt the new pad's playback.
 - No user-facing changes (internal test cleanup only)
