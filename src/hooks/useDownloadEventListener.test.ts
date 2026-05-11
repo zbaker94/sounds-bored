@@ -338,3 +338,95 @@ describe("useDownloadEventListener — buildJobUpdate status variants", () => {
     await waitFor(() => expect(mockUpdateJob).toHaveBeenCalledWith("job-1", { status: "queued" }));
   });
 });
+
+describe("useDownloadEventListener — unmount race condition guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockJobs.current = {};
+    mockListenToDownloadEvents.mockResolvedValue(() => {});
+  });
+
+  it("does not call updateJob when an event fires after component unmount", async () => {
+    const { unmount } = renderHook(() => useDownloadEventListener());
+    await waitFor(() => expect(mockListenToDownloadEvents).toHaveBeenCalled());
+
+    const callback = mockListenToDownloadEvents.mock.calls[0][0] as (e: DownloadProgressEvent) => void;
+
+    unmount();
+
+    callback({ id: "job-1", percent: 0, status: "queued" });
+
+    expect(mockUpdateJob).not.toHaveBeenCalled();
+  });
+
+  it("does not call updateJob or show toasts when a completed event fires after component unmount", async () => {
+    const { toast } = await import("sonner");
+    const { unmount } = renderHook(() => useDownloadEventListener());
+    await waitFor(() => expect(mockListenToDownloadEvents).toHaveBeenCalled());
+
+    const callback = mockListenToDownloadEvents.mock.calls[0][0] as (e: DownloadProgressEvent) => void;
+
+    unmount();
+
+    callback({ id: "job-1", percent: 100, status: "completed", outputPath: "/downloads/clip.mp3" });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    expect(mockUpdateJob).not.toHaveBeenCalled();
+    expect(mockUpdateLibrary).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("suppresses finalizeDownload side effects when component unmounts before async work completes", async () => {
+    const { toast } = await import("sonner");
+
+    mockJobs.current = {
+      "job-mid-finalize": {
+        id: "job-mid-finalize",
+        url: "https://example.com",
+        outputName: "clip",
+        status: "downloading",
+        percent: 50,
+        tags: [],
+        sets: [],
+      },
+    };
+
+    const { unmount } = renderHook(() => useDownloadEventListener());
+    await waitFor(() => expect(mockListenToDownloadEvents).toHaveBeenCalled());
+
+    const callback = mockListenToDownloadEvents.mock.calls[0][0] as (e: DownloadProgressEvent) => void;
+
+    // Fire event while mounted — finalizeDownload starts async work
+    callback({ id: "job-mid-finalize", percent: 100, status: "completed", outputPath: "/downloads/clip.mp3" });
+    // Unmount immediately before async work completes
+    unmount();
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+    expect(mockUpdateLibrary).not.toHaveBeenCalled();
+    expect(mockUpdateJob).not.toHaveBeenCalledWith("job-mid-finalize", expect.objectContaining({ soundId: expect.any(String) }));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalledWith("Download complete but file path was rejected", expect.anything());
+  });
+
+  it("suppresses listener-setup error toast when component unmounts before rejection resolves", async () => {
+    const { toast } = await import("sonner");
+
+    let rejectListen!: (err: Error) => void;
+    mockListenToDownloadEvents.mockReturnValueOnce(
+      new Promise<() => void>((_, reject) => {
+        rejectListen = reject;
+      }),
+    );
+
+    const { unmount } = renderHook(() => useDownloadEventListener());
+
+    unmount();
+
+    rejectListen(new Error("Tauri listen failed"));
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
