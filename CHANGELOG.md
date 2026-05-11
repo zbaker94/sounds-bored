@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Tightened app security permissions — removed broad default plugin permissions (`opener:default`, `dialog:default`, `updater:default`, `process:default`) in favor of explicit, minimal allow-only entries
 - No user-facing changes; internal test coverage improvements only.
 - Improved internal test coverage for audio layer chain isolation (no user-facing behavior changes)
 - Internal audio engine test improvements; no user-facing behavior changed.
