@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine fix: playback state is now guaranteed consistent when notifications fire, preventing rare edge cases where pad/layer active states could briefly appear out of sync.
 - Fixed audio state leak when pad layers are added or removed while a fade is in progress — cleanup now reflects the pad's current configuration at fade completion.
 - Fixed a bug where download-related error toasts could appear after navigating away from the download manager
 - Fixed a memory/resource leak where audio nodes were not disconnected from the Web Audio graph after sounds finished playing or were stopped, which could cause audio glitches or increased memory usage over time.

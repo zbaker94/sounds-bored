@@ -27,16 +27,21 @@ const padToLayerIds = new Map<string, Set<string>>();
 type LayerVoiceSetChangedListener = () => void;
 let layerVoiceSetChangeListener: LayerVoiceSetChangedListener | null = null;
 
+// INVARIANT: Must be the final statement in every mutation before any external side effects
+// (e.g., voice.stop()). All three Maps — voiceMap, layerVoiceMap, padToLayerIds — must
+// be in their final post-mutation state before this fires; the listener reads them and
+// assumes full consistency.
 function notifyLayerVoiceSetChanged(): void {
   layerVoiceSetChangeListener?.();
 }
 
 /** Register a listener that fires whenever layerVoiceMap is mutated.
  *  Returns an unsubscribe function. Only one listener slot exists; registering
- *  a second listener replaces the first. */
+ *  a second listener replaces the first. This slot is owned exclusively by audioTick —
+ *  any other registrant will silently evict it. */
 export function onLayerVoiceSetChanged(listener: LayerVoiceSetChangedListener): () => void {
   layerVoiceSetChangeListener = listener;
-  return () => { layerVoiceSetChangeListener = null; };
+  return () => { if (layerVoiceSetChangeListener === listener) layerVoiceSetChangeListener = null; };
 }
 
 export function isPadActive(padId: string): boolean {
@@ -47,6 +52,8 @@ export function isLayerActive(layerId: string): boolean {
   return (layerVoiceMap.get(layerId)?.length ?? 0) > 0;
 }
 
+// Internal helpers — only called by recordLayerVoice / clearLayerVoice. External callers
+// that bypass the layer functions would break the voiceMap / layerVoiceMap invariant.
 export function recordVoice(padId: string, voice: AudioVoice): void {
   voiceMap.set(padId, [...(voiceMap.get(padId) ?? []), voice]);
 }
@@ -68,8 +75,8 @@ export function recordLayerVoice(padId: string, layerId: string, voice: AudioVoi
     padToLayerIds.set(padId, padLayers);
   }
   padLayers.add(layerId);
-  notifyLayerVoiceSetChanged();
   recordVoice(padId, voice);
+  notifyLayerVoiceSetChanged();
 }
 
 export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoice): void {
@@ -84,8 +91,8 @@ export function clearLayerVoice(padId: string, layerId: string, voice: AudioVoic
   } else {
     layerVoiceMap.set(layerId, updated);
   }
-  notifyLayerVoiceSetChanged();
   clearVoice(padId, voice);
+  notifyLayerVoiceSetChanged();
 }
 
 export function stopPadVoices(padId: string): void {
@@ -120,21 +127,23 @@ export function stopLayerVoices(padId: string, layerId: string): void {
   const voices = layerVoiceMap.get(layerId) ?? [];
   const stoppedSet = new Set(voices);
 
-  // Clean up maps BEFORE calling stop() — wrapStreamingElement.stop()
-  // fires onended synchronously, so clearing first makes clearLayerVoice a safe no-op.
+  // All three Maps are drained first. Notify fires after all writes so the listener
+  // sees consistent state. Notify fires before voice.stop() because stop() can trigger
+  // onended synchronously (wrapStreamingElement), re-entering clearLayerVoice — that
+  // re-entry is a safe no-op because the maps are already drained.
   layerVoiceMap.delete(layerId);
   const padLayers = padToLayerIds.get(padId);
   if (padLayers) {
     padLayers.delete(layerId);
     if (padLayers.size === 0) padToLayerIds.delete(padId);
   }
-  notifyLayerVoiceSetChanged();
   const padVoices = (voiceMap.get(padId) ?? []).filter((v) => !stoppedSet.has(v));
   if (padVoices.length === 0) {
     voiceMap.delete(padId);
   } else {
     voiceMap.set(padId, padVoices);
   }
+  notifyLayerVoiceSetChanged();
 
   for (const voice of voices) {
     try { voice.stop(); } catch { /* already ended */ }
@@ -155,6 +164,7 @@ export function stopAllVoices(): void {
   }
 }
 
+// Caller MUST update voiceMap and call notifyLayerVoiceSetChanged() after invoking this helper.
 function removeVoicesFromLayers(padId: string, voiceSet: Set<AudioVoice>): void {
   const padLayers = padToLayerIds.get(padId);
   if (!padLayers) return;
