@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal test coverage for shuffled sound playback ordering (no user-facing behavior changes)
 - Internal test code refactored for consistency; no user-facing changes.
 - Audio analysis queue no longer hangs when a file is rejected before analysis begins (e.g. due to a path permission error)
 - Invalid or out-of-scope file paths now surface a clear error in the analysis results instead of silently failing

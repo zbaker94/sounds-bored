@@ -56,6 +56,27 @@ describe("buildPlayOrder", () => {
     expect(order.map((s) => s.id).sort()).toEqual(sounds.map((s) => s.id).sort());
   });
 
+  it("shuffled: produces at least 2 distinct orderings across 100 trials", () => {
+    const manySounds = Array.from({ length: 5 }, (_, i) =>
+      createMockSound({ filePath: `s${i + 1}.wav` })
+    );
+    const orders = Array.from({ length: 100 }, () =>
+      buildPlayOrder("shuffled", manySounds)
+        .map((s) => s.id)
+        .join(",")
+    );
+    expect(new Set(orders).size).toBeGreaterThan(1);
+  });
+
+  it("shuffled: returns empty array for empty input", () => {
+    expect(buildPlayOrder("shuffled", [])).toEqual([]);
+  });
+
+  it("shuffled: returns single-element array unchanged", () => {
+    const single = createMockSound({ filePath: "only.wav" });
+    expect(buildPlayOrder("shuffled", [single])).toEqual([single]);
+  });
+
   it("does not mutate the input array", () => {
     const ids = sounds.map((s) => s.id);
     buildPlayOrder("shuffled", sounds);
