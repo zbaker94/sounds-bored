@@ -7,9 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { Project, ProjectHistoryEntry } from "@/lib/schemas";
 import logo from "@/assets/sleeping knight-emblem.gif";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { exists, remove } from "@tauri-apps/plugin-fs";
-import { restorePathScope } from "@/lib/scope";
+import { restorePathScope, openPathInExplorer } from "@/lib/scope";
+import { logError } from "@/lib/logger";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FolderOpenIcon, Settings01Icon, Delete02Icon, FolderRemoveIcon } from "@hugeicons/core-free-icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -66,8 +66,9 @@ export function StartScreen() {
         toast.error("Project folder no longer exists at this location.");
         return;
       }
-      await openPath(entry.path);
-    } catch {
+      await openPathInExplorer(entry.path);
+    } catch (err) {
+      logError("[StartScreen] openProjectInExplorer", err instanceof Error ? err : new Error(String(err)));
       toast.error("Could not open project folder.");
     }
   };

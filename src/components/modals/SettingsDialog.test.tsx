@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@/lib/scope", () => ({
   pickFolder: vi.fn(),
+  openPathInExplorer: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/contexts/ProjectActionsContext", () => ({
@@ -35,7 +36,6 @@ vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
   return { ...actual, useNavigate: vi.fn(() => vi.fn()) };
 });
-vi.mock("@tauri-apps/plugin-opener", () => ({ openPath: vi.fn(() => Promise.resolve()) }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ exists: vi.fn(() => Promise.resolve(true)) }));
 
 vi.mock("sonner", () => ({
@@ -50,11 +50,9 @@ vi.mock("@/lib/appSettings.queries", () => ({
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: vi.fn().mockResolvedValue("1.2.3") }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn().mockResolvedValue(undefined) }));
 
-import { pickFolder } from "@/lib/scope";
+import { pickFolder, openPathInExplorer } from "@/lib/scope";
 const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
-
-import { openPath } from "@tauri-apps/plugin-opener";
-const mockOpenPath = openPath as ReturnType<typeof vi.fn>;
+const mockOpenPathInExplorer = openPathInExplorer as unknown as ReturnType<typeof vi.fn>;
 
 import { toast } from "sonner";
 const mockToastError = toast.error as ReturnType<typeof vi.fn>;
@@ -98,8 +96,8 @@ beforeEach(() => {
   });
   mockSaveSettings.mockClear();
   mockPickFolder.mockReset();
-  mockOpenPath.mockReset();
-  mockOpenPath.mockResolvedValue(undefined);
+  mockOpenPathInExplorer.mockReset();
+  mockOpenPathInExplorer.mockResolvedValue(undefined);
   mockToastError.mockClear();
   mockGetVersion.mockClear();
   mockRelaunch.mockClear();
@@ -456,11 +454,10 @@ describe("SettingsDialog — Open In Explorer error path", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows toast with error description when openPath throws", async () => {
+  it("shows toast with error description when openPathInExplorer throws", async () => {
     const user = userEvent.setup();
     setupFolderState();
-    mockOpenPath.mockRejectedValueOnce(new Error("permission denied"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockOpenPathInExplorer.mockRejectedValueOnce(new Error("permission denied"));
     renderDialog();
     openDialog();
     await user.click(screen.getByRole("button", { name: /open other in file explorer/i }));

@@ -27,9 +27,9 @@ import { TruncatedPath } from "@/components/ui/truncated-path";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, FolderAddIcon, FolderOpenIcon, Loading03Icon, CheckmarkCircle01Icon, Alert01Icon, RefreshIcon, Download04Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
-import { pickFolder } from "@/lib/scope";
+import { pickFolder, openPathInExplorer } from "@/lib/scope";
 import { basename } from "@/lib/utils";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { logError } from "@/lib/logger";
 import { exists } from "@tauri-apps/plugin-fs";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
@@ -108,9 +108,9 @@ function FoldersTab() {
         toast.error("Folder no longer exists at this location.");
         return;
       }
-      await openPath(folder.path);
+      await openPathInExplorer(folder.path);
     } catch (err) {
-      console.error("[SettingsDialog] openInExplorer:", err);
+      logError("[SettingsDialog] openInExplorer", err instanceof Error ? err : new Error(String(err)));
       toast.error("Could not open folder in file explorer.", {
         description: err instanceof Error ? err.message : undefined,
       });

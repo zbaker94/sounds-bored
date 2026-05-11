@@ -315,8 +315,8 @@ const result = await saveProjectAs(projectName, currentPath, project);
 ```
 
 ```typescript
-import { openPath } from "@tauri-apps/plugin-opener";
-await openPath(folderPath); // requires opener:allow-open-path capability
+import { openPathInExplorer } from "@/lib/scope";
+await openPathInExplorer(folderPath); // routes through Rust open_path_in_explorer command
 ```
 
 ---

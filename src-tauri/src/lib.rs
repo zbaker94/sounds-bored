@@ -23,6 +23,7 @@ pub fn run() {
             commands::pick_file_and_grant,
             commands::pick_files_and_grant,
             commands::restore_path_scope,
+            commands::open_path_in_explorer,
             commands::extract_cover_art,
             commands::start_audio_analysis,
         ]);

@@ -61,6 +61,18 @@ export async function pickFiles(options?: FilePickerOptions): Promise<string[]> 
 }
 
 /**
+ * Opens a path in the OS file explorer. Routes through a Rust command so
+ * user-chosen project paths outside the static opener capability allowlist
+ * work correctly. Validates via validate_grant_path + fs-scope server-side.
+ *
+ * Throws on validation failure or OS opener error — callers must catch.
+ * The path must be in scope (via restorePathScope or a picker) before calling.
+ */
+export async function openPathInExplorer(path: string): Promise<void> {
+  await invoke("open_path_in_explorer", { path });
+}
+
+/**
  * Restores runtime fs-scope access for a path previously selected by the user
  * and persisted to disk (e.g. a project folder from history or a global
  * library folder from app settings). Tauri's allow_directory grants are
