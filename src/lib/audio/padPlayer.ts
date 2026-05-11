@@ -8,7 +8,7 @@ import type { Pad, Scene } from "@/lib/schemas";
 import { snapshotSounds } from "./resolveSounds";
 import { isFadeablePad } from "@/lib/padUtils";
 import { emitAudioError } from "./audioEvents";
-import { startAudioTick, stopAudioTick } from "./audioTick";
+import { startAudioTick } from "./audioTick";
 
 import {
   addStopCleanupTimeout,
@@ -20,7 +20,6 @@ import {
 } from "./audioState";
 import {
   cancelFade,
-  clearAllFades,
   getFadeFromVolume,
   isFading,
   isFadingIn,
@@ -32,7 +31,6 @@ import {
   getLayerIdsForPads,
   getLayerVoices,
   isPadActive,
-  nullAllOnEnded,
   stopSpecificVoices,
 } from "./voiceRegistry";
 import {
@@ -44,22 +42,18 @@ import {
   clearPadGainsForIds,
 } from "./gainRegistry";
 import {
-  clearAllLayerChains,
-  clearAllLayerCycleIndexes,
-  clearAllLayerPending,
-  clearAllLayerPlayOrders,
   clearLayerPending,
   deleteLayerChain,
   isLayerPending,
   setLayerPending,
 } from "./chainCycleState";
 import { dispose as disposeStreaming } from "./streamingAudioLifecycle";
+import { stopPad as _stopPad, stopAllPads as _stopAllPads } from "./stopHandler";
 
 import {
   resolveFadeDuration,
   fadePad,
   fadePadIn,
-  stopPadInternal,
 } from "./fadeMixer";
 
 import { rampGainTo } from "./gainManager";
@@ -189,12 +183,11 @@ export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDuratio
   crossfadePads(fadingOut, fadingIn, globalFadeDurationMs);
 }
 
-/** Stop a single pad, clearing its layer chain queues, cycle cursors, and play orders first so onended doesn't advance the chain. */
+/** Stop a single pad: cancel any in-progress fade, delegate engine teardown (chain queues / onended / voices) to stopHandler, then remove the pad from UI stores in lockstep. */
 export function stopPad(pad: Pad): void {
   cancelFade(pad.id);
-  stopPadInternal(pad);
-  // stopPadInternal removes the pad from the playing-pads set; clear its
-  // metadata overlay in lockstep so a stopped pad never displays stale info.
+  _stopPad(pad);
+  usePlaybackStore.getState().removePlayingPad(pad.id);
   usePadDisplayStore.getState().clearPadDisplay(pad.id);
 }
 
@@ -208,19 +201,12 @@ export function stopScene(scene: Scene): void {
 /**
  * Stop all active pads with a short gain ramp to avoid clicks.
  *
- * Clears chain queues and fade tracking first, nulls onended callbacks to
- * prevent loop restarts during the ramp window, then ramps all pad gains to
- * zero before stopping voices.
+ * Delegates the pre-ramp engine teardown (chain queues, fade tracking,
+ * onended callbacks, audio tick) to stopHandler.stopAllPads, then ramps
+ * all active pad gains to zero and schedules voice cleanup after the ramp.
  */
 export function stopAllPads(): void {
-  clearAllFades();
-  clearAllLayerChains();
-  clearAllLayerCycleIndexes();
-  clearAllLayerPlayOrders();
-  clearAllLayerPending();
-  // Null all onended callbacks — prevents loop restarts during ramp window
-  nullAllOnEnded();
-  stopAudioTick(); // immediately clear bars before the STOP_RAMP_S window
+  _stopAllPads();
 
   // Snapshot active pads and voices before the ramp starts so the cleanup
   // timeout can scope its work — pads triggered during the ramp window are

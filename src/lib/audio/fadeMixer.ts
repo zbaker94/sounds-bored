@@ -8,12 +8,8 @@ import {
   isFadingIn,
 } from "./fadeCoordinator";
 import { getPadGain } from "./gainRegistry";
-import { nullPadOnEnded, stopPadVoices } from "./voiceRegistry";
-import {
-  deleteLayerChain,
-  deleteLayerCycleIndex,
-  deleteLayerPlayOrder,
-} from "./chainCycleState";
+import { nullPadOnEnded } from "./voiceRegistry";
+import { stopPad } from "./stopHandler";
 import { rampGainTo, resetPadGain } from "./gainManager";
 import { usePlaybackStore } from "@/state/playbackStore";
 import type { Pad } from "@/lib/schemas";
@@ -44,12 +40,7 @@ export function resolveFadeDuration(pad: Pad, globalFadeDurationMs?: number): nu
 }
 
 export function stopPadInternal(pad: Pad): void {
-  for (const layer of pad.layers) {
-    deleteLayerChain(layer.id);
-    deleteLayerCycleIndex(layer.id);
-    deleteLayerPlayOrder(layer.id);
-  }
-  stopPadVoices(pad.id);
+  stopPad(pad);
   usePlaybackStore.getState().removePlayingPad(pad.id);
 }
 
