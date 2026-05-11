@@ -12,7 +12,18 @@ import { nullPadOnEnded } from "./voiceRegistry";
 import { stopPad } from "./stopHandler";
 import { rampGainTo, resetPadGain } from "./gainManager";
 import * as coordinator from './playbackStateCoordinator';
+import { useProjectStore } from "@/state/projectStore";
+import { buildPadMap } from "@/lib/padDefaults";
 import type { Pad } from "@/lib/schemas";
+
+// Pre-#423 stopgap: look up the live pad at timeout fire time so that layers
+// added or removed via the pad config drawer during a long fade are reflected
+// in the cleanup pass. Falls back to the captured reference if the pad was
+// deleted mid-fade.
+// TODO(#423): FadeCoordinator will own the timeout body — this lookup becomes natural.
+function resolveLivePad(pad: Pad): Pad {
+  return buildPadMap(useProjectStore.getState().project?.scenes ?? []).get(pad.id) ?? pad;
+}
 
 /**
  * Freeze a pad's gain at its current value — cancels any in-progress ramp
@@ -74,7 +85,7 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
     durationMs,
     fadingDown && toVolume === 0
       ? () => {
-          stopPadInternal(pad);
+          stopPadInternal(resolveLivePad(pad));
           resetPadGain(pad.id);
         }
       : undefined,
@@ -104,6 +115,8 @@ export async function fadePadIn(
     0,
     false,
     durationMs,
-    toVolume === 0 ? () => stopPadInternal(pad) : undefined,
+    toVolume === 0
+      ? () => { stopPadInternal(resolveLivePad(pad)); }
+      : undefined,
   );
 }
