@@ -155,15 +155,19 @@ describe("preview — streaming path (large files)", () => {
       mockAudioInstances.push(this);
     }));
 
-    const { playPreview } = await import("./preview");
+    const { playPreview, _getCurrentPreviewGain, _getCurrentPreviewLimiter } = await import("./preview");
     const sound = createMockSound({ filePath: "ambient.wav" });
 
+    mockGainNode.disconnect.mockClear();
     vi.mocked(mockLimiterNode.disconnect).mockReset();
     await expect(playPreview(sound)).rejects.toThrow("NotAllowedError");
 
     expect(mockSourceNode.disconnect).toHaveBeenCalledOnce();
+    expect(mockGainNode.disconnect).toHaveBeenCalledOnce();
     expect(mockLimiterNode.disconnect).toHaveBeenCalledOnce();
     expect(mockSetIsPreviewPlaying).toHaveBeenCalledWith(false);
+    expect(_getCurrentPreviewGain()).toBeNull();
+    expect(_getCurrentPreviewLimiter()).toBeNull();
   });
 
   it("does not disconnect sourceNode on successful play", async () => {
