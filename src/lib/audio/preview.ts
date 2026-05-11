@@ -96,6 +96,7 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
         try { sourceNode.disconnect(); previewGain.disconnect(); previewLimiter.disconnect(); } catch { /* already disconnected */ }
         if (currentStreamingAudio === audio) {
           currentStreamingAudio = null;
+          currentPreviewGain = null;
           currentPreviewLimiter = null;
         }
         throw err;
@@ -161,3 +162,8 @@ export async function playPreview(sound: Sound, onEnded?: () => void): Promise<v
     throw err;
   }
 }
+
+/** Exposed for test introspection only — do not use in production code. */
+export const _getCurrentPreviewGain = (): GainNode | null => currentPreviewGain;
+/** Exposed for test introspection only — do not use in production code. */
+export const _getCurrentPreviewLimiter = (): DynamicsCompressorNode | null => currentPreviewLimiter;
