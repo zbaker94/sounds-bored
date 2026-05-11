@@ -1,8 +1,7 @@
 import { ensureResumed, getAudioContext } from "./audioContext";
 import { STOP_RAMP_S } from "./audioVoice";
 import { useLibraryStore } from "@/state/libraryStore";
-import { usePlaybackStore } from "@/state/playbackStore";
-import { usePadDisplayStore } from "@/state/padDisplayStore";
+import * as coordinator from './playbackStateCoordinator';
 import { usePadMetricsStore } from "@/state/padMetricsStore";
 import type { Pad, Scene } from "@/lib/schemas";
 import { snapshotSounds } from "./resolveSounds";
@@ -85,7 +84,7 @@ export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
   const currentVol = getLivePadVolume(pad.id) ?? reverseTarget;
 
   fadePad(pad, currentVol, reverseTarget, duration);
-  usePlaybackStore.getState().addReversingPad(pad.id);
+  coordinator.padReversing(pad.id);
 }
 
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
@@ -187,8 +186,8 @@ export function executeCrossfadeSelection(selectedPads: Pad[], globalFadeDuratio
 export function stopPad(pad: Pad): void {
   cancelFade(pad.id);
   _stopPad(pad);
-  usePlaybackStore.getState().removePlayingPad(pad.id);
-  usePadDisplayStore.getState().clearPadDisplay(pad.id);
+  coordinator.padStopped(pad.id);
+  coordinator.clearPadMetadata(pad.id);
 }
 
 /** Stop all pads in a scene, clearing their chain queues before stopping voices. */
@@ -244,11 +243,11 @@ export function stopAllPads(): void {
     clearPadGainsForIds(stoppedPadIds);
     const fullyStopped = stopSpecificVoices(stoppedVoices, stoppedPadIds);
     for (const padId of fullyStopped) {
-      usePlaybackStore.getState().removePlayingPad(padId);
+      coordinator.padStopped(padId);
       // Clear the metadata overlay in lockstep with the playing-pads removal so
       // a stopped pad never displays stale info (scoped to fullyStopped so pads
       // triggered during the ramp window are not affected).
-      usePadDisplayStore.getState().clearPadDisplay(padId);
+      coordinator.clearPadMetadata(padId);
     }
   }, STOP_RAMP_S * 1000 + 5);
   setGlobalStopTimeout(stopTimeoutId);
@@ -370,9 +369,9 @@ export async function triggerLayer(pad: Pad, layer: import("@/lib/schemas").Laye
         const timeoutId = setTimeout(() => {
           deleteStopCleanupTimeout(timeoutId);
           if (!isPadActive(pad.id)) {
-            usePlaybackStore.getState().removePlayingPad(pad.id);
+            coordinator.padStopped(pad.id);
             cancelFade(pad.id);
-            // Safety net: rampStopLayerVoices already handles removePlayingPad at STOP_RAMP_S+5ms;
+            // Safety net: rampStopLayerVoices already handles padStopped at STOP_RAMP_S+5ms;
             // this fires at +10ms and is idempotent if the ramp already cleaned up.
           }
         }, STOP_RAMP_S * 1000 + 10);
