@@ -1215,6 +1215,121 @@ describe("retrigger next", () => {
 
     expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.6, expect.any(Number));
   });
+
+});
+
+describe('triggerPad — click-free ramp on active retrigger', () => {
+  it('ramps pad gain to live value when retriggering an active pad', async () => {
+    const { triggerPad } = await import('./padPlayer');
+    const sound = createMockSound({ filePath: 'a.wav' });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      retriggerMode: 'restart',
+      arrangement: 'simultaneous',
+      selection: { type: 'assigned', instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    gains[0].gain.value = 0.4;
+    gains[0].gain.linearRampToValueAtTime.mockClear();
+
+    await triggerPad(pad);
+    await tick();
+
+    // rampGainTo called — linearRampToValueAtTime must be scheduled to preserved live gain
+    expect(gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.4, expect.any(Number));
+  });
+
+  it('ramps to explicit startVolume when caller passes 0 on an active pad', async () => {
+    const { triggerPad } = await import('./padPlayer');
+    const sound = createMockSound({ filePath: 'a.wav' });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      retriggerMode: 'restart',
+      arrangement: 'simultaneous',
+      selection: { type: 'assigned', instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    gains[0].gain.value = 0.7;
+    gains[0].gain.linearRampToValueAtTime.mockClear();
+
+    await triggerPad(pad, 0);
+    await tick();
+
+    expect(gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+  });
+
+  it('does not ramp on fresh trigger — uses instant setValueAtTime', async () => {
+    const { triggerPad } = await import('./padPlayer');
+    const sound = createMockSound({ filePath: 'a.wav' });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: 'simultaneous',
+      selection: { type: 'assigned', instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad);
+    await tick();
+
+    expect(gains[0].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  });
+
+  it('does not ramp on fresh trigger with explicit startVolume 0', async () => {
+    const { triggerPad } = await import('./padPlayer');
+    const sound = createMockSound({ filePath: 'a.wav' });
+    setSounds([sound]);
+
+    const layer = createMockLayer({
+      arrangement: 'simultaneous',
+      selection: { type: 'assigned', instances: [{ id: sound.id, soundId: sound.id, volume: 1 }] },
+    });
+    const pad = createMockPad({ layers: [layer] });
+
+    const gains: ReturnType<typeof makeMockGain>[] = [];
+    mockCtx.createGain.mockImplementation(() => {
+      const g = makeMockGain();
+      gains.push(g);
+      return g;
+    });
+
+    await triggerPad(pad, 0);
+    await tick();
+
+    expect(gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0, expect.any(Number));
+    expect(gains[0].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  });
 });
 
 describe("stopAllPads â€” ramped", () => {
