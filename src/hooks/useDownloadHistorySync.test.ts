@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useDownloadHistorySync } from "./useDownloadHistorySync";
 import { useDownloadStore } from "@/state/downloadStore";
 import { saveDownloadHistory } from "@/lib/downloads";
+import * as logger from "@/lib/logger";
 import type { DownloadJob } from "@/lib/schemas";
 
 vi.mock("@/lib/downloads", () => ({
@@ -10,11 +11,17 @@ vi.mock("@/lib/downloads", () => ({
   loadDownloadHistory: vi.fn().mockResolvedValue([]),
 }));
 
-const saveMock = vi.mocked(saveDownloadHistory);
+vi.mock("@/lib/logger", () => ({
+  logError: vi.fn(),
+  logInfo: vi.fn(),
+  logWarn: vi.fn(),
+}));
 
-// Flush the promise queue used by the hook to serialize saves.
-// setTimeout(0) drains ALL pending microtasks before resolving, which is required
-// because the hook chains saves through a promise queue.
+const saveMock = vi.mocked(saveDownloadHistory);
+const logErrorMock = vi.mocked(logger.logError);
+
+// Yields one macrotask, draining microtasks queued before that point —
+// sufficient to flush the short save-chain produced by a single act() block.
 const flushSaveQueue = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 function makeJob(overrides: Partial<DownloadJob> = {}): DownloadJob {
@@ -34,6 +41,7 @@ describe("useDownloadHistorySync", () => {
   beforeEach(() => {
     useDownloadStore.setState({ jobs: {} });
     vi.clearAllMocks();
+    saveMock.mockResolvedValue(undefined);
   });
 
   it("does NOT save on progress-only (non-terminal) updates", async () => {
@@ -175,6 +183,49 @@ describe("useDownloadHistorySync", () => {
     await flushSaveQueue();
 
     expect(saveMock.mock.calls.length).toBe(callsAfterMount);
+  });
+
+  it("saves truncated terminal list when a terminal job is removed", async () => {
+    renderHook(() => useDownloadHistorySync());
+
+    act(() => {
+      useDownloadStore.getState().addJob(makeJob({ id: "job-1" }));
+      useDownloadStore.getState().addJob(makeJob({ id: "job-2" }));
+      useDownloadStore.getState().updateJob("job-1", { status: "completed", percent: 100, outputPath: "C:/sounds/file.mp3" });
+      useDownloadStore.getState().updateJob("job-2", { status: "failed", error: "Timeout" });
+    });
+    await flushSaveQueue();
+
+    act(() => {
+      useDownloadStore.getState().removeJob("job-1");
+    });
+    await flushSaveQueue();
+
+    const lastCall = saveMock.mock.calls[saveMock.mock.calls.length - 1][0] as DownloadJob[];
+    expect(lastCall.some((j) => j.id === "job-1")).toBe(false);
+    expect(lastCall.some((j) => j.id === "job-2")).toBe(true);
+  });
+
+  it("logs error and continues queue when a save fails", async () => {
+    saveMock.mockRejectedValueOnce(new Error("disk full"));
+
+    renderHook(() => useDownloadHistorySync());
+
+    act(() => {
+      useDownloadStore.getState().addJob(makeJob({ id: "job-1" }));
+      useDownloadStore.getState().updateJob("job-1", { status: "failed", error: "Network error" });
+    });
+    await flushSaveQueue();
+
+    expect(logErrorMock).toHaveBeenCalledWith("Failed to save download history", expect.any(Error));
+
+    act(() => {
+      useDownloadStore.getState().addJob(makeJob({ id: "job-2" }));
+      useDownloadStore.getState().updateJob("job-2", { status: "cancelled" });
+    });
+    await flushSaveQueue();
+
+    expect(saveMock).toHaveBeenCalledTimes(2);
   });
 
   it("unsubscribes on unmount — no save after unmount", async () => {

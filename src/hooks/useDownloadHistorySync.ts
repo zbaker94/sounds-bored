@@ -4,12 +4,15 @@ import { saveDownloadHistory } from "@/lib/downloads";
 import { logError } from "@/lib/logger";
 import type { DownloadJob } from "@/lib/schemas";
 
-/** Call once at the app root — multiple instances write duplicate disk saves per terminal transition. */
+/** Call once within the project shell (MainPageInner) — multiple instances write duplicate saves per terminal transition. */
 export function useDownloadHistorySync(): void {
   const lastKeyRef = useRef("");
   const pendingSaveRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
+    const buildKey = (jobs: DownloadJob[]) =>
+      jobs.map((j) => `${j.id}::${j.status}`).sort().join("|");
+
     const enqueue = (jobs: DownloadJob[]) => {
       pendingSaveRef.current = pendingSaveRef.current
         .then(() => saveDownloadHistory(jobs))
@@ -24,14 +27,13 @@ export function useDownloadHistorySync(): void {
       TERMINAL_STATUSES.has(j.status),
     );
     if (initial.length > 0) {
-      const key = initial.map((j) => `${j.id}::${j.status}`).sort().join("|");
-      lastKeyRef.current = key;
+      lastKeyRef.current = buildKey(initial);
       enqueue(initial);
     }
 
     const unsub = useDownloadStore.subscribe((state) => {
       const terminal = Object.values(state.jobs).filter((j) => TERMINAL_STATUSES.has(j.status));
-      const key = terminal.map((j) => `${j.id}::${j.status}`).sort().join("|");
+      const key = buildKey(terminal);
       if (key === lastKeyRef.current) return;
       lastKeyRef.current = key;
       enqueue(terminal);

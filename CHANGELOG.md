@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Download history now correctly updates when a completed or failed download is removed from the queue
+- Save errors no longer block future history saves — failures are logged and the queue continues
 - Download history is now saved reliably when downloads complete, fail, or are cancelled — including downloads that were interrupted before the app fully loaded
 - Download history saving no longer triggers redundant disk writes on progress-only updates
 - Opening project folders in the file explorer now works correctly for projects saved outside the default locations
