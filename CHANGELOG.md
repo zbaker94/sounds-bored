@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad buttons no longer re-render when an unrelated pad on the same scene is modified, reducing unnecessary UI updates.
+- Deleting a pad now cleans up gracefully — the button renders nothing during the brief transition instead of crashing.
 - Pad layer playback progress bar extracted into its own optimized component, reducing unnecessary re-renders during audio playback
 - Fixed unnecessary re-renders in the download manager, improving UI performance during active downloads
 - Download history now correctly updates when a completed or failed download is removed from the queue
