@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed unnecessary re-renders in the download manager, improving UI performance during active downloads
 - Download history now correctly updates when a completed or failed download is removed from the queue
 - Save errors no longer block future history saves — failures are logged and the queue continues
 - Download history is now saved reliably when downloads complete, fail, or are cancelled — including downloads that were interrupted before the app fully loaded

@@ -34,6 +34,12 @@ function renderItem(job: DownloadJob) {
 }
 
 describe("DownloadItem", () => {
+  it("is wrapped with React.memo", () => {
+    expect((DownloadItem as unknown as { $$typeof: symbol }).$$typeof).toBe(
+      Symbol.for("react.memo"),
+    );
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useCancelDownload).mockReturnValue({ mutate: mockCancelMutate, isPending: false } as never);

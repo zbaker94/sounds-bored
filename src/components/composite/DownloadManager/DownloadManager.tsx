@@ -1,16 +1,18 @@
-import { useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useDownloadStore, selectActiveJobs, ACTIVE_STATUSES } from "@/state/downloadStore";
+import { useShallow } from "zustand/react/shallow";
+import { useDownloadStore, ACTIVE_STATUSES } from "@/state/downloadStore";
 import { DownloadItem } from "./DownloadItem";
 
 export function DownloadManager() {
-  const jobs = useDownloadStore((s) => s.jobs);
-
-  const sortedJobs = useMemo(() => {
-    const active = selectActiveJobs({ jobs });
-    const inactive = Object.values(jobs).filter((j) => !ACTIVE_STATUSES.has(j.status));
-    return [...active, ...inactive];
-  }, [jobs]);
+  const sortedJobs = useDownloadStore(
+    useShallow((s) => {
+      const all = Object.values(s.jobs);
+      return [
+        ...all.filter((j) => ACTIVE_STATUSES.has(j.status)),
+        ...all.filter((j) => !ACTIVE_STATUSES.has(j.status)),
+      ];
+    })
+  );
 
   return (
     <motion.div
