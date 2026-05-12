@@ -240,7 +240,7 @@ export function SceneView() {
                 }}
               >
                 <PadButton
-                  pad={pad}
+                  padId={pad.id}
                   sceneId={activeScene.id}
                   index={i}
                 />

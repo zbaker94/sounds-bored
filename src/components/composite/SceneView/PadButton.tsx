@@ -2,6 +2,7 @@ import React, { memo, useCallback, useMemo, useRef, useEffect, useState } from "
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
+import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
@@ -24,7 +25,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 interface PadButtonProps {
-  pad: Pad;
+  padId: string;
   sceneId: string;
   index?: number;
 }
@@ -149,8 +150,8 @@ function PadFrontFace({
   const currentVoice = usePadDisplayStore((s) => s.currentVoice[pad.id] ?? null);
   const hasCoverArt = !!currentVoice?.coverArtDataUrl;
   // Memoized so Immer reference churn on pad.layers (any project mutation) doesn't
-  // create a new array reference when layer IDs are unchanged — arePropsEqual can then
-  // short-circuit via reference equality instead of element-wise walk.
+  // create a new array reference when layer IDs are unchanged — PadButtonProgress.memo
+  // can then short-circuit via reference equality instead of element-wise walk.
   const layerIds = useMemo(() => pad.layers.map((l) => l.id), [pad.layers]);
 
   return (
@@ -249,7 +250,13 @@ function PadFrontFace({
   );
 }
 
-export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: PadButtonProps) {
+interface PadButtonContentProps {
+  pad: Pad;
+  sceneId: string;
+  index: number;
+}
+
+const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }: PadButtonContentProps) {
   // isPlaying drives styling (border, background, drop-shadow, pulse ring).
   // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
@@ -485,4 +492,26 @@ export const PadButton = memo(function PadButton({ pad, sceneId, index = 0 }: Pa
       </motion.div>
     </div>
   );
+});
+
+/**
+ * Selects the pad from the project store by ID and renders PadButtonContent.
+ * `padId` and `sceneId` are stable string props; `index` is a number that changes
+ * only on reorder (intentionally re-renders for stagger animation). React.memo on
+ * these primitives prevents cascade re-renders from SceneView's displayPads.map.
+ *
+ * The selector walks scenes/pads on every store update (including isDirty, folderPath,
+ * etc.), but Immer structural sharing means it returns the same pad reference for
+ * unchanged pads, and Zustand's === check then skips the re-render.
+ *
+ * Returning null when pad is not found (deleted or not yet committed) fully unmounts
+ * PadButtonContent, resetting all local state (tilt spring, volume display timer).
+ * SceneView removes the PadButton from the DOM in its next render cycle.
+ */
+export const PadButton = memo(function PadButton({ padId, sceneId, index = 0 }: PadButtonProps) {
+  const pad = useProjectStore(
+    (s) => s.project?.scenes.find((sc) => sc.id === sceneId)?.pads.find((p) => p.id === padId) ?? null,
+  );
+  if (!pad) return null;
+  return <PadButtonContent pad={pad} sceneId={sceneId} index={index} />;
 });

@@ -1,6 +1,12 @@
 # Changelog
 
 ## Current Changes
+- Improved internal test reliability for pad button rendering: store resets are now consistent across all test suites, reducing false negatives
+- Added explicit assertion that mutating one pad does not change the object reference of another pad, verifying the performance guarantee holds
+- Strengthened re-render count check from "at least one" to "exactly one" when a pad's color changes, confirming the memoization cache-reuse path is exercised
+- Updated code comments to more precisely describe when and why PadButton skips re-renders after unrelated store updates
+- Pad buttons no longer re-render when an unrelated pad on the same scene is modified, reducing unnecessary UI updates.
+- Deleting a pad now cleans up gracefully — the button renders nothing during the brief transition instead of crashing.
 - Pad layer playback progress bar extracted into its own optimized component, reducing unnecessary re-renders during audio playback
 - Fixed unnecessary re-renders in the download manager, improving UI performance during active downloads
 - Download history now correctly updates when a completed or failed download is removed from the queue
