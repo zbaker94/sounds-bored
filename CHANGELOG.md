@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where volume drag on pads could behave incorrectly after internal audio functions changed between interactions.
 - Fixed a bug where releasing a held pad after dragging its volume could leave the audio gain stuck at the dragged level instead of resetting correctly.
 - Pad volume drag gestures now coalesce rapid pointer movements into one update per animation frame, reducing unnecessary audio processing during fast drags.
 - Fixed a bug where switching edit modes could incorrectly cancel an active multi-fade operation

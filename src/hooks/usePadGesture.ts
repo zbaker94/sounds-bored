@@ -263,7 +263,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     }
 
     return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onContextMenu };
-  }, [pad.id, hasHoldLayer, now]);
+  }, [pad.id, hasHoldLayer, now, scheduleDragVolume, resetDragVolume, scheduleAudioVolume, cancelAudioVolume]);
 
   return { gestureHandlers, isDragging, dragVolume, isPressed };
 }
