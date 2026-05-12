@@ -65,6 +65,15 @@ vi.mock("@/lib/audio/audioState", () => ({
   onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}),
 }));
 
+function resetAllStores() {
+  useUiStore.setState({ ...initialUiState });
+  useProjectStore.setState({ ...initialProjectState });
+  usePlaybackStore.setState({ ...initialPlaybackState });
+  useMultiFadeStore.setState({ ...initialMultiFadeState });
+  usePadMetricsStore.setState({ ...initialPadMetricsState });
+  useLibraryStore.setState({ ...initialLibraryState });
+}
+
 function loadPadInStore(padOverrides = {}) {
   const layer = createMockLayer({ id: "layer-1" });
   const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer], ...padOverrides });
@@ -459,14 +468,7 @@ describe("onMultiFade callback (handleMultiFade)", () => {
 });
 
 describe("PadButton — React.memo", () => {
-  beforeEach(() => {
-    useUiStore.setState({ ...initialUiState });
-    useProjectStore.setState({ ...initialProjectState });
-    usePlaybackStore.setState({ ...initialPlaybackState });
-    useMultiFadeStore.setState({ ...initialMultiFadeState });
-    usePadMetricsStore.setState({ ...initialPadMetricsState });
-    useLibraryStore.setState({ ...initialLibraryState });
-  });
+  beforeEach(resetAllStores);
 
   it("does not re-render PadButtonProgress when padId and sceneId props are unchanged", () => {
     const MockProgress = vi.mocked(PadButtonProgress);
@@ -513,25 +515,24 @@ describe("PadButton — React.memo", () => {
     render(<PadButton padId="pad-1" sceneId="scene-1" />);
     const callsAfterMount = MockProgress.mock.calls.length;
 
+    const pad1Before = useProjectStore.getState().project?.scenes[0]?.pads[0];
+
     // Mutate pad-2 — Immer structural sharing preserves pad-1's reference,
     // so the selector inside PadButton returns the same pad-1 object and no re-render occurs.
     act(() => {
       useProjectStore.getState().setPadName("scene-1", "pad-2", "Hi-Hat");
     });
 
+    // Confirm structural sharing held: pad-1's object reference must be unchanged.
+    const pad1After = useProjectStore.getState().project?.scenes[0]?.pads[0];
+    expect(pad1After).toBe(pad1Before);
+
     expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
   });
 });
 
 describe("PadButton — null pad handling", () => {
-  beforeEach(() => {
-    useUiStore.setState({ ...initialUiState });
-    useProjectStore.setState({ ...initialProjectState });
-    usePlaybackStore.setState({ ...initialPlaybackState });
-    useMultiFadeStore.setState({ ...initialMultiFadeState });
-    usePadMetricsStore.setState({ ...initialPadMetricsState });
-    useLibraryStore.setState({ ...initialLibraryState });
-  });
+  beforeEach(resetAllStores);
 
   it("renders nothing when padId is not found in the store", () => {
     loadPadInStore();
@@ -553,14 +554,7 @@ describe("PadButton — null pad handling", () => {
 });
 
 describe("PadFrontFace — layerIds useMemo", () => {
-  beforeEach(() => {
-    useUiStore.setState({ ...initialUiState });
-    useProjectStore.setState({ ...initialProjectState });
-    usePlaybackStore.setState({ ...initialPlaybackState });
-    useMultiFadeStore.setState({ ...initialMultiFadeState });
-    usePadMetricsStore.setState({ ...initialPadMetricsState });
-    useLibraryStore.setState({ ...initialLibraryState });
-  });
+  beforeEach(resetAllStores);
 
   it("reuses the same layerIds reference when pad re-renders with non-layer change", () => {
     const MockProgress = vi.mocked(PadButtonProgress);
@@ -585,8 +579,9 @@ describe("PadFrontFace — layerIds useMemo", () => {
       useProjectStore.getState().setPadColor("scene-1", "pad-1", "#ff0000");
     });
 
-    // Verify a re-render DID occur (pad color changed → new pad reference → PadButtonContent re-renders)
-    expect(MockProgress.mock.calls.length).toBeGreaterThan(callsAfterMount);
+    // Verify exactly one re-render occurred (pad color changed → new pad reference → PadButtonContent re-renders).
+    // Exact count confirms the cache-reuse path was actually exercised, not just that "something rendered".
+    expect(MockProgress.mock.calls.length).toBe(callsAfterMount + 1);
     const secondCall = MockProgress.mock.calls.at(-1)?.[0];
 
     // useMemo([pad.layers]) returns the cached array when pad.layers reference is unchanged.
@@ -612,12 +607,9 @@ describe("PadFrontFace — layerIds useMemo", () => {
 
     // Add a layer via the store — pad.layers gets a new array reference.
     const newLayer = createMockLayer({ id: "layer-2" });
+    const { id: _padId, ...padConfig } = pad;
     act(() => {
-      useProjectStore.getState().updatePad("scene-1", "pad-1", {
-        name: "Kick",
-        layers: [layer, newLayer],
-        muteTargetPadIds: [],
-      });
+      useProjectStore.getState().updatePad("scene-1", "pad-1", { ...padConfig, layers: [layer, newLayer] });
     });
     const secondLayerIds = MockProgress.mock.calls.at(-1)?.[0]?.layerIds;
 

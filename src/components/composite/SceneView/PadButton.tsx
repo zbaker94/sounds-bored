@@ -496,15 +496,22 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
 
 /**
  * Selects the pad from the project store by ID and renders PadButtonContent.
- * Props are stable primitives — React.memo prevents re-renders from SceneView.
- * Each instance subscribes only to its own pad via the Zustand selector, so Immer
- * structural sharing ensures sibling-pad mutations don't trigger re-renders here.
+ * `padId` and `sceneId` are stable string props; `index` is a number that changes
+ * only on reorder (intentionally re-renders for stagger animation). React.memo on
+ * these primitives prevents cascade re-renders from SceneView's displayPads.map.
+ *
+ * The selector walks scenes/pads on every store update (including isDirty, folderPath,
+ * etc.), but Immer structural sharing means it returns the same pad reference for
+ * unchanged pads, and Zustand's === check then skips the re-render.
+ *
+ * Returning null when pad is not found (deleted or not yet committed) fully unmounts
+ * PadButtonContent, resetting all local state (tilt spring, volume display timer).
+ * SceneView removes the PadButton from the DOM in its next render cycle.
  */
 export const PadButton = memo(function PadButton({ padId, sceneId, index = 0 }: PadButtonProps) {
   const pad = useProjectStore(
     (s) => s.project?.scenes.find((sc) => sc.id === sceneId)?.pads.find((p) => p.id === padId) ?? null,
   );
-  // Pad may be transiently null when deleted — renders nothing while SceneView catches up.
   if (!pad) return null;
   return <PadButtonContent pad={pad} sceneId={sceneId} index={index} />;
 });
