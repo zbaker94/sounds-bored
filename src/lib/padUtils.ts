@@ -14,6 +14,18 @@ export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
   return map;
 }
 
+/**
+ * Find a pad by id, returning both the pad and its parent scene in a single
+ * pass. Returns null when no pad with the given id exists across all scenes.
+ */
+export function findPadAndScene(scenes: Scene[], padId: string): { scene: Scene; pad: Pad } | null {
+  for (const scene of scenes) {
+    const pad = scene.pads.find((p) => p.id === padId);
+    if (pad) return { scene, pad };
+  }
+  return null;
+}
+
 export function padToConfig(pad: Pad, layers?: Layer[]): PadConfig {
   return {
     name: pad.name,

@@ -5,7 +5,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { executeFadeTap } from "@/lib/audio";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { buildPadMap } from "@/lib/padUtils";
+import { findPadAndScene } from "@/lib/padUtils";
 import { createDefaultStoreLayer } from "@/lib/layerHelpers";
 import type { PadConfig } from "@/lib/schemas";
 import { PADS_PER_PAGE } from "@/lib/constants";
@@ -16,7 +16,7 @@ function enterMultiFadeFromHoverHotkey(): void {
   if (editMode) return;
   if (!hoveredPadId || editingPadId || fadePopoverPadId) return;
   const scenes = useProjectStore.getState().project?.scenes ?? [];
-  const pad = buildPadMap(scenes).get(hoveredPadId);
+  const pad = findPadAndScene(scenes, hoveredPadId)?.pad;
   useMultiFadeStore.getState().enterMultiFade(hoveredPadId, pad?.volume ?? 100, pad?.fadeTargetVol ?? 0);
 }
 
@@ -31,12 +31,12 @@ function executeHoveredPadFade(
     setFadePopoverPadId(hoveredPadId);
     return;
   }
-  const project = useProjectStore.getState().project;
-  const pad = buildPadMap(project?.scenes ?? []).get(hoveredPadId);
-  if (!pad) return;
+  const scenes = useProjectStore.getState().project?.scenes ?? [];
+  const result = findPadAndScene(scenes, hoveredPadId);
+  if (!result) return;
+  const { scene, pad } = result;
   if (fadePopoverTarget !== null) {
-    const scene = project?.scenes.find((s) => s.pads.some((p) => p.id === hoveredPadId));
-    if (scene) useProjectStore.getState().setPadFadeTarget(scene.id, hoveredPadId, fadePopoverTarget);
+    useProjectStore.getState().setPadFadeTarget(scene.id, hoveredPadId, fadePopoverTarget);
   }
   const effectivePad = fadePopoverTarget !== null ? { ...pad, fadeTargetVol: fadePopoverTarget } : pad;
   executeFadeTap(effectivePad, globalFadeDurationMs);
@@ -122,7 +122,7 @@ export function useGlobalHotkeys() {
 
     // Edit mode with a pad being edited: immediately execute that pad's configured fade.
     if (editMode && editingPadId) {
-      const pad = buildPadMap(useProjectStore.getState().project?.scenes ?? []).get(editingPadId);
+      const pad = findPadAndScene(useProjectStore.getState().project?.scenes ?? [], editingPadId)?.pad;
       if (pad) executeFadeTap(pad, globalFadeDurationMs);
       return;
     }

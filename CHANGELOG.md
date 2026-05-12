@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pressing **F** on a hovered pad now correctly saves the fade target volume before executing the fade
+- Pressing **X** to enter multi-fade mode now works when a pad is open in the edit drawer
 - Internal code reorganization: pad and layer utility functions split into purpose-specific modules (`padUtils`, `layerHelpers`) with no behavior changes
 - Test coverage expanded for pad and layer helper functions
 - Fixed a bug where volume drag on pads could behave incorrectly after internal audio functions changed between interactions.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isFadeablePad, buildPadMap, padToConfig } from "@/lib/padUtils";
+import { isFadeablePad, buildPadMap, padToConfig, findPadAndScene } from "@/lib/padUtils";
 import { createMockPad, createMockLayer, createMockScene } from "@/test/factories";
 
 describe("buildPadMap", () => {
@@ -122,6 +122,49 @@ describe("padToConfig", () => {
     const layer = createMockLayer({ id: "l1" });
     const pad = createMockPad({ layers: [layer] });
     expect(padToConfig(pad, []).layers).toEqual([]);
+  });
+});
+
+describe("findPadAndScene", () => {
+  it("returns null for an empty scene list", () => {
+    expect(findPadAndScene([], "p1")).toBeNull();
+  });
+
+  it("returns null when pad id not found", () => {
+    const scene = createMockScene({ pads: [createMockPad({ id: "p1" })] });
+    expect(findPadAndScene([scene], "nonexistent")).toBeNull();
+  });
+
+  it("finds pad in the first scene", () => {
+    const pad = createMockPad({ id: "p1" });
+    const scene = createMockScene({ pads: [pad] });
+    const result = findPadAndScene([scene], "p1");
+    expect(result?.pad).toBe(pad);
+    expect(result?.scene).toBe(scene);
+  });
+
+  it("finds pad in a later scene", () => {
+    const pad = createMockPad({ id: "p2" });
+    const scene1 = createMockScene({ pads: [createMockPad({ id: "p1" })] });
+    const scene2 = createMockScene({ pads: [pad] });
+    const result = findPadAndScene([scene1, scene2], "p2");
+    expect(result?.pad).toBe(pad);
+    expect(result?.scene).toBe(scene2);
+  });
+
+  it("returns null for a scene with an empty pads array", () => {
+    const scene = createMockScene({ pads: [] });
+    expect(findPadAndScene([scene], "p1")).toBeNull();
+  });
+
+  it("returns the first scene's match when the same pad id appears in two scenes", () => {
+    const first = createMockPad({ id: "dup", name: "First" });
+    const second = createMockPad({ id: "dup", name: "Second" });
+    const scene1 = createMockScene({ pads: [first] });
+    const scene2 = createMockScene({ pads: [second] });
+    const result = findPadAndScene([scene1, scene2], "dup");
+    expect(result?.pad).toBe(first);
+    expect(result?.scene).toBe(scene1);
   });
 });
 
