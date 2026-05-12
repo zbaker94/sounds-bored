@@ -10,7 +10,8 @@ import { executeMultiFadeNow } from "./useMultiFadeMode";
  * Registers multi-fade hotkeys and auto-cancel side effects with zero React
  * subscriptions. Uses getState() inside callbacks and a single Zustand
  * subscribe listener so the calling component never re-renders due to
- * multi-fade state changes.
+ * multi-fade state changes. Also subscribes to uiStore (outside React) to
+ * auto-cancel an active multi-fade when editMode turns on or any overlay opens.
  *
  * Call this once at the SceneView level. Components that need to read
  * multi-fade state should use useMultiFadeMode() or subscribe to
@@ -57,13 +58,14 @@ export function useMultiFadeSideEffects(): void {
   );
 
   useEffect(() => {
-    const unsub = useUiStore.subscribe((state) => {
-      const { active, cancelMultiFade } = useMultiFadeStore.getState();
-      if (!active) return;
-      if (state.editMode || state.overlayStack.length > 0) {
-        cancelMultiFade();
-      }
-    });
+    const unsub = useUiStore.subscribe(
+      (s) => s.editMode || s.overlayStack.length > 0,
+      (shouldCancel) => {
+        if (!shouldCancel) return;
+        const { active, cancelMultiFade } = useMultiFadeStore.getState();
+        if (active) cancelMultiFade();
+      },
+    );
     return unsub;
   }, []);
 }

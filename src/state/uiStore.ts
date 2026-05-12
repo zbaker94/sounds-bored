@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 
 type OverlayType = "drawer" | "dialog";
 
@@ -75,7 +76,10 @@ export const initialUiState: UiState = {
   pageByScene: {},
 };
 
-export const useUiStore = create<UiStore>()((set, get) => ({
+// subscribeWithSelector enables imperative .subscribe(selector, listener) calls
+// in useMultiFadeSideEffects — same rationale as padMetricsStore.
+export const useUiStore = create<UiStore>()(
+  subscribeWithSelector((set, get) => ({
   ...initialUiState,
 
   openOverlay: (id, type) =>
@@ -124,7 +128,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setScenePage: (sceneId, page) =>
     set((state) => ({ pageByScene: { ...state.pageByScene, [sceneId]: page } })),
-}));
+  })),
+);
 
 // Standalone selector factories for reactive subscriptions via useUiStore().
 // Use these instead of `(s) => s.isOverlayOpen(id)` to avoid creating a new
