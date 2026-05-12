@@ -172,8 +172,9 @@ describe("useMultiFadeSideEffects — auto-cancel on editMode", () => {
 
     act(() => { useUiStore.getState().toggleEditMode(); });
     act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
-    act(() => { useUiStore.getState().toggleEditMode(); });
+    expect(useMultiFadeStore.getState().active).toBe(true);
 
+    act(() => { useUiStore.getState().toggleEditMode(); });
     expect(useMultiFadeStore.getState().active).toBe(false);
   });
 });
@@ -195,11 +196,29 @@ describe("useMultiFadeSideEffects — auto-cancel on overlay", () => {
     const pads = loadPadsInStore(1);
     renderHook(() => useMultiFadeSideEffects());
 
+    // Open overlay first (selector=true), then enter multi-fade — no transition fires.
+    // Closing the overlay (selector true→false) must not trigger cancelMultiFade.
     act(() => { useUiStore.getState().openOverlay("some-dialog", "dialog"); });
     act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
 
     act(() => { useUiStore.getState().closeOverlay("some-dialog"); });
 
+    expect(useMultiFadeStore.getState().active).toBe(true);
+  });
+});
+
+describe("useMultiFadeSideEffects — cleanup", () => {
+  it("unsubscribes from uiStore on unmount", () => {
+    const pads = loadPadsInStore(1);
+    const { unmount } = renderHook(() => useMultiFadeSideEffects());
+
+    act(() => { useMultiFadeStore.getState().enterMultiFade(pads[0].id, 100, 0); });
+    unmount();
+
+    const cancelSpy = vi.spyOn(useMultiFadeStore.getState(), "cancelMultiFade");
+    act(() => { useUiStore.getState().toggleEditMode(); });
+
+    expect(cancelSpy).not.toHaveBeenCalled();
     expect(useMultiFadeStore.getState().active).toBe(true);
   });
 });

@@ -76,10 +76,9 @@ export const initialUiState: UiState = {
   pageByScene: {},
 };
 
-// subscribeWithSelector enables imperative .subscribe(selector, listener) calls
-// in useMultiFadeSideEffects — same rationale as padMetricsStore.
-export const useUiStore = create<UiStore>()(
-  subscribeWithSelector((set, get) => ({
+// subscribeWithSelector enables the imperative .subscribe(selector, listener) form
+// used by useMultiFadeSideEffects to auto-cancel on editMode/overlay transitions.
+export const useUiStore = create<UiStore>()(subscribeWithSelector((set, get) => ({
   ...initialUiState,
 
   openOverlay: (id, type) =>
@@ -128,8 +127,7 @@ export const useUiStore = create<UiStore>()(
 
   setScenePage: (sceneId, page) =>
     set((state) => ({ pageByScene: { ...state.pageByScene, [sceneId]: page } })),
-  })),
-);
+})));
 
 // Standalone selector factories for reactive subscriptions via useUiStore().
 // Use these instead of `(s) => s.isOverlayOpen(id)` to avoid creating a new

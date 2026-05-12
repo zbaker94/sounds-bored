@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where switching edit modes could incorrectly cancel an active multi-fade operation
+- Multi-fade no longer gets cancelled when closing an overlay that was open before the fade started
+- Multi-fade side effects now properly clean up when the component unmounts, preventing stale subscriptions from interfering
 - Multi-fade mode no longer gets unexpectedly cancelled when hovering pads, changing scene pages, or other unrelated UI interactions occur
 - Multi-fade now correctly cancels when switching into edit mode, even after re-entering multi-fade multiple times
 - Closing a dialog/overlay no longer interrupts an active multi-fade session

@@ -57,6 +57,9 @@ export function useMultiFadeSideEffects(): void {
     { enableOnFormTags: true },
   );
 
+  // Fires only on false→true transitions (editMode or overlay opens). Entering
+  // multi-fade while either is already active is a caller invariant violation —
+  // the subscription won't auto-cancel in that case since no transition occurs.
   useEffect(() => {
     const unsub = useUiStore.subscribe(
       (s) => s.editMode || s.overlayStack.length > 0,
