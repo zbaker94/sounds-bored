@@ -1,6 +1,12 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where switching edit modes could incorrectly cancel an active multi-fade operation
+- Multi-fade no longer gets cancelled when closing an overlay that was open before the fade started
+- Multi-fade side effects now properly clean up when the component unmounts, preventing stale subscriptions from interfering
+- Multi-fade mode no longer gets unexpectedly cancelled when hovering pads, changing scene pages, or other unrelated UI interactions occur
+- Multi-fade now correctly cancels when switching into edit mode, even after re-entering multi-fade multiple times
+- Closing a dialog/overlay no longer interrupts an active multi-fade session
 - Improved internal test reliability for pad button rendering: store resets are now consistent across all test suites, reducing false negatives
 - Added explicit assertion that mutating one pad does not change the object reference of another pad, verifying the performance guarantee holds
 - Strengthened re-render count check from "at least one" to "exactly one" when a pad's color changes, confirming the memoization cache-reuse path is exercised
