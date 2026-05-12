@@ -14,6 +14,7 @@ import {
   Volume1,
 } from "@hugeicons/core-free-icons";
 import { useLayerMetricsStore } from "@/state/layerMetricsStore";
+import { BackFaceLayerProgressBar } from "./BackFaceLayerProgressBar";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useProjectStore } from "@/state/projectStore";
 import {
@@ -39,11 +40,6 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
 }) {
   const canRemove = pad.layers.length > 1;
   const layerActive = useLayerMetricsStore((s) => s.activeLayerIds.has(layer.id));
-  // Gate on activeLayerIds to short-circuit the layerProgress lookup for idle layers,
-  // avoiding selector work on every audioTick frame when the bar isn't visible.
-  const layerProgress = useLayerMetricsStore((s) =>
-    s.activeLayerIds.has(layer.id) ? (s.layerProgress[layer.id] ?? 0) : 0
-  );
   const [liveLayerVol, setLiveLayerVol] = useState<number | null>(() => {
     const stored = useLayerMetricsStore.getState().layerVolumes[layer.id];
     return stored !== undefined ? Math.round(stored * 100) : null;
@@ -228,15 +224,7 @@ export const BackFaceLayerRow = memo(function BackFaceLayerRow({
         />
       </div>
 
-      {layerActive && (
-        <div className="h-0.5 rounded-full bg-muted overflow-hidden">
-          <div
-            data-testid="back-face-layer-progress-bar"
-            className="h-full bg-primary/60 rounded-full"
-            style={{ width: `${layerProgress * 100}%` }}
-          />
-        </div>
-      )}
+      <BackFaceLayerProgressBar layerId={layer.id} />
     </div>
   );
 });
