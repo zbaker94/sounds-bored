@@ -6,7 +6,7 @@ import { useUiStore } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
 import { PAD_STAGGER_MS, padEnterAnimation } from "./padAnimations";
 import { MultiFadePill } from "./MultiFadePill";
-import { createDefaultStoreLayer } from "@/lib/padDefaults";
+import { createDefaultStoreLayer } from "@/lib/layerHelpers";
 import { useMultiFadeSideEffects } from "@/hooks/useMultiFadeSideEffects";
 import { Button } from "@/components/ui/button";
 import {

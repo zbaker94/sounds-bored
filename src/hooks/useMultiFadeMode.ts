@@ -4,7 +4,7 @@ import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadMetricsStore } from "@/state/padMetricsStore";
 import { executeFadeTap, triggerPad, isPadActive, emitAudioError } from "@/lib/audio";
-import { buildPadMap } from "@/lib/padDefaults";
+import { buildPadMap } from "@/lib/padUtils";
 
 export function executeMultiFadeNow(): void {
   const { selectedPads, resetMultiFade } = useMultiFadeStore.getState();

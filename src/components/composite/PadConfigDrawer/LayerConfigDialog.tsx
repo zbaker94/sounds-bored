@@ -7,7 +7,8 @@ import { useUiStore, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { PadConfigSchema } from "@/lib/schemas";
 import type { PadConfigForm, Layer, Pad } from "@/lib/schemas";
-import { padToConfig, layerToFormLayer, formLayerToLayer } from "@/lib/padDefaults";
+import { padToConfig } from "@/lib/padUtils";
+import { layerToFormLayer, formLayerToLayer } from "@/lib/layerHelpers";
 import {
   Dialog,
   DialogContent,
