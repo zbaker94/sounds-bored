@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Download history is now saved reliably when downloads complete, fail, or are cancelled — including downloads that were interrupted before the app fully loaded
+- Download history saving no longer triggers redundant disk writes on progress-only updates
 - Opening project folders in the file explorer now works correctly for projects saved outside the default locations
 - Path validation is enforced before opening any folder in the OS file explorer, preventing unauthorized access
 - Error messages when "Open in Explorer" fails now include more detail to help diagnose the issue
