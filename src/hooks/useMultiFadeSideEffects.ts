@@ -4,6 +4,7 @@ import { useUiStore } from "@/state/uiStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useProjectStore } from "@/state/projectStore";
 import { isPadActive } from "@/lib/audio";
+import { findPadAndScene } from "@/lib/padUtils";
 import { executeMultiFadeNow } from "./useMultiFadeMode";
 
 /**
@@ -37,8 +38,8 @@ export function useMultiFadeSideEffects(): void {
       if (useMultiFadeStore.getState().active) return;
       const { editingPadId } = useUiStore.getState();
       if (!editingPadId) return;
-      const { project } = useProjectStore.getState();
-      const pad = project?.scenes.flatMap((s) => s.pads).find((p) => p.id === editingPadId);
+      const scenes = useProjectStore.getState().project?.scenes ?? [];
+      const pad = findPadAndScene(scenes, editingPadId)?.pad;
       if (!pad) return;
       const currentVol = isPadActive(pad.id) ? (pad.volume ?? 100) : 0;
       useMultiFadeStore.getState().enterMultiFade(pad.id, currentVol, pad.fadeTargetVol ?? 0);

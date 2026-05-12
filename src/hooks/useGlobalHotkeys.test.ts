@@ -182,6 +182,37 @@ describe("useGlobalHotkeys — hotkey configuration", () => {
     expect(mockUiState.setFadePopoverPadId).toHaveBeenCalledWith(null);
   });
 
+  it("F with popover open and fadePopoverTarget set calls setPadFadeTarget with the correct scene id", async () => {
+    const { executeFadeTap } = await import("@/lib/audio/padPlayer");
+    const setPadFadeTargetSpy = vi.spyOn(useProjectStore.getState(), "setPadFadeTarget");
+
+    const pad = { id: "pad-2", layers: [], volume: 80, fadeTargetVol: 0 } as unknown as import("@/lib/schemas").Pad;
+    useProjectStore.setState({
+      ...initialProjectState,
+      project: createMockProject({
+        scenes: [
+          { id: "scene-a", name: "Scene A", pads: [] },
+          { id: "scene-b", name: "Scene B", pads: [pad] },
+        ],
+      }),
+    });
+    mockUiState.editMode = false;
+    mockUiState.hoveredPadId = "pad-2";
+    mockUiState.editingPadId = null;
+    mockUiState.fadePopoverPadId = "pad-2";
+    mockUiState.fadePopoverTarget = 50;
+
+    renderHook(() => useGlobalHotkeys());
+    triggerKey("f");
+
+    expect(setPadFadeTargetSpy).toHaveBeenCalledWith("scene-b", "pad-2", 50);
+    expect(executeFadeTap).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "pad-2", fadeTargetVol: 50 }),
+      300,
+    );
+    expect(mockUiState.setFadePopoverPadId).toHaveBeenCalledWith(null);
+  });
+
   it("F in edit mode with editingPadId set executes the fade for the editing pad (does not exit edit mode)", async () => {
     const { executeFadeTap } = await import("@/lib/audio/padPlayer");
 

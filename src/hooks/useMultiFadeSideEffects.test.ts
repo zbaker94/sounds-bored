@@ -84,6 +84,60 @@ describe("useMultiFadeSideEffects — hotkeys", () => {
     expect(executeFadeTap).not.toHaveBeenCalled();
   });
 
+  it("standalone x handler enters multi-fade using editingPadId", () => {
+    const pads = loadPadsInStore(1);
+    useUiStore.setState({ ...initialUiState, editingPadId: pads[0].id });
+
+    renderHook(() => useMultiFadeSideEffects());
+
+    const calls = vi.mocked(useHotkeys).mock.calls;
+    const xCall = calls.find((c) => c[0] === "x");
+    const handler = xCall?.[1] as (() => void) | undefined;
+    expect(handler).toBeDefined();
+
+    act(() => { handler!(); });
+
+    expect(useMultiFadeStore.getState().active).toBe(true);
+    expect(useMultiFadeStore.getState().originPadId).toBe(pads[0].id);
+    expect(useUiStore.getState().editingPadId).toBeNull();
+  });
+
+  it("standalone x handler is a no-op when editingPadId is null", () => {
+    loadPadsInStore(1);
+
+    renderHook(() => useMultiFadeSideEffects());
+
+    const calls = vi.mocked(useHotkeys).mock.calls;
+    const xCall = calls.find((c) => c[0] === "x");
+    const handler = xCall?.[1] as (() => void) | undefined;
+
+    act(() => { handler!(); });
+
+    expect(useMultiFadeStore.getState().active).toBe(false);
+  });
+
+  it("standalone x handler is a no-op when multi-fade is already active", () => {
+    const pads = loadPadsInStore(1);
+    useMultiFadeStore.setState({
+      active: true,
+      originPadId: pads[0].id,
+      selectedPads: new Map([[pads[0].id, { padId: pads[0].id, levels: [100, 0] as [number, number] }]]),
+      reopenPadId: null,
+    });
+    useUiStore.setState({ ...initialUiState, editingPadId: pads[0].id });
+
+    renderHook(() => useMultiFadeSideEffects());
+
+    const calls = vi.mocked(useHotkeys).mock.calls;
+    const xCall = calls.find((c) => c[0] === "x");
+    const handler = xCall?.[1] as (() => void) | undefined;
+
+    act(() => { handler!(); });
+
+    expect(useMultiFadeStore.getState().active).toBe(true);
+    expect(useMultiFadeStore.getState().originPadId).toBe(pads[0].id);
+  });
+
   it("escape handler cancels multi-fade when active", () => {
     const pads = loadPadsInStore(1);
     useMultiFadeStore.setState({
