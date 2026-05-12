@@ -14,9 +14,8 @@ import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useReconcileLibrary } from "@/hooks/useReconcileLibrary";
 import { useAudioErrorHandler } from "@/hooks/useAudioErrorHandler";
 import { useDownloadEventListener } from "@/hooks/useDownloadEventListener";
+import { useDownloadHistorySync } from "@/hooks/useDownloadHistorySync";
 import { useAppSettingsStore } from "@/state/appSettingsStore";
-import { useDownloadStore, TERMINAL_STATUSES } from "@/state/downloadStore";
-import { saveDownloadHistory } from "@/lib/downloads";
 import { ConfirmCloseDialog } from "@/components/modals/ConfirmCloseDialog";
 import { SidePanel } from "@/components/composite/SidePanel/SidePanel";
 import { ProjectActionsProvider } from "@/contexts/ProjectActionsContext";
@@ -45,16 +44,7 @@ function MainPageInner() {
   useAudioErrorHandler();
   const downloadFolderId = useAppSettingsStore((s) => s.settings?.downloadFolderId);
   useDownloadEventListener(downloadFolderId);
-
-  const jobs = useDownloadStore((s) => s.jobs);
-  const lastSavedTerminalRef = useRef("");
-  useEffect(() => {
-    const terminal = Object.values(jobs).filter((j) => TERMINAL_STATUSES.has(j.status));
-    const serialized = JSON.stringify(terminal.map((j) => j.id + j.status));
-    if (serialized === lastSavedTerminalRef.current) return;
-    lastSavedTerminalRef.current = serialized;
-    void saveDownloadHistory(terminal);
-  }, [jobs]);
+  useDownloadHistorySync();
 
   const { reconcile } = useReconcileLibrary();
   // Ref-wrap reconcile so the mount-only effect below always calls the latest
