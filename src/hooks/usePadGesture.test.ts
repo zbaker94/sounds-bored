@@ -315,9 +315,39 @@ describe("usePadGesture — drag phase", () => {
     // Move 10px up — exceeds DRAG_PX
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
     });
 
     expect(setPadVolume).toHaveBeenCalledWith(oneShotPad.id, expect.any(Number));
+  });
+
+  it("coalesces multiple rapid pointermove events: setPadVolume called once per RAF boundary", () => {
+    const { result } = renderHook(() => usePadGesture(oneShotPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); });
+
+    // Activate drag phase
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
+    });
+    vi.mocked(setPadVolume).mockClear();
+
+    // Fire 5 rapid moves within a single frame (no RAF flush between them)
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 285 }));
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 280 }));
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 275 }));
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 270 }));
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 265 }));
+      vi.runAllTimers();
+    });
+
+    // Despite 5 pointer events, only 1 RAF fired → only 1 setPadVolume call
+    expect(setPadVolume).toHaveBeenCalledTimes(1);
   });
 
   it("calls setPadVolume and does not throw on pointer up after drag", () => {
@@ -475,6 +505,33 @@ describe("usePadGesture — hold-mode layer pad", () => {
     });
 
     expect(resetPadGain).toHaveBeenCalledWith(holdPad.id);
+  });
+
+  it("cancels pending audio RAF before resetPadGain on pointer up — prevents stale drag volume from overriding gain reset", () => {
+    vi.mocked(resetPadGain).mockClear();
+    vi.mocked(setPadVolume).mockClear();
+    const { result } = renderHook(() => usePadGesture(holdPad));
+
+    act(() => {
+      result.current.gestureHandlers.onPointerDown(makePointerEvent({ clientY: 300 }));
+    });
+    act(() => { vi.advanceTimersByTime(150); }); // enter hold phase
+
+    // Drag to non-zero volume — schedules audio RAF but do NOT flush it
+    act(() => {
+      result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+    });
+
+    // Release before RAF fires
+    act(() => {
+      result.current.gestureHandlers.onPointerUp(makePointerEvent({ clientY: 290 }));
+    });
+
+    // Now flush all pending timers — the cancelled RAF must NOT fire setPadVolume
+    act(() => { vi.runAllTimers(); });
+
+    expect(resetPadGain).toHaveBeenCalledWith(holdPad.id);
+    expect(setPadVolume).not.toHaveBeenCalled();
   });
 });
 
@@ -652,6 +709,7 @@ describe("usePadGesture — startY staleness fix", () => {
     // Fire move again at same position — now at full ramp, linear
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 280 }));
+      vi.runAllTimers();
     });
 
     // Volume applied should reflect 40px drag from hold-start (Y=320), not from pointer-down (Y=300)
@@ -691,6 +749,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // First move crosses DRAG_PX threshold — drag activates; rampFactor = (0 - 0) / 150 = 0
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
     });
 
     const calls = vi.mocked(setPadVolume).mock.calls;
@@ -712,6 +771,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // Activate drag at nowMs=0; rampFactor = (0 - 0) / 150 = 0 (startTime = 0)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
     });
     vi.mocked(setPadVolume).mockClear();
 
@@ -721,6 +781,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // Move to 50px up from hold-start (300 → 250)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 250 }));
+      vi.runAllTimers();
     });
 
     // deltaY = 300 - 250 = 50px from hold-start
@@ -742,6 +803,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // Activate drag at nowMs=0; rampFactor = (0 - 0) / 150 = 0 (startTime = 0)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
     });
     vi.mocked(setPadVolume).mockClear();
 
@@ -751,6 +813,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // Move 40px up from hold-start
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 260 }));
+      vi.runAllTimers();
     });
 
     // deltaY = 300 - 260 = 40; rampFactor = 1.0; newVolume = 0 + 1.0 × (40/200) = 0.2
@@ -775,6 +838,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // rampFactor = (100 - 0) / 150 ≈ 0.667 (ramp already 2/3 done from hold time)
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 290 }));
+      vi.runAllTimers();
     });
 
     // deltaY = 300 - 290 = 10px; rampFactor ≈ 0.667; linear = 10/200 = 0.05
@@ -804,6 +868,7 @@ describe("usePadGesture — time-based sensitivity ramp", () => {
     // Move 200px up (full DRAG_RANGE_PX) → should clamp to 1.0
     act(() => {
       result.current.gestureHandlers.onPointerMove(makePointerEvent({ clientY: 300 }));
+      vi.runAllTimers();
     });
 
     const calls = vi.mocked(setPadVolume).mock.calls;

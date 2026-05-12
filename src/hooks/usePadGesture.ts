@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useEffect } from "react";
+import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import type React from "react";
 import type { Pad } from "@/lib/schemas";
 import { triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad, isFading, freezePadAtCurrentVolume, clampGain01, isLayerActive, getLivePadVolume, emitAudioError } from "@/lib/audio";
@@ -38,8 +38,8 @@ export function usePadGesture(pad: Pad, now = Date.now) {
   const [isPressed, setIsPressed] = useState(false);
   // dragVolume: the volume being set by the current gesture drag (null when not dragging).
   // Exposed so PadButton can display the intended volume before audio latency resolves.
-  // Throttled to one React setState per animation frame via useRafThrottledState;
-  // setPadVolume (Web Audio) still fires immediately on every pointermove for glitch-free audio.
+  // Both the React state update and the Web Audio gain update are throttled to one call per
+  // animation frame via useRafThrottledState and scheduleAudioVolume respectively.
   const { value: dragVolume, schedule: scheduleDragVolume, reset: resetDragVolume } = useRafThrottledState<number | null>(null);
 
   const padRef = useRef(pad);
@@ -57,6 +57,35 @@ export function usePadGesture(pad: Pad, now = Date.now) {
     hasTriggeredDuringDrag: false,
   });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pendingAudioVolRef = useRef<number | null>(null);
+  const audioRafIdRef = useRef<number | null>(null);
+
+  const scheduleAudioVolume = useCallback((v: number) => {
+    pendingAudioVolRef.current = v;
+    if (audioRafIdRef.current === null) {
+      audioRafIdRef.current = requestAnimationFrame(() => {
+        audioRafIdRef.current = null;
+        const pending = pendingAudioVolRef.current;
+        if (pending !== null) {
+          setPadVolume(padRef.current.id, pending);
+          pendingAudioVolRef.current = null;
+        }
+      });
+    }
+  }, []);
+
+  const cancelAudioVolume = useCallback(() => {
+    if (audioRafIdRef.current !== null) {
+      cancelAnimationFrame(audioRafIdRef.current);
+      audioRafIdRef.current = null;
+    }
+    pendingAudioVolRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => { cancelAudioVolume(); };
+  }, [cancelAudioVolume]);
 
   // All handlers and their helpers are co-located in a single useMemo so that:
   // 1. Helper functions share the same closure scope as the handlers that call them,
@@ -176,7 +205,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
           s.hasTriggeredDuringDrag = true;
         }
 
-        setPadVolume(padRef.current.id, newVolume);
+        scheduleAudioVolume(newVolume);
         scheduleDragVolume(newVolume);
       }
     }
@@ -189,6 +218,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
       setIsPressed(false);
       resetDragVolume();
       if (hasHoldLayer) {
+        cancelAudioVolume();
         releasePadHoldLayers(padRef.current);
         resetPadGain(padRef.current.id);
       }
@@ -208,6 +238,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
         }
       } else if (s.phase === "drag" && s.currentVolume < 0.01 && !hasHoldLayer) {
         stopPad(padRef.current);
+        cancelAudioVolume();
         resetPadGain(padRef.current.id);
       }
 
@@ -220,6 +251,7 @@ export function usePadGesture(pad: Pad, now = Date.now) {
 
       if (s.phase === "drag" && s.currentVolume < 0.01 && !hasHoldLayer) {
         stopPad(padRef.current);
+        cancelAudioVolume();
         resetPadGain(padRef.current.id);
       }
 

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where releasing a held pad after dragging its volume could leave the audio gain stuck at the dragged level instead of resetting correctly.
+- Pad volume drag gestures now coalesce rapid pointer movements into one update per animation frame, reducing unnecessary audio processing during fast drags.
 - Fixed a bug where switching edit modes could incorrectly cancel an active multi-fade operation
 - Multi-fade no longer gets cancelled when closing an overlay that was open before the fade started
 - Multi-fade side effects now properly clean up when the component unmounts, preventing stale subscriptions from interfering
