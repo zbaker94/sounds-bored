@@ -13,7 +13,7 @@ import { stopPad } from "./stopHandler";
 import { rampGainTo, resetPadGain } from "./gainManager";
 import * as coordinator from './playbackStateCoordinator';
 import { useProjectStore } from "@/state/projectStore";
-import { buildPadMap } from "@/lib/padDefaults";
+import { buildPadMap } from "@/lib/padUtils";
 import type { Pad } from "@/lib/schemas";
 
 // Pre-#423 stopgap: look up the live pad at timeout fire time so that layers

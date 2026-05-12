@@ -20,7 +20,8 @@ import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
 import {
   triggerPad, stopPad, executeFadeTap, reverseFade, stopFade, emitAudioError,
 } from "@/lib/audio";
-import { createDefaultStoreLayer, padToConfig } from "@/lib/padDefaults";
+import { createDefaultStoreLayer } from "@/lib/layerHelpers";
+import { padToConfig } from "@/lib/padUtils";
 import { LayerConfigDialog } from "@/components/composite/PadConfigDrawer/LayerConfigDialog";
 import { ConfirmDeletePadDialog } from "@/components/modals/ConfirmDeletePadDialog";
 import { PadFadeControls } from "./PadFadeControls";

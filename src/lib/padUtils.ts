@@ -1,4 +1,32 @@
-import type { Pad } from "@/lib/schemas";
+import type { Layer, Pad, PadConfig, Scene } from "@/lib/schemas";
+
+/**
+ * Build an O(1) lookup map of padId → Pad across all scenes. Avoids the
+ * O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops.
+ */
+export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
+  const map = new Map<string, Pad>();
+  for (const scene of scenes) {
+    for (const pad of scene.pads) {
+      map.set(pad.id, pad);
+    }
+  }
+  return map;
+}
+
+export function padToConfig(pad: Pad, layers?: Layer[]): PadConfig {
+  return {
+    name: pad.name,
+    layers: layers ?? pad.layers,
+    muteTargetPadIds: pad.muteTargetPadIds,
+    muteGroupId: pad.muteGroupId,
+    color: pad.color,
+    icon: pad.icon,
+    fadeDurationMs: pad.fadeDurationMs,
+    volume: pad.volume ?? 100,
+    fadeTargetVol: pad.fadeTargetVol ?? 0,
+  };
+}
 
 /**
  * Returns true if a pad is eligible for fade/crossfade operations.
