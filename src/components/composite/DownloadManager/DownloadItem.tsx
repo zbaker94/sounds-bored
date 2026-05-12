@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -76,7 +76,7 @@ function StatusDetail({ job, elapsed }: { job: DownloadJob; elapsed: string }) {
   return null;
 }
 
-export function DownloadItem({ job }: DownloadItemProps) {
+export const DownloadItem = memo(function DownloadItem({ job }: DownloadItemProps) {
   const { mutate: cancelDownload, isPending: isCancelling } =
     useCancelDownload();
 
@@ -133,4 +133,4 @@ export function DownloadItem({ job }: DownloadItemProps) {
       )}
     </div>
   );
-}
+});
