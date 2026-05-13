@@ -907,6 +907,7 @@ pub fn pick_folder_and_grant(
     app: AppHandle,
     title: Option<String>,
     default_path: Option<String>,
+    can_create_directories: Option<bool>,
 ) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
     let mut builder = app.dialog().file();
@@ -915,6 +916,9 @@ pub fn pick_folder_and_grant(
     }
     if let Some(ref p) = default_path {
         builder = builder.set_directory(p);
+    }
+    if let Some(can) = can_create_directories {
+        builder = builder.set_can_create_directories(can);
     }
     let Some(fp) = builder.blocking_pick_folder() else {
         return Ok(None);

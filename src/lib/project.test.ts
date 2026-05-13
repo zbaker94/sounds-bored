@@ -648,6 +648,7 @@ describe("saveProjectAs", () => {
     expect(result?.newPath).toBe("/new/location/New_Name");
     expect(result?.project.name).toBe("New Name");
     expect(mockFs.remove).toHaveBeenCalledWith("/app-local-data/SoundsBored/temp_Test_123", { recursive: true });
+    expect(mockPickFolder).toHaveBeenCalledWith({ title: "Select Save Location", canCreateDirectories: true });
   });
 
   it("should return null when user cancels", async () => {
