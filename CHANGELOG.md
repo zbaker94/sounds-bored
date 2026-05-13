@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Cover art now backfills for sounds already in your library, not only newly discovered files
+- File size metadata now populates for existing library sounds that were missing it
+- Cover art extraction skips sounds already checked (including those with no embedded art), preventing redundant processing on every load
+- Library reconciliation is now idempotent — repeated scans with no new files produce no spurious saves
 - Internal sound search and tag-count logic extracted into a shared hook; no user-visible behavior changes.
 - Internal audio engine refactored into focused modules (`voiceRegistry`, `gainRegistry`, `chainCycleState`, `fadeCoordinator`) — no user-facing behavior changed.
 - Pressing **F** on a hovered pad now correctly saves the fade target volume before executing the fade
