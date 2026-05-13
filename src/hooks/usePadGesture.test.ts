@@ -28,14 +28,14 @@ vi.mock("@/lib/audio/fadeMixer", () => ({
   resolveFadeDuration: vi.fn(),
 }));
 
-vi.mock("@/lib/audio/audioState", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/audio/audioState")>();
-  return {
-    ...actual,
-    isLayerActive: vi.fn().mockReturnValue(false),
-    isPadFading: vi.fn().mockReturnValue(false),
-    getLivePadVolume: vi.fn().mockReturnValue(undefined),
-  };
+vi.mock("@/lib/audio/voiceRegistry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/voiceRegistry")>();
+  return { ...actual, isLayerActive: vi.fn().mockReturnValue(false) };
+});
+
+vi.mock("@/lib/audio/gainRegistry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/gainRegistry")>();
+  return { ...actual, getLivePadVolume: vi.fn().mockReturnValue(undefined) };
 });
 
 import { isLayerActive, getLivePadVolume, triggerPad, setPadVolume, resetPadGain, releasePadHoldLayers, stopPad } from "@/lib/audio";

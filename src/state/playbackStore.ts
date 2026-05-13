@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
-// NOTE: All non-serializable audio engine state (voiceMap, layerVoiceMap, GainNodes,
-// streaming audio, chain queues, fade tracking) lives in src/lib/audio/audioState.ts.
+// NOTE: All non-serializable audio engine state lives in focused src/lib/audio/ submodules
+// (voiceRegistry, gainRegistry, chainCycleState, streamingAudioLifecycle, fadeCoordinator).
 // This store contains only reactive Zustand state that drives UI re-renders.
 //
 // Tick-managed metrics (padVolumes, padProgress, layerVolumes, layerProgress,

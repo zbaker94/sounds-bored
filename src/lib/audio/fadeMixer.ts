@@ -29,7 +29,7 @@ function resolveLivePad(pad: Pad): Pad {
  * Freeze a pad's gain at its current value — cancels any in-progress ramp
  * so the pad stays at whatever volume it was at when called.
  *
- * Also clears fade tracking on both audioState and playbackStore via cancelFade.
+ * Also clears fade tracking on both fadeCoordinator and playbackStore via cancelFade.
  */
 export function freezePadAtCurrentVolume(padId: string): void {
   const ctx = getAudioContext();

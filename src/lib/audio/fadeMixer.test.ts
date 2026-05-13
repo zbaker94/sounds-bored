@@ -82,7 +82,7 @@ describe("fadeMixer", () => {
     it("cancels scheduled ramp and holds gain at its current value", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-freeze");
       // getPadGain sets gain.gain.value = 1.0 after creation; override to test non-default value
       mockGain.gain.value = 0.6;
@@ -99,7 +99,7 @@ describe("fadeMixer", () => {
     it("clears playbackStore fadingPadIds and fadingOutPadIds", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-freeze-store");
       const { freezePadAtCurrentVolume } = await import("./fadeMixer");
       const { usePlaybackStore } = await import("@/state/playbackStore");
@@ -121,7 +121,8 @@ describe("fadeMixer", () => {
     it("schedules a linear ramp to 0 and marks pad as fading out", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain, isPadFadingOut } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { isPadFadingOut } = await import("./fadeCoordinator");
       getPadGain("pad-fadeout");
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fadeout" });
@@ -136,7 +137,8 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer = createMockLayer({ id: "layer-fadeout-stop" });
-      const { getPadGain, setLayerChain, getLayerChain, getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder, getLayerPlayOrder } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain, getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder, getLayerPlayOrder } = await import("./chainCycleState");
       getPadGain("pad-fadeout-stop");
       setLayerChain("layer-fadeout-stop", []);
       setLayerCycleIndex("layer-fadeout-stop", 1);
@@ -158,7 +160,8 @@ describe("fadeMixer", () => {
     it("nulls onended callbacks on active pad voices at fade start", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain, recordLayerVoice } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { recordLayerVoice } = await import("./voiceRegistry");
       getPadGain("pad-null-ended");
       const mockVoice = makeMockVoice();
       recordLayerVoice("pad-null-ended", "layer-null-ended", mockVoice);
@@ -175,15 +178,17 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer = createMockLayer({ id: "layer-stale-guard" });
+      const { getPadGain } = await import("./gainRegistry");
       const {
-        getPadGain,
         removeFadingOutPad,
         isPadFadingOut,
+      } = await import("./fadeCoordinator");
+      const {
         setLayerChain,
         setLayerCycleIndex,
         getLayerChain,
         getLayerCycleIndex,
-      } = await import("./audioState");
+      } = await import("./chainCycleState");
       const { resetPadGain } = await import("./gainManager");
       getPadGain("pad-stale-guard");
       // Seed chain state so we can assert it is NOT cleared by the stale cleanup
@@ -209,7 +214,7 @@ describe("fadeMixer", () => {
     it("does not stop pad when fading to a non-zero volume", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-partial-fade");
       const { fadePad } = await import("./fadeMixer");
       const { resetPadGain } = await import("./gainManager");
@@ -224,8 +229,8 @@ describe("fadeMixer", () => {
     it("cancelFade on a partial-fade clears the fading-out flag", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain, isPadFadingOut } = await import("./audioState");
-      const { cancelFade } = await import("./fadeCoordinator");
+      const { getPadGain } = await import("./gainRegistry");
+      const { isPadFadingOut, cancelFade } = await import("./fadeCoordinator");
       getPadGain("pad-partial-retrigger");
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-partial-retrigger" });
@@ -242,7 +247,7 @@ describe("fadeMixer", () => {
     it("mirrors fading-out state to playbackStore", async () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-store-mirror");
       const { fadePad } = await import("./fadeMixer");
       const { usePlaybackStore } = await import("@/state/playbackStore");
@@ -259,7 +264,8 @@ describe("fadeMixer", () => {
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer1 = createMockLayer({ id: "layer-live-add-1" });
       const layer2 = createMockLayer({ id: "layer-live-add-2" });
-      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       const { useProjectStore } = await import("@/state/projectStore");
       getPadGain("pad-live-add");
       setLayerChain("layer-live-add-1", []);
@@ -292,7 +298,8 @@ describe("fadeMixer", () => {
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer1 = createMockLayer({ id: "layer-live-rm-1" });
       const layer2 = createMockLayer({ id: "layer-live-rm-2" });
-      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       const { useProjectStore } = await import("@/state/projectStore");
       getPadGain("pad-live-rm");
       setLayerChain("layer-live-rm-1", []);
@@ -326,7 +333,8 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(1.0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer1 = createMockLayer({ id: "layer-live-del-1" });
-      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       const { useProjectStore } = await import("@/state/projectStore");
       const { resetPadGain } = await import("./gainManager");
       getPadGain("pad-live-del");
@@ -362,7 +370,8 @@ describe("fadeMixer", () => {
     it("completes without error and does not null onended callbacks", async () => {
       const mockGain = makeMockGain(0.5);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain, recordLayerVoice } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { recordLayerVoice } = await import("./voiceRegistry");
       getPadGain("pad-equal-vol");
       const mockVoice = makeMockVoice();
       recordLayerVoice("pad-equal-vol", "layer-equal-vol", mockVoice);
@@ -378,7 +387,7 @@ describe("fadeMixer", () => {
     it("still schedules a gain ramp when volumes are equal", async () => {
       const mockGain = makeMockGain(0.5);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-equal-ramp");
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-equal-ramp" });
@@ -393,7 +402,7 @@ describe("fadeMixer", () => {
     it("ramps gain up from provided fromVolume to 1.0", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-fadein");
       mockGain.gain.setValueAtTime.mockClear();
       const { fadePad } = await import("./fadeMixer");
@@ -408,7 +417,7 @@ describe("fadeMixer", () => {
     it("ramps to specified toVolume", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-fadein-vol");
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fadein-vol" });
@@ -426,7 +435,7 @@ describe("fadeMixer", () => {
       const {
         setLayerChain, setLayerCycleIndex, setLayerPlayOrder,
         getLayerChain, getLayerCycleIndex, getLayerPlayOrder,
-      } = await import("./audioState");
+      } = await import("./chainCycleState");
       setLayerChain("layer-si-1", []);
       setLayerCycleIndex("layer-si-1", 2);
       setLayerPlayOrder("layer-si-1", []);
@@ -451,7 +460,7 @@ describe("fadeMixer", () => {
     it("calls startPad callback and ramps gain up to toVolume", async () => {
       const mockGain = makeMockGain(0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-fpi");
       const { fadePadIn } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fpi" });
@@ -466,7 +475,8 @@ describe("fadeMixer", () => {
     it("bails without ramping if pre-empted during startPad await", async () => {
       const mockGain = makeMockGain(0);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain, removeFadingInPad } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { removeFadingInPad } = await import("./fadeCoordinator");
       getPadGain("pad-fpi-bail");
       const { fadePadIn } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fpi-bail" });
@@ -484,7 +494,8 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer = createMockLayer({ id: "layer-fpi-stop" });
-      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       getPadGain("pad-fpi-stop");
       setLayerChain("layer-fpi-stop", []);
       const { fadePadIn } = await import("./fadeMixer");
@@ -501,7 +512,8 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer = createMockLayer({ id: "layer-fpi-nonzero" });
-      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       getPadGain("pad-fpi-nonzero");
       setLayerChain("layer-fpi-nonzero", []);
       const { fadePadIn } = await import("./fadeMixer");
@@ -519,7 +531,9 @@ describe("fadeMixer", () => {
       const mockGain = makeMockGain(0);
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer = createMockLayer({ id: "layer-fpi-cancel" });
-      const { getPadGain, recordLayerVoice, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { recordLayerVoice } = await import("./voiceRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       const { cancelFade } = await import("./fadeCoordinator");
       getPadGain("pad-fpi-cancel");
       const mockVoice = makeMockVoice();
@@ -543,7 +557,8 @@ describe("fadeMixer", () => {
       mockCtx.createGain.mockReturnValue(mockGain);
       const layer1 = createMockLayer({ id: "layer-fpi-live-1" });
       const layer2 = createMockLayer({ id: "layer-fpi-live-2" });
-      const { getPadGain, setLayerChain, getLayerChain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
+      const { setLayerChain, getLayerChain } = await import("./chainCycleState");
       const { useProjectStore } = await import("@/state/projectStore");
       getPadGain("pad-fpi-live");
       setLayerChain("layer-fpi-live-1", []);

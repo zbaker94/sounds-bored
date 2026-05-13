@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactored into focused modules (`voiceRegistry`, `gainRegistry`, `chainCycleState`, `fadeCoordinator`) — no user-facing behavior changed.
 - Pressing **F** on a hovered pad now correctly saves the fade target volume before executing the fade
 - Pressing **X** to enter multi-fade mode now works when a pad is open in the edit drawer
 - Internal code reorganization: pad and layer utility functions split into purpose-specific modules (`padUtils`, `layerHelpers`) with no behavior changes

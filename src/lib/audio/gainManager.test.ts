@@ -45,7 +45,7 @@ describe("gainManager", () => {
     it("schedules a linear ramp on the pad gain node", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-1");
       const { setPadVolume } = await import("./gainManager");
 
@@ -58,7 +58,7 @@ describe("gainManager", () => {
     it("clamps volume above 1 to 1", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-clamp-hi");
       const { setPadVolume } = await import("./gainManager");
 
@@ -70,7 +70,7 @@ describe("gainManager", () => {
     it("clamps volume below 0 to 0", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-clamp-lo");
       const { setPadVolume } = await import("./gainManager");
 
@@ -82,7 +82,7 @@ describe("gainManager", () => {
     it("clamps NaN to 0 (guards against malformed data)", async () => {
       const mockGain = makeMockGain();
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-nan");
       const { setPadVolume } = await import("./gainManager");
 
@@ -96,7 +96,7 @@ describe("gainManager", () => {
     it("resets gain to 1.0 and cancels any scheduled values", async () => {
       const mockGain = makeMockGain(0.3);
       mockCtx.createGain.mockReturnValue(mockGain);
-      const { getPadGain } = await import("./audioState");
+      const { getPadGain } = await import("./gainRegistry");
       getPadGain("pad-reset");
       const { resetPadGain } = await import("./gainManager");
 
@@ -117,7 +117,7 @@ describe("gainManager", () => {
         if (!next) throw new Error("createGain called more times than expected");
         return next;
       });
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync");
       getOrCreateLayerGain("layer-sync", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
@@ -141,7 +141,7 @@ describe("gainManager", () => {
         if (!next) throw new Error("createGain called more times than expected");
         return next;
       });
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync-hi");
       getOrCreateLayerGain("layer-sync-hi", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
@@ -160,7 +160,7 @@ describe("gainManager", () => {
         if (!next) throw new Error("createGain called more times than expected");
         return next;
       });
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync-lo");
       getOrCreateLayerGain("layer-sync-lo", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
@@ -179,7 +179,7 @@ describe("gainManager", () => {
         if (!next) throw new Error("createGain called more times than expected");
         return next;
       });
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync-nan");
       getOrCreateLayerGain("layer-sync-nan", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
@@ -200,7 +200,7 @@ describe("gainManager", () => {
         if (!next) throw new Error("createGain called more times than expected");
         return next;
       });
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-setlvol");
       getOrCreateLayerGain("layer-setlvol", 0.8, padGain);
       const { setLayerVolume } = await import("./gainManager");
@@ -229,7 +229,7 @@ describe("gainManager", () => {
         if (!next) throw new Error("createGain called more times than expected");
         return next;
       });
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-clamp");
       getOrCreateLayerGain("layer-clamp", 0.5, padGain);
       const { setLayerVolume } = await import("./gainManager");

@@ -267,7 +267,7 @@ describe("layerTrigger", () => {
 
   describe("applyRetriggerMode", () => {
     async function setup() {
-      const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-r");
       const layerGain = getOrCreateLayerGain("layer-r", 1, padGain);
       return { padGain, layerGain };
@@ -332,7 +332,8 @@ describe("layerTrigger", () => {
 
     it("advances cycle cursor in 'stop' mode when cycleMode is on", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
       const padGain = getPadGain("pad-cyc-stop");
       const layerGain = getOrCreateLayerGain("layer-cyc-stop", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-stop" });
@@ -353,7 +354,8 @@ describe("layerTrigger", () => {
 
     it("deletes cycle cursor in 'stop' mode when it reaches the end", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
       const padGain = getPadGain("pad-cyc-stop-wrap");
       const layerGain = getOrCreateLayerGain("layer-cyc-stop-wrap", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-stop-wrap" });
@@ -377,7 +379,8 @@ describe("layerTrigger", () => {
 
     it("backs cycle cursor up in 'restart' mode when cycleMode is on", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
       const padGain = getPadGain("pad-cyc-restart");
       const layerGain = getOrCreateLayerGain("layer-cyc-restart", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-restart" });
@@ -398,7 +401,8 @@ describe("layerTrigger", () => {
 
     it("wraps cycle cursor from 0 to last index in 'restart' mode", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
       const padGain = getPadGain("pad-cyc-restart-wrap");
       const layerGain = getOrCreateLayerGain("layer-cyc-restart-wrap", 1, padGain);
       const pad = createMockPad({ id: "pad-cyc-restart-wrap" });
@@ -423,7 +427,9 @@ describe("layerTrigger", () => {
     it("'next' mode with remaining sounds returns 'chain-advanced' and plays next", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { loadBuffer } = await import("./bufferCache");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerChain } = await import("./chainCycleState");
+      const { recordLayerVoice, isLayerActive } = await import("./voiceRegistry");
       const padGain = getPadGain("pad-next-rem");
       const layerGain = getOrCreateLayerGain("layer-next-rem", 1, padGain);
       const pad = createMockPad({ id: "pad-next-rem" });
@@ -455,7 +461,9 @@ describe("layerTrigger", () => {
 
     it("'next' mode with exhausted one-shot queue returns 'chain-advanced' (stops only)", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerChain } = await import("./chainCycleState");
+      const { recordLayerVoice, isLayerActive } = await import("./voiceRegistry");
       const { usePlaybackStore } = await import("@/state/playbackStore");
       const padGain = getPadGain("pad-next-exhaust");
       const layerGain = getOrCreateLayerGain("layer-next-exhaust", 1, padGain);
@@ -486,7 +494,9 @@ describe("layerTrigger", () => {
     it("'next' mode with loop + exhausted queue loops back to beginning", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
       const { loadBuffer } = await import("./bufferCache");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain, recordLayerVoice, isLayerActive } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerChain } = await import("./chainCycleState");
+      const { recordLayerVoice, isLayerActive } = await import("./voiceRegistry");
       const padGain = getPadGain("pad-next-loop");
       const layerGain = getOrCreateLayerGain("layer-next-loop", 1, padGain);
       const pad = createMockPad({ id: "pad-next-loop" });
@@ -515,7 +525,8 @@ describe("layerTrigger", () => {
 
     it("'next' mode with cycleMode + chained returns 'proceed'", async () => {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerChain } = await import("./chainCycleState");
       const padGain = getPadGain("pad-next-cycle");
       const layerGain = getOrCreateLayerGain("layer-next-cycle", 1, padGain);
       const pad = createMockPad({ id: "pad-next-cycle" });
@@ -540,7 +551,8 @@ describe("layerTrigger", () => {
   describe("startLayerPlayback", () => {
     it("starts simultaneous sounds for non-chained arrangement", async () => {
       const { startLayerPlayback } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, isLayerActive } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { isLayerActive } = await import("./voiceRegistry");
       const padGain = getPadGain("pad-slp");
       const layerGain = getOrCreateLayerGain("layer-slp", 1, padGain);
       const pad = createMockPad({ id: "pad-slp" });
@@ -558,7 +570,9 @@ describe("layerTrigger", () => {
 
     it("chained arrangement: starts first sound and queues remainder", async () => {
       const { startLayerPlayback } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, isLayerActive, getLayerChain } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { isLayerActive } = await import("./voiceRegistry");
+      const { getLayerChain } = await import("./chainCycleState");
       const padGain = getPadGain("pad-chain");
       const layerGain = getOrCreateLayerGain("layer-chain", 1, padGain);
       const pad = createMockPad({ id: "pad-chain" });
@@ -583,7 +597,9 @@ describe("layerTrigger", () => {
     it("cycle-mode: plays first sound by index and advances cursor", async () => {
       const { startLayerPlayback } = await import("./layerTrigger");
       const { loadBuffer } = await import("./bufferCache");
-      const { getPadGain, getOrCreateLayerGain, isLayerActive, getLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { isLayerActive } = await import("./voiceRegistry");
+      const { getLayerCycleIndex } = await import("./chainCycleState");
       const padGain = getPadGain("pad-cycle");
       const layerGain = getOrCreateLayerGain("layer-cycle", 1, padGain);
       const pad = createMockPad({ id: "pad-cycle" });
@@ -612,7 +628,8 @@ describe("layerTrigger", () => {
 
     it("cycle-mode: deletes cursor after last sound in one-shot mode", async () => {
       const { startLayerPlayback } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, setLayerCycleIndex, getLayerCycleIndex } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
       const padGain = getPadGain("pad-cycle-end");
       const layerGain = getOrCreateLayerGain("layer-cycle-end", 1, padGain);
       const pad = createMockPad({ id: "pad-cycle-end" });
@@ -659,7 +676,7 @@ describe("startLayerSound padDisplayStore integration", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.5 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "pd-pad-1" });
@@ -685,7 +702,7 @@ describe("startLayerSound padDisplayStore integration", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "ca-pad-1" });
@@ -704,7 +721,7 @@ describe("startLayerSound padDisplayStore integration", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "ca-pad-2" });
@@ -723,7 +740,7 @@ describe("startLayerSound padDisplayStore integration", () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("not found"));
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "pd-pad-2" });
@@ -761,7 +778,9 @@ describe("handleNextRetrigger display correctness", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
     const { applyRetriggerMode } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, recordLayerVoice, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { recordLayerVoice } = await import("./voiceRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "disp-next-rem-pad" });
@@ -798,7 +817,9 @@ describe("handleNextRetrigger display correctness", () => {
 
   it("'next' retrigger cycleMode clears the stale display before returning 'proceed'", async () => {
     const { applyRetriggerMode } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, recordLayerVoice, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { recordLayerVoice } = await import("./voiceRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "disp-next-cyc-pad" });
@@ -832,7 +853,9 @@ describe("handleNextRetrigger display correctness", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
     const { applyRetriggerMode } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, recordLayerVoice, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { recordLayerVoice } = await import("./voiceRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { usePadDisplayStore } = await import("@/state/padDisplayStore");
 
     const pad = createMockPad({ id: "disp-next-loop-pad" });
@@ -867,7 +890,7 @@ describe("startLayerSound error bus", () => {
   it("emits isMissingFile:true via audioEvents on MissingFileError", async () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("not found"));
     const pad = createMockPad({ id: "err-pad" });
     const layer = createMockLayer({ id: "err-layer" });
@@ -886,7 +909,7 @@ describe("startLayerSound error bus", () => {
   it("emits generic error via audioEvents on load failure", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
     const pad = createMockPad({ id: "err-pad-2" });
     const layer = createMockLayer({ id: "err-layer-2" });
@@ -926,7 +949,8 @@ describe("startLayerSound circuit-breaker", () => {
   it("increments the consecutive-failure counter on each failure (below threshold)", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getLayerConsecutiveFailures } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getLayerConsecutiveFailures } = await import("./chainCycleState");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
 
     const pad = createMockPad({ id: "cb-pad-1" });
@@ -949,13 +973,12 @@ describe("startLayerSound circuit-breaker", () => {
   it("fires the circuit-breaker after 3 consecutive failures: deletes chain and emits ONE summary error", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const {
-      getPadGain,
-      getOrCreateLayerGain,
       setLayerChain,
       getLayerChain,
       getLayerConsecutiveFailures,
-    } = await import("./audioState");
+    } = await import("./chainCycleState");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
 
     const pad = createMockPad({ id: "cb-pad-2" });
@@ -991,7 +1014,7 @@ describe("startLayerSound circuit-breaker", () => {
   it("does NOT emit additional errors once the circuit has tripped (no toast per sound in a 500-sound chain)", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
 
     const pad = createMockPad({ id: "cb-pad-3" });
@@ -1021,11 +1044,8 @@ describe("startLayerSound circuit-breaker", () => {
   it("resets the consecutive-failure counter on a successful load", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const {
-      getPadGain,
-      getOrCreateLayerGain,
-      getLayerConsecutiveFailures,
-    } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getLayerConsecutiveFailures } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "cb-pad-4" });
     const layer = createMockLayer({ id: "cb-layer-4" });
@@ -1053,7 +1073,8 @@ describe("startLayerSound circuit-breaker", () => {
     // (through startLayerSound's internal catch), proving the error is not lost.
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "cb-pad-log" });
     const layer = createMockLayer({ id: "cb-layer-log", arrangement: "sequential" });
@@ -1105,7 +1126,8 @@ describe("startLayerSound circuit-breaker", () => {
     layerId: string,
   ) {
     const { loadBuffer } = await import("./bufferCache");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { startLayerSound } = await import("./layerTrigger");
 
     const s1 = createMockSound({
@@ -1191,7 +1213,8 @@ describe("startLayerSound circuit-breaker", () => {
     // companion test above ("no longer silently swallows") exercises the onended path.
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain, getLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain, getLayerChain } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "cb-chain-stop-pad" });
     const layer = createMockLayer({ id: "cb-chain-stop-layer", arrangement: "sequential" });
@@ -1223,7 +1246,8 @@ describe("startLayerSound circuit-breaker", () => {
     // from 0 before the breaker trips — not trip immediately from a stale count.
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getLayerConsecutiveFailures } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getLayerConsecutiveFailures } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "cb-reset-pad" });
     const layer = createMockLayer({ id: "cb-reset-layer" });
@@ -1258,7 +1282,8 @@ describe("startLayerSound circuit-breaker", () => {
     // failure on the new trigger is counted from 0, not from the stale value.
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerPlayback } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getLayerConsecutiveFailures } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getLayerConsecutiveFailures } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "cb-retrig-pad" });
     const layer = createMockLayer({ id: "cb-retrig-layer", arrangement: "sequential" });
@@ -1312,12 +1337,8 @@ describe("startLayerSound chain-state cleanup on error", () => {
   it("clears layerChain after a single (below-threshold) decode failure so the next trigger starts fresh", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const {
-      getPadGain,
-      getOrCreateLayerGain,
-      setLayerChain,
-      getLayerChain,
-    } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain, getLayerChain } = await import("./chainCycleState");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
 
     const pad = createMockPad({ id: "cleanup-pad-1" });
@@ -1340,12 +1361,8 @@ describe("startLayerSound chain-state cleanup on error", () => {
   it("clears layerCycleIndex after a single (below-threshold) decode failure so the next trigger resets the cycle", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const {
-      getPadGain,
-      getOrCreateLayerGain,
-      setLayerCycleIndex,
-      getLayerCycleIndex,
-    } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
 
     const pad = createMockPad({ id: "cleanup-pad-2" });
@@ -1367,12 +1384,8 @@ describe("startLayerSound chain-state cleanup on error", () => {
   it("clears layerChain on MissingFileError — same cleanup applies regardless of error type", async () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const {
-      getPadGain,
-      getOrCreateLayerGain,
-      setLayerChain,
-      getLayerChain,
-    } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain, getLayerChain } = await import("./chainCycleState");
     vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("kick.wav not found"));
 
     const pad = createMockPad({ id: "cleanup-pad-3" });
@@ -1392,12 +1405,8 @@ describe("startLayerSound chain-state cleanup on error", () => {
   it("clears layerCycleIndex on MissingFileError — same cleanup applies regardless of error type", async () => {
     const { loadBuffer, MissingFileError } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const {
-      getPadGain,
-      getOrCreateLayerGain,
-      setLayerCycleIndex,
-      getLayerCycleIndex,
-    } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
     vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("kick.wav not found"));
 
     const pad = createMockPad({ id: "cleanup-pad-4" });
@@ -1421,12 +1430,8 @@ describe("startLayerSound chain-state cleanup on error", () => {
     // means the next trigger starts fresh from sound #1 — correct behavior.
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const {
-      getPadGain,
-      getOrCreateLayerGain,
-      setLayerChain,
-      getLayerChain,
-    } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain, getLayerChain } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "cleanup-pad-5" });
     const layer = createMockLayer({ id: "cleanup-layer-5", arrangement: "sequential" });
@@ -1480,7 +1485,8 @@ describe("triggerLayerOfPad", () => {
   });
 
   async function setup(layerOpts?: Parameters<typeof createMockLayer>[0]) {
-    const { getPadGain, getOrCreateLayerGain, setLayerPending } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerPending } = await import("./chainCycleState");
     const { loadBuffer } = await import("./bufferCache");
     const pad = createMockPad({ id: "pad-tlop" });
     const layer = createMockLayer({ id: "layer-tlop", ...layerOpts });
@@ -1493,7 +1499,8 @@ describe("triggerLayerOfPad", () => {
 
   it("starts playback and clears pending on proceed", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { isLayerPending, isLayerActive } = await import("./audioState");
+    const { isLayerPending } = await import("./chainCycleState");
+    const { isLayerActive } = await import("./voiceRegistry");
     const { loadBuffer } = await import("./bufferCache");
     const { pad, layer, padGain } = await setup();
     const sound = createMockSound({ id: "s1", filePath: "s1.wav" });
@@ -1510,7 +1517,8 @@ describe("triggerLayerOfPad", () => {
 
   it("clears pending and skips playback when action is 'skip' (continue mode, layer playing)", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { recordLayerVoice, isLayerPending } = await import("./audioState");
+    const { recordLayerVoice } = await import("./voiceRegistry");
+    const { isLayerPending } = await import("./chainCycleState");
     const { pad, layer, padGain, loadBuffer } = await setup({ retriggerMode: "continue" });
 
     const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
@@ -1527,7 +1535,8 @@ describe("triggerLayerOfPad", () => {
 
   it("clears pending when action is 'chain-advanced' (next mode, chain has remaining)", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { recordLayerVoice, setLayerChain, isLayerPending } = await import("./audioState");
+    const { recordLayerVoice } = await import("./voiceRegistry");
+    const { setLayerChain, isLayerPending } = await import("./chainCycleState");
     const { pad, layer, padGain, loadBuffer } = await setup({ retriggerMode: "next", arrangement: "sequential" });
 
     const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
@@ -1541,14 +1550,14 @@ describe("triggerLayerOfPad", () => {
 
     // Chain was popped: next sound loaded, remaining chain is now empty
     expect(vi.mocked(loadBuffer)).toHaveBeenCalledOnce();
-    const { getLayerChain } = await import("./audioState");
+    const { getLayerChain } = await import("./chainCycleState");
     expect(getLayerChain(layer.id)).toHaveLength(0);
     expect(isLayerPending(layer.id)).toBe(false);
   });
 
   it("calls afterStopCleanup when 'stop' mode stops a playing layer", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { recordLayerVoice } = await import("./audioState");
+    const { recordLayerVoice } = await import("./voiceRegistry");
     const { pad, layer, padGain } = await setup({ retriggerMode: "stop" });
 
     const fakeVoice = { setOnEnded: vi.fn(), stop: vi.fn(), stopWithRamp: vi.fn() } as unknown as import("./audioVoice").AudioVoice;
@@ -1612,7 +1621,7 @@ describe("triggerLayerOfPad", () => {
 
   it("clears pending and emits error when buffer load fails (via startLayerSound catch)", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { isLayerPending } = await import("./audioState");
+    const { isLayerPending } = await import("./chainCycleState");
     const { pad, layer, padGain, loadBuffer } = await setup();
 
     vi.mocked(loadBuffer).mockRejectedValue(new Error("load failed"));
@@ -1639,7 +1648,8 @@ describe("triggerLayerOfPad", () => {
 
   it("does not start new playback when 'next' mode exhausts a one-shot chain", async () => {
     const { triggerLayerOfPad } = await import("./layerTrigger");
-    const { recordLayerVoice, isLayerPending, isLayerActive } = await import("./audioState");
+    const { recordLayerVoice, isLayerActive } = await import("./voiceRegistry");
+    const { isLayerPending } = await import("./chainCycleState");
     const { loadBuffer } = await import("./bufferCache");
     const { pad, layer, padGain } = await setup({
       retriggerMode: "next",
@@ -1690,7 +1700,8 @@ describe("layerTrigger playbackStore integration", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, isLayerActive } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { isLayerActive } = await import("./voiceRegistry");
     const { usePlaybackStore } = await import("@/state/playbackStore");
     const pad = createMockPad({ id: "pp-pad-1" });
     const layer = createMockLayer({ id: "pp-layer-1" });
@@ -1710,7 +1721,7 @@ describe("layerTrigger playbackStore integration", () => {
   it("onended removes the pad from playingPadIds when the last voice ends", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const { usePlaybackStore } = await import("@/state/playbackStore");
 
     const pad = createMockPad({ id: "pp-pad-end" });
@@ -1748,7 +1759,8 @@ describe("layerTrigger playbackStore integration", () => {
     vi.useFakeTimers();
     try {
       const { rampStopLayerVoices } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, recordLayerVoice } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { recordLayerVoice } = await import("./voiceRegistry");
       const { usePlaybackStore } = await import("@/state/playbackStore");
 
       const pad = createMockPad({ id: "pp-pad-ramp" });
@@ -1775,7 +1787,8 @@ describe("layerTrigger playbackStore integration", () => {
 
   it("skipLayerForward clears fadingPadIds / fadingOutPadIds when starting the next sound", async () => {
     const { skipLayerForward } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { usePlaybackStore } = await import("@/state/playbackStore");
 
     const s1 = createMockSound({ id: "s1", filePath: "s1.wav" });
@@ -1811,7 +1824,7 @@ describe("layerTrigger playbackStore integration", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockRejectedValueOnce(new Error("load failed"));
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const { usePlaybackStore } = await import("@/state/playbackStore");
 
     const pad = createMockPad({ id: "catch-remove-pad" });
@@ -1862,7 +1875,8 @@ describe("afterStopCleanup with real active voices", () => {
     vi.useFakeTimers();
     try {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, recordLayerVoice, isLayerActive } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { recordLayerVoice, isLayerActive } = await import("./voiceRegistry");
 
       const pad = createMockPad({ id: "asc-pad" });
       const layer = createMockLayer({ id: "asc-layer", retriggerMode: "stop" });
@@ -1891,7 +1905,8 @@ describe("afterStopCleanup with real active voices", () => {
     vi.useFakeTimers();
     try {
       const { applyRetriggerMode } = await import("./layerTrigger");
-      const { getPadGain, getOrCreateLayerGain, recordLayerVoice } = await import("./audioState");
+      const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+      const { recordLayerVoice } = await import("./voiceRegistry");
       const { usePlaybackStore } = await import("@/state/playbackStore");
 
       const pad = createMockPad({ id: "asc-pad-2" });
@@ -1916,7 +1931,8 @@ describe("afterStopCleanup with real active voices", () => {
 
   it("stopWithRamp is called on the actual voice object registered via recordLayerVoice", async () => {
     const { applyRetriggerMode } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, recordLayerVoice } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { recordLayerVoice } = await import("./voiceRegistry");
 
     const pad = createMockPad({ id: "asc-pad-3" });
     const layer = createMockLayer({ id: "asc-layer-3", retriggerMode: "stop" });
@@ -1963,7 +1979,9 @@ describe("onended chain continuation — happy path", () => {
   it("fires onended and starts the next sound in the chain", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain, isLayerActive } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
+    const { isLayerActive } = await import("./voiceRegistry");
 
     const pad = createMockPad({ id: "oe-pad" });
     const layer = createMockLayer({ id: "oe-layer", arrangement: "sequential" });
@@ -2003,7 +2021,9 @@ describe("onended chain continuation — happy path", () => {
   it("fires onended and layer becomes inactive when chain is empty (one-shot, chain exhausted)", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain, isLayerActive } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
+    const { isLayerActive } = await import("./voiceRegistry");
     const { usePlaybackStore } = await import("@/state/playbackStore");
 
     const pad = createMockPad({ id: "oe-pad-2" });
@@ -2044,7 +2064,8 @@ describe("onended chain continuation — happy path", () => {
   it("fires onended with chain cleared externally — does not start next sound", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain, deleteLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain, deleteLayerChain } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "oe-pad-3" });
     const layer = createMockLayer({ id: "oe-layer-3", arrangement: "sequential" });
@@ -2084,7 +2105,8 @@ describe("onended chain continuation — happy path", () => {
     mockEmitAudioError.mockClear();
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { useLibraryStore } = await import("@/state/libraryStore");
 
     // Live library contains a DIFFERENT sound (sZ) that is NOT in the captured
@@ -2150,7 +2172,8 @@ describe("onended chain continuation — happy path", () => {
     mockEmitAudioError.mockClear();
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
     const { useProjectStore, initialProjectState } = await import("@/state/projectStore");
     const { createMockProject, createMockScene, createMockHistoryEntry } = await import("@/test/factories");
 
@@ -2217,7 +2240,8 @@ describe("onended chain continuation — happy path", () => {
     mockEmitAudioError.mockClear();
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "snap-hold-pad" });
     // Captured layer has playbackMode: "hold" — restart should still fire on exhaustion.
@@ -2261,7 +2285,8 @@ describe("onended chain continuation — happy path", () => {
     mockEmitAudioError.mockClear();
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, setLayerChain } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setLayerChain } = await import("./chainCycleState");
 
     const pad = createMockPad({ id: "snap-sim-pad" });
     const layer = createMockLayer({
@@ -2328,7 +2353,8 @@ describe("startLayerSound progress info", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 2.5 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getLayerProgressInfo } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getLayerProgressInfo } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad" });
     const layer = createMockLayer({ id: "pi-layer" });
@@ -2350,7 +2376,8 @@ describe("startLayerSound progress info", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 3.0 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getPadProgressInfo } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad-2" });
     const layer = createMockLayer({ id: "pi-layer-2" });
@@ -2371,7 +2398,8 @@ describe("startLayerSound progress info", () => {
   it("simultaneous arrangement: keeps the longer-duration padProgressInfo (longest-wins)", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getPadProgressInfo } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad-3" });
     const layerA = createMockLayer({ id: "pi-layer-3a", arrangement: "simultaneous" });
@@ -2396,7 +2424,8 @@ describe("startLayerSound progress info", () => {
   it("simultaneous arrangement: longer second sound overwrites shorter padProgressInfo", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getPadProgressInfo } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad-4" });
     const layerA = createMockLayer({ id: "pi-layer-4a", arrangement: "simultaneous" });
@@ -2421,7 +2450,8 @@ describe("startLayerSound progress info", () => {
   it("chained arrangement: padProgressInfo is always updated (not longest-wins)", async () => {
     const { loadBuffer } = await import("./bufferCache");
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getPadProgressInfo, setPadProgressInfo } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo, setPadProgressInfo } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad-5" });
     const layer = createMockLayer({ id: "pi-layer-5", arrangement: "sequential" });
@@ -2444,7 +2474,8 @@ describe("startLayerSound progress info", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockResolvedValue({ duration: 4.0 } as unknown as AudioBuffer);
     const { startLayerSound } = await import("./layerTrigger");
-    const { getPadGain, getOrCreateLayerGain, getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
 
     const pad = createMockPad({ id: "pi-pad-6" });
     // simultaneous loop → shouldLayerLoopNatively returns true
@@ -2463,8 +2494,9 @@ describe("startLayerSound progress info", () => {
     const { loadBuffer } = await import("./bufferCache");
     vi.mocked(loadBuffer).mockRejectedValue(new Error("load error"));
     const { startLayerSound } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
     const {
-      getPadGain, getOrCreateLayerGain, getPadProgressInfo, getLayerProgressInfo,
+      getPadProgressInfo, getLayerProgressInfo,
       setPadProgressInfo, setLayerProgressInfo,
     } = await import("./audioState");
 

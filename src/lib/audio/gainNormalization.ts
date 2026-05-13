@@ -32,7 +32,7 @@ export function normalizedVoiceGain(
 
 /**
  * Create a DynamicsCompressorNode configured as a near-brickwall limiter.
- * Used by audioState (per-pad) and preview (per-session) to catch peaks
+ * Used by gainRegistry (per-pad) and preview (per-session) to catch peaks
  * that exceed 0 dBFS after normalization gain is applied.
  */
 export function createLimiterNode(
