@@ -2516,3 +2516,532 @@ describe("startLayerSound progress info", () => {
     expect(getLayerProgressInfo(layer.id)).toBeUndefined();
   });
 });
+
+// ── loadVoice — pure voice creation, no side effects ────────────────────────
+
+describe("loadVoice", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null,
+      loop: false,
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      addEventListener: vi.fn(),
+    });
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
+  });
+
+  it("buffer path: returns voice, null audio, and bufferMeta with duration and loop flag", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 2.5 } as unknown as AudioBuffer);
+
+    const pad = createMockPad({ id: "lv-pad-1" });
+    const layer = createMockLayer({ id: "lv-layer-1", playbackMode: "one-shot", arrangement: "simultaneous" });
+    const sound = createMockSound({ filePath: "s1.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    const result = await loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0);
+
+    expect(result.voice).toBeDefined();
+    expect(result.audio).toBeNull();
+    expect(result.bufferMeta).toEqual({ duration: 2.5, isLooping: false });
+  });
+
+  it("buffer path: sets isLooping:true for loop mode with non-chained arrangement", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const mockSource = { buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn() };
+    mockCtx.createBufferSource.mockReturnValue(mockSource);
+
+    const layer = createMockLayer({ id: "lv-layer-loop", playbackMode: "loop", arrangement: "simultaneous" });
+    const sound = createMockSound({ filePath: "s.wav" });
+    const padGain = getPadGain("lv-pad-loop");
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    const result = await loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0);
+
+    expect(result.bufferMeta?.isLooping).toBe(true);
+    expect(mockSource.loop).toBe(true);
+  });
+
+  it("buffer path: does not write progress state or start voice (no side effects)", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
+
+    vi.mocked(loadBuffer).mockResolvedValue({ duration: 1.0 } as unknown as AudioBuffer);
+    const mockSource = { buffer: null, loop: false, connect: vi.fn(), start: vi.fn(), stop: vi.fn(), addEventListener: vi.fn() };
+    mockCtx.createBufferSource.mockReturnValue(mockSource);
+
+    const pad = createMockPad({ id: "lv-pad-noeff" });
+    const layer = createMockLayer({ id: "lv-layer-noeff" });
+    const sound = createMockSound({ filePath: "s.wav" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0);
+
+    // No progress state written — that's setupVoiceLifecycle's job.
+    expect(getPadProgressInfo(pad.id)).toBeUndefined();
+    expect(getLayerProgressInfo(layer.id)).toBeUndefined();
+    // voice.start() must NOT be called — loadVoice is pure creation only.
+    expect(mockSource.start).not.toHaveBeenCalled();
+  });
+
+  it("streaming path: returns voice, non-null audio, and undefined bufferMeta", async () => {
+    const { checkIsLargeFile, getOrCreateStreamingElement } = await import("./streamingCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+
+    vi.mocked(checkIsLargeFile).mockResolvedValue(true);
+    const mockAudio = {
+      currentTime: 0, loop: false,
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    const mockSourceNode = { connect: vi.fn(), disconnect: vi.fn() };
+    vi.mocked(getOrCreateStreamingElement).mockReturnValue({
+      audio: mockAudio as unknown as HTMLAudioElement,
+      sourceNode: mockSourceNode as unknown as MediaElementAudioSourceNode,
+    });
+
+    const layer = createMockLayer({ id: "lv-layer-stream", playbackMode: "one-shot", arrangement: "simultaneous" });
+    const sound = createMockSound({ filePath: "large.wav" });
+    const padGain = getPadGain("lv-pad-stream");
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    const result = await loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0);
+
+    expect(result.voice).toBeDefined();
+    expect(result.audio).toBe(mockAudio);
+    expect(result.bufferMeta).toBeUndefined();
+    // Verify element was prepared: currentTime reset to 0 and sourceNode disconnected.
+    expect(mockAudio.currentTime).toBe(0);
+    expect(mockSourceNode.disconnect).toHaveBeenCalled();
+  });
+
+  it("streaming path: sets audio.loop=true for loop mode with non-chained arrangement", async () => {
+    const { checkIsLargeFile, getOrCreateStreamingElement } = await import("./streamingCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+
+    vi.mocked(checkIsLargeFile).mockResolvedValue(true);
+    const mockAudio = {
+      currentTime: 0, loop: false,
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    const mockSourceNode = { connect: vi.fn(), disconnect: vi.fn() };
+    vi.mocked(getOrCreateStreamingElement).mockReturnValue({
+      audio: mockAudio as unknown as HTMLAudioElement,
+      sourceNode: mockSourceNode as unknown as MediaElementAudioSourceNode,
+    });
+
+    const layer = createMockLayer({ id: "lv-layer-stream-loop", playbackMode: "loop", arrangement: "simultaneous" });
+    const sound = createMockSound({ filePath: "large.wav" });
+    const padGain = getPadGain("lv-pad-stream-loop");
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0);
+
+    expect(mockAudio.loop).toBe(true);
+  });
+
+  it("streaming path: does not register streaming element (no side effects)", async () => {
+    const { checkIsLargeFile, getOrCreateStreamingElement } = await import("./streamingCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const streamingLifecycle = await import("./streamingAudioLifecycle");
+    const registerSpy = vi.spyOn(streamingLifecycle, "register");
+
+    vi.mocked(checkIsLargeFile).mockResolvedValue(true);
+    const mockAudio = {
+      currentTime: 0, loop: false,
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    const mockSourceNode = { connect: vi.fn(), disconnect: vi.fn() };
+    vi.mocked(getOrCreateStreamingElement).mockReturnValue({
+      audio: mockAudio as unknown as HTMLAudioElement,
+      sourceNode: mockSourceNode as unknown as MediaElementAudioSourceNode,
+    });
+
+    const layer = createMockLayer({ id: "lv-layer-stream-noside" });
+    const sound = createMockSound({ filePath: "large.wav" });
+    const padGain = getPadGain("lv-pad-stream-noside");
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0);
+
+    expect(registerSpy).not.toHaveBeenCalled();
+    registerSpy.mockRestore();
+  });
+
+  it("propagates MissingFileError from loadBuffer without swallowing", async () => {
+    const { loadBuffer, MissingFileError } = await import("./bufferCache");
+    const { checkIsLargeFile } = await import("./streamingCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+
+    vi.mocked(checkIsLargeFile).mockResolvedValue(false);
+    vi.mocked(loadBuffer).mockRejectedValue(new MissingFileError("not found"));
+
+    const layer = createMockLayer({ id: "lv-layer-err-missing" });
+    const sound = createMockSound({ filePath: "s.wav" });
+    const padGain = getPadGain("lv-pad-err-missing");
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await expect(loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0))
+      .rejects.toThrow(MissingFileError);
+  });
+
+  it("propagates generic error from loadBuffer without swallowing", async () => {
+    const { loadBuffer } = await import("./bufferCache");
+    const { checkIsLargeFile } = await import("./streamingCache");
+    const { loadVoice } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+
+    vi.mocked(checkIsLargeFile).mockResolvedValue(false);
+    vi.mocked(loadBuffer).mockRejectedValue(new Error("decode failed"));
+
+    const layer = createMockLayer({ id: "lv-layer-err-generic" });
+    const sound = createMockSound({ filePath: "s.wav" });
+    const padGain = getPadGain("lv-pad-err-generic");
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    await expect(loadVoice(sound, layer, mockCtx as unknown as AudioContext, layerGain, 1.0))
+      .rejects.toThrow("decode failed");
+  });
+});
+
+// ── setupVoiceLifecycle — side effects, progress rules, race-guard ───────────
+
+describe("setupVoiceLifecycle", () => {
+  function makeTestVoice() {
+    let capturedOnEnded: (() => void) | null = null;
+    const voice = {
+      setOnEnded: vi.fn((cb: (() => void) | null) => { capturedOnEnded = cb; }),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      stopWithRamp: vi.fn(),
+      setLoop: vi.fn(),
+    };
+    return {
+      voice,
+      fireOnEnded: () => { capturedOnEnded?.(); },
+    };
+  }
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockCtx.currentTime = 0;
+    mockCtx.createGain.mockReset().mockReturnValue(makeMockGain());
+    mockCtx.createBufferSource.mockReset().mockReturnValue({
+      buffer: null,
+      loop: false,
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      addEventListener: vi.fn(),
+    });
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
+  });
+
+  it("buffer path: sets padProgressInfo and layerProgressInfo from bufferMeta", async () => {
+    const { setupVoiceLifecycle } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
+    const { voice } = makeTestVoice();
+
+    const pad = createMockPad({ id: "svl-pad-prog" });
+    const layer = createMockLayer({ id: "svl-layer-prog", arrangement: "simultaneous" });
+    const sound = createMockSound({ name: "kick" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+    mockCtx.currentTime = 1.0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await setupVoiceLifecycle(voice as any, null, pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, [sound], { duration: 3.0, isLooping: false });
+
+    expect(getPadProgressInfo(pad.id)).toEqual({ startedAt: 1.0, duration: 3.0, isLooping: false });
+    expect(getLayerProgressInfo(layer.id)).toEqual({ startedAt: 1.0, duration: 3.0, isLooping: false });
+  });
+
+  it("simultaneous: shorter sound does NOT overwrite longer padProgressInfo (longest-wins)", async () => {
+    const { setupVoiceLifecycle } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { voice } = makeTestVoice();
+
+    const pad = createMockPad({ id: "svl-pad-lw" });
+    const layer = createMockLayer({ id: "svl-layer-lw", arrangement: "simultaneous" });
+    const sound = createMockSound({ name: "kick" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // Pre-seed with a longer duration.
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 5.0, isLooping: false });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await setupVoiceLifecycle(voice as any, null, pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, [sound], { duration: 2.0, isLooping: false });
+
+    // Shorter sound must NOT overwrite the longer one.
+    expect(getPadProgressInfo(pad.id)?.duration).toBe(5.0);
+  });
+
+  it("simultaneous: longer second sound DOES overwrite shorter padProgressInfo", async () => {
+    const { setupVoiceLifecycle } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { voice } = makeTestVoice();
+
+    const pad = createMockPad({ id: "svl-pad-lw2" });
+    const layer = createMockLayer({ id: "svl-layer-lw2", arrangement: "simultaneous" });
+    const sound = createMockSound({ name: "kick" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 1.0, isLooping: false });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await setupVoiceLifecycle(voice as any, null, pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, [sound], { duration: 4.0, isLooping: false });
+
+    expect(getPadProgressInfo(pad.id)?.duration).toBe(4.0);
+  });
+
+  it("chained: always overwrites padProgressInfo regardless of duration (not longest-wins)", async () => {
+    const { setupVoiceLifecycle } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const { setPadProgressInfo, getPadProgressInfo } = await import("./audioState");
+    const { voice } = makeTestVoice();
+
+    const pad = createMockPad({ id: "svl-pad-chain" });
+    const layer = createMockLayer({ id: "svl-layer-chain", arrangement: "sequential" });
+    const sound = createMockSound({ name: "kick" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 10.0, isLooping: false });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await setupVoiceLifecycle(voice as any, null, pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, [sound], { duration: 2.0, isLooping: false });
+
+    // Chained: always overwrite, even if shorter.
+    expect(getPadProgressInfo(pad.id)?.duration).toBe(2.0);
+  });
+
+  it("registers streaming element for cleanup tracking (streaming path)", async () => {
+    const { setupVoiceLifecycle } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const streamingLifecycle = await import("./streamingAudioLifecycle");
+    const registerSpy = vi.spyOn(streamingLifecycle, "register");
+    const { voice } = makeTestVoice();
+
+    const mockAudio = { currentTime: 0, loop: false, play: vi.fn(), pause: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    const pad = createMockPad({ id: "svl-pad-stream" });
+    const layer = createMockLayer({ id: "svl-layer-stream" });
+    const sound = createMockSound({ name: "sound" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await setupVoiceLifecycle(voice as any, mockAudio as unknown as HTMLAudioElement, pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, [sound]);
+
+    expect(registerSpy).toHaveBeenCalledWith(pad.id, layer.id, mockAudio);
+    registerSpy.mockRestore();
+  });
+
+  it("skips voiceEnqueued when isPadActive returns false after start (race-guard)", async () => {
+    const { setupVoiceLifecycle } = await import("./layerTrigger");
+    const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
+    const voiceRegistry = await import("./voiceRegistry");
+    const coordinator = await import("./playbackStateCoordinator");
+    const voiceEnqueuedSpy = vi.spyOn(coordinator, "voiceEnqueued");
+    // Simulate race: pad becomes inactive between start() and enqueueVoice.
+    const isPadActiveSpy = vi.spyOn(voiceRegistry, "isPadActive").mockReturnValue(false);
+    const { voice } = makeTestVoice();
+
+    const pad = createMockPad({ id: "svl-pad-race" });
+    const layer = createMockLayer({ id: "svl-layer-race" });
+    const sound = createMockSound({ name: "sound" });
+    const padGain = getPadGain(pad.id);
+    const layerGain = getOrCreateLayerGain(layer.id, 1, padGain);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await setupVoiceLifecycle(voice as any, null, pad, layer, sound, mockCtx as unknown as AudioContext, layerGain, [sound], { duration: 1.0, isLooping: false });
+
+    expect(voiceEnqueuedSpy).not.toHaveBeenCalled();
+
+    isPadActiveSpy.mockRestore();
+    voiceEnqueuedSpy.mockRestore();
+  });
+});
+
+// ── handleVoiceError — circuit-breaker in isolation ─────────────────────────
+
+describe("handleVoiceError (circuit-breaker in isolation)", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    const { clearAllAudioState } = await import("./audioState");
+    clearAllAudioState();
+  });
+
+  it("clears progress, chain, and cycle state on any error", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const { setLayerChain, getLayerChain, setLayerCycleIndex, getLayerCycleIndex } = await import("./chainCycleState");
+    const { setPadProgressInfo, setLayerProgressInfo, getPadProgressInfo, getLayerProgressInfo } = await import("./audioState");
+
+    const pad = createMockPad({ id: "hve-pad-1" });
+    const layer = createMockLayer({ id: "hve-layer-1" });
+    const sound = createMockSound({ id: "s1", name: "kick" });
+
+    setLayerChain(layer.id, [sound]);
+    setLayerCycleIndex(layer.id, 2);
+    setPadProgressInfo(pad.id, { startedAt: 0, duration: 5, isLooping: false });
+    setLayerProgressInfo(layer.id, { startedAt: 0, duration: 5, isLooping: false });
+
+    handleVoiceError(new Error("load failed"), pad, layer, sound);
+
+    expect(getPadProgressInfo(pad.id)).toBeUndefined();
+    expect(getLayerProgressInfo(layer.id)).toBeUndefined();
+    expect(getLayerChain(layer.id)).toBeUndefined();
+    expect(getLayerCycleIndex(layer.id)).toBeUndefined();
+  });
+
+  it("increments failure counter and emits per-sound error below threshold", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const { getLayerConsecutiveFailures } = await import("./chainCycleState");
+
+    const pad = createMockPad({ id: "hve-pad-2" });
+    const layer = createMockLayer({ id: "hve-layer-2" });
+    const sound = createMockSound({ id: "s1", name: "snare", filePath: "snare.wav" });
+
+    handleVoiceError(new Error("fail 1"), pad, layer, sound);
+    expect(getLayerConsecutiveFailures(layer.id)).toBe(1);
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(1);
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "fail 1" }),
+      expect.objectContaining({ isMissingFile: false, soundName: "snare" }),
+    );
+
+    handleVoiceError(new Error("fail 2"), pad, layer, sound);
+    expect(getLayerConsecutiveFailures(layer.id)).toBe(2);
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(2);
+  });
+
+  it("trips circuit-breaker on 3rd consecutive call: emits summary error and resets counter", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const { getLayerConsecutiveFailures, setLayerChain, getLayerChain } = await import("./chainCycleState");
+
+    const pad = createMockPad({ id: "hve-pad-3", name: "Pad A" });
+    const layer = createMockLayer({ id: "hve-layer-3", name: "Layer B" });
+    const sound = createMockSound({ id: "s1", name: "hat", filePath: "hat.wav" });
+
+    // Pre-seed a chain to verify it gets torn down.
+    setLayerChain(layer.id, [sound]);
+
+    handleVoiceError(new Error("fail"), pad, layer, sound);
+    handleVoiceError(new Error("fail"), pad, layer, sound);
+    handleVoiceError(new Error("fail"), pad, layer, sound);
+
+    expect(mockEmitAudioError).toHaveBeenCalledTimes(3);
+    const [summaryErr, summaryMeta] = mockEmitAudioError.mock.calls[2];
+    // Use a pattern that won't break if CHAIN_FAILURE_THRESHOLD changes value.
+    expect((summaryErr as Error).message).toMatch(/consecutive load failures/i);
+    expect((summaryErr as Error).message).toContain("Pad A");
+    expect((summaryErr as Error).message).toContain("Layer B");
+    expect(summaryMeta).toEqual(expect.objectContaining({ isMissingFile: false }));
+    expect(getLayerConsecutiveFailures(layer.id)).toBe(0);
+    // Chain must be torn down by the 3rd failure.
+    expect(getLayerChain(layer.id)).toBeUndefined();
+  });
+
+  it("sets isMissingFile:true for MissingFileError", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const { MissingFileError } = await import("./bufferCache");
+
+    const pad = createMockPad({ id: "hve-pad-4" });
+    const layer = createMockLayer({ id: "hve-layer-4" });
+    const sound = createMockSound({ id: "s1", name: "kick", filePath: "kick.wav" });
+
+    handleVoiceError(new MissingFileError("not found"), pad, layer, sound);
+
+    expect(mockEmitAudioError).toHaveBeenCalledWith(
+      expect.any(MissingFileError),
+      expect.objectContaining({ isMissingFile: true, soundName: "kick" }),
+    );
+  });
+
+  it("counter resets after tripping so a subsequent failure restarts from 1", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const { getLayerConsecutiveFailures } = await import("./chainCycleState");
+
+    const pad = createMockPad({ id: "hve-pad-5" });
+    const layer = createMockLayer({ id: "hve-layer-5" });
+    const sound = createMockSound({ name: "sound" });
+
+    handleVoiceError(new Error("e"), pad, layer, sound);
+    handleVoiceError(new Error("e"), pad, layer, sound);
+    handleVoiceError(new Error("e"), pad, layer, sound);
+    expect(getLayerConsecutiveFailures(layer.id)).toBe(0);
+
+    handleVoiceError(new Error("e"), pad, layer, sound);
+    expect(getLayerConsecutiveFailures(layer.id)).toBe(1);
+  });
+
+  it("calls coordinator.padStopped when pad has no active voices (removes from playingPadIds)", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const coordinator = await import("./playbackStateCoordinator");
+    const padStoppedSpy = vi.spyOn(coordinator, "padStopped");
+
+    const pad = createMockPad({ id: "hve-pad-6" });
+    const layer = createMockLayer({ id: "hve-layer-6" });
+    const sound = createMockSound({ name: "sound" });
+
+    // No voices registered for this pad, so isPadActive returns false → padStopped fires.
+    handleVoiceError(new Error("fail"), pad, layer, sound);
+
+    expect(padStoppedSpy).toHaveBeenCalledWith(pad.id);
+    padStoppedSpy.mockRestore();
+  });
+
+  it("sets isMissingFile:true in circuit-breaker summary error (trip path)", async () => {
+    const { handleVoiceError } = await import("./layerTrigger");
+    const { MissingFileError } = await import("./bufferCache");
+
+    const pad = createMockPad({ id: "hve-pad-7", name: "Pad B" });
+    const layer = createMockLayer({ id: "hve-layer-7" });
+    const sound = createMockSound({ name: "snare" });
+
+    // Three MissingFileErrors to trip the breaker.
+    handleVoiceError(new MissingFileError("e"), pad, layer, sound);
+    handleVoiceError(new MissingFileError("e"), pad, layer, sound);
+    handleVoiceError(new MissingFileError("e"), pad, layer, sound);
+
+    const [, summaryMeta] = mockEmitAudioError.mock.calls[2];
+    expect(summaryMeta).toEqual(expect.objectContaining({ isMissingFile: true }));
+  });
+});

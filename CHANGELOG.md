@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactored for better reliability and testability — no user-facing behavior changes
 - Cover art now backfills for sounds already in your library, not only newly discovered files
 - File size metadata now populates for existing library sounds that were missing it
 - Cover art extraction skips sounds already checked (including those with no embedded art), preventing redundant processing on every load

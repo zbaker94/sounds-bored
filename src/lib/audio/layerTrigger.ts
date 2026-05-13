@@ -1,17 +1,23 @@
 // src/lib/audio/layerTrigger.ts
 //
-// Extracted layer trigger helpers used by padPlayer.ts:
-//   - resolveSounds / getVoiceVolume / shouldLayerLoopNatively — private utilities
-//   - rampStopLayerVoices / stopLayerWithRampInternal — ramped layer stop primitives
-//   - loadLayerVoice — voice creation (streaming vs buffer), separated from lifecycle
-//   - startLayerSound — onended chain-continuation lifecycle (calls loadLayerVoice)
-//   - applyRetriggerMode — deduplicates the retrigger switch shared by triggerPad + triggerLayer
-//   - startLayerPlayback — deduplicates the start-playback section shared by both
-//   - triggerLayerOfPad — core per-layer trigger sequence shared by triggerPad + triggerLayer
-//   - syncLayerPlaybackMode / syncLayerArrangement / syncLayerSelection / syncLayerConfig — live sync
-//   - selectionsEqual — structural equality for LayerSelection
-//   - stopLayerWithRamp — per-layer stop with pad-state cleanup
-//   - skipLayerForward / skipLayerBack — chain/cycle navigation
+// Extracted layer trigger helpers used by padPlayer.ts.
+//
+// Public exports (re-exported from index.ts):
+//   - getVoiceVolume / getLayerNormalizedVolume / shouldLayerLoopNatively
+//   - rampStopLayerVoices
+//   - startLayerSound — public entry point; thin coordinator over the three phases below
+//   - applyRetriggerMode / startLayerPlayback / triggerLayerOfPad
+//   - syncLayerPlaybackMode / syncLayerArrangement / syncLayerSelection / syncLayerConfig
+//   - selectionsEqual / stopLayerWithRamp / skipLayerForward / skipLayerBack
+//   - BufferVoiceMeta (type)
+//
+// Internal exports (@internal — exported for unit testing only, not in public index):
+//   - loadVoice — pure voice creation (streaming vs buffer), no side effects
+//   - setupVoiceLifecycle — wires onended, records voice, updates UI overlay, streaming/progress state
+//   - handleVoiceError — circuit-breaker, error emit, state cleanup on load failure
+//
+// Private (not exported):
+//   - resolveSounds / stopLayerWithRampInternal
 
 import { ensureResumed, getAudioContext } from "./audioContext";
 import * as coordinator from './playbackStateCoordinator';
@@ -152,39 +158,45 @@ function stopLayerWithRampInternal(pad: Pad, layer: Layer): void {
 }
 
 // ---------------------------------------------------------------------------
-// Voice creation — streaming vs buffer path
+// Voice creation — streaming vs buffer path (pure, no side effects)
 // ---------------------------------------------------------------------------
 
+/** Metadata returned by loadVoice for the buffer (short file) path.
+ *  Consumed by setupVoiceLifecycle to write progress info and loop state. */
+export interface BufferVoiceMeta {
+  duration: number;
+  /** Whether the buffer source's native loop flag was set (per layer policy, via shouldLayerLoopNatively). */
+  isLooping: boolean;
+}
+
 /**
- * Create and start a voice for one sound on one layer.
- * Routes to the streaming path (HTMLAudioElement) for large files and the
- * buffer path (AudioBufferSourceNode) for small files. Updates progress info
- * as a side effect. Returns the started voice and the HTMLAudioElement (if
- * streaming, for cleanup tracking; null for buffer path).
+ * Create a voice for one sound on one layer. Pure: routes to streaming path
+ * (HTMLAudioElement) for large files, buffer path (AudioBufferSourceNode) for
+ * small files. Returns the voice, the HTMLAudioElement (streaming) or null
+ * (buffer), and buffer metadata for the buffer path. Side effects (progress
+ * info, streaming registration) are handled by setupVoiceLifecycle.
  *
  * Throws on load failure — caller is responsible for catching.
+ *
+ * @internal Exported for unit testing only — do not import outside layerTrigger.ts or its test.
  */
-async function loadLayerVoice(
+export async function loadVoice(
   sound: Sound,
   layer: Layer,
   ctx: AudioContext,
   layerGain: GainNode,
   voiceVolume: number,
-  padId: string,
-): Promise<{ voice: AudioVoice; audio: HTMLAudioElement | null }> {
+): Promise<{ voice: AudioVoice; audio: HTMLAudioElement | null; bufferMeta?: BufferVoiceMeta }> {
   const isLarge = await checkIsLargeFile(sound);
 
   if (isLarge) {
-    // -- Streaming path (large files) ---
     const { audio: cachedAudio, sourceNode } = getOrCreateStreamingElement(sound, ctx);
     sourceNode.disconnect();
     cachedAudio.currentTime = 0;
     cachedAudio.loop = shouldLayerLoopNatively(layer);
     const voice = wrapStreamingElement(cachedAudio, sourceNode, ctx, layerGain, voiceVolume);
-    registerStreaming(padId, layer.id, cachedAudio);
     return { voice, audio: cachedAudio };
   } else {
-    // -- Buffer path (short files) ---
     const buffer = await loadBuffer(sound);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -192,17 +204,142 @@ async function loadLayerVoice(
       source.loop = true;
     }
     const voice = wrapBufferSource(source, ctx, layerGain, voiceVolume);
+    return { voice, audio: null, bufferMeta: { duration: buffer.duration, isLooping: source.loop } satisfies BufferVoiceMeta };
+  }
+}
 
+// ---------------------------------------------------------------------------
+// Voice lifecycle — onended wiring, registry, UI overlay, progress/streaming
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire the onended chain-continuation callback, register the voice, update UI
+ * overlay and progress/streaming state, then start the voice. All observable
+ * side effects from a successful load live here.
+ *
+ * @internal Exported for unit testing only — do not import outside layerTrigger.ts or its test.
+ */
+export async function setupVoiceLifecycle(
+  voice: AudioVoice,
+  audio: HTMLAudioElement | null,
+  pad: Pad,
+  layer: Layer,
+  sound: Sound,
+  ctx: AudioContext,
+  layerGain: GainNode,
+  allSounds: Sound[],
+  bufferMeta?: BufferVoiceMeta,
+): Promise<void> {
+  if (audio) {
+    registerStreaming(pad.id, layer.id, audio);
+  }
+  if (bufferMeta) {
     // Chained: always update progress to track the current sound.
     // Simultaneous: keep the longest-duration voice so the bar fills on the slowest sound.
-    const existing = getPadProgressInfo(padId);
-    if (isChained(layer.arrangement) || !existing || buffer.duration > existing.duration) {
-      setPadProgressInfo(padId, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
+    const existing = getPadProgressInfo(pad.id);
+    if (isChained(layer.arrangement) || !existing || bufferMeta.duration > existing.duration) {
+      setPadProgressInfo(pad.id, { startedAt: ctx.currentTime, duration: bufferMeta.duration, isLooping: bufferMeta.isLooping });
     }
-    setLayerProgressInfo(layer.id, { startedAt: ctx.currentTime, duration: buffer.duration, isLooping: source.loop });
-
-    return { voice, audio: null };
+    setLayerProgressInfo(layer.id, { startedAt: ctx.currentTime, duration: bufferMeta.duration, isLooping: bufferMeta.isLooping });
   }
+
+  voice.setOnEnded(() => {
+    if (audio) disposeStreaming(pad.id, layer.id, audio);
+    clearLayerVoice(pad.id, layer.id, voice);
+
+    // Chain to the next sound if one is queued (sequential/shuffled).
+    // `remaining === undefined` means the queue was cleared externally (stop/reset).
+    // `remaining.length === 0` means the chain ran to completion naturally.
+    const remaining = getLayerChain(layer.id);
+
+    if (remaining !== undefined && remaining.length > 0) {
+      // Chain continues — defer removePlayingPad until the next voice starts so
+      // the pad doesn't briefly flash as "not playing" between chained sounds.
+      const [next, ...rest] = remaining;
+      continueLayerChain(pad, layer, ctx, layerGain, next, rest, allSounds).catch(
+        (err) => emitAudioError(err, {}),
+      );
+    } else if (remaining !== undefined && (layer.playbackMode === "loop" || layer.playbackMode === "hold")) {
+      // Chain exhausted naturally — restart using captured snapshot; config changes take effect next trigger.
+      restartLoopChain(pad, layer, ctx, layerGain, allSounds);
+    } else {
+      // Chain exhausted (one-shot) or cleared externally (stop/reset).
+      if (remaining !== undefined) deleteLayerChain(layer.id);
+      if (!isPadActive(pad.id)) coordinator.padStopped(pad.id);
+    }
+  });
+
+  await voice.start();
+  recordLayerVoice(pad.id, layer.id, voice);
+  // Only show metadata overlay if the pad is still active. Guards against the
+  // narrow race where stopPad fires between voice.start() resolving and
+  // enqueueVoice being called — after the stop cleanup runs, isPadActive
+  // returns false and we skip the now-stale overlay enqueue.
+  if (isPadActive(pad.id)) {
+    coordinator.voiceEnqueued(pad.id, {
+      soundName: sound.name,
+      layerName: layer.name,
+      playbackMode: layer.playbackMode,
+      durationMs: sound.durationMs,
+      coverArtDataUrl: sound.coverArtDataUrl,
+    });
+  }
+  coordinator.padStarted(pad.id);
+  startAudioTick();
+}
+
+// ---------------------------------------------------------------------------
+// Error handling — circuit-breaker, error emit, state cleanup
+// ---------------------------------------------------------------------------
+
+/**
+ * Handle a voice load failure: clear progress/chain/cycle state, run the
+ * circuit-breaker, and emit the appropriate error. Isolated here so the
+ * circuit-breaker behavior is testable without voice setup.
+ *
+ * @internal Exported for unit testing only — do not import outside layerTrigger.ts or its test.
+ */
+export function handleVoiceError(err: unknown, pad: Pad, layer: Layer, sound: Sound): void {
+  // Clear stale progress so a failed load doesn't freeze the bar at 1.0.
+  clearLayerProgressInfo(layer.id);
+  clearPadProgressInfo(pad.id);
+
+  // Always clear chain and cycle state on any failure so the next trigger
+  // starts fresh rather than resuming from an invalid position (#136).
+  deleteLayerChain(layer.id);
+  deleteLayerCycleIndex(layer.id);
+
+  // When a restart-mode retrigger stopped the current voice but failed to load
+  // the new one, the pad must be removed from playingPadIds (no voices remain).
+  if (!isPadActive(pad.id)) {
+    coordinator.padStopped(pad.id);
+  }
+
+  // Circuit-breaker: a chain of consecutive load failures (e.g. entire library
+  // missing on disk) would otherwise spawn one toast per sound. Tear the chain
+  // down after CHAIN_FAILURE_THRESHOLD consecutive failures and emit a single
+  // summary error in place of the per-sound error for that final failure.
+  const failureCount = incrementLayerConsecutiveFailures(layer.id);
+  if (failureCount >= CHAIN_FAILURE_THRESHOLD) {
+    resetLayerConsecutiveFailures(layer.id);
+    emitAudioError(
+      new Error(
+        `Chain stopped after ${CHAIN_FAILURE_THRESHOLD} consecutive load failures (pad: "${pad.name}", layer: "${layer.name ?? layer.id}")`,
+      ),
+      {
+        soundName: sound.name,
+        isMissingFile: err instanceof MissingFileError,
+      },
+    );
+    return;
+  }
+
+  // Under the threshold — emit via the error bus as usual. The UI-layer
+  // handler (useAudioErrorHandler) shows the toast and triggers reconciliation.
+  emitAudioError(err, {
+    soundName: sound.name,
+    isMissingFile: err instanceof MissingFileError,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -266,8 +403,8 @@ async function continueLayerChain(
 }
 
 /**
- * Load and start a single sound for a layer. Sets up the onended callback that
- * auto-chains to the next sound in layerChainQueue (sequential/shuffled arrangement).
+ * Load and start a single sound for a layer. Thin coordinator: delegates to
+ * loadVoice → setupVoiceLifecycle → handleVoiceError.
  *
  * Audio graph: sourceNode -> voiceGain -> layerGain -> padGain -> masterGain
  */
@@ -281,97 +418,14 @@ export async function startLayerSound(
   allSounds: Sound[],
 ): Promise<void> {
   try {
-    const { voice, audio } = await loadLayerVoice(sound, layer, ctx, layerGain, voiceVolume, pad.id);
-
-    voice.setOnEnded(() => {
-      if (audio) disposeStreaming(pad.id, layer.id, audio);
-      clearLayerVoice(pad.id, layer.id, voice);
-
-      // Chain to the next sound if one is queued (sequential/shuffled).
-      // `remaining === undefined` means the queue was cleared externally (stop/reset).
-      // `remaining.length === 0` means the chain ran to completion naturally.
-      const remaining = getLayerChain(layer.id);
-
-      if (remaining !== undefined && remaining.length > 0) {
-        // Chain continues — defer removePlayingPad until the next voice starts so
-        // the pad doesn't briefly flash as "not playing" between chained sounds.
-        const [next, ...rest] = remaining;
-        continueLayerChain(pad, layer, ctx, layerGain, next, rest, allSounds).catch(
-          (err) => emitAudioError(err, {}),
-        );
-      } else if (remaining !== undefined && (layer.playbackMode === "loop" || layer.playbackMode === "hold")) {
-        // Chain exhausted naturally — restart using captured snapshot; config changes take effect next trigger.
-        restartLoopChain(pad, layer, ctx, layerGain, allSounds);
-      } else {
-        // Chain exhausted (one-shot) or cleared externally (stop/reset).
-        if (remaining !== undefined) deleteLayerChain(layer.id);
-        if (!isPadActive(pad.id)) coordinator.padStopped(pad.id);
-      }
-    });
-
-    await voice.start();
-    recordLayerVoice(pad.id, layer.id, voice);
-    // Only show metadata overlay if the pad is still active. Guards against the
-    // narrow race where stopPad fires between voice.start() resolving and
-    // enqueueVoice being called — after the stop cleanup runs, isPadActive
-    // returns false and we skip the now-stale overlay enqueue.
-    if (isPadActive(pad.id)) {
-      coordinator.voiceEnqueued(pad.id, {
-        soundName: sound.name,
-        layerName: layer.name,
-        playbackMode: layer.playbackMode,
-        durationMs: sound.durationMs,
-        coverArtDataUrl: sound.coverArtDataUrl,
-      });
-    }
-    coordinator.padStarted(pad.id);
+    const { voice, audio, bufferMeta } = await loadVoice(sound, layer, ctx, layerGain, voiceVolume);
+    await setupVoiceLifecycle(voice, audio, pad, layer, sound, ctx, layerGain, allSounds, bufferMeta);
     // Voice fully started and recorded — clear the consecutive-failure counter so
-    // a future failure starts from zero. Placed after recordLayerVoice so we only
+    // a future failure starts from zero. Placed after setupVoiceLifecycle so we only
     // count it as a real success once the voice is actually tracked in state.
     resetLayerConsecutiveFailures(layer.id);
-    startAudioTick();
-
   } catch (err) {
-    // Clear stale progress so a failed load doesn't freeze the bar at 1.0.
-    clearLayerProgressInfo(layer.id);
-    clearPadProgressInfo(pad.id);
-
-    // Always clear chain and cycle state on any failure so the next trigger
-    // starts fresh rather than resuming from an invalid position (#136).
-    deleteLayerChain(layer.id);
-    deleteLayerCycleIndex(layer.id);
-
-    // When a restart-mode retrigger stopped the current voice but failed to load
-    // the new one, the pad must be removed from playingPadIds (no voices remain).
-    if (!isPadActive(pad.id)) {
-      coordinator.padStopped(pad.id);
-    }
-
-    // Circuit-breaker: a chain of consecutive load failures (e.g. entire library
-    // missing on disk) would otherwise spawn one toast per sound. Tear the chain
-    // down after CHAIN_FAILURE_THRESHOLD consecutive failures and emit a single
-    // summary error in place of the per-sound error for that final failure.
-    const failureCount = incrementLayerConsecutiveFailures(layer.id);
-    if (failureCount >= CHAIN_FAILURE_THRESHOLD) {
-      resetLayerConsecutiveFailures(layer.id);
-      emitAudioError(
-        new Error(
-          `Chain stopped after ${CHAIN_FAILURE_THRESHOLD} consecutive load failures (pad: "${pad.name}", layer: "${layer.name ?? layer.id}")`,
-        ),
-        {
-          soundName: sound.name,
-          isMissingFile: err instanceof MissingFileError,
-        },
-      );
-      return;
-    }
-
-    // Under the threshold — emit via the error bus as usual. The UI-layer
-    // handler (useAudioErrorHandler) shows the toast and triggers reconciliation.
-    emitAudioError(err, {
-      soundName: sound.name,
-      isMissingFile: err instanceof MissingFileError,
-    });
+    handleVoiceError(err, pad, layer, sound);
   }
 }
 
