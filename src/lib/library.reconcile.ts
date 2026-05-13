@@ -15,11 +15,25 @@ import { logError } from "@/lib/logger";
 export interface ReconcileResult {
   /** The reconciled sounds array (existing + newly discovered). */
   sounds: Sound[];
-  /** Whether any changes were made (new sounds added or folderIds backfilled). */
+  /** Whether any changes were made (new sounds added or fields backfilled). */
   changed: boolean;
   /** IDs of folders that could not be read (e.g. outside the app's fs scope). */
   inaccessibleFolderIds: string[];
 }
+
+/** Shared context passed to every enricher in a pipeline run. Intentionally open — extend as needed. */
+export type EnricherContext = Record<string, unknown>;
+
+/**
+ * A composable enricher takes a Sound array and returns a new array with
+ * enriched fields. Implementers MUST:
+ * - Return the same array length in the same order as the input.
+ * - Return the same Sound reference for sounds they did not modify (load-bearing
+ *   for change detection in `reconcileGlobalLibrary`).
+ * - Be idempotent — skip sounds that already have the target field populated.
+ * Enrichers have no dependency on Zustand stores, making them independently testable.
+ */
+export type SoundEnricher = (sounds: Sound[], context?: EnricherContext) => Promise<Sound[]>;
 
 /**
  * Check if a filename has a supported audio extension.
@@ -56,24 +70,6 @@ async function scanFolderForAudioFiles(folderPath: string): Promise<string[] | n
   }
 }
 
-/**
- * Reconcile the global sound library against audio files on disk.
- *
- * For each globalFolder:
- * - Scans the folder for audio files (top-level only)
- * - Creates new Sound entries for files not already in the library (matched by filePath)
- * - Sets `folderId` on new sounds to link them to their source folder
- * - Backfills `folderId` on existing sounds if previously undefined
- *
- * Missing files are left as-is — the audio engine (Phase 5) handles
- * missing files gracefully at load time.
- *
- * @param globalFolders - The configured global folders from AppSettings
- * @param existingSounds - The current sounds array from the library store
- * @returns ReconcileResult with the updated sounds array and a changed flag
- */
-interface BackfillEntry { index: number; filePath: string; }
-
 async function scanFoldersForNewSounds(
   globalFolders: GlobalFolder[],
   soundsByPath: Map<string, Sound>,
@@ -104,110 +100,79 @@ async function scanFoldersForNewSounds(
   return { newSounds, pathToFolderId, inaccessibleFolderIds };
 }
 
-async function statSounds(sounds: Sound[]): Promise<void> {
-  await Promise.all(sounds.map(async (sound) => {
-    if (!sound.filePath) return;
+/**
+ * Enriches sounds with their file size. Idempotent: skips sounds that already
+ * have `fileSizeBytes` set. Returns a new array; unchanged sounds keep their
+ * original reference.
+ */
+export const statEnricher: SoundEnricher = async (sounds) =>
+  Promise.all(sounds.map(async (sound) => {
+    if (!sound.filePath || sound.fileSizeBytes != null) return sound;
     try {
       const info = await stat(sound.filePath);
-      sound.fileSizeBytes = info.size;
+      return { ...sound, fileSizeBytes: info.size };
     } catch {
-      // stat failed — leave fileSizeBytes undefined
+      return sound;
     }
   }));
-}
 
-async function extractCoverArts(sounds: Sound[]): Promise<void> {
+/**
+ * Enriches sounds with embedded cover art. Idempotent: skips sounds whose
+ * `coverArtDataUrl` is already set (including the empty-string sentinel `""`
+ * that means "checked, no art found" — prevents perpetual re-extraction).
+ * Processes sounds in batches of 8 to bound concurrent IPC calls.
+ * Returns a new array; unchanged sounds keep their original reference.
+ */
+export const coverArtEnricher: SoundEnricher = async (sounds) => {
   const BATCH = 8;
+  const result: Sound[] = [];
   for (let i = 0; i < sounds.length; i += BATCH) {
-    await Promise.all(sounds.slice(i, i + BATCH).map(async (sound) => {
-      if (!sound.filePath || sound.coverArtDataUrl !== undefined) return;
+    const updates = await Promise.all(sounds.slice(i, i + BATCH).map(async (sound) => {
+      if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
       try {
         const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
-        sound.coverArtDataUrl = dataUrl ?? "";  // "" = checked, no art found (prevents perpetual re-extraction)
+        return { ...sound, coverArtDataUrl: dataUrl ?? "" };
       } catch {
-        // extraction failed — leave coverArtDataUrl undefined to retry next boot
+        return sound;
       }
     }));
+    result.push(...updates);
   }
+  return result;
+};
+
+/**
+ * Run `enrichers` sequentially over `sounds`, passing each output as input to
+ * the next. Enrichers are applied in order — later enrichers see changes made
+ * by earlier ones.
+ */
+export async function applyEnrichers(sounds: Sound[], enrichers: readonly SoundEnricher[], context: EnricherContext = {}): Promise<Sound[]> {
+  let result = sounds;
+  for (const enricher of enrichers) {
+    result = await enricher(result, context);
+  }
+  return result;
 }
 
-async function applyStatBackfill(
-  sounds: Sound[],
-  entries: BackfillEntry[],
-): Promise<boolean> {
-  if (entries.length === 0) return false;
-  const results = await Promise.all(entries.map(async (e) => {
-    try { const info = await stat(e.filePath); return { index: e.index, size: info.size }; }
-    catch { return { index: e.index, size: undefined }; }
-  }));
-  let anyUpdated = false;
-  for (const r of results) {
-    if (r.size != null) {
-      sounds[r.index] = { ...sounds[r.index], fileSizeBytes: r.size };
-      anyUpdated = true;
-    }
-  }
-  return anyUpdated;
-}
+const DEFAULT_ENRICHERS: readonly SoundEnricher[] = [statEnricher, coverArtEnricher];
 
-async function applyCoverArtBackfill(
-  sounds: Sound[],
-  entries: BackfillEntry[],
-): Promise<boolean> {
-  if (entries.length === 0) return false;
-  const BATCH = 8;
-  let anyUpdated = false;
-  for (let i = 0; i < entries.length; i += BATCH) {
-    const results = await Promise.all(entries.slice(i, i + BATCH).map(async (e) => {
-      try {
-        const dataUrl = await invoke<string | null>("extract_cover_art", { path: e.filePath });
-        return { index: e.index, dataUrl: dataUrl ?? "" };  // "" = checked, no art found
-      } catch {
-        return { index: e.index, dataUrl: null };  // null = error, retry next boot
-      }
-    }));
-    for (const r of results) {
-      if (r.dataUrl !== null) {
-        sounds[r.index] = { ...sounds[r.index], coverArtDataUrl: r.dataUrl };
-        anyUpdated = true;
-      }
-    }
-  }
-  return anyUpdated;
-}
-
-async function backfillExistingSounds(
-  existingSounds: Sound[],
-  pathToFolderId: Map<string, string>,
-): Promise<{ reconciledSounds: Sound[]; anyFieldUpdated: boolean }> {
-  const reconciledExisting: Sound[] = [];
-  let anyFieldUpdated = false;
-  const backfillStatEntries: BackfillEntry[] = [];
-  const backfillCoverArtEntries: BackfillEntry[] = [];
-
-  for (const sound of existingSounds) {
-    let updated = { ...sound };
-    if (sound.filePath && !sound.folderId) {
-      const discoveredFolderId = pathToFolderId.get(sound.filePath);
-      if (discoveredFolderId) { updated = { ...updated, folderId: discoveredFolderId }; anyFieldUpdated = true; }
-    }
-    reconciledExisting.push(updated);
-    if (sound.filePath && sound.fileSizeBytes == null) {
-      backfillStatEntries.push({ index: reconciledExisting.length - 1, filePath: sound.filePath });
-    }
-    if (sound.filePath && sound.coverArtDataUrl === undefined) {
-      backfillCoverArtEntries.push({ index: reconciledExisting.length - 1, filePath: sound.filePath });
-    }
-  }
-
-  const [statUpdated, coverArtUpdated] = await Promise.all([
-    applyStatBackfill(reconciledExisting, backfillStatEntries),
-    applyCoverArtBackfill(reconciledExisting, backfillCoverArtEntries),
-  ]);
-  if (statUpdated || coverArtUpdated) anyFieldUpdated = true;
-  return { reconciledSounds: reconciledExisting, anyFieldUpdated };
-}
-
+/**
+ * Reconcile the global sound library against audio files on disk.
+ *
+ * For each globalFolder:
+ * - Scans the folder for audio files (top-level only)
+ * - Creates new Sound entries for files not already in the library (matched by filePath)
+ * - Sets `folderId` on new sounds to link them to their source folder
+ * - Backfills `folderId` on existing sounds if previously undefined
+ * - Applies all enrichers (stat, cover art) to both new and existing sounds
+ *
+ * Missing files are left as-is — the audio engine handles missing files
+ * gracefully at load time.
+ *
+ * @param globalFolders - The configured global folders from AppSettings
+ * @param existingSounds - The current sounds array from the library store
+ * @returns ReconcileResult with the updated sounds array and a changed flag
+ */
 export async function reconcileGlobalLibrary(
   globalFolders: GlobalFolder[],
   existingSounds: Sound[],
@@ -220,15 +185,34 @@ export async function reconcileGlobalLibrary(
   const { newSounds, pathToFolderId, inaccessibleFolderIds } =
     await scanFoldersForNewSounds(globalFolders, soundsByPath);
 
-  await statSounds(newSounds);
-  await extractCoverArts(newSounds);
+  // folderId is derived from the folder-scan side-effect (pathToFolderId), not
+  // from a per-sound operation — it cannot be expressed as a SoundEnricher.
+  let anyFolderIdUpdated = false;
+  const reconciledExisting = existingSounds.map((sound) => {
+    if (sound.filePath && !sound.folderId) {
+      const discoveredFolderId = pathToFolderId.get(sound.filePath);
+      if (discoveredFolderId) {
+        anyFolderIdUpdated = true;
+        return { ...sound, folderId: discoveredFolderId };
+      }
+    }
+    return sound;
+  });
 
-  const { reconciledSounds, anyFieldUpdated } =
-    await backfillExistingSounds(existingSounds, pathToFolderId);
+  // Apply all enrichers to new and existing sounds. Enrichers are idempotent,
+  // so existing sounds only receive updates for fields they are missing.
+  const [enrichedNew, enrichedExisting] = await Promise.all([
+    applyEnrichers(newSounds, DEFAULT_ENRICHERS),
+    applyEnrichers(reconciledExisting, DEFAULT_ENRICHERS),
+  ]);
+
+  // Reference inequality is the change signal — enrichers contractually return
+  // the same Sound ref when no-op (required by the SoundEnricher contract).
+  const anyEnricherUpdated = enrichedExisting.some((s, i) => s !== reconciledExisting[i]);
 
   return {
-    sounds: [...reconciledSounds, ...newSounds],
-    changed: newSounds.length > 0 || anyFieldUpdated,
+    sounds: [...enrichedExisting, ...enrichedNew],
+    changed: newSounds.length > 0 || anyFolderIdUpdated || anyEnricherUpdated,
     inaccessibleFolderIds,
   };
 }
