@@ -135,6 +135,7 @@ describe("loadJsonWithRecovery", () => {
     mockFs.readTextFile.mockResolvedValue("[]");
     mockFs.writeTextFile.mockResolvedValue(undefined);
     mockFs.rename.mockResolvedValue(undefined);
+    mockFs.readDir.mockResolvedValue([]);
   });
 
   it("parses and returns the value from the file on success", async () => {
@@ -217,6 +218,41 @@ describe("loadJsonWithRecovery", () => {
 
     expect(result).toEqual([]);
     expect(mockFs.writeTextFile).toHaveBeenCalled();
+  });
+
+  it("sweeps orphaned .tmp files before reading by default", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    mockFs.readDir.mockResolvedValue([{ name: `file.json.${uuid}.tmp` }]);
+
+    await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => raw as string[],
+      defaults: [],
+      corruptMessage: "corrupt",
+    });
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/dir");
+    expect(mockFs.remove).toHaveBeenCalledWith(`/dir/file.json.${uuid}.tmp`);
+    expect(mockFs.readDir.mock.invocationCallOrder[0])
+      .toBeLessThan(mockFs.readTextFile.mock.invocationCallOrder[0]);
+  });
+
+  it("skips sweep when sweep: false but recovery still works", async () => {
+    mockFs.readTextFile.mockResolvedValue("bad json {{");
+    const onCorruption = vi.fn();
+
+    const result = await loadJsonWithRecovery({
+      path: "/dir/file.json",
+      parse: (raw) => raw as string[],
+      defaults: ["fallback"],
+      onCorruption,
+      corruptMessage: "corrupt",
+      sweep: false,
+    });
+
+    expect(mockFs.readDir).not.toHaveBeenCalled();
+    expect(result).toEqual(["fallback"]);
+    expect(onCorruption).toHaveBeenCalledWith("corrupt");
   });
 
   it("proceeds with recovery even if the backup rename fails — writes defaults and calls onCorruption", async () => {

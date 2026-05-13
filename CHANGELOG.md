@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Corrupt settings file no longer crashes the app — it is backed up automatically and fresh defaults are restored.
+- Leftover temporary files from previous app crashes are now cleaned up on startup across settings, library, and download history.
 - Internal audio engine refactored for better reliability and testability — no user-facing behavior changes
 - Cover art now backfills for sounds already in your library, not only newly discovered files
 - File size metadata now populates for existing library sounds that were missing it

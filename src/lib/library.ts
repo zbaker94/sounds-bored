@@ -44,6 +44,7 @@ export async function loadGlobalLibrary(
     defaults: GlobalLibrarySchema.parse({ version: CURRENT_LIBRARY_VERSION, sounds: [], tags: [], sets: [] }),
     onCorruption: options?.onCorruption,
     corruptMessage: `${LIBRARY_FILE_NAME} was corrupt and has been reset. Your sound library has been cleared.`,
+    sweep: false,
   });
 }
 

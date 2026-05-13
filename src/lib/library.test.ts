@@ -176,6 +176,21 @@ describe("loadGlobalLibrary", () => {
     );
   });
 
+  it("sweeps orphaned .tmp files even when the library file does not exist", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    createMockFileSystem({
+      [`/app-data/SoundsBored/library.json.${uuid}.tmp`]: "stale",
+      // library.json intentionally absent
+    });
+
+    await loadGlobalLibrary();
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/app-data/SoundsBored");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      `/app-data/SoundsBored/library.json.${uuid}.tmp`,
+    );
+  });
+
   it("proceeds with recovery even if corruption-backup rename fails", async () => {
     const files = createMockFileSystem({
       "/app-data/SoundsBored/library.json": JSON.stringify({ invalid: true }),

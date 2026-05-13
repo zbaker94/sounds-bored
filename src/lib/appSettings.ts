@@ -1,8 +1,9 @@
 import { AppSettings, AppSettingsSchema, GlobalFolder } from "./schemas";
 import { appDataDir, audioDir, join } from "@tauri-apps/api/path";
 import { readTextFile, mkdir, exists } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson, sweepOrphanedTmpFiles } from "./fsUtils";
+import { atomicWriteJson, backupCorruptFile, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, SETTINGS_FILE_NAME } from "./constants";
+import { logWarn } from "@/lib/logger";
 
 export async function getSettingsFilePath(): Promise<string> {
   const dir = await appDataDir();
@@ -30,7 +31,7 @@ async function createDefaultAppSettings(): Promise<AppSettings> {
     try {
       await mkdir(folder.path, { recursive: true });
     } catch {
-      console.warn(`Could not create default folder on disk: ${folder.path}`);
+      logWarn(`Could not create default folder on disk: ${folder.path}`);
     }
   }
 
@@ -41,7 +42,11 @@ async function createDefaultAppSettings(): Promise<AppSettings> {
   });
 }
 
-export async function loadAppSettings(): Promise<AppSettings> {
+interface LoadAppSettingsOptions {
+  onCorruption?: (message: string) => void;
+}
+
+export async function loadAppSettings(options?: LoadAppSettingsOptions): Promise<AppSettings> {
   const dir = await appDataDir();
   const folderPath = await join(dir, APP_FOLDER);
   const filePath = await join(folderPath, SETTINGS_FILE_NAME);
@@ -58,8 +63,15 @@ export async function loadAppSettings(): Promise<AppSettings> {
   }
 
   const text = await readTextFile(filePath);
-  const parsed = JSON.parse(text);
-  return AppSettingsSchema.parse(parsed);
+  try {
+    return AppSettingsSchema.parse(JSON.parse(text));
+  } catch {
+    await backupCorruptFile(filePath);
+    const freshDefaults = await createDefaultAppSettings();
+    await atomicWriteJson(filePath, freshDefaults);
+    options?.onCorruption?.(`${SETTINGS_FILE_NAME} was corrupt and has been reset. Your app settings have been cleared.`);
+    return freshDefaults;
+  }
 }
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
