@@ -24,6 +24,8 @@ vi.mock("@/lib/export", () => ({
   buildSoundMapJson: vi.fn().mockReturnValue({ json: "{}", collisions: [] }),
 }));
 
+// useSaveProject/useSaveProjectAs are used by saveDialog/saveAs flows — not the export path,
+// but the provider renders them unconditionally so they must be stubbed.
 vi.mock("@/lib/project.queries", () => ({
   useSaveProject: vi.fn(() => ({ mutate: vi.fn() })),
   useSaveProjectAs: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -38,7 +40,9 @@ vi.mock("sonner", () => ({
 }));
 
 import { pickFolder } from "@/lib/scope";
+import { saveProject } from "@/lib/project";
 const mockPickFolder = pickFolder as ReturnType<typeof vi.fn>;
+const mockSaveProject = saveProject as ReturnType<typeof vi.fn>;
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -48,15 +52,17 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-describe("ProjectActionsProvider — handleExportClick", () => {
+describe("ProjectActionsProvider - handleExportClick", () => {
   beforeEach(() => {
     useProjectStore.setState({ ...initialProjectState });
     useLibraryStore.setState({ ...initialLibraryState });
     mockPickFolder.mockReset();
     mockPickFolder.mockResolvedValue(null);
+    mockSaveProject.mockReset();
+    mockSaveProject.mockResolvedValue(undefined);
   });
 
-  it("calls pickFolder with canCreateDirectories: true", async () => {
+  it("calls pickFolder with canCreateDirectories: true after auto-saving", async () => {
     const project = createMockProject({ name: "Test" });
     useProjectStore.setState({ project, folderPath: "/projects/Test", isTemporary: false, isDirty: false });
 
@@ -71,9 +77,30 @@ describe("ProjectActionsProvider — handleExportClick", () => {
 
     await act(async () => { await exportClick(); });
 
+    expect(mockSaveProject).toHaveBeenCalledWith("/projects/Test", project);
+    expect(mockPickFolder).toHaveBeenCalledTimes(1);
     expect(mockPickFolder).toHaveBeenCalledWith({
       title: "Select Export Destination",
       canCreateDirectories: true,
     });
+  });
+
+  it("does not call pickFolder when auto-save fails", async () => {
+    const project = createMockProject({ name: "Test" });
+    useProjectStore.setState({ project, folderPath: "/projects/Test", isTemporary: false, isDirty: false });
+    mockSaveProject.mockRejectedValue(new Error("disk full"));
+
+    let exportClick!: () => void;
+    function Consumer() {
+      const ctx = useProjectActions();
+      exportClick = ctx.handleExportClick;
+      return null;
+    }
+
+    render(<Consumer />, { wrapper: Wrapper });
+
+    await act(async () => { await exportClick(); });
+
+    expect(mockPickFolder).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,7 @@ export interface FolderPickerOptions {
   defaultPath?: string;
   /**
    * Allow users to create new folders from the picker dialog.
-   * macOS only — silently ignored on Windows and Linux. When omitted, the platform default is used.
+   * macOS only — silently ignored on Windows and Linux. When omitted, tauri-plugin-dialog's default is used.
    */
   canCreateDirectories?: boolean;
 }

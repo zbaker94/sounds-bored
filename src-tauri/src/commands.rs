@@ -903,7 +903,8 @@ pub struct FilterSpec {
 /// atomic in Rust — a renderer script cannot bypass the dialog to grant an
 /// arbitrary path. Returns null when the user cancels.
 /// `can_create_directories`: when `Some(true)`, exposes a "New Folder" affordance in the
-/// dialog (macOS only; ignored on Windows and Linux). When `None`, the platform default is used.
+/// dialog (macOS only; ignored on Windows and Linux). `None` leaves the plugin default unchanged
+/// (currently enabled on macOS). Pass `Some(false)` to explicitly disable.
 #[tauri::command]
 pub fn pick_folder_and_grant(
     app: AppHandle,
@@ -920,7 +921,7 @@ pub fn pick_folder_and_grant(
         builder = builder.set_directory(p);
     }
     if let Some(can) = can_create_directories {
-        builder = builder.set_can_create_directories(can);
+        builder = builder.set_can_create_directories(can); // macOS-only; ignored on Windows/Linux
     }
     let Some(fp) = builder.blocking_pick_folder() else {
         return Ok(None);

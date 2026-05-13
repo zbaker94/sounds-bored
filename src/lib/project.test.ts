@@ -648,6 +648,16 @@ describe("saveProjectAs", () => {
     expect(result?.newPath).toBe("/new/location/New_Name");
     expect(result?.project.name).toBe("New Name");
     expect(mockFs.remove).toHaveBeenCalledWith("/app-local-data/SoundsBored/temp_Test_123", { recursive: true });
+  });
+
+  it("requests folder picker with canCreateDirectories: true so users can create the destination folder", async () => {
+    mockPickFolder.mockResolvedValue("/new/location");
+    mockFs.exists.mockResolvedValue(false);
+    mockFs.readDir.mockResolvedValue([]);
+    const project = createMockProject();
+
+    await saveProjectAs("Test", "/app-local-data/SoundsBored/temp_Test_123", project);
+
     expect(mockPickFolder).toHaveBeenCalledWith({ title: "Select Save Location", canCreateDirectories: true });
   });
 
