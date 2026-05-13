@@ -902,6 +902,8 @@ pub struct FilterSpec {
 /// access to the selected folder, and returns the path. Dialog and scope-grant are
 /// atomic in Rust — a renderer script cannot bypass the dialog to grant an
 /// arbitrary path. Returns null when the user cancels.
+/// `can_create_directories`: when `Some(true)`, exposes a "New Folder" affordance in the
+/// dialog (macOS only; ignored on Windows and Linux). When `None`, the platform default is used.
 #[tauri::command]
 pub fn pick_folder_and_grant(
     app: AppHandle,

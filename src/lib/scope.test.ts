@@ -104,6 +104,18 @@ describe("pickFolder", () => {
     });
   });
 
+  it("coerces canCreateDirectories: undefined to null", async () => {
+    mockCore.invoke.mockResolvedValue("/user/projects");
+
+    await pickFolder({ canCreateDirectories: undefined });
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
+      title: null,
+      defaultPath: null,
+      canCreateDirectories: null,
+    });
+  });
+
   it("returns null when the Rust command returns null (user cancelled)", async () => {
     mockCore.invoke.mockResolvedValue(null);
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- When exporting a project on macOS, you can now create a new destination folder directly from the export folder picker dialog.
 - The folder picker dialog now lets you create new folders directly from the "Save Project As" and "Export" dialogs (macOS/Linux only — Windows already supports this natively).
 - Corrupt settings file no longer crashes the app — it is backed up automatically and fresh defaults are restored.
 - Leftover temporary files from previous app crashes are now cleaned up on startup across settings, library, and download history.

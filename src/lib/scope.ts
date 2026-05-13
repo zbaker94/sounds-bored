@@ -9,7 +9,7 @@ export interface FolderPickerOptions {
   defaultPath?: string;
   /**
    * Allow users to create new folders from the picker dialog.
-   * macOS/Linux only — silently ignored on Windows (the Windows picker always permits folder creation).
+   * macOS only — silently ignored on Windows and Linux. When omitted, the platform default is used.
    */
   canCreateDirectories?: boolean;
 }
