@@ -23,10 +23,9 @@ import {
 } from "@/components/ui/combobox";
 import { TagPicker } from "@/components/composite/LibraryPickers";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import { useSoundStats, type SoundSearchDoc } from "@/hooks/useSoundStats";
 import { SoundFolderTree } from "./SoundFolderTree";
 import { buildTree, findFolderNode, getSoundsInSubtree } from "./soundTreeUtils";
-
-type SoundSearchDoc = { sound: Sound; tagNames: string[] };
 
 interface SoundSelectorProps {
   value: LayerSelection;
@@ -47,37 +46,7 @@ export function SoundSelector({ value, onChange }: SoundSelectorProps) {
     useShallow((s) => s.settings?.globalFolders ?? [])
   );
 
-  // Build denormalized search docs: sound + resolved tag names (used by assigned mode)
-  const searchDocs: SoundSearchDoc[] = useMemo(
-    () =>
-      sounds.map((sound) => ({
-        sound,
-        tagNames: sound.tags.map(
-          (tid) => tags.find((t) => t.id === tid)?.name ?? ""
-        ),
-      })),
-    [sounds, tags]
-  );
-
-  const fuse = useMemo(
-    () =>
-      new Fuse(searchDocs, {
-        keys: ["sound.name", "tagNames"],
-        threshold: 0.4,
-      }),
-    [searchDocs]
-  );
-
-  // Single pass over sounds: O(sounds × (avgTagsPerSound + avgSetsPerSound))
-  const { tagCountMap, setCountMap } = useMemo(() => {
-    const tc: Record<string, number> = {};
-    const sc: Record<string, number> = {};
-    for (const s of sounds) {
-      for (const tid of s.tags) tc[tid] = (tc[tid] ?? 0) + 1;
-      for (const sid of s.sets) sc[sid] = (sc[sid] ?? 0) + 1;
-    }
-    return { tagCountMap: tc, setCountMap: sc };
-  }, [sounds]);
+  const { tagCountMap, setCountMap, fuse } = useSoundStats(sounds, tags);
 
   // ── Assigned mode ────────────────────────────────────────────────────────────
 
