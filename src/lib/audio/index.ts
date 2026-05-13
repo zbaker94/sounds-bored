@@ -54,18 +54,11 @@ export {
 } from "./gainManager";
 
 // ── Audio state queries ───────────────────────────────────────────────────────
-// Re-exported from audioState which proxies to the focused sub-modules
-// (voiceRegistry / gainRegistry / chainCycleState). External consumers and
-// test mocks targeting "@/lib/audio/audioState" continue to work.
 export { isFading } from "./fadeCoordinator";
-
-export {
-  isLayerActive,
-  isPadActive,
-  getLivePadVolume,
-  getLayerPlayOrder,
-  clearAllAudioState,
-} from "./audioState";
+export { isLayerActive, isPadActive } from "./voiceRegistry";
+export { getLivePadVolume } from "./gainRegistry";
+export { getLayerPlayOrder } from "./chainCycleState";
+export { clearAllAudioState } from "./audioState";
 
 // Test mock target
 // fallow-ignore-next-line unused-export

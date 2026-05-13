@@ -1,7 +1,11 @@
 ﻿import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockLayer, createMockPad, createMockScene, createMockProject, createMockHistoryEntry, createMockSound } from "@/test/factories";
 import { clearAllSizeCache } from "./streamingCache";
-import { isLayerActive, isPadFading, isPadFadingOut, isLayerPending, clearAllFadeTracking, getPadProgress, getPadGain, clearAllAudioState } from "./audioState";
+import { getPadProgress, clearAllAudioState } from "./audioState";
+import { isLayerActive } from "./voiceRegistry";
+import { isLayerPending } from "./chainCycleState";
+import { isPadFading, isPadFadingOut, clearAllFadeTracking } from "./fadeCoordinator";
+import { getPadGain } from "./gainRegistry";
 import { isPadStreaming } from "./streamingAudioLifecycle";
 import { fadePad, resolveFadeDuration, freezePadAtCurrentVolume } from "./fadeMixer";
 import { resetPadGain, setLayerVolume } from "./gainManager";
@@ -3424,7 +3428,7 @@ describe("setLayerVolume", () => {
 
   it("updates the gain node (not layerVolumes) when the layer gain node exists", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { getLayerGain } = await import("./audioState");
+    const { getLayerGain } = await import("./gainRegistry");
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
 
@@ -3475,7 +3479,7 @@ describe("setLayerVolume", () => {
 
   it("clamps volume to [0, 1] range", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { getLayerGain } = await import("./audioState");
+    const { getLayerGain } = await import("./gainRegistry");
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
 
@@ -3526,7 +3530,7 @@ describe("skipLayerForward", () => {
   });
 
   it("does nothing when chain queue is empty (already at end)", async () => {
-    const { setLayerChain } = await import("./audioState");
+    const { setLayerChain } = await import("./chainCycleState");
 
     const layer = createMockLayer({ arrangement: "sequential" });
     const pad = createMockPad({ layers: [layer] });
@@ -3541,7 +3545,7 @@ describe("skipLayerForward", () => {
 
   it("advances to next sound in chain and updates chain state", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { getLayerChain } = await import("./audioState");
+    const { getLayerChain } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3574,7 +3578,7 @@ describe("skipLayerForward", () => {
   });
 
   it("advances cycleIndex in cycle mode instead of using chain queue", async () => {
-    const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./audioState");
+    const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3605,7 +3609,7 @@ describe("skipLayerForward", () => {
 
   it("preserves playOrder after skip so subsequent skip back works", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { getLayerPlayOrder } = await import("./audioState");
+    const { getLayerPlayOrder } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3633,7 +3637,7 @@ describe("skipLayerForward", () => {
 
   it("cancels an in-progress fade-out before starting the skip voice (chain mode)", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { isPadFadingOut } = await import("./audioState");
+    const { isPadFadingOut } = await import("./fadeCoordinator");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3664,7 +3668,8 @@ describe("skipLayerForward", () => {
   });
 
   it("cancels an in-progress fade-out before starting the skip voice (cycle mode)", async () => {
-    const { isPadFadingOut, setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3703,7 +3708,7 @@ describe("skipLayerForward", () => {
     const { ensureResumed } = await import("./audioContext");
     vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
 
-    const { setLayerPlayOrder, setLayerChain } = await import("./audioState");
+    const { setLayerPlayOrder, setLayerChain } = await import("./chainCycleState");
 
     const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" })];
     setSounds(sounds);
@@ -3729,7 +3734,7 @@ describe("skipLayerForward", () => {
     const { ensureResumed } = await import("./audioContext");
     vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
 
-    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./chainCycleState");
 
     const sounds = [createMockSound({ filePath: "a.wav" }), createMockSound({ filePath: "b.wav" })];
     setSounds(sounds);
@@ -3779,7 +3784,7 @@ describe("skipLayerBack", () => {
 
   it("stays at position 0 when already at start of play order", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { getLayerCycleIndex, getLayerChain } = await import("./audioState");
+    const { getLayerCycleIndex, getLayerChain } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3810,7 +3815,7 @@ describe("skipLayerBack", () => {
   });
 
   it("goes back one position when in the middle of play order", async () => {
-    const { getLayerCycleIndex, getLayerChain, setLayerChain, setLayerPlayOrder } = await import("./audioState");
+    const { getLayerCycleIndex, getLayerChain, setLayerChain, setLayerPlayOrder } = await import("./chainCycleState");
 
     const { sounds, layer, pad } = makeThreeLoopSounds();
 
@@ -3830,7 +3835,7 @@ describe("skipLayerBack", () => {
   });
 
   it("uses cycleIndex (not chain) to determine position in cycle mode", async () => {
-    const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./audioState");
+    const { getLayerCycleIndex, setLayerCycleIndex, setLayerPlayOrder } = await import("./chainCycleState");
 
     const { sounds, layer, pad } = makeThreeLoopSoundsCycle();
 
@@ -3849,7 +3854,7 @@ describe("skipLayerBack", () => {
 
   it("preserves playOrder after skip so subsequent skip back works", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { getLayerChain, getLayerPlayOrder } = await import("./audioState");
+    const { getLayerChain, getLayerPlayOrder } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3884,7 +3889,7 @@ describe("skipLayerBack", () => {
 
   it("cancels an in-progress fade-out before starting the skip voice (chain mode)", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { isPadFadingOut } = await import("./audioState");
+    const { isPadFadingOut } = await import("./fadeCoordinator");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3916,7 +3921,8 @@ describe("skipLayerBack", () => {
   });
 
   it("cancels an in-progress fade-out before starting the skip voice (cycle mode)", async () => {
-    const { isPadFadingOut, setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./chainCycleState");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3953,7 +3959,7 @@ describe("skipLayerBack", () => {
     const { ensureResumed } = await import("./audioContext");
     vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
 
-    const { setLayerPlayOrder, setLayerChain } = await import("./audioState");
+    const { setLayerPlayOrder, setLayerChain } = await import("./chainCycleState");
 
     const { sounds, layer, pad } = makeThreeLoopSounds();
     setLayerPlayOrder(layer.id, sounds);
@@ -3971,7 +3977,7 @@ describe("skipLayerBack", () => {
     const { ensureResumed } = await import("./audioContext");
     vi.mocked(ensureResumed).mockRejectedValueOnce(new Error("audio context unavailable"));
 
-    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./audioState");
+    const { setLayerPlayOrder, setLayerCycleIndex } = await import("./chainCycleState");
 
     const { sounds, layer, pad } = makeThreeLoopSoundsCycle();
     setLayerPlayOrder(layer.id, sounds);
@@ -4236,7 +4242,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     mockCtx.createGain.mockReturnValue(mockGain);
 
     const { triggerPad, executeFadeTap } = await import("./padPlayer");
-    const { isPadFadingOut } = await import("./audioState");
+    const { isPadFadingOut } = await import("./fadeCoordinator");
     const pad = createMockPad({
       id: "fpl-reverse-fadeout-pad",
       fadeTargetVol: 0,
@@ -4404,7 +4410,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     mockCtx.createGain.mockReturnValue(mockGain);
 
     const { executeFadeTap } = await import("./padPlayer");
-    const { setFadePadTimeout } = await import("./audioState");
+    const { setFadePadTimeout } = await import("./fadeCoordinator");
     const pad = createMockPad({
       id: "fpl-noop-fading-pad",
       fadeTargetVol: 50,
@@ -4666,7 +4672,7 @@ describe("triggerLayer", () => {
 
     // After ramp completes, layer is no longer active
     vi.advanceTimersByTime(35);
-    const { isLayerActive: checkLayerActive } = await import("./audioState");
+    const { isLayerActive: checkLayerActive } = await import("./voiceRegistry");
     expect(checkLayerActive(layer.id)).toBe(false);
     vi.useRealTimers();
   });
@@ -4843,7 +4849,7 @@ describe("pending leak guards", () => {
 
   it("cancels in-progress fade-out when pad is re-triggered (clears both flag and timeout)", async () => {
     vi.useFakeTimers();
-    const { addFadingOutPad, isPadFadingOut, isPadFading, setFadePadTimeout } = await import("./audioState");
+    const { addFadingOutPad, isPadFadingOut, isPadFading, setFadePadTimeout } = await import("./fadeCoordinator");
     const { triggerPad } = await import("./padPlayer");
 
     const sound = createMockSound({ filePath: "a.wav" });
@@ -4902,7 +4908,7 @@ describe("pending leak guards", () => {
 
   it("starts all simultaneous layers â€” both layers become active after triggerPad with a 2-layer pad", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { isLayerActive } = await import("./audioState");
+    const { isLayerActive } = await import("./voiceRegistry");
 
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);
@@ -4931,7 +4937,7 @@ describe("pending leak guards", () => {
     // layer 2's pending flag was set only after layer 1's entire async chain completed.
     // With the pre-pass + Promise.all, both flags are set before any applyRetriggerMode await.
     const { triggerPad } = await import("./padPlayer");
-    const { isLayerPending } = await import("./audioState");
+    const { isLayerPending } = await import("./chainCycleState");
 
     const sound = createMockSound({ filePath: "a.wav" });
     setSounds([sound]);

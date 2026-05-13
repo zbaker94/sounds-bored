@@ -76,7 +76,7 @@ function createVoice(
       // Ramps the per-voice gain node (voiceGain) to zero — intentionally does NOT
       // call markGainRamp, because the audioTick reads padGainMap/layerGainMap, not
       // individual voice gains. Importing audioState here would create a circular
-      // dependency (audioVoice ← padPlayer → audioState).
+      // dependency (audioVoice ← padPlayer → gainRegistry).
       voiceGain.gain.cancelScheduledValues(ctx.currentTime);
       voiceGain.gain.setValueAtTime(voiceGain.gain.value, ctx.currentTime);
       voiceGain.gain.linearRampToValueAtTime(0, ctx.currentTime + rampS);

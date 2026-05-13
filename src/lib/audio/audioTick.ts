@@ -1,7 +1,7 @@
 /**
  * audioTick.ts — Single global RAF loop for audio engine → UI state synchronization.
  *
- * Reads from audioState.ts Maps (gain nodes, voice map, progress) each animation frame
+ * Reads from audioState (progress), gainRegistry (gain nodes), and voiceRegistry (voice map) each animation frame
  * and emits batched setPadMetrics() / setLayerMetrics() calls to padMetricsStore /
  * layerMetricsStore. Splitting the writes across two stores keeps pad-scoped and
  * layer-scoped subscribers from waking each other unnecessarily. Replaces:
@@ -72,7 +72,7 @@ let prevLayerChain: Record<string, string[]> = {};
 
 // Track the last observed Sound[] source reference per layer so we can skip
 // the .map(s => s.id) allocation when the source array reference is unchanged.
-// These Sound[] arrays in audioState's layerPlayOrderMap / layerChainQueue only
+// These Sound[] arrays in chainCycleState's layerPlayOrderMap / layerChainQueue only
 // swap to a new reference on explicit writes, so reference equality is sufficient.
 const prevLayerPlayOrderSource = new Map<string, readonly unknown[]>();
 const prevLayerChainSource = new Map<string, readonly unknown[]>();
@@ -105,7 +105,7 @@ export const _stopMasterVolumeSync = usePlaybackStore.subscribe(
   (vol) => applyMasterVolume(vol),
 );
 
-// Register the layer-voice-set changed listener. audioState fires this whenever layerVoiceMap
+// Register the layer-voice-set changed listener. voiceRegistry fires this whenever layerVoiceMap
 // mutates; the dirty flag gates getActiveLayerIdSet() allocation to frames where a change
 // actually occurred. The unsubscribe handle is exported for test teardown.
 export const _stopLayerVoiceSetListener = onLayerVoiceSetChanged(() => {

@@ -59,11 +59,15 @@ vi.mock("@dnd-kit/sortable", () => ({
   verticalListSortingStrategy: {},
 }));
 
-vi.mock("@/lib/audio/audioState", () => ({
-  isPadActive: vi.fn().mockReturnValue(false),
-  isPadFading: vi.fn().mockReturnValue(false),
-  onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}),
-}));
+vi.mock("@/lib/audio/voiceRegistry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/voiceRegistry")>();
+  return { ...actual, isPadActive: vi.fn().mockReturnValue(false), onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}) };
+});
+
+vi.mock("@/lib/audio/fadeCoordinator", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/fadeCoordinator")>();
+  return { ...actual, isPadFading: vi.fn().mockReturnValue(false) };
+});
 
 function resetAllStores() {
   useUiStore.setState({ ...initialUiState });

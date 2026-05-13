@@ -49,7 +49,6 @@ import {
   setLayerProgressInfo,
   isAnyGainChanging,
   clearAllAudioState,
-  markGainRamp,
 } from "./audioState";
 import {
   cancelPadFade,
@@ -65,7 +64,7 @@ import {
 } from "./fadeCoordinator";
 import { register as registerStreaming, clearAll as clearAllStreaming, dispose as disposeStreaming, isPadStreaming } from "./streamingAudioLifecycle";
 import { recordLayerVoice, clearAll as clearAllVoiceRegistry } from "./voiceRegistry";
-import { clearAll as clearAllGainRegistry } from "./gainRegistry";
+import { clearAll as clearAllGainRegistry, markGainRamp } from "./gainRegistry";
 import { clearAll as clearAllChainCycleState } from "./chainCycleState";
 import type { AudioVoice } from "./audioVoice";
 
@@ -77,7 +76,7 @@ beforeEach(() => {
   mockCtx.createGain.mockImplementation(() => makeMockGain());
   mockCtx.createDynamicsCompressor.mockImplementation(() => makeMockCompressor());
   // Reset every audioState collection in one call so private state like
-  // pendingStopCleanupTimeouts and _globalStopTimeoutId — which the per-suite
+  // pendingStopCleanupTimeouts and globalStopTimeoutId — which the per-suite
   // helpers do not touch — also starts each test clean.
   clearAllAudioState();
   clearAllGainRegistry();
@@ -364,10 +363,9 @@ describe("clearAllAudioState", () => {
       clearAllAudioState,
       setPadProgressInfo,
       getPadProgressInfo,
-      addFadingOutPad,
-      isPadFadingOut,
       setGlobalStopTimeout,
     } = await import("./audioState");
+    const { addFadingOutPad, isPadFadingOut } = await import("./fadeCoordinator");
     const { setLayerChain, setLayerCycleIndex, setLayerPlayOrder, setLayerPending, getLayerChain, getLayerCycleIndex, getLayerPlayOrder, isLayerPending } = await import("./chainCycleState");
     const { getPadGain, getOrCreateLayerGain, getLayerGain } = await import("./gainRegistry");
     const { isPadActive } = await import("./voiceRegistry");

@@ -73,10 +73,10 @@ vi.mock("@/state/playbackStore", () => ({
   usePlaybackStore: { getState: vi.fn(() => ({})), subscribe: vi.fn(() => () => {}) },
 }));
 
-vi.mock("@/lib/audio/audioState", () => ({
-  isPadActive: vi.fn(() => false),
-  onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}),
-}));
+vi.mock("@/lib/audio/voiceRegistry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audio/voiceRegistry")>();
+  return { ...actual, isPadActive: vi.fn(() => false), onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}) };
+});
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   executeFadeTap: vi.fn(),
