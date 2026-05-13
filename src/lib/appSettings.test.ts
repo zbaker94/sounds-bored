@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { loadAppSettings, saveAppSettings, getSettingsFilePath } from "./appSettings";
 import { mockFs, mockPath, createMockFileSystem } from "@/test/tauri-mocks";
 import { CURRENT_SETTINGS_VERSION } from "./constants";
@@ -93,13 +93,71 @@ describe("loadAppSettings", () => {
     );
   });
 
-  it("should throw a ZodError if the file contains invalid JSON structure", async () => {
+  it("recovers from invalid schema (ZodError) — backs up corrupt file and returns fresh defaults", async () => {
+    const onCorruption = vi.fn();
     createMockFileSystem({
       "/app-data/SoundsBored": null,
       "/app-data/SoundsBored/settings.json": JSON.stringify({ version: "1.0.0" }),  // missing required fields
     });
 
-    await expect(loadAppSettings()).rejects.toThrow();
+    const result = await loadAppSettings({ onCorruption });
+
+    expect(onCorruption).toHaveBeenCalledWith(expect.stringContaining("settings.json was corrupt"));
+    expect(mockFs.rename).toHaveBeenCalledWith(
+      "/app-data/SoundsBored/settings.json",
+      "/app-data/SoundsBored/settings.corrupt.json",
+    );
+    expect(mockFs.writeTextFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/app-data\/SoundsBored\/settings\.json\.[0-9a-f-]{36}\.tmp$/),
+      expect.stringContaining("globalFolders"),
+    );
+    expect(result.globalFolders).toHaveLength(2);
+  });
+
+  it("recovers from SyntaxError (malformed JSON) — backs up corrupt file and returns fresh defaults", async () => {
+    const onCorruption = vi.fn();
+    createMockFileSystem({
+      "/app-data/SoundsBored": null,
+      "/app-data/SoundsBored/settings.json": "not valid json {{",
+    });
+
+    const result = await loadAppSettings({ onCorruption });
+
+    expect(onCorruption).toHaveBeenCalledWith(expect.stringContaining("settings.json was corrupt"));
+    expect(result.globalFolders).toHaveLength(2);
+    const writtenCall = mockFs.writeTextFile.mock.calls.find(
+      (call) => (call[0] as string).includes("settings.json"),
+    );
+    expect(writtenCall).toBeDefined();
+    expect(JSON.parse(writtenCall![1] as string)).toMatchObject({ globalFolders: expect.any(Array) });
+  });
+
+  it("works without onCorruption callback when settings file is corrupt", async () => {
+    createMockFileSystem({
+      "/app-data/SoundsBored": null,
+      "/app-data/SoundsBored/settings.json": "not valid json {{",
+    });
+
+    const result = await loadAppSettings();
+
+    expect(result.globalFolders).toHaveLength(2);
+    expect(mockFs.writeTextFile).toHaveBeenCalled();
+  });
+
+  it("sweeps orphaned .tmp files even when the settings file does not exist", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    createMockFileSystem({
+      "/app-data/SoundsBored": null,
+      [`/app-data/SoundsBored/settings.json.${uuid}.tmp`]: "stale",
+      // settings.json intentionally absent
+    });
+
+    await loadAppSettings();
+
+    expect(mockFs.readDir).toHaveBeenCalledWith("/app-data/SoundsBored");
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      `/app-data/SoundsBored/settings.json.${uuid}.tmp`,
+    );
   });
 });
 

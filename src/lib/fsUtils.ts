@@ -40,13 +40,6 @@ export async function atomicWriteJson(filePath: string, data: unknown): Promise<
   await atomicWriteText(filePath, JSON.stringify(data, null, 2));
 }
 
-/**
- * Removes any orphaned `<basename>.<uuid>.tmp` files left in the same directory
- * as `filePath` by prior crashed {@link atomicWriteText} calls.
- *
- * This is opportunistic cleanup — all errors are silently suppressed so that a
- * sweep failure never prevents the caller from loading its file.
- */
 const UUID_TMP_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp$/i;
 
@@ -84,10 +77,17 @@ export interface LoadJsonWithRecoveryOptions<T> {
   defaults: T;
   onCorruption?: (message: string) => void;
   corruptMessage: string;
+  /**
+   * Defaults to true; pass `false` to skip when the caller already swept
+   * before an early-return branch and delegates here for the read+parse path.
+   */
+  sweep?: boolean;
 }
 
 /**
  * Reads and parses a JSON file, recovering automatically if the file is corrupt.
+ *
+ * Sweeps orphaned `.tmp` files before reading (unless `opts.sweep` is false).
  *
  * I/O errors from `readTextFile` propagate unchanged — callers should handle
  * permission or missing-file errors before calling this function.
@@ -98,6 +98,9 @@ export interface LoadJsonWithRecoveryOptions<T> {
  * returned — callers never get an unrecoverable broken state.
  */
 export async function loadJsonWithRecovery<T>(opts: LoadJsonWithRecoveryOptions<T>): Promise<T> {
+  if (opts.sweep !== false) {
+    await sweepOrphanedTmpFiles(opts.path);
+  }
   const text = await readTextFile(opts.path);
   try {
     return opts.parse(JSON.parse(text));
@@ -125,7 +128,7 @@ export async function loadJsonWithRecovery<T>(opts: LoadJsonWithRecoveryOptions<
  * The caller is responsible for writing a fresh default and notifying the user
  * after this helper returns.
  */
-async function backupCorruptFile(filePath: string): Promise<void> {
+export async function backupCorruptFile(filePath: string): Promise<void> {
   const backupPath = filePath.endsWith(".json")
     ? filePath.replace(/\.json$/, ".corrupt.json")
     : `${filePath}.corrupt.json`;

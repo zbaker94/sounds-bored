@@ -2,7 +2,7 @@ import { appDataDir, join } from "@tauri-apps/api/path";
 import { exists } from "@tauri-apps/plugin-fs";
 import { z } from "zod";
 import { DownloadJobSchema } from "./schemas";
-import { atomicWriteJson, loadJsonWithRecovery } from "./fsUtils";
+import { atomicWriteJson, loadJsonWithRecovery, sweepOrphanedTmpFiles } from "./fsUtils";
 import { APP_FOLDER, DOWNLOADS_FILE_NAME } from "./constants";
 import { ACTIVE_STATUSES } from "@/state/downloadStore";
 
@@ -19,6 +19,7 @@ async function getDownloadsFilePath(): Promise<string> {
 
 export async function loadDownloadHistory(options?: LoadDownloadHistoryOptions) {
   const filePath = await getDownloadsFilePath();
+  await sweepOrphanedTmpFiles(filePath);
   if (!(await exists(filePath))) return [];
 
   const jobs = await loadJsonWithRecovery({
@@ -27,6 +28,7 @@ export async function loadDownloadHistory(options?: LoadDownloadHistoryOptions) 
     defaults: [] as z.infer<typeof DownloadHistorySchema>,
     onCorruption: options?.onCorruption,
     corruptMessage: `${DOWNLOADS_FILE_NAME} was corrupt and has been reset. Your download history has been cleared.`,
+    sweep: false,
   });
   // Any non-terminal job was interrupted by app restart — mark it failed.
   return jobs.map((job) =>

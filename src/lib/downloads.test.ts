@@ -19,6 +19,21 @@ describe("loadDownloadHistory", () => {
     expect(result).toEqual([]);
   });
 
+  it("sweeps orphaned .tmp files even when the downloads file does not exist", async () => {
+    const uuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+    mockFs.exists.mockResolvedValue(false);
+    mockFs.readDir.mockResolvedValue([
+      { name: `${DOWNLOADS_FILE_NAME}.${uuid}.tmp` },
+    ]);
+
+    await loadDownloadHistory();
+
+    expect(mockFs.readDir).toHaveBeenCalled();
+    expect(mockFs.remove).toHaveBeenCalledWith(
+      expect.stringContaining(`${DOWNLOADS_FILE_NAME}.${uuid}.tmp`),
+    );
+  });
+
   it("loads valid history and returns jobs", async () => {
     const job = createMockDownloadJob({ status: "completed" });
     mockFs.exists.mockResolvedValue(true);

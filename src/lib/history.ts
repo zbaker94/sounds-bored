@@ -1,7 +1,7 @@
 import { ProjectHistory, ProjectHistorySchema } from "./schemas";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { mkdir, exists } from "@tauri-apps/plugin-fs";
-import { atomicWriteJson, loadJsonWithRecovery, sweepOrphanedTmpFiles } from "./fsUtils";
+import { atomicWriteJson, loadJsonWithRecovery } from "./fsUtils";
 import { APP_FOLDER, HISTORY_FILE_NAME } from "./constants";
 
 interface LoadHistoryOptions {
@@ -28,7 +28,6 @@ export async function ensureHistoryFile(): Promise<string> {
 
 export async function loadProjectHistory(options?: LoadHistoryOptions): Promise<ProjectHistory> {
   const filePath = await ensureHistoryFile();
-  await sweepOrphanedTmpFiles(filePath);
   return loadJsonWithRecovery<ProjectHistory>({
     path: filePath,
     parse: (raw) => ProjectHistorySchema.parse(raw),
