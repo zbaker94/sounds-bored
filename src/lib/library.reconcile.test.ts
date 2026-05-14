@@ -516,6 +516,87 @@ describe("reconcileGlobalLibrary", () => {
       expect(result.missingSoundIds).toContain("s1");
       expect(result.unknownSoundIds.size).toBe(0);
     });
+
+    it("processes sound file checks in batches — all sounds checked even with many entries", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sounds = Array.from({ length: 110 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+      );
+      mockFs.exists.mockResolvedValue(true);
+
+      const result = await checkMissingStatus([folder], sounds);
+
+      expect(result.missingSoundIds.size).toBe(0);
+      // exists() called once per sound path (plus once for the folder itself)
+      sounds.forEach((s) => {
+        expect(mockFs.exists).toHaveBeenCalledWith(s.filePath);
+      });
+    });
+
+    it("respects batch size — sound exists() calls are issued in chunks of exactly SOUND_EXISTS_BATCH", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sounds = Array.from({ length: 150 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+      );
+
+      let concurrentSoundChecks = 0;
+      let maxConcurrentSoundChecks = 0;
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/music") return Promise.resolve(true);
+        concurrentSoundChecks++;
+        maxConcurrentSoundChecks = Math.max(maxConcurrentSoundChecks, concurrentSoundChecks);
+        return Promise.resolve(true).then((v) => {
+          concurrentSoundChecks--;
+          return v;
+        });
+      });
+
+      await checkMissingStatus([folder], sounds);
+
+      // First 3 batches have 50 sounds each; max concurrent = 50
+      expect(maxConcurrentSoundChecks).toBe(50);
+    });
+
+    it("handles exact-batch-size boundaries — 50 and 100 sounds", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      mockFs.exists.mockResolvedValue(true);
+
+      for (const count of [50, 100]) {
+        mockFs.exists.mockClear();
+        const sounds = Array.from({ length: count }, (_, i) =>
+          createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+        );
+
+        const result = await checkMissingStatus([folder], sounds);
+
+        expect(result.missingSoundIds.size).toBe(0);
+        sounds.forEach((s) => {
+          expect(mockFs.exists).toHaveBeenCalledWith(s.filePath);
+        });
+      }
+    });
+
+    it("maps errors to unknown status in non-first batch (batch 2 rejection)", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sounds = Array.from({ length: 75 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+      );
+
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/music") return Promise.resolve(true);
+        // sound #74 is in batch 2 (index 50-74) — simulate permission error
+        if (path === "/music/sound-74.wav") return Promise.reject(new Error("permission denied"));
+        return Promise.resolve(true);
+      });
+
+      const result = await checkMissingStatus([folder], sounds);
+
+      expect(result.unknownSoundIds).toContain("s74");
+      expect(result.missingSoundIds).not.toContain("s74");
+      // All other sounds in both batches are still processed correctly
+      expect(result.missingSoundIds.size).toBe(0);
+      expect(result.unknownSoundIds.size).toBe(1);
+    });
   });
 
   describe("fileSizeBytes population", () => {
@@ -1185,6 +1266,64 @@ describe("statEnricher", () => {
 
     expect(result[0].fileSizeBytes).toBe(100);
     expect(result[1].fileSizeBytes).toBe(200);
+  });
+
+  it("processes sounds in batches — all sounds stat'd, order preserved, no-op references kept", async () => {
+    const alreadySized = createSound({ id: "pre", name: "pre", filePath: "/music/pre.wav", fileSizeBytes: 9999 });
+    const sounds = [
+      alreadySized,
+      ...Array.from({ length: 70 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav` }),
+      ),
+    ];
+
+    const result = await statEnricher(sounds);
+
+    expect(result).toHaveLength(71);
+    // Order preserved
+    expect(result.map((s) => s.id)).toEqual(sounds.map((s) => s.id));
+    // No-op reference kept for already-sized sound
+    expect(result[0]).toBe(alreadySized);
+    // All others stat'd
+    expect(result.slice(1).every((s) => s.fileSizeBytes === 1024)).toBe(true);
+  });
+
+  it("respects batch size — stat calls are issued in chunks of exactly STAT_BATCH", async () => {
+    let concurrentCount = 0;
+    let maxConcurrent = 0;
+
+    mockStat.mockImplementation(() => {
+      concurrentCount++;
+      maxConcurrent = Math.max(maxConcurrent, concurrentCount);
+      return Promise.resolve({ size: 512 }).then((v) => {
+        concurrentCount--;
+        return v;
+      });
+    });
+
+    const sounds = Array.from({ length: 100 }, (_, i) =>
+      createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav` }),
+    );
+
+    await statEnricher(sounds);
+
+    // First 3 batches have 32 sounds each; max concurrent = 32
+    expect(maxConcurrent).toBe(32);
+  });
+
+  it("handles exact-batch-size boundaries — 32 and 64 sounds", async () => {
+    for (const count of [32, 64]) {
+      mockStat.mockReset();
+      mockStat.mockResolvedValue({ size: 1024 });
+      const sounds = Array.from({ length: count }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav` }),
+      );
+
+      const result = await statEnricher(sounds);
+
+      expect(result).toHaveLength(count);
+      expect(mockStat).toHaveBeenCalledTimes(count);
+    }
   });
 });
 

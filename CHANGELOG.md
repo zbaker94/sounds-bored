@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Large sound libraries now load more reliably — file existence checks and file size reads process in controlled batches instead of all at once, preventing IPC overload with 100+ sounds
 - Improved reliability of streaming audio playback tracking when sounds are stopped mid-session
 - Improved reliability of pad progress tracking when streaming audio completes or is disposed
 - Fixed a bug where streaming audio progress (for yt-dlp/large file sounds) was not being tracked when no buffer-based sounds were playing — progress bars and meters now update correctly for streaming-only playback
