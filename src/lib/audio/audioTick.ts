@@ -37,7 +37,7 @@ import {
   onLayerVoiceSetChanged,
 } from "./voiceRegistry";
 import { forEachActivePadGain, forEachActiveLayerGain } from "./gainRegistry";
-import { getLayerPlayOrder, getLayerChain } from "./chainCycleState";
+import { getLayerPlayOrder, getLayerChain, onChainCycleStateChanged } from "./chainCycleState";
 import { applyMasterVolume } from "./audioContext";
 
 const VOLUME_EPSILON = 0.001;
@@ -60,6 +60,9 @@ let prevActiveLayerIds = new Set<string>();
 // True on startup and after resetTrackers() so the first tick after start/resume
 // always captures the current active layer set — matches the old -1 sentinel behavior.
 let layerVoiceSetChanged = true;
+// True on startup and after resetTrackers() so the first tick after start/resume
+// always walks all active layers to rebuild the chain/playOrder lists.
+let chainCycleStateChanged = true;
 // True on startup and after resetTrackers() so the first tick after the tick
 // restarts (gap between chain-link sounds, stop/restart) always samples gain nodes
 // regardless of isAnyGainChanging(). Prevents prevPadVolumes={} (cleared by
@@ -88,6 +91,7 @@ function resetTrackers(): void {
   prevLayerVolumes = {};
   prevActiveLayerIds = new Set();
   layerVoiceSetChanged = true; // ensure first tick after reset always refreshes activeLayerIds
+  chainCycleStateChanged = true; // ensure first tick after reset always rebuilds chain/playOrder lists
   gainSampleNeeded = true;     // ensure first tick after reset always samples gain nodes
   prevPadProgress = {};
   prevLayerProgress = {};
@@ -111,6 +115,13 @@ export const _stopMasterVolumeSync = usePlaybackStore.subscribe(
 // actually occurred. The unsubscribe handle is exported for test teardown.
 export const _stopLayerVoiceSetListener = onLayerVoiceSetChanged(() => {
   layerVoiceSetChanged = true;
+});
+
+// Register the chain-cycle-state changed listener. chainCycleState fires this whenever
+// layer chain or play-order state mutates; the dirty flag gates collectLayerSoundLists()
+// to skip the per-layer walk in steady-state.
+export const _stopChainCycleStateListener = onChainCycleStateChanged(() => {
+  chainCycleStateChanged = true;
 });
 
 /**
@@ -204,12 +215,34 @@ function pruneStaleKeys(
  * Sound[] reference or its contents are unchanged — keeps Zustand selectors
  * stable across layers that haven't advanced their chain this tick.
  */
-function collectLayerSoundLists(activeLayerIds: ReadonlySet<string>): {
+function collectLayerSoundLists(
+  activeLayerIds: ReadonlySet<string>,
+  activeLayerIdsChanged: boolean,
+): {
   nextLayerPlayOrder: Record<string, string[]>;
   nextLayerChain: Record<string, string[]>;
   layerPlayOrderChanged: boolean;
   layerChainChanged: boolean;
 } {
+  // Subscription-gated: skip the per-layer walk when neither a chainCycleState mutation
+  // nor an active-layer-set change has occurred since the last tick — the common
+  // steady-state case for looping/playing layers. chainCycleStateChanged is set by the
+  // onChainCycleStateChanged listener registered at module load, and reset to true by
+  // resetTrackers() so the first tick after start/resume always rebuilds the lists.
+  // activeLayerIdsChanged forces the walk even without a chain mutation so pruneStaleKeys
+  // can clean up layers that deactivated via layerVoiceSetChanged alone — otherwise
+  // prevLayerPlayOrder/prevLayerChain would retain stale entries for inactive layers
+  // until the next unrelated chain mutation.
+  if (!chainCycleStateChanged && !activeLayerIdsChanged) {
+    return {
+      nextLayerPlayOrder: prevLayerPlayOrder,
+      nextLayerChain: prevLayerChain,
+      layerPlayOrderChanged: false,
+      layerChainChanged: false,
+    };
+  }
+  chainCycleStateChanged = false;
+
   const nextLayerPlayOrder: Record<string, string[]> = {};
   const nextLayerChain: Record<string, string[]> = {};
   let seenPlayOrderCount = 0;
@@ -310,7 +343,7 @@ function tick(): void {
     computeGainChanges(activePadIdsForGains, nextActiveLayerIds);
 
   const { nextLayerPlayOrder, nextLayerChain, layerPlayOrderChanged, layerChainChanged } =
-    collectLayerSoundLists(nextActiveLayerIds);
+    collectLayerSoundLists(nextActiveLayerIds, activeLayerIdsChanged);
 
   if (
     !padVolumesChanged &&

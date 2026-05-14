@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Reduced CPU usage during playback: the audio engine now skips redundant per-layer work each animation frame when chain/play-order state hasn't changed, improving performance in steady-state looping/playback scenarios.
 - Internal code quality improvements to the sound library reconciliation system; no change to app behavior or functionality.
 - Improved reliability of sound library file-checking — large libraries now process in controlled batches, preventing IPC overload during missing-file detection
 - Large sound libraries now load more reliably — file existence checks and file size reads process in controlled batches instead of all at once, preventing IPC overload with 100+ sounds

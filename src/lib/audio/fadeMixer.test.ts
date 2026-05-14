@@ -15,6 +15,7 @@ const mockCtx = {
 vi.mock("./audioContext", () => ({
   getAudioContext: vi.fn(() => mockCtx),
   getMasterGain: vi.fn(() => ({ connect: vi.fn() })),
+  applyMasterVolume: vi.fn(),
 }));
 
 vi.mock("./gainManager", () => ({
