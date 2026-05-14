@@ -35,7 +35,7 @@ function makeMockCtx() {
   };
 }
 
-function headResponse(contentLength: number | null) {
+function headResponse(contentLength: number | string | null) {
   return {
     headers: {
       get: (name: string) =>
@@ -73,10 +73,12 @@ describe("checkIsLargeFile", () => {
     expect(await checkIsLargeFile(sound)).toBe(true);
   });
 
-  it("returns false when Content-Length header is absent", async () => {
+  it("returns false when Content-Length header is absent and caches the result", async () => {
     mockFetch.mockResolvedValue(headResponse(null));
     const sound = createMockSound({ filePath: "unknown.mp3" });
     expect(await checkIsLargeFile(sound)).toBe(false);
+    await checkIsLargeFile(sound);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("returns false when fetch throws (missing file, network error, etc.)", async () => {
@@ -115,6 +117,72 @@ describe("checkIsLargeFile", () => {
       expect.any(String),
       expect.objectContaining({ method: "HEAD" }),
     );
+  });
+
+  it("returns false for zero Content-Length and caches the result", async () => {
+    mockFetch.mockResolvedValue(headResponse(0));
+    const sound = createMockSound({ filePath: "empty.mp3" });
+    expect(await checkIsLargeFile(sound)).toBe(false);
+    await checkIsLargeFile(sound);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns false for empty-string Content-Length (Number('') === 0) and caches the result", async () => {
+    mockFetch.mockResolvedValue(headResponse(""));
+    const sound = createMockSound({ filePath: "empty-header.mp3" });
+    expect(await checkIsLargeFile(sound)).toBe(false);
+    await checkIsLargeFile(sound);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe("invalid Content-Length guard", () => {
+    it("returns false for a negative Content-Length", async () => {
+      mockFetch.mockResolvedValue(headResponse(-1));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      expect(await checkIsLargeFile(sound)).toBe(false);
+    });
+
+    it("returns false for a non-numeric Content-Length", async () => {
+      mockFetch.mockResolvedValue(headResponse("invalid"));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      expect(await checkIsLargeFile(sound)).toBe(false);
+    });
+
+    it('returns false for "NaN" literal Content-Length', async () => {
+      mockFetch.mockResolvedValue(headResponse("NaN"));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      expect(await checkIsLargeFile(sound)).toBe(false);
+    });
+
+    it('returns false for "Infinity" Content-Length', async () => {
+      mockFetch.mockResolvedValue(headResponse("Infinity"));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      expect(await checkIsLargeFile(sound)).toBe(false);
+    });
+
+    it("does not cache a negative Content-Length — re-fetches on next call", async () => {
+      mockFetch.mockResolvedValue(headResponse(-1));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      await checkIsLargeFile(sound);
+      await checkIsLargeFile(sound);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not cache a non-numeric Content-Length — re-fetches on next call", async () => {
+      mockFetch.mockResolvedValue(headResponse("invalid"));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      await checkIsLargeFile(sound);
+      await checkIsLargeFile(sound);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not cache "Infinity" Content-Length — re-fetches on next call', async () => {
+      mockFetch.mockResolvedValue(headResponse("Infinity"));
+      const sound = createMockSound({ filePath: "bad-header.mp3" });
+      await checkIsLargeFile(sound);
+      await checkIsLargeFile(sound);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("fileSizeBytes fast path", () => {

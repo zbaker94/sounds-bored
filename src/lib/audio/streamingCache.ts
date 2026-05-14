@@ -140,13 +140,13 @@ export function clearAllStreamingElements(): void {
 }
 
 /**
- * Returns true when the sound's compressed file is at or above the 20 MB
+ * Returns true when the sound's compressed file is at or above the 5 MB
  * threshold, meaning it should be played via the streaming path.
  *
- * Caches the result per sound ID (including false on fetch failure, so a
- * broken file path does not hammer the network on every pad trigger).
- * Returns false (safe fallback: buffer path) when the file has no path,
- * the fetch fails, or Content-Length is absent.
+ * Caches the result per sound ID. On fetch failure or absent Content-Length,
+ * caches false so a broken file path does not hammer the network on every pad
+ * trigger. An invalid (non-numeric or negative) Content-Length is NOT cached —
+ * the server may correct the header on a future request.
  */
 export async function checkIsLargeFile(sound: Sound): Promise<boolean> {
   if (!sound.filePath) return false;
@@ -161,19 +161,27 @@ export async function checkIsLargeFile(sound: Sound): Promise<boolean> {
 
   // Slow path: fall back to HTTP HEAD request (first trigger before reconcile runs)
   const url = convertFileSrc(sound.filePath);
-  let isLarge = false;
   try {
     const response = await fetch(url, { method: "HEAD" });
     const contentLength = response.headers.get("Content-Length");
     if (contentLength !== null) {
-      isLarge = parseInt(contentLength, 10) >= LARGE_FILE_THRESHOLD_BYTES;
+      const parsed = Number(contentLength);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        const isLarge = parsed >= LARGE_FILE_THRESHOLD_BYTES;
+        sizeCache.set(sound.id, isLarge);
+        return isLarge;
+      }
+      // Content-Length present but invalid or negative — return false without
+      // caching so a future call can re-evaluate if the server corrects the header.
+      return false;
     }
   } catch {
-    // Network error or missing file — fall back to buffer path.
+    // Network error or missing file — fall through below.
   }
 
-  sizeCache.set(sound.id, isLarge);
-  return isLarge;
+  // Absent Content-Length or network error: cache false to avoid repeated requests.
+  sizeCache.set(sound.id, false);
+  return false;
 }
 
 /** Remove a single entry (e.g. after a sound file is replaced on disk). */
