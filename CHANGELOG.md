@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved reliability of streaming audio playback tracking when sounds are stopped mid-session
 - Improved reliability of pad progress tracking when streaming audio completes or is disposed
 - Fixed a bug where streaming audio progress (for yt-dlp/large file sounds) was not being tracked when no buffer-based sounds were playing — progress bars and meters now update correctly for streaming-only playback
 - Master volume now applies immediately on app startup, not only after the first change

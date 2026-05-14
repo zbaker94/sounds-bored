@@ -353,4 +353,12 @@ describe("hasAnyStreamingPad / hasAnyStreamingLayer", () => {
     dispose("pad-1", "layer-2", el2);
     expect(hasAnyStreamingLayer()).toBe(true);
   });
+
+  it("sentinels stay true when one layer is fully disposed via whole-layer overload (no el)", () => {
+    register("pad-1", "layer-1", makeAudio(10));
+    register("pad-1", "layer-2", makeAudio(5));
+    dispose("pad-1", "layer-2"); // whole-layer overload — different cache update path
+    expect(hasAnyStreamingLayer()).toBe(true);
+    expect(hasAnyStreamingPad()).toBe(true);
+  });
 });
