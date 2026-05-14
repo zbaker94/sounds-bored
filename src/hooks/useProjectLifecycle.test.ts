@@ -14,15 +14,22 @@ const {
   mockOpenOverlay,
   mockCloseOverlay,
   mockRequestSaveAndThen,
-} = vi.hoisted(() => ({
-  mockNavigate: vi.fn(),
-  mockToastError: vi.fn(),
-  mockAllowClose: vi.fn(),
-  mockDiscardTemporaryProject: vi.fn().mockResolvedValue(undefined),
-  mockOpenOverlay: vi.fn(),
-  mockCloseOverlay: vi.fn(),
-  mockRequestSaveAndThen: vi.fn(),
-}));
+  mockUseWindowCloseHandler,
+} = vi.hoisted(() => {
+  const mockAllowClose = vi.fn();
+  return {
+    mockNavigate: vi.fn(),
+    mockToastError: vi.fn(),
+    mockAllowClose,
+    mockDiscardTemporaryProject: vi.fn().mockResolvedValue(undefined),
+    mockOpenOverlay: vi.fn(),
+    mockCloseOverlay: vi.fn(),
+    mockRequestSaveAndThen: vi.fn(),
+    mockUseWindowCloseHandler: vi.fn<
+      (hasUnsavedChanges: boolean, onCloseRequested: () => void) => { allowClose: () => void }
+    >(() => ({ allowClose: mockAllowClose })),
+  };
+});
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -35,7 +42,7 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/hooks/useWindowCloseHandler", () => ({
-  useWindowCloseHandler: () => ({ allowClose: mockAllowClose }),
+  useWindowCloseHandler: mockUseWindowCloseHandler,
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({
@@ -248,6 +255,7 @@ describe("useProjectLifecycle — close dialog handlers", () => {
   });
 
   it("handleDiscardAndClose still calls closeWindow when discardTemporaryProject rejects", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const project = createMockProject();
     const historyEntry = createMockHistoryEntry({ path: "/some/path" });
     useProjectStore.getState().loadProject(historyEntry, project, true);
@@ -260,7 +268,9 @@ describe("useProjectLifecycle — close dialog handlers", () => {
     });
 
     expect(mockDiscardTemporaryProject).toHaveBeenCalledWith("/some/path");
-    expect(mockAllowClose).toHaveBeenCalled(); // closeWindow still runs despite rejection
+    expect(mockAllowClose).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("handleCancelClose closes the overlay without any other action", () => {
@@ -277,5 +287,77 @@ describe("useProjectLifecycle — close dialog handlers", () => {
     expect(mockCloseOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG");
     expect(mockRequestSaveAndThen).not.toHaveBeenCalled();
     expect(mockDiscardTemporaryProject).not.toHaveBeenCalled();
+  });
+});
+
+describe("useProjectLifecycle — useWindowCloseHandler integration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDiscardTemporaryProject.mockResolvedValue(undefined);
+    useProjectStore.setState({ ...initialProjectState });
+  });
+
+  it("passes false to useWindowCloseHandler when project has no unsaved changes", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+
+    renderHook(() => useProjectLifecycle());
+
+    expect(mockUseWindowCloseHandler).toHaveBeenCalledWith(false, expect.any(Function));
+  });
+
+  it("passes true to useWindowCloseHandler when project isTemporary", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, true);
+
+    renderHook(() => useProjectLifecycle());
+
+    expect(mockUseWindowCloseHandler).toHaveBeenCalledWith(true, expect.any(Function));
+  });
+
+  it("passes true to useWindowCloseHandler when project isDirty", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+    useProjectStore.setState({ isDirty: true });
+
+    renderHook(() => useProjectLifecycle());
+
+    expect(mockUseWindowCloseHandler).toHaveBeenCalledWith(true, expect.any(Function));
+  });
+
+  it("updates hasUnsavedChanges to false when isDirty changes to false", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+    useProjectStore.setState({ isDirty: true });
+
+    const { rerender } = renderHook(() => useProjectLifecycle());
+    expect(mockUseWindowCloseHandler).toHaveBeenLastCalledWith(true, expect.any(Function));
+
+    act(() => {
+      useProjectStore.setState({ isDirty: false });
+    });
+    rerender();
+
+    expect(mockUseWindowCloseHandler).toHaveBeenLastCalledWith(false, expect.any(Function));
+  });
+
+  it("passes handleCloseRequested that opens the confirm dialog overlay", () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+
+    renderHook(() => useProjectLifecycle());
+
+    expect(mockUseWindowCloseHandler).toHaveBeenCalledTimes(1);
+    const [, onCloseRequested] = mockUseWindowCloseHandler.mock.calls.at(-1)!;
+    act(() => {
+      onCloseRequested();
+    });
+
+    expect(mockOpenOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG", "dialog");
   });
 });
