@@ -17,7 +17,7 @@
  *     in case an AbortController fires late or is bypassed.
  *
  * Public API: register, dispose, clearAll, isPadStreaming, getStreamingElement,
- *   getBestForPad, iterateBestLayers.
+ *   getBestForPad, iterateBestLayers, hasAnyStreamingPad, hasAnyStreamingLayer.
  */
 
 // pad ID → layer ID → set of active streaming HTMLAudioElements.
@@ -165,6 +165,16 @@ export function getStreamingElement(padId: string, layerId: string): HTMLAudioEl
 
 export function getBestForPad(padId: string): HTMLAudioElement | undefined {
   return padBestCache.get(padId);
+}
+
+/** O(1) sentinel: true when any streaming pad is registered. */
+export function hasAnyStreamingPad(): boolean {
+  return padBestCache.size > 0;
+}
+
+/** O(1) sentinel: true when any streaming layer is registered. */
+export function hasAnyStreamingLayer(): boolean {
+  return layerBestCache.size > 0;
 }
 
 /** Yields [layerId, bestElement] for all layers with active streaming elements.

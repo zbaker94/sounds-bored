@@ -7,6 +7,8 @@ import {
   getStreamingElement,
   getBestForPad,
   iterateBestLayers,
+  hasAnyStreamingPad,
+  hasAnyStreamingLayer,
 } from "./streamingAudioLifecycle";
 
 function makeAudio(duration: number, currentTime = 0): HTMLAudioElement {
@@ -298,5 +300,49 @@ describe("isPadStreaming", () => {
 
   it("returns false for unknown pads", () => {
     expect(isPadStreaming("never-registered")).toBe(false);
+  });
+});
+
+describe("hasAnyStreamingPad / hasAnyStreamingLayer", () => {
+  it("both return false when nothing is registered", () => {
+    expect(hasAnyStreamingPad()).toBe(false);
+    expect(hasAnyStreamingLayer()).toBe(false);
+  });
+
+  it("hasAnyStreamingPad returns true after register, false after last element is disposed", () => {
+    const el = makeAudio(10);
+    register("pad-1", "layer-1", el);
+    expect(hasAnyStreamingPad()).toBe(true);
+
+    dispose("pad-1", "layer-1", el);
+    expect(hasAnyStreamingPad()).toBe(false);
+  });
+
+  it("hasAnyStreamingLayer returns true after register, false after last element is disposed", () => {
+    const el = makeAudio(10);
+    register("pad-1", "layer-1", el);
+    expect(hasAnyStreamingLayer()).toBe(true);
+
+    dispose("pad-1", "layer-1", el);
+    expect(hasAnyStreamingLayer()).toBe(false);
+  });
+
+  it("both return false after clearAll", () => {
+    register("pad-1", "layer-1", makeAudio(10));
+    register("pad-2", "layer-2", makeAudio(5));
+    expect(hasAnyStreamingPad()).toBe(true);
+    expect(hasAnyStreamingLayer()).toBe(true);
+
+    clearAll();
+    expect(hasAnyStreamingPad()).toBe(false);
+    expect(hasAnyStreamingLayer()).toBe(false);
+  });
+
+  it("hasAnyStreamingPad stays true when one of two pads is disposed", () => {
+    register("pad-1", "layer-1", makeAudio(10));
+    const el2 = makeAudio(5);
+    register("pad-2", "layer-2", el2);
+    dispose("pad-2", "layer-2", el2);
+    expect(hasAnyStreamingPad()).toBe(true);
   });
 });

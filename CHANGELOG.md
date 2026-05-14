@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where streaming audio progress (for yt-dlp/large file sounds) was not being tracked when no buffer-based sounds were playing — progress bars and meters now update correctly for streaming-only playback
 - Master volume now applies immediately on app startup, not only after the first change
 - Keyboard shortcuts now correctly check whether a panel or dialog is the topmost overlay before acting, preventing hotkeys from firing through stacked UI layers.
 - Audio buffer cache now enforces a ~200 MB memory cap, automatically evicting least-recently-used sounds to reduce memory pressure during long sessions.
