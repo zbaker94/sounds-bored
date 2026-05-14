@@ -86,13 +86,13 @@ const CHAIN_FAILURE_THRESHOLD = 3;
 
 /** Returns the 0–1 gain value for a specific sound within a layer.
  *  For "assigned" selections, reads SoundInstance.volume (0–100 scale).
- *  For "tag"/"set" selections, defaults to 1.0.
+ *  For "tag"/"set" selections, reads LayerSelection.defaultVolume (0–100 scale).
  *  Applies loudness normalization (EBU R128 → −14 LUFS target) when available. */
 export function getVoiceVolume(layer: Layer, sound: Sound): number {
   const rawGain =
     layer.selection.type === "assigned"
       ? clampGain01((layer.selection.instances.find((i) => i.soundId === sound.id)?.volume ?? 100) / 100)
-      : 1.0;
+      : clampGain01(layer.selection.defaultVolume / 100);
   return normalizedVoiceGain(rawGain, sound.loudnessLufs ?? undefined);
 }
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Sounds played from tag or set selections now respect the layer's default volume setting instead of always playing at full volume.
 - Auto-saves your project before opening the export destination picker, so exported files reflect the latest changes
 - Export is cancelled if the auto-save fails, preventing export of stale data
 - The folder picker dialog now lets you create new folders directly from the "Save Project As" and "Export" dialogs (macOS only — Windows and Linux folder pickers already allow this by default).
