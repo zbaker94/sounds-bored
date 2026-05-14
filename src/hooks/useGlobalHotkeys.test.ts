@@ -717,6 +717,16 @@ describe("useGlobalHotkeys — overlay-gated hotkeys", () => {
       triggerKey("mod+shift+m");
       expect(mockUiState.toggleOverlay).not.toHaveBeenCalled();
     });
+
+    it("is a no-op when sounds panel is open but not topmost", () => {
+      mockUiState.overlayStack = [
+        { id: OVERLAY_ID.SOUNDS_PANEL, type: "dialog" },
+        { id: OVERLAY_ID.MENU_DRAWER, type: "drawer" },
+      ];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+m");
+      expect(mockUiState.toggleOverlay).not.toHaveBeenCalled();
+    });
   });
 
   describe("mod+s (save)", () => {
@@ -731,6 +741,16 @@ describe("useGlobalHotkeys — overlay-gated hotkeys", () => {
       renderHook(() => useGlobalHotkeys());
       triggerKey("mod+s");
       expect(mockHandleSaveClick).not.toHaveBeenCalled();
+    });
+
+    it("triggers save when save dialog is open but not topmost", () => {
+      mockUiState.overlayStack = [
+        { id: OVERLAY_ID.SAVE_PROJECT_DIALOG, type: "dialog" },
+        { id: OVERLAY_ID.CONFIRM_CLOSE_DIALOG, type: "dialog" },
+      ];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+s");
+      expect(mockHandleSaveClick).toHaveBeenCalled();
     });
   });
 
@@ -747,6 +767,16 @@ describe("useGlobalHotkeys — overlay-gated hotkeys", () => {
       triggerKey("mod+shift+s");
       expect(mockHandleSaveAsMenuClick).not.toHaveBeenCalled();
     });
+
+    it("is a no-op when export dialog is open but not topmost", () => {
+      mockUiState.overlayStack = [
+        { id: OVERLAY_ID.EXPORT_PROGRESS_DIALOG, type: "dialog" },
+        { id: OVERLAY_ID.MENU_DRAWER, type: "drawer" },
+      ];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+s");
+      expect(mockHandleSaveAsMenuClick).not.toHaveBeenCalled();
+    });
   });
 
   describe("mod+shift+e (export)", () => {
@@ -758,6 +788,16 @@ describe("useGlobalHotkeys — overlay-gated hotkeys", () => {
 
     it("is a no-op when export is already in progress", () => {
       mockUiState.overlayStack = [{ id: OVERLAY_ID.EXPORT_PROGRESS_DIALOG, type: "dialog" }];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+e");
+      expect(mockHandleExportClick).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op when export dialog is open but not topmost", () => {
+      mockUiState.overlayStack = [
+        { id: OVERLAY_ID.EXPORT_PROGRESS_DIALOG, type: "dialog" },
+        { id: OVERLAY_ID.MENU_DRAWER, type: "drawer" },
+      ];
       renderHook(() => useGlobalHotkeys());
       triggerKey("mod+shift+e");
       expect(mockHandleExportClick).not.toHaveBeenCalled();

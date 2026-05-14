@@ -114,14 +114,19 @@ export const useUiStore = create<UiStore>()(subscribeWithSelector((set) => ({
     set((state) => ({ pageByScene: { ...state.pageByScene, [sceneId]: page } })),
 })));
 
-// Standalone selector factories. Reactive: useUiStore(selectIsOverlayOpen(id)).
-// Imperative: selectIsOverlayOpen(id)(useUiStore.getState()).
-// Stable function reference — avoids unnecessary re-renders when used reactively.
+// Computed overlay queries live here as standalone exports, not store methods — keeps
+// the store's action surface mutation-only and makes these tree-shakeable and
+// independently testable (issue #409).
+// Parameterized: curried factory (id) => (s) => boolean.
+// Parameterless: plain selector (s) => boolean (no factory wrapper needed).
+// Reactive: useUiStore(selectIsOverlayOpen(id)) / useUiStore(selectHasOpenOverlay).
+// Imperative: selectIsOverlayOpen(id)(useUiStore.getState()) / selectHasOpenOverlay(useUiStore.getState()).
 export const selectIsOverlayOpen = (id: string) => (s: UiStore) =>
   s.overlayStack.some((entry) => entry.id === id);
 
 export const selectIsTopOverlay = (id: string) => (s: UiStore) =>
   s.overlayStack.at(-1)?.id === id;
 
+// Plain selector (not a factory) — no id param, so no currying needed.
 export const selectHasOpenOverlay = (s: UiStore) =>
   s.overlayStack.length > 0;
