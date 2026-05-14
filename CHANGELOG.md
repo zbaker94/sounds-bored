@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Audio buffer cache now enforces a ~200 MB memory cap, automatically evicting least-recently-used sounds to reduce memory pressure during long sessions.
+- Triggering the same sound rapidly no longer issues duplicate network/decode requests — concurrent loads share a single in-flight fetch.
+- Evicting or clearing a sound with a bad/corrupted file no longer corrupts internal memory accounting.
 - No user-facing changes in this release.
 - Fixed a bug where audio cache entries for removed or relocated sounds were not properly cleared, which could cause stale audio to play
 - When resolving a missing sound file that duplicates an existing library entry, the duplicate's cached audio is now correctly evicted before the library is updated
