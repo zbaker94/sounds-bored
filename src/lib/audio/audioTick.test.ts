@@ -1,9 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-// _stopLayerVoiceSetListener is intentionally NOT imported — it would unsubscribe
-// the module-scope listener and break _notifyLayerVoiceSetChangedForTest for the
-// rest of the suite. _stopMasterVolumeSync is exposed here only as a smoke check
-// that the module-level subscription handle is exported as a function.
-import { startAudioTick, stopAudioTick, _getPrevActiveLayerIds, _getGainSampleNeeded, _stopMasterVolumeSync } from "./audioTick";
+// _stopLayerVoiceSetListener is intentionally NOT imported — calling it would
+// unsubscribe the module-scope listener and break _notifyLayerVoiceSetChangedForTest
+// for the rest of the suite. _stopMasterVolumeSync and _stopChainCycleStateListener
+// are imported only as smoke checks that the module-level subscription handles are
+// exported as functions — importing a handle does not invoke it, so the underlying
+// subscriptions stay intact.
+import {
+  startAudioTick,
+  stopAudioTick,
+  _getPrevActiveLayerIds,
+  _getGainSampleNeeded,
+  _stopMasterVolumeSync,
+  _stopChainCycleStateListener,
+} from "./audioTick";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsStore";
 import { useLayerMetricsStore, initialLayerMetricsState } from "@/state/layerMetricsStore";
@@ -30,8 +39,9 @@ vi.mock("./audioState", async (importOriginal) => {
 // _notifyLayerVoiceSetChangedForTest to fire the audioTick subscription.
 // vi.hoisted runs before vi.mock factories so the holder object is defined
 // when the voiceRegistry mock factory executes.
-const { _voiceListenerHolder } = vi.hoisted(() => ({
+const { _voiceListenerHolder, _chainListenerHolder } = vi.hoisted(() => ({
   _voiceListenerHolder: { current: null as (() => void) | null },
+  _chainListenerHolder: { current: null as (() => void) | null },
 }));
 
 vi.mock("./voiceRegistry", async (importOriginal) => {
@@ -65,6 +75,10 @@ vi.mock("./chainCycleState", async (importOriginal) => {
     ...actual,
     getLayerPlayOrder: vi.fn().mockReturnValue(undefined),
     getLayerChain: vi.fn().mockReturnValue(undefined),
+    onChainCycleStateChanged: vi.fn((listener: () => void) => {
+      _chainListenerHolder.current = listener;
+      return () => { _chainListenerHolder.current = null; };
+    }),
   };
 });
 
@@ -92,6 +106,12 @@ function _notifyLayerVoiceSetChangedForTest(): void {
   _voiceListenerHolder.current?.();
 }
 
+/** Test helper — fires the chain-cycle-state-changed listener captured by the
+ *  chainCycleState mock. */
+function _notifyChainCycleStateChangedForTest(): void {
+  _chainListenerHolder.current?.();
+}
+
 describe("audioTick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,6 +124,11 @@ describe("audioTick", () => {
     // test file, so clearing the holder here would orphan the listener for every
     // subsequent test and break _notifyLayerVoiceSetChangedForTest. vi.clearAllMocks()
     // resets mock call history without invalidating the captured reference.
+    // NOTE: _chainListenerHolder.current follows the same pattern and is also
+    // intentionally NOT reset. audioTick.ts captures its chain-cycle-state listener
+    // once at module load via onChainCycleStateChanged(...); resetting the holder
+    // here would orphan it for the rest of the suite and break
+    // _notifyChainCycleStateChangedForTest.
     vi.mocked(getActivePadCount).mockReturnValue(0);
     vi.mocked(forEachActivePadGain).mockImplementation(() => {});
     vi.mocked(forEachActiveLayerGain).mockImplementation(() => {});
@@ -243,6 +268,101 @@ describe("audioTick", () => {
 
     expect(getActiveLayerIdSet).toHaveBeenCalled();
     expect(useLayerMetricsStore.getState().activeLayerIds).toEqual(newActiveIds);
+
+    rafSpy.mockRestore();
+  });
+
+  it("does not walk active layers in collectLayerSoundLists when no chainCycleState mutation occurred", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+    // Seed play order data so the first tick writes a value into the store that
+    // the steady-state skip tick must retain.
+    vi.mocked(getLayerPlayOrder).mockReturnValue([
+      { id: "s1" },
+      { id: "s2" },
+    ] as import("@/lib/schemas").Sound[]);
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // first tick — chainCycleStateChanged=true (from resetTrackers) → walks
+    expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
+    vi.mocked(getLayerPlayOrder).mockClear();
+    vi.mocked(getLayerChain).mockClear();
+
+    capturedCallback!(performance.now()); // second tick — no mutation fired → should skip the walk
+    expect(getLayerPlayOrder).not.toHaveBeenCalled();
+    expect(getLayerChain).not.toHaveBeenCalled();
+    // The skip path must retain tick-1's store value, not wipe it to {}.
+    expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
+
+    rafSpy.mockRestore();
+  });
+
+  it("walks active layers in collectLayerSoundLists when a chainCycleState mutation fires", () => {
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // first tick — chainCycleStateChanged=true → walks (no play order data yet)
+    vi.mocked(getLayerPlayOrder).mockClear();
+    vi.mocked(getLayerChain).mockClear();
+
+    // Set up new chain data so the second tick's walk produces an observable store write.
+    const mockSounds = [{ id: "s1" }, { id: "s2" }] as import("@/lib/schemas").Sound[];
+    vi.mocked(getLayerPlayOrder).mockReturnValue(mockSounds);
+
+    // Simulate a chain mutation.
+    // The negative (no notify → walk skipped) is covered by the "does not walk..." test above.
+    _notifyChainCycleStateChangedForTest();
+    capturedCallback!(performance.now()); // second tick — mutation fired → must walk layers and update store
+    expect(getLayerPlayOrder).toHaveBeenCalled();
+    expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toEqual(["s1", "s2"]);
+
+    rafSpy.mockRestore();
+  });
+
+  it("walks active layers in collectLayerSoundLists on the first tick after stop/restart even without a mutation", () => {
+    // Regression guard: resetTrackers() sets chainCycleStateChanged=true so the first
+    // tick after a stop/restart always rebuilds the chain/playOrder lists, even though
+    // no onChainCycleStateChanged notification fired.
+    vi.mocked(getActivePadCount).mockReturnValue(1);
+    vi.mocked(computeAllPadProgress).mockReturnValue({ "pad-1": 0.1 });
+    vi.mocked(computeAllLayerProgress).mockReturnValue({});
+    vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
+
+    let capturedCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
+      capturedCallback = cb;
+      return 1 as unknown as ReturnType<typeof requestAnimationFrame>;
+    });
+
+    startAudioTick();
+    capturedCallback!(performance.now()); // first tick — chainCycleStateChanged=true (from resetTrackers) → walks
+    capturedCallback!(performance.now()); // second tick — steady state → walk skipped
+    vi.mocked(getLayerPlayOrder).mockClear();
+    capturedCallback!(performance.now()); // third tick — still steady state → walk skipped
+    expect(getLayerPlayOrder).not.toHaveBeenCalled();
+
+    // Stop and restart — resetTrackers() must re-arm chainCycleStateChanged.
+    stopAudioTick();
+    startAudioTick();
+    capturedCallback!(performance.now()); // first tick after restart — must walk again
+    expect(getLayerPlayOrder).toHaveBeenCalled();
 
     rafSpy.mockRestore();
   });
@@ -618,8 +738,10 @@ describe("audioTick", () => {
       capturedCallback!(performance.now());
       expect(useLayerMetricsStore.getState().layerChain["layer-1"]).toEqual(["s2", "s3"]);
 
-      // Tick 2: chain advances to [s3] — s2 is now playing
+      // Tick 2: chain advances to [s3] — s2 is now playing. In production this
+      // chain advance goes through setLayerChain, which fires onChainCycleStateChanged.
       vi.mocked(getLayerChain).mockReturnValue([mkSound("s3")]);
+      _notifyChainCycleStateChangedForTest();
       capturedCallback!(performance.now());
       expect(useLayerMetricsStore.getState().layerChain["layer-1"]).toEqual(["s3"]);
 
@@ -748,8 +870,10 @@ describe("audioTick", () => {
       capturedCallback!(performance.now());
       const firstRef = useLayerMetricsStore.getState().layerPlayOrder["layer-1"];
 
-      // Tick 2: layer-2's chain advances to [] (empty → undefined)
+      // Tick 2: layer-2's chain advances to [] (empty → undefined). In production
+      // this chain advance goes through chainCycleState and fires the listener.
       vi.mocked(getLayerChain).mockImplementation(() => undefined);
+      _notifyChainCycleStateChangedForTest();
       capturedCallback!(performance.now());
       const secondRef = useLayerMetricsStore.getState().layerPlayOrder["layer-1"];
 
@@ -780,8 +904,11 @@ describe("audioTick", () => {
       expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
       expect(useLayerMetricsStore.getState().layerPlayOrder["layer-2"]).toBeDefined();
 
-      // Tick 2: only layer-1 active — layer-2's stale entry should drop out
+      // Tick 2: only layer-1 active — layer-2's stale entry should drop out.
+      // Voice removal fires onLayerVoiceSetChanged; deleting layer-2's play order
+      // fires onChainCycleStateChanged, which ungates the collectLayerSoundLists walk.
       _notifyLayerVoiceSetChangedForTest(); // simulate voice removal firing the subscription
+      _notifyChainCycleStateChangedForTest(); // simulate deleteLayerPlayOrder firing the subscription
       vi.mocked(getActiveLayerIdSet).mockReturnValue(new Set(["layer-1"]));
       capturedCallback!(performance.now());
       expect(useLayerMetricsStore.getState().layerPlayOrder["layer-1"]).toBeDefined();
@@ -817,6 +944,10 @@ describe("audioTick", () => {
 
     it("_stopMasterVolumeSync is a function that can be used to detach the subscription", () => {
       expect(typeof _stopMasterVolumeSync).toBe("function");
+    });
+
+    it("_stopChainCycleStateListener is a function that can be used to detach the subscription", () => {
+      expect(typeof _stopChainCycleStateListener).toBe("function");
     });
 
     it("calls applyMasterVolume with store's masterVolume at module initialization", () => {

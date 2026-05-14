@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createMockSound } from '@/test/factories';
+import { logWarn } from '@/lib/logger';
 import {
   getLayerChain,
   setLayerChain,
@@ -21,8 +22,15 @@ import {
   incrementLayerConsecutiveFailures,
   resetLayerConsecutiveFailures,
   clearAllLayerConsecutiveFailures,
+  onChainCycleStateChanged,
   clearAll,
 } from './chainCycleState';
+
+vi.mock('@/lib/logger', () => ({
+  logWarn: vi.fn(),
+  logInfo: vi.fn(),
+  logError: vi.fn(),
+}));
 
 beforeEach(() => {
   clearAll();
@@ -300,5 +308,95 @@ describe('clearAll', () => {
     expect(isLayerPending('layer-2')).toBe(false);
     expect(getLayerConsecutiveFailures('layer-1')).toBe(0);
     expect(getLayerConsecutiveFailures('layer-2')).toBe(0);
+  });
+});
+
+// ── onChainCycleStateChanged ─────────────────────────────────────────────────
+
+describe('onChainCycleStateChanged', () => {
+  // clearAll() in the top-level beforeEach does not drop the listener, so each
+  // test registers its own listener and unsubscribes (via afterEach) to keep
+  // tests isolated.
+  let unsubscribe: (() => void) | undefined;
+
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = undefined;
+  });
+
+  it('fires the listener once for setLayerChain', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    setLayerChain('l1', []);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires the listener once for deleteLayerChain', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    deleteLayerChain('l1');
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires the listener once for setLayerPlayOrder', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    setLayerPlayOrder('l1', []);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires the listener once for deleteLayerPlayOrder', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    deleteLayerPlayOrder('l1');
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT fire the listener for non-notifying mutations', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    setLayerCycleIndex('l1', 0);
+    setLayerPending('l1');
+    incrementLayerConsecutiveFailures('l1');
+    clearAllLayerChains();
+    clearAllLayerPlayOrders();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('unsubscribe stops further notifications', () => {
+    const listener = vi.fn();
+    const unsub = onChainCycleStateChanged(listener);
+    unsub();
+    setLayerChain('l1', []);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('clearAll does not fire the listener but preserves its registration', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+
+    clearAll();
+    expect(listener).not.toHaveBeenCalled();
+
+    // Listener registration survives clearAll() — a subsequent mutation still fires it.
+    setLayerChain('l1', []);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns when a different listener replaces an existing one', () => {
+    vi.mocked(logWarn).mockClear();
+    const listenerA = vi.fn();
+    const listenerB = vi.fn();
+
+    const unsubA = onChainCycleStateChanged(listenerA);
+    expect(logWarn).not.toHaveBeenCalled();
+
+    unsubscribe = onChainCycleStateChanged(listenerB);
+    expect(logWarn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logWarn).mock.calls[0][0]).toMatch(/replacing existing listener/);
+
+    // listenerB is cleaned up by afterEach (via `unsubscribe`); unsubA is already
+    // a no-op since registering listenerB evicted listenerA.
+    unsubA();
   });
 });
