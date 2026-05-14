@@ -792,6 +792,11 @@ describe("audioTick", () => {
   });
 
   describe("masterVolume sync", () => {
+    // Snapshot mock calls at describe-collection time — before any beforeEach/clearAllMocks runs.
+    // audioTick module initialization calls applyMasterVolume with the current store masterVolume
+    // (default: 100) before registering the subscription.
+    const callsAtModuleLoad = vi.mocked(applyMasterVolume).mock.calls.slice();
+
     beforeEach(() => {
       // Ensure store is at default and clear any calls accumulated during beforeEach resets
       usePlaybackStore.getState().setMasterVolume(100);
@@ -812,6 +817,11 @@ describe("audioTick", () => {
 
     it("_stopMasterVolumeSync is a function that can be used to detach the subscription", () => {
       expect(typeof _stopMasterVolumeSync).toBe("function");
+    });
+
+    it("calls applyMasterVolume with store's masterVolume at module initialization", () => {
+      expect(callsAtModuleLoad).toHaveLength(1);
+      expect(callsAtModuleLoad[0][0]).toBe(100);
     });
   });
 });
