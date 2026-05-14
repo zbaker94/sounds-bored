@@ -303,6 +303,16 @@ describe("computeAllPadProgress", () => {
     expect(result["pad-1"]).toBeCloseTo(0.5);
   });
 
+  it("returns empty object after last streaming pad is disposed (short-circuit re-engages)", () => {
+    const el = makeAudio(10, 5);
+    registerStreaming("pad-1", "layer-1", el);
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    expect(computeAllPadProgress()["pad-1"]).toBeCloseTo(0.5); // cache active
+
+    disposeStreaming("pad-1", "layer-1", el);
+    expect(computeAllPadProgress()).toEqual({}); // cache cleared → short-circuit
+  });
+
   it("returns progress for pads that have progress info", () => {
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: false });

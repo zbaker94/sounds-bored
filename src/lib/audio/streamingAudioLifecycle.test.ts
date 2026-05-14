@@ -345,4 +345,12 @@ describe("hasAnyStreamingPad / hasAnyStreamingLayer", () => {
     dispose("pad-2", "layer-2", el2);
     expect(hasAnyStreamingPad()).toBe(true);
   });
+
+  it("hasAnyStreamingLayer stays true when one of two layers is disposed", () => {
+    register("pad-1", "layer-1", makeAudio(10));
+    const el2 = makeAudio(5);
+    register("pad-1", "layer-2", el2);
+    dispose("pad-1", "layer-2", el2);
+    expect(hasAnyStreamingLayer()).toBe(true);
+  });
 });
