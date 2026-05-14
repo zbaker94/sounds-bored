@@ -296,6 +296,23 @@ describe("computeAllPadProgress", () => {
     expect(computeAllPadProgress()).toEqual({});
   });
 
+  it("does not short-circuit when streaming is active even if padProgressInfo is empty", () => {
+    registerStreaming("pad-1", "layer-1", makeAudio(10, 5));
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    const result = computeAllPadProgress();
+    expect(result["pad-1"]).toBeCloseTo(0.5);
+  });
+
+  it("returns empty object after last streaming pad is disposed (short-circuit re-engages)", () => {
+    const el = makeAudio(10, 5);
+    registerStreaming("pad-1", "layer-1", el);
+    recordLayerVoice("pad-1", "layer-1", makeVoice());
+    expect(computeAllPadProgress()["pad-1"]).toBeCloseTo(0.5); // cache active
+
+    disposeStreaming("pad-1", "layer-1", el);
+    expect(computeAllPadProgress()).toEqual({}); // cache cleared → short-circuit
+  });
+
   it("returns progress for pads that have progress info", () => {
     recordLayerVoice("pad-1", "layer-1", makeVoice());
     setPadProgressInfo("pad-1", { startedAt: 0, duration: 4, isLooping: false });
@@ -332,6 +349,21 @@ describe("computeAllLayerProgress — streaming path uses cached best element", 
     registerStreaming("pad-1", "layer-1", el);
     const progress = computeAllLayerProgress();
     expect(progress["layer-1"]).toBeCloseTo(0.4);
+  });
+
+  it("does not short-circuit when streaming layer cache is non-empty but layerProgressInfo is empty", () => {
+    registerStreaming("pad-1", "layer-1", makeAudio(10, 2));
+    const progress = computeAllLayerProgress();
+    expect(progress["layer-1"]).toBeCloseTo(0.2);
+  });
+
+  it("returns empty object after last streaming layer is disposed (short-circuit re-engages)", () => {
+    const el = makeAudio(10, 4);
+    registerStreaming("pad-1", "layer-1", el);
+    expect(computeAllLayerProgress()["layer-1"]).toBeCloseTo(0.4); // cache active
+
+    disposeStreaming("pad-1", "layer-1", el);
+    expect(computeAllLayerProgress()).toEqual({}); // cache cleared → short-circuit
   });
 
   it("buffer layer progress takes priority over streaming for the same layer ID", () => {

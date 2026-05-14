@@ -9,7 +9,7 @@
  */
 
 import { getAudioContext } from "./audioContext";
-import { getBestForPad, iterateBestLayers, clearAll as clearAllStreamingAudio } from "./streamingAudioLifecycle";
+import { getBestForPad, iterateBestLayers, clearAll as clearAllStreamingAudio, hasAnyStreamingPad, hasAnyStreamingLayer } from "./streamingAudioLifecycle";
 import { isGainRampPending, clearAll as clearAllGainRegistry, resetGainRampDeadline } from "./gainRegistry";
 import { getActivePadIds, nullAllOnEnded, stopAllVoices } from "./voiceRegistry";
 import { clearAll as clearAllChainCycleState } from "./chainCycleState";
@@ -49,6 +49,7 @@ export function getPadProgress(padId: string, currentTime?: number): number | nu
 }
 
 export function computeAllPadProgress(): Record<string, number> {
+  if (padProgressInfo.size === 0 && !hasAnyStreamingPad()) return {};
   const activePadIds = getActivePadIds();
   if (activePadIds.size === 0) return {};
   const currentTime = getAudioContext().currentTime;
@@ -61,6 +62,7 @@ export function computeAllPadProgress(): Record<string, number> {
 }
 
 export function computeAllLayerProgress(): Record<string, number> {
+  if (layerProgressInfo.size === 0 && !hasAnyStreamingLayer()) return {};
   const result: Record<string, number> = {};
   if (layerProgressInfo.size > 0) {
     const ctx = getAudioContext();
