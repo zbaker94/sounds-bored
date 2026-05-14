@@ -78,7 +78,7 @@ beforeEach(() => {
   mockSaveSettings.mockClear();
   mockPickFolder.mockReset();
   mockPickFile.mockReset();
-  mockEvictSoundCachesMany.mockClear();
+  mockEvictSoundCachesMany.mockReset();
 });
 
 describe("ResolveMissingFolderDialog — pickFolder / pickFile integration", () => {

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release.
 - Fixed a bug where audio cache entries for removed or relocated sounds were not properly cleared, which could cause stale audio to play
 - When resolving a missing sound file that duplicates an existing library entry, the duplicate's cached audio is now correctly evicted before the library is updated
 - When removing an entire sounds folder, all cached audio for sounds in that folder is now cleared at once
