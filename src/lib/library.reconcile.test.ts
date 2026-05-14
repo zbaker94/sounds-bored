@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed, scheduleAnalysisForSounds, clearDispatchInFlight, statEnricher, coverArtEnricher, applyEnrichers } from "./library.reconcile";
+import { reconcileGlobalLibrary, checkMissingStatus, refreshMissingState, addGlobalFolderAndReconcile, scheduleAnalysisForUnanalyzed, scheduleAnalysisForSounds, clearDispatchInFlight, statEnricher, coverArtEnricher, applyEnrichers, batchMap, STAT_BATCH, SOUND_EXISTS_BATCH } from "./library.reconcile";
 import { mockFs, mockPath, mockCore } from "@/test/tauri-mocks";
 import { createMockGlobalFolder, createMockAppSettings, createMockSound } from "@/test/factories";
 import { Sound } from "./schemas";
@@ -515,6 +515,96 @@ describe("reconcileGlobalLibrary", () => {
       expect(result.missingFolderIds).toContain("f1");
       expect(result.missingSoundIds).toContain("s1");
       expect(result.unknownSoundIds.size).toBe(0);
+    });
+
+    it("processes sound file checks in batches — all sounds checked even with many entries", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sounds = Array.from({ length: 110 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+      );
+      mockFs.exists.mockResolvedValue(true);
+
+      const result = await checkMissingStatus([folder], sounds);
+
+      expect(result.missingSoundIds.size).toBe(0);
+      // exists() called once for the folder + once per sound
+      expect(mockFs.exists).toHaveBeenCalledTimes(111);
+      sounds.forEach((s) => {
+        expect(mockFs.exists).toHaveBeenCalledWith(s.filePath);
+      });
+    });
+
+    it("respects batch size — sound exists() calls are issued in chunks of exactly SOUND_EXISTS_BATCH", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sounds = Array.from({ length: 150 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+      );
+
+      let concurrentSoundChecks = 0;
+      let maxConcurrentSoundChecks = 0;
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/music") return Promise.resolve(true);
+        concurrentSoundChecks++;
+        maxConcurrentSoundChecks = Math.max(maxConcurrentSoundChecks, concurrentSoundChecks);
+        return Promise.resolve(true).then((v) => {
+          concurrentSoundChecks--;
+          return v;
+        });
+      });
+
+      await checkMissingStatus([folder], sounds);
+
+      // First 3 batches have SOUND_EXISTS_BATCH sounds each; max concurrent = SOUND_EXISTS_BATCH
+      expect(maxConcurrentSoundChecks).toBe(SOUND_EXISTS_BATCH);
+    });
+
+    it("handles exact-batch-size boundaries — 50 and 100 sounds", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+
+      for (const count of [50, 100]) {
+        mockFs.exists.mockReset();
+        mockFs.exists.mockResolvedValue(true);
+        const sounds = Array.from({ length: count }, (_, i) =>
+          createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+        );
+
+        const result = await checkMissingStatus([folder], sounds);
+
+        expect(result.missingSoundIds.size).toBe(0);
+        // 1 folder check + count sound checks
+        expect(mockFs.exists).toHaveBeenCalledTimes(count + 1);
+        sounds.forEach((s) => {
+          expect(mockFs.exists).toHaveBeenCalledWith(s.filePath);
+        });
+      }
+    });
+
+    it("maps errors to unknown status in non-first batch (batch 2 rejection)", async () => {
+      const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+      const sounds = Array.from({ length: 75 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav`, folderId: "f1" }),
+      );
+
+      mockFs.exists.mockImplementation((path: string) => {
+        if (path === "/music") return Promise.resolve(true);
+        // sound #74 is in batch 2 (index 50-74) — simulate permission error
+        if (path === "/music/sound-74.wav") return Promise.reject(new Error("permission denied"));
+        return Promise.resolve(true);
+      });
+
+      const result = await checkMissingStatus([folder], sounds);
+
+      expect(result.unknownSoundIds).toContain("s74");
+      expect(result.missingSoundIds).not.toContain("s74");
+      expect(result.missingSoundIds.size).toBe(0);
+      expect(result.unknownSoundIds.size).toBe(1);
+      // Batch 1 sounds (s0–s49) and other batch-2 sounds (s50–s73) processed correctly
+      expect(mockFs.exists).toHaveBeenCalledWith("/music/sound-0.wav");
+      expect(mockFs.exists).toHaveBeenCalledWith("/music/sound-49.wav");
+      expect(mockFs.exists).toHaveBeenCalledWith("/music/sound-73.wav");
+      expect(result.missingSoundIds).not.toContain("s0");
+      expect(result.missingSoundIds).not.toContain("s49");
+      expect(result.missingSoundIds).not.toContain("s73");
     });
   });
 
@@ -1186,6 +1276,68 @@ describe("statEnricher", () => {
     expect(result[0].fileSizeBytes).toBe(100);
     expect(result[1].fileSizeBytes).toBe(200);
   });
+
+  it("processes sounds in batches — all sounds stat'd, order preserved, no-op references kept", async () => {
+    const alreadySized = createSound({ id: "pre", name: "pre", filePath: "/music/pre.wav", fileSizeBytes: 9999 });
+    const sounds = [
+      alreadySized,
+      ...Array.from({ length: 70 }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav` }),
+      ),
+    ];
+
+    const result = await statEnricher(sounds);
+
+    expect(result).toHaveLength(71);
+    // Order preserved across all batch boundaries
+    expect(result.map((s) => s.id)).toEqual(sounds.map((s) => s.id));
+    // No-op reference kept for already-sized sound
+    expect(result[0]).toBe(alreadySized);
+    // Explicit cross-boundary checks: last of batch 1 (index 32) and first of batch 2 (index 33)
+    expect(result[32].id).toBe("s31");
+    expect(result[33].id).toBe("s32");
+    // All others stat'd
+    expect(result.slice(1).every((s) => s.fileSizeBytes === 1024)).toBe(true);
+  });
+
+  it("respects batch size — stat calls are issued in chunks of exactly STAT_BATCH", async () => {
+    let concurrentCount = 0;
+    let maxConcurrent = 0;
+
+    mockStat.mockImplementation(() => {
+      concurrentCount++;
+      maxConcurrent = Math.max(maxConcurrent, concurrentCount);
+      return Promise.resolve({ size: 512 }).then((v) => {
+        concurrentCount--;
+        return v;
+      });
+    });
+
+    const sounds = Array.from({ length: 100 }, (_, i) =>
+      createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav` }),
+    );
+
+    await statEnricher(sounds);
+
+    // First 3 batches have STAT_BATCH sounds each; max concurrent = STAT_BATCH
+    expect(maxConcurrent).toBe(STAT_BATCH);
+    expect(mockStat).toHaveBeenCalledTimes(100);
+  });
+
+  it("handles exact-batch-size boundaries — 32 and 64 sounds", async () => {
+    for (const count of [32, 64]) {
+      mockStat.mockReset();
+      mockStat.mockResolvedValue({ size: 1024 });
+      const sounds = Array.from({ length: count }, (_, i) =>
+        createSound({ id: `s${i}`, name: `sound-${i}`, filePath: `/music/sound-${i}.wav` }),
+      );
+
+      const result = await statEnricher(sounds);
+
+      expect(result).toHaveLength(count);
+      expect(mockStat).toHaveBeenCalledTimes(count);
+    }
+  });
 });
 
 describe("coverArtEnricher", () => {
@@ -1587,5 +1739,90 @@ describe("scheduleAnalysisForSounds", () => {
     expect(mockCore.invoke).toHaveBeenCalledWith("start_audio_analysis", {
       entries: [{ id: "s2", path: "/music/b.wav" }],
     });
+  });
+});
+
+describe("batchMap", () => {
+  it("returns empty array for empty input", async () => {
+    const fn = vi.fn().mockResolvedValue("x");
+    const result = await batchMap([], 10, fn);
+    expect(result).toEqual([]);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("processes all items when batchSize exceeds input length", async () => {
+    const items = [1, 2, 3];
+    const result = await batchMap(items, 100, async (n) => n * 2);
+    expect(result).toEqual([2, 4, 6]);
+  });
+
+  it("preserves input order across batch boundaries", async () => {
+    const items = Array.from({ length: 7 }, (_, i) => i);
+    const callOrder: number[] = [];
+    const result = await batchMap(items, 3, async (n) => {
+      callOrder.push(n);
+      return n * 10;
+    });
+    expect(result).toEqual([0, 10, 20, 30, 40, 50, 60]);
+    expect(callOrder).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("runs batches sequentially — batch N+1 starts only after batch N resolves", async () => {
+    const resolved: number[] = [];
+    const snapshotAtBatch2Start: number[] = [];
+    const items = [0, 1, 2, 3];
+
+    await batchMap(items, 2, async (n) => {
+      if (n === 2) {
+        // First item of batch 2 is starting — capture what's already resolved
+        snapshotAtBatch2Start.push(...resolved);
+      }
+      await Promise.resolve();
+      resolved.push(n);
+      return n;
+    });
+
+    // Batch 1 must be fully resolved before batch 2 begins
+    expect(snapshotAtBatch2Start).toEqual([0, 1]);
+    expect(resolved).toEqual([0, 1, 2, 3]);
+  });
+
+  it("propagates fn rejection — rejects whole call, later batches not started", async () => {
+    const called: number[] = [];
+
+    await expect(
+      batchMap([1, 2, 3, 4], 2, async (n) => {
+        called.push(n);
+        if (n === 1) throw new Error("fail");
+        return n;
+      }),
+    ).rejects.toThrow("fail");
+
+    // Both batch-1 items started (map runs synchronously before any await)
+    expect(called).toContain(1);
+    expect(called).toContain(2);
+    // Batch 2 never started
+    expect(called).not.toContain(3);
+    expect(called).not.toContain(4);
+  });
+
+  it("handles batchSize === 1", async () => {
+    const items = [10, 20, 30];
+    const result = await batchMap(items, 1, async (n) => n + 1);
+    expect(result).toEqual([11, 21, 31]);
+  });
+
+  it("handles exact multiple of batchSize", async () => {
+    const items = [1, 2, 3, 4, 5, 6];
+    const result = await batchMap(items, 3, async (n) => n);
+    expect(result).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("throws RangeError for batchSize === 0", async () => {
+    await expect(batchMap([1, 2], 0, async (n) => n)).rejects.toThrow(RangeError);
+  });
+
+  it("throws RangeError for negative batchSize", async () => {
+    await expect(batchMap([1], -5, async (n) => n)).rejects.toThrow(RangeError);
   });
 });

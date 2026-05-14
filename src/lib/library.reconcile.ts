@@ -35,6 +35,26 @@ export type EnricherContext = Record<string, unknown>;
  */
 export type SoundEnricher = (sounds: Sound[], context?: EnricherContext) => Promise<Sound[]>;
 
+// Batch sizes for IPC-bound operations. Values differ because per-op cost differs:
+// stat() and exists() are cheap filesystem calls; cover-art extraction runs a Rust decoder.
+export const STAT_BATCH = 32;
+export const COVER_ART_BATCH = 8;
+export const SOUND_EXISTS_BATCH = 50;
+
+/**
+ * Process `items` in sequential batches of `batchSize`, applying `fn` to each
+ * item. Preserves input order. Used to bound concurrent Tauri IPC calls.
+ */
+export async function batchMap<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  if (batchSize < 1) throw new RangeError(`batchSize must be >= 1, got ${batchSize}`);
+  const result: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = await Promise.all(items.slice(i, i + batchSize).map(fn));
+    result.push(...batch);
+  }
+  return result;
+}
+
 /**
  * Check if a filename has a supported audio extension.
  */
@@ -103,10 +123,10 @@ async function scanFoldersForNewSounds(
 /**
  * Enriches sounds with their file size. Idempotent: skips sounds that already
  * have `fileSizeBytes` set. Returns a new array; unchanged sounds keep their
- * original reference.
+ * original reference. Processes in bounded batches to limit concurrent IPC calls.
  */
-export const statEnricher: SoundEnricher = async (sounds) =>
-  Promise.all(sounds.map(async (sound) => {
+export const statEnricher: SoundEnricher = (sounds) =>
+  batchMap(sounds, STAT_BATCH, async (sound) => {
     if (!sound.filePath || sound.fileSizeBytes != null) return sound;
     try {
       const info = await stat(sound.filePath);
@@ -114,32 +134,26 @@ export const statEnricher: SoundEnricher = async (sounds) =>
     } catch {
       return sound;
     }
-  }));
+  });
 
 /**
  * Enriches sounds with embedded cover art. Idempotent: skips sounds whose
  * `coverArtDataUrl` is already set (including the empty-string sentinel `""`
  * that means "checked, no art found" — prevents perpetual re-extraction).
- * Processes sounds in batches of 8 to bound concurrent IPC calls.
  * Returns a new array; unchanged sounds keep their original reference.
+ * Processes in bounded batches to limit concurrent IPC calls — cover-art
+ * extraction is the costliest enricher, so it uses the smallest batch size.
  */
-export const coverArtEnricher: SoundEnricher = async (sounds) => {
-  const BATCH = 8;
-  const result: Sound[] = [];
-  for (let i = 0; i < sounds.length; i += BATCH) {
-    const updates = await Promise.all(sounds.slice(i, i + BATCH).map(async (sound) => {
-      if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
-      try {
-        const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
-        return { ...sound, coverArtDataUrl: dataUrl ?? "" };
-      } catch {
-        return sound;
-      }
-    }));
-    result.push(...updates);
-  }
-  return result;
-};
+export const coverArtEnricher: SoundEnricher = (sounds) =>
+  batchMap(sounds, COVER_ART_BATCH, async (sound) => {
+    if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
+    try {
+      const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
+      return { ...sound, coverArtDataUrl: dataUrl ?? "" };
+    } catch {
+      return sound;
+    }
+  });
 
 /**
  * Run `enrichers` sequentially over `sounds`, passing each output as input to
@@ -272,9 +286,9 @@ export async function checkMissingStatus(
   type FolderCheckResult = { id: string; status: "missing" | "present" | "unknown" };
   type SoundCheckResult = { id: string; folderId: string | undefined; status: "missing" | "present" | "unknown" };
 
-  // Check all folder paths in parallel.
-  // exists() can throw when the path is outside the Tauri scope or the OS
-  // denies access — treat those as 'unknown' rather than silently 'present'.
+  // Folders are few (<20 typical), so an unbounded Promise.all is fine here;
+  // sounds are batched below. exists() can throw when the path is outside the
+  // Tauri scope or the OS denies access — treat those as 'unknown' not 'present'.
   const folderChecks: FolderCheckResult[] = await Promise.all(
     globalFolders.map(async (f): Promise<FolderCheckResult> => {
       try {
@@ -292,11 +306,13 @@ export async function checkMissingStatus(
     folderChecks.filter((f) => f.status === "unknown").map((f) => f.id),
   );
 
-  // Check all sound filePaths in parallel.
-  // Same policy: errors become 'unknown', not 'present'.
+  // Sound filePaths are batched to bound concurrent IPC calls. Same error policy:
+  // errors become 'unknown', not 'present'.
   const soundsWithPath = sounds.filter((s) => !!s.filePath);
-  const soundFileChecks: SoundCheckResult[] = await Promise.all(
-    soundsWithPath.map(async (s): Promise<SoundCheckResult> => {
+  const soundFileChecks: SoundCheckResult[] = await batchMap(
+    soundsWithPath,
+    SOUND_EXISTS_BATCH,
+    async (s): Promise<SoundCheckResult> => {
       try {
         return {
           id: s.id,
@@ -306,7 +322,7 @@ export async function checkMissingStatus(
       } catch {
         return { id: s.id, folderId: s.folderId, status: "unknown" };
       }
-    }),
+    },
   );
 
   const missingSoundIds = new Set<string>();
