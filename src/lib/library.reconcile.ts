@@ -45,7 +45,8 @@ const SOUND_EXISTS_BATCH = 50;
  * Process `items` in sequential batches of `batchSize`, applying `fn` to each
  * item. Preserves input order. Used to bound concurrent Tauri IPC calls.
  */
-async function batchMap<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+export async function _batchMap<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  if (batchSize < 1) throw new RangeError(`batchSize must be >= 1, got ${batchSize}`);
   const result: R[] = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = await Promise.all(items.slice(i, i + batchSize).map(fn));
@@ -125,7 +126,7 @@ async function scanFoldersForNewSounds(
  * original reference. Processes in bounded batches to limit concurrent IPC calls.
  */
 export const statEnricher: SoundEnricher = (sounds) =>
-  batchMap(sounds, STAT_BATCH, async (sound) => {
+  _batchMap(sounds, STAT_BATCH, async (sound) => {
     if (!sound.filePath || sound.fileSizeBytes != null) return sound;
     try {
       const info = await stat(sound.filePath);
@@ -144,7 +145,7 @@ export const statEnricher: SoundEnricher = (sounds) =>
  * extraction is the costliest enricher, so it uses the smallest batch size.
  */
 export const coverArtEnricher: SoundEnricher = (sounds) =>
-  batchMap(sounds, COVER_ART_BATCH, async (sound) => {
+  _batchMap(sounds, COVER_ART_BATCH, async (sound) => {
     if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
     try {
       const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
@@ -308,7 +309,7 @@ export async function checkMissingStatus(
   // Sound filePaths are batched to bound concurrent IPC calls. Same error policy:
   // errors become 'unknown', not 'present'.
   const soundsWithPath = sounds.filter((s) => !!s.filePath);
-  const soundFileChecks: SoundCheckResult[] = await batchMap(
+  const soundFileChecks: SoundCheckResult[] = await _batchMap(
     soundsWithPath,
     SOUND_EXISTS_BATCH,
     async (s): Promise<SoundCheckResult> => {
