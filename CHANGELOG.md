@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where closing the window after saving a project didn't always complete correctly due to a missing async delay before the window close call.
+- Fixed unsaved changes dialog not appearing when closing the window with a dirty (modified but previously saved) project.
+- Window close behavior now correctly stops blocking the close event once unsaved changes are resolved.
+- Added test coverage for window close behavior — unsaved-changes prompt now has integration and unit tests verifying it correctly blocks or allows app closure
 - Sounds played from tag or set selections now respect the layer's default volume setting instead of always playing at full volume.
 - Auto-saves your project before opening the export destination picker, so exported files reflect the latest changes
 - Export is cancelled if the auto-save fails, preventing export of stale data
