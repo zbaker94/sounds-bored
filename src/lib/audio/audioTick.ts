@@ -100,6 +100,7 @@ function resetTrackers(): void {
 // Wire playbackStore.masterVolume to the audio context master gain node.
 // audioTick is the documented reactive bridge; audioContext itself has no store dependency.
 // The unsubscribe handle is exported (with _ prefix per project convention) for test teardown.
+applyMasterVolume(usePlaybackStore.getState().masterVolume);
 export const _stopMasterVolumeSync = usePlaybackStore.subscribe(
   (s) => s.masterVolume,
   (vol) => applyMasterVolume(vol),
