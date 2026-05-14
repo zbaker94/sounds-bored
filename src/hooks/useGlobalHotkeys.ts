@@ -1,5 +1,5 @@
 import { useHotkeys } from "react-hotkeys-hook";
-import { useUiStore, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, OVERLAY_ID, selectHasOpenOverlay, selectIsTopOverlay, selectIsOverlayOpen } from "@/state/uiStore";
 import { useProjectActions } from "@/contexts/ProjectActionsContext";
 import { useProjectStore } from "@/state/projectStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
@@ -70,29 +70,32 @@ export function useGlobalHotkeys() {
 
   // Ctrl+Shift+M: toggle the sounds panel, but not when another overlay is on top.
   useHotkeys("mod+shift+m", () => {
-    const { hasOpenOverlay, isTopOverlay, toggleOverlay } = useUiStore.getState();
-    if (!hasOpenOverlay() || isTopOverlay(OVERLAY_ID.SOUNDS_PANEL)) {
-      toggleOverlay(OVERLAY_ID.SOUNDS_PANEL, "dialog");
+    const state = useUiStore.getState();
+    if (!selectHasOpenOverlay(state) || selectIsTopOverlay(OVERLAY_ID.SOUNDS_PANEL)(state)) {
+      state.toggleOverlay(OVERLAY_ID.SOUNDS_PANEL, "dialog");
     }
   });
 
   // Ctrl+S: save, but not when the Save dialog is already open.
   useHotkeys("mod+s", () => {
-    if (!useUiStore.getState().isTopOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG)) {
+    const state = useUiStore.getState();
+    if (!selectIsTopOverlay(OVERLAY_ID.SAVE_PROJECT_DIALOG)(state)) {
       handleSaveClick();
     }
   });
 
   // Ctrl+Shift+S: Save As.
   useHotkeys("mod+shift+s", () => {
-    if (!useUiStore.getState().isOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG)) {
+    const state = useUiStore.getState();
+    if (!selectIsOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG)(state)) {
       handleSaveAsMenuClick();
     }
   }, {}, [handleSaveAsMenuClick]);
 
   // Ctrl+Shift+E: Export. No-op if export is already in progress.
   useHotkeys("mod+shift+e", () => {
-    if (!useUiStore.getState().isOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG)) {
+    const state = useUiStore.getState();
+    if (!selectIsOverlayOpen(OVERLAY_ID.EXPORT_PROGRESS_DIALOG)(state)) {
       handleExportClick();
     }
   }, { preventDefault: true });

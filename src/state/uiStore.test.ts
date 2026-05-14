@@ -70,55 +70,6 @@ describe("uiStore", () => {
     });
   });
 
-  describe("isOverlayOpen", () => {
-    it("returns true when overlay is in the stack", () => {
-      useUiStore.getState().openOverlay("menu-drawer", "drawer");
-      expect(useUiStore.getState().isOverlayOpen("menu-drawer")).toBe(true);
-    });
-
-    it("returns false when overlay is not in the stack", () => {
-      expect(useUiStore.getState().isOverlayOpen("menu-drawer")).toBe(false);
-    });
-
-    it("returns true for a mid-stack overlay", () => {
-      const { openOverlay } = useUiStore.getState();
-      openOverlay("menu-drawer", "drawer");
-      openOverlay("save-dialog", "dialog");
-      expect(useUiStore.getState().isOverlayOpen("menu-drawer")).toBe(true);
-    });
-  });
-
-  describe("isTopOverlay", () => {
-    it("returns true for the topmost overlay", () => {
-      const { openOverlay } = useUiStore.getState();
-      openOverlay("menu-drawer", "drawer");
-      openOverlay("save-dialog", "dialog");
-      expect(useUiStore.getState().isTopOverlay("save-dialog")).toBe(true);
-    });
-
-    it("returns false for a non-top overlay", () => {
-      const { openOverlay } = useUiStore.getState();
-      openOverlay("menu-drawer", "drawer");
-      openOverlay("save-dialog", "dialog");
-      expect(useUiStore.getState().isTopOverlay("menu-drawer")).toBe(false);
-    });
-
-    it("returns false when stack is empty", () => {
-      expect(useUiStore.getState().isTopOverlay("menu-drawer")).toBe(false);
-    });
-  });
-
-  describe("hasOpenOverlay", () => {
-    it("returns true when overlays are open", () => {
-      useUiStore.getState().openOverlay("menu-drawer", "drawer");
-      expect(useUiStore.getState().hasOpenOverlay()).toBe(true);
-    });
-
-    it("returns false when stack is empty", () => {
-      expect(useUiStore.getState().hasOpenOverlay()).toBe(false);
-    });
-  });
-
   describe("stack ordering", () => {
     it("maintains correct order across open and close operations", () => {
       const { openOverlay } = useUiStore.getState();
@@ -130,7 +81,7 @@ describe("uiStore", () => {
         { id: "menu-drawer", type: "drawer" },
         { id: "confirm-close", type: "dialog" },
       ]);
-      expect(useUiStore.getState().isTopOverlay("confirm-close")).toBe(true);
+      expect(selectIsTopOverlay("confirm-close")(useUiStore.getState())).toBe(true);
     });
   });
 

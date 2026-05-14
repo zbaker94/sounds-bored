@@ -44,12 +44,6 @@ interface UiActions {
   closeOverlay: (id: string) => void;
   /** Toggle an overlay open/closed. */
   toggleOverlay: (id: string, type: OverlayType) => void;
-  /** Returns true if the given id is anywhere in the stack. */
-  isOverlayOpen: (id: string) => boolean;
-  /** Returns true if the given id is the topmost overlay. */
-  isTopOverlay: (id: string) => boolean;
-  /** Returns true if any overlay is currently open. */
-  hasOpenOverlay: () => boolean;
   /** Toggle edit mode on/off. */
   toggleEditMode: () => void;
   /** Set the currently hovered pad id, or null to clear. */
@@ -78,7 +72,7 @@ export const initialUiState: UiState = {
 
 // subscribeWithSelector enables the imperative .subscribe(selector, listener) form
 // used by useMultiFadeSideEffects to auto-cancel on editMode/overlay transitions.
-export const useUiStore = create<UiStore>()(subscribeWithSelector((set, get) => ({
+export const useUiStore = create<UiStore>()(subscribeWithSelector((set) => ({
   ...initialUiState,
 
   openOverlay: (id, type) =>
@@ -105,15 +99,6 @@ export const useUiStore = create<UiStore>()(subscribeWithSelector((set, get) => 
       return { overlayStack: [...state.overlayStack, { id, type }] };
     }),
 
-  isOverlayOpen: (id) => get().overlayStack.some((entry) => entry.id === id),
-
-  isTopOverlay: (id) => {
-    const { overlayStack } = get();
-    return overlayStack.length > 0 && overlayStack[overlayStack.length - 1].id === id;
-  },
-
-  hasOpenOverlay: () => get().overlayStack.length > 0,
-
   toggleEditMode: () =>
     set((state) => ({ editMode: !state.editMode })),
 
@@ -129,14 +114,19 @@ export const useUiStore = create<UiStore>()(subscribeWithSelector((set, get) => 
     set((state) => ({ pageByScene: { ...state.pageByScene, [sceneId]: page } })),
 })));
 
-// Standalone selector factories for reactive subscriptions via useUiStore().
-// Use these instead of `(s) => s.isOverlayOpen(id)` to avoid creating a new
-// function reference on every state change, which would cause unnecessary re-renders.
+// Computed overlay queries live here as standalone exports, not store methods — keeps
+// the store's action surface mutation-only and makes these tree-shakeable and
+// independently testable (issue #409).
+// Parameterized: curried factory (id) => (s) => boolean.
+// Parameterless: plain selector (s) => boolean (no factory wrapper needed).
+// Reactive: useUiStore(selectIsOverlayOpen(id)) / useUiStore(selectHasOpenOverlay).
+// Imperative: selectIsOverlayOpen(id)(useUiStore.getState()) / selectHasOpenOverlay(useUiStore.getState()).
 export const selectIsOverlayOpen = (id: string) => (s: UiStore) =>
   s.overlayStack.some((entry) => entry.id === id);
 
 export const selectIsTopOverlay = (id: string) => (s: UiStore) =>
   s.overlayStack.at(-1)?.id === id;
 
+// Plain selector (not a factory) — no id param, so no currying needed.
 export const selectHasOpenOverlay = (s: UiStore) =>
   s.overlayStack.length > 0;
