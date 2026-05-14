@@ -262,7 +262,7 @@ export async function saveProjectAs(
   currentPath: string,
   project: Project
 ): Promise<{ newPath: string; project: Project } | null> {
-  const selectedPath = await pickFolder({ title: "Select Save Location" });
+  const selectedPath = await pickFolder({ title: "Select Save Location", canCreateDirectories: true });
 
   if (!selectedPath) {
     return null; // User cancelled

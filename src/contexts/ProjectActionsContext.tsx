@@ -183,7 +183,7 @@ export function ProjectActionsProvider({ children }: { children: React.ReactNode
     const missingCount = countMissingReferencedSounds(project, sounds);
 
     // 3. Open folder picker
-    const destPath = await pickFolder({ title: "Select Export Destination" });
+    const destPath = await pickFolder({ title: "Select Export Destination", canCreateDirectories: true });
     if (!destPath) return;
 
     if (missingCount > 0) {

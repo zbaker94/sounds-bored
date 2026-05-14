@@ -63,6 +63,7 @@ describe("pickFolder", () => {
     expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
       title: null,
       defaultPath: null,
+      canCreateDirectories: null,
     });
     expect(result).toBe("/user/music");
   });
@@ -75,6 +76,43 @@ describe("pickFolder", () => {
     expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
       title: "Choose Folder",
       defaultPath: "/user",
+      canCreateDirectories: null,
+    });
+  });
+
+  it("passes canCreateDirectories to the Rust command when set", async () => {
+    mockCore.invoke.mockResolvedValue("/user/projects");
+
+    await pickFolder({ title: "Select Save Location", canCreateDirectories: true });
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
+      title: "Select Save Location",
+      defaultPath: null,
+      canCreateDirectories: true,
+    });
+  });
+
+  it("forwards canCreateDirectories: false without coercing to null", async () => {
+    mockCore.invoke.mockResolvedValue("/user/projects");
+
+    await pickFolder({ canCreateDirectories: false });
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
+      title: null,
+      defaultPath: null,
+      canCreateDirectories: false,
+    });
+  });
+
+  it("coerces canCreateDirectories: undefined to null", async () => {
+    mockCore.invoke.mockResolvedValue("/user/projects");
+
+    await pickFolder({ canCreateDirectories: undefined });
+
+    expect(mockCore.invoke).toHaveBeenCalledWith("pick_folder_and_grant", {
+      title: null,
+      defaultPath: null,
+      canCreateDirectories: null,
     });
   });
 

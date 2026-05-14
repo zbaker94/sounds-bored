@@ -7,6 +7,11 @@ import { toast } from "sonner";
 export interface FolderPickerOptions {
   title?: string;
   defaultPath?: string;
+  /**
+   * Allow users to create new folders from the picker dialog.
+   * macOS only — silently ignored on Windows and Linux. When omitted, tauri-plugin-dialog's default is used.
+   */
+  canCreateDirectories?: boolean;
 }
 
 /** Options forwarded to the native file picker dialog. */
@@ -27,6 +32,7 @@ export async function pickFolder(options?: FolderPickerOptions): Promise<string 
     return await invoke<string | null>("pick_folder_and_grant", {
       title: options?.title ?? null,
       defaultPath: options?.defaultPath ?? null,
+      canCreateDirectories: options?.canCreateDirectories ?? null,
     });
   } catch (err) {
     toast.error(`Cannot use that folder: ${err instanceof Error ? err.message : String(err)}`);
