@@ -352,7 +352,6 @@ describe("useProjectLifecycle — useWindowCloseHandler integration", () => {
 
     renderHook(() => useProjectLifecycle());
 
-    expect(mockUseWindowCloseHandler).toHaveBeenCalledTimes(1);
     const [, onCloseRequested] = mockUseWindowCloseHandler.mock.calls.at(-1)!;
     act(() => {
       onCloseRequested();

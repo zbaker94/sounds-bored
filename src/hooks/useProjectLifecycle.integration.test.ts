@@ -148,8 +148,14 @@ describe("useProjectLifecycle + useWindowCloseHandler — full chain", () => {
 
     const saveCallback = mockRequestSaveAndThen.mock.calls[0][0] as () => void;
     act(() => {
-      saveCallback(); // simulates save completing → calls closeWindow → allowClose() called
+      saveCallback(); // simulates save completing → calls closeWindow → allowClose() + schedules setTimeout
     });
+
+    // Flush the 0ms timeout so closeWindow's appWindow.close() runs
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(mockWindowClose).toHaveBeenCalled();
 
     const event = { preventDefault: vi.fn() };
     await act(async () => {
@@ -157,5 +163,23 @@ describe("useProjectLifecycle + useWindowCloseHandler — full chain", () => {
     });
 
     expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("Tauri close event prevents close when project isDirty (not isTemporary)", async () => {
+    const project = createMockProject();
+    const historyEntry = createMockHistoryEntry();
+    useProjectStore.getState().loadProject(historyEntry, project, false);
+    useProjectStore.setState({ isDirty: true });
+
+    renderHook(() => useProjectLifecycle());
+    const cb = await getRegisteredCloseCb();
+
+    const event = { preventDefault: vi.fn() };
+    await act(async () => {
+      await cb(event);
+    });
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(mockOpenOverlay).toHaveBeenCalledWith("CONFIRM_CLOSE_DIALOG", "dialog");
   });
 });

@@ -142,6 +142,35 @@ describe("useWindowCloseHandler", () => {
     expect(onCloseRequested).toHaveBeenCalledTimes(1);
   });
 
+  it("stops preventing close when hasUnsavedChanges changes from true to false", async () => {
+    const onCloseRequested = vi.fn();
+    const { rerender } = renderHook(
+      ({ hasUnsaved }: { hasUnsaved: boolean }) =>
+        useWindowCloseHandler(hasUnsaved, onCloseRequested),
+      { initialProps: { hasUnsaved: true } },
+    );
+
+    const cb = await getRegisteredCallback();
+
+    const event1 = { preventDefault: vi.fn() };
+    await act(async () => {
+      await cb(event1);
+    });
+    expect(event1.preventDefault).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender({ hasUnsaved: false });
+    });
+    expect(mockOnCloseRequested).toHaveBeenCalledTimes(1);
+
+    const event2 = { preventDefault: vi.fn() };
+    await act(async () => {
+      await cb(event2);
+    });
+    expect(event2.preventDefault).not.toHaveBeenCalled();
+    expect(onCloseRequested).toHaveBeenCalledTimes(1);
+  });
+
   it("picks up onCloseRequested changes via ref without re-registering listener", async () => {
     const first = vi.fn();
     const second = vi.fn();
