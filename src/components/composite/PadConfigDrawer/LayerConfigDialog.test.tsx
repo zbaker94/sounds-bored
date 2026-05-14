@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
-import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, initialUiState, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useLibraryStore, initialLibraryState } from "@/state/libraryStore";
 import { createMockHistoryEntry, createMockProject, createMockScene, createMockPad, createMockLayer } from "@/test/factories";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -113,7 +113,7 @@ describe("LayerConfigDialog", () => {
     renderDialog();
     openDialog();
 
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)).toBe(true);
+    expect(selectIsOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)(useUiStore.getState())).toBe(true);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
@@ -134,7 +134,7 @@ describe("LayerConfigDialog", () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)).toBe(false);
+    expect(selectIsOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)(useUiStore.getState())).toBe(false);
   });
 
   it("closes overlay after Cancel", async () => {
@@ -144,7 +144,7 @@ describe("LayerConfigDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)).toBe(false);
+    expect(selectIsOverlayOpen(OVERLAY_ID.LAYER_CONFIG_DIALOG)(useUiStore.getState())).toBe(false);
   });
 
   it("renders layer-specific content (sound selector) when opened with an assigned layer", () => {

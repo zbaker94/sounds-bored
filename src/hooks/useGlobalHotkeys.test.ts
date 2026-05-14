@@ -2,12 +2,16 @@ import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
+import { OVERLAY_ID } from "@/state/uiStore";
 import { createMockProject } from "@/test/factories";
 
 // ── Hoisted mock fns ──────────────────────────────────────────────────────────
 
-const { mockUseHotkeys } = vi.hoisted(() => ({
+const { mockUseHotkeys, mockHandleSaveClick, mockHandleSaveAsMenuClick, mockHandleExportClick } = vi.hoisted(() => ({
   mockUseHotkeys: vi.fn(),
+  mockHandleSaveClick: vi.fn(),
+  mockHandleSaveAsMenuClick: vi.fn(),
+  mockHandleExportClick: vi.fn(),
 }));
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -24,9 +28,9 @@ vi.mock("react-hotkeys-hook", () => ({
 
 vi.mock("@/contexts/ProjectActionsContext", () => ({
   useProjectActions: () => ({
-    handleSaveClick: vi.fn(),
-    handleSaveAsMenuClick: vi.fn(),
-    handleExportClick: vi.fn(),
+    handleSaveClick: mockHandleSaveClick,
+    handleSaveAsMenuClick: mockHandleSaveAsMenuClick,
+    handleExportClick: mockHandleExportClick,
   }),
 }));
 
@@ -40,9 +44,6 @@ const mockUiState = {
   closeOverlay: vi.fn(),
   toggleOverlay: vi.fn(),
   openOverlay: vi.fn(),
-  hasOpenOverlay: vi.fn(() => false),
-  isTopOverlay: vi.fn(() => false),
-  isOverlayOpen: vi.fn(() => false),
   toggleEditMode: vi.fn(),
   setHoveredPadId: vi.fn(),
   setEditingPadId: vi.fn((id: string | null) => { mockUiState.editingPadId = id; }),
@@ -52,18 +53,18 @@ const mockUiState = {
   setScenePage: vi.fn(),
 };
 
-vi.mock("@/state/uiStore", () => ({
-  useUiStore: Object.assign(vi.fn(), {
-    getState: vi.fn(() => mockUiState),
-  }),
-  OVERLAY_ID: {
-    EXPORT_PROGRESS_DIALOG: "EXPORT_PROGRESS_DIALOG",
-    MENU_DRAWER: "MENU_DRAWER",
-    SOUNDS_PANEL: "SOUNDS_PANEL",
-    PAD_CONFIG_DRAWER: "PAD_CONFIG_DRAWER",
-    SAVE_PROJECT_DIALOG: "SAVE_PROJECT_DIALOG",
-  },
-}));
+vi.mock("@/state/uiStore", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/state/uiStore")>();
+  return {
+    useUiStore: Object.assign(vi.fn(), {
+      getState: vi.fn(() => mockUiState),
+    }),
+    OVERLAY_ID: actual.OVERLAY_ID,
+    selectIsOverlayOpen: actual.selectIsOverlayOpen,
+    selectIsTopOverlay: actual.selectIsTopOverlay,
+    selectHasOpenOverlay: actual.selectHasOpenOverlay,
+  };
+});
 
 vi.mock("@/state/multiFadeStore", () => ({
   useMultiFadeStore: { getState: vi.fn(() => ({ active: false })) },
@@ -683,5 +684,83 @@ describe("useGlobalHotkeys — shift+left / shift+right — page navigation", ()
 
     // totalPages = 1; safePage = min(5, 0) = 0; 0 < 0 is false → setScenePage(0)
     expect(mockUiState.setScenePage).toHaveBeenCalledWith("scene-1", 0);
+  });
+});
+
+// ── Overlay-gated hotkeys ─────────────────────────────────────────────────────
+
+describe("useGlobalHotkeys — overlay-gated hotkeys", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(hotkeyRegistrations).forEach((k) => delete hotkeyRegistrations[k]);
+    useProjectStore.setState({ ...initialProjectState });
+    mockUiState.overlayStack = [];
+  });
+
+  describe("mod+shift+m (toggle sounds panel)", () => {
+    it("toggles the sounds panel when no overlay is open", () => {
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+m");
+      expect(mockUiState.toggleOverlay).toHaveBeenCalledWith(OVERLAY_ID.SOUNDS_PANEL, "dialog");
+    });
+
+    it("toggles the sounds panel when sounds panel is the topmost overlay", () => {
+      mockUiState.overlayStack = [{ id: OVERLAY_ID.SOUNDS_PANEL, type: "dialog" }];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+m");
+      expect(mockUiState.toggleOverlay).toHaveBeenCalledWith(OVERLAY_ID.SOUNDS_PANEL, "dialog");
+    });
+
+    it("is a no-op when a different overlay is topmost", () => {
+      mockUiState.overlayStack = [{ id: OVERLAY_ID.MENU_DRAWER, type: "drawer" }];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+m");
+      expect(mockUiState.toggleOverlay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mod+s (save)", () => {
+    it("triggers save when save dialog is not topmost", () => {
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+s");
+      expect(mockHandleSaveClick).toHaveBeenCalled();
+    });
+
+    it("is a no-op when save dialog is topmost", () => {
+      mockUiState.overlayStack = [{ id: OVERLAY_ID.SAVE_PROJECT_DIALOG, type: "dialog" }];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+s");
+      expect(mockHandleSaveClick).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mod+shift+s (save as)", () => {
+    it("triggers save as when export is not in progress", () => {
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+s");
+      expect(mockHandleSaveAsMenuClick).toHaveBeenCalled();
+    });
+
+    it("is a no-op when export is in progress", () => {
+      mockUiState.overlayStack = [{ id: OVERLAY_ID.EXPORT_PROGRESS_DIALOG, type: "dialog" }];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+s");
+      expect(mockHandleSaveAsMenuClick).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("mod+shift+e (export)", () => {
+    it("triggers export when export is not in progress", () => {
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+e");
+      expect(mockHandleExportClick).toHaveBeenCalled();
+    });
+
+    it("is a no-op when export is already in progress", () => {
+      mockUiState.overlayStack = [{ id: OVERLAY_ID.EXPORT_PROGRESS_DIALOG, type: "dialog" }];
+      renderHook(() => useGlobalHotkeys());
+      triggerKey("mod+shift+e");
+      expect(mockHandleExportClick).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Keyboard shortcuts (Save, Save As, Export, toggle Sounds Panel) now correctly ignore duplicate presses when the relevant dialog is already open.
 - Audio buffer cache now enforces a ~200 MB memory cap, automatically evicting least-recently-used sounds to reduce memory pressure during long sessions.
 - Triggering the same sound rapidly no longer issues duplicate network/decode requests — concurrent loads share a single in-flight fetch.
 - Evicting or clearing a sound with a bad/corrupted file no longer corrupts internal memory accounting.

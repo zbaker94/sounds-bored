@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useUiStore, initialUiState, OVERLAY_ID } from "@/state/uiStore";
+import { useUiStore, initialUiState, OVERLAY_ID, selectIsOverlayOpen } from "@/state/uiStore";
 import { useAppSettingsStore, initialAppSettingsState } from "@/state/appSettingsStore";
 import { useUpdaterStore } from "@/state/updaterStore";
 import { createMockAppSettings, createMockGlobalFolder } from "@/test/factories";
@@ -127,7 +127,7 @@ describe("SettingsDialog — shell", () => {
     renderDialog();
     openDialog();
     await user.click(screen.getByRole("button", { name: /close/i }));
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(false);
+    expect(selectIsOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)(useUiStore.getState())).toBe(false);
   });
 });
 
@@ -150,7 +150,7 @@ describe("SettingsDialog — StartScreen trigger", () => {
     const user = userEvent.setup();
     renderStartScreen();
     await user.click(screen.getByRole("button", { name: /settings/i }));
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(true);
+    expect(selectIsOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)(useUiStore.getState())).toBe(true);
   });
 });
 
@@ -178,7 +178,7 @@ describe("SettingsDialog — MenuDrawer trigger", () => {
     renderMenuDrawer();
     openMenuDrawer();
     await user.click(screen.getByRole("button", { name: /settings/i }));
-    expect(useUiStore.getState().isOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)).toBe(true);
+    expect(selectIsOverlayOpen(OVERLAY_ID.SETTINGS_DIALOG)(useUiStore.getState())).toBe(true);
   });
 });
 

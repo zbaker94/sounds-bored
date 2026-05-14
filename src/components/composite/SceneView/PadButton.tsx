@@ -4,7 +4,7 @@ import type { Pad } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
-import { useUiStore } from "@/state/uiStore";
+import { useUiStore, selectHasOpenOverlay } from "@/state/uiStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
@@ -88,7 +88,7 @@ function useClickOutsideToDeselect(
   useEffect(() => {
     if (editingPadId !== padId || editMode) return;
     function handlePointerDown(e: PointerEvent) {
-      if (useUiStore.getState().hasOpenOverlay()) return;
+      if (selectHasOpenOverlay(useUiStore.getState())) return;
       if (!containerRef.current?.contains(e.target as Node)) {
         useUiStore.getState().setEditingPadId(null);
       }
