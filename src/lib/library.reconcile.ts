@@ -37,15 +37,15 @@ export type SoundEnricher = (sounds: Sound[], context?: EnricherContext) => Prom
 
 // Batch sizes for IPC-bound operations. Values differ because per-op cost differs:
 // stat() and exists() are cheap filesystem calls; cover-art extraction runs a Rust decoder.
-const STAT_BATCH = 32;
-const COVER_ART_BATCH = 8;
-const SOUND_EXISTS_BATCH = 50;
+export const STAT_BATCH = 32;
+export const COVER_ART_BATCH = 8;
+export const SOUND_EXISTS_BATCH = 50;
 
 /**
  * Process `items` in sequential batches of `batchSize`, applying `fn` to each
  * item. Preserves input order. Used to bound concurrent Tauri IPC calls.
  */
-export async function _batchMap<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+export async function batchMap<T, R>(items: T[], batchSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   if (batchSize < 1) throw new RangeError(`batchSize must be >= 1, got ${batchSize}`);
   const result: R[] = [];
   for (let i = 0; i < items.length; i += batchSize) {
@@ -126,7 +126,7 @@ async function scanFoldersForNewSounds(
  * original reference. Processes in bounded batches to limit concurrent IPC calls.
  */
 export const statEnricher: SoundEnricher = (sounds) =>
-  _batchMap(sounds, STAT_BATCH, async (sound) => {
+  batchMap(sounds, STAT_BATCH, async (sound) => {
     if (!sound.filePath || sound.fileSizeBytes != null) return sound;
     try {
       const info = await stat(sound.filePath);
@@ -145,7 +145,7 @@ export const statEnricher: SoundEnricher = (sounds) =>
  * extraction is the costliest enricher, so it uses the smallest batch size.
  */
 export const coverArtEnricher: SoundEnricher = (sounds) =>
-  _batchMap(sounds, COVER_ART_BATCH, async (sound) => {
+  batchMap(sounds, COVER_ART_BATCH, async (sound) => {
     if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
     try {
       const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
@@ -309,7 +309,7 @@ export async function checkMissingStatus(
   // Sound filePaths are batched to bound concurrent IPC calls. Same error policy:
   // errors become 'unknown', not 'present'.
   const soundsWithPath = sounds.filter((s) => !!s.filePath);
-  const soundFileChecks: SoundCheckResult[] = await _batchMap(
+  const soundFileChecks: SoundCheckResult[] = await batchMap(
     soundsWithPath,
     SOUND_EXISTS_BATCH,
     async (s): Promise<SoundCheckResult> => {
