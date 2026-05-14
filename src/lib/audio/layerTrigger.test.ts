@@ -152,11 +152,25 @@ describe("layerTrigger", () => {
       expect(getVoiceVolume(layer, sound)).toBeCloseTo(0.8);
     });
 
-    it("returns 1.0 for tag/set selections", async () => {
+    it("applies defaultVolume / 100 for set selections", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1" });
+      const layer = createMockLayer({ selection: { type: "set", setId: "set-1", defaultVolume: 50 } });
+      expect(getVoiceVolume(layer, sound)).toBeCloseTo(0.5);
+    });
+
+    it("applies defaultVolume / 100 for tag selections", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1" });
+      const layer = createMockLayer({ selection: { type: "tag", tagIds: ["t1"], matchMode: "any", defaultVolume: 75 } });
+      expect(getVoiceVolume(layer, sound)).toBeCloseTo(0.75);
+    });
+
+    it("returns 1.0 for tag/set selections with defaultVolume: 100", async () => {
       const { getVoiceVolume } = await import("./layerTrigger");
       const sound = createMockSound({ id: "s1" });
       const layer = createMockLayer({ selection: { type: "set", setId: "set-1", defaultVolume: 100 } });
-      expect(getVoiceVolume(layer, sound)).toBe(1.0);
+      expect(getVoiceVolume(layer, sound)).toBeCloseTo(1.0);
     });
 
     it("returns 1.0 when sound instance is not found in assigned selection", async () => {
@@ -184,6 +198,23 @@ describe("layerTrigger", () => {
         selection: { type: "assigned", instances: [{ id: "i1", soundId: "s1", volume: Infinity }] },
       });
       expect(getVoiceVolume(layer, sound)).toBe(0);
+    });
+
+    it("returns 0 for tag/set selections with defaultVolume: 0 (silence)", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1" });
+      const layer = createMockLayer({ selection: { type: "set", setId: "set-1", defaultVolume: 0 } });
+      expect(getVoiceVolume(layer, sound)).toBe(0);
+    });
+
+    it("applies loudness normalization with tag/set defaultVolume (-20 LUFS → +6 dB boost)", async () => {
+      const { getVoiceVolume } = await import("./layerTrigger");
+      const sound = createMockSound({ id: "s1", loudnessLufs: -20 });
+      const layer = createMockLayer({ selection: { type: "set", setId: "set-1", defaultVolume: 50 } });
+      // rawGain = 0.5; normGain = 10^(6/20) ≈ 1.995; result = 0.5 * 1.995 ≈ 0.998
+      const result = getVoiceVolume(layer, sound);
+      expect(result).toBeCloseTo(0.5 * Math.pow(10, 6 / 20), 4);
+      expect(result).toBeLessThanOrEqual(1.0);
     });
 
     it("applies loudness normalization when loudnessLufs is set (-20 LUFS → +6 dB boost)", async () => {
