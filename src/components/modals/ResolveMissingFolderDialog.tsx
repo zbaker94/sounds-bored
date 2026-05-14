@@ -7,7 +7,7 @@ import { useAppSettingsStore } from "@/state/appSettingsStore";
 import { useSaveAppSettings } from "@/lib/appSettings.queries";
 import { useSaveCurrentLibrary } from "@/lib/library.queries";
 import { reconcileGlobalLibrary, refreshMissingState, addGlobalFolderAndReconcile } from "@/lib/library.reconcile";
-import { evictSoundCaches } from "@/lib/audio";
+import { evictSoundCaches, evictSoundCachesMany } from "@/lib/audio";
 import { pickFolder, pickFile } from "@/lib/scope";
 import { AUDIO_FILE_FILTERS } from "@/lib/constants";
 import { basename, nameFromFilename } from "@/lib/utils";
@@ -213,6 +213,9 @@ export function ResolveMissingFolderDialog({ folder, onClose, onResolved }: Reso
         globalFolders: settings.globalFolders.filter((f) => f.id !== folder.id),
       };
       await saveSettings(updatedSettings);
+
+      const removedIds = useLibraryStore.getState().sounds.filter((s) => s.folderId === folder.id).map((s) => s.id);
+      evictSoundCachesMany(removedIds);
 
       updateLibrary((draft) => {
         draft.sounds = draft.sounds.filter((s) => s.folderId !== folder.id);

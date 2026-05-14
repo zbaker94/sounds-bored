@@ -91,6 +91,10 @@ export function ResolveMissingDialog({ sound, onClose, onResolved }: ResolveMiss
       const newName = nameFromFilename(newBasename);
       const nameDiffers = newName !== sound.name;
 
+      if (dup) {
+        evictSoundCaches(dup.id);
+      }
+
       updateLibrary((draft) => {
         if (dup) {
           draft.sounds = draft.sounds.filter((s) => s.id !== dup.id);

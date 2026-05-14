@@ -68,6 +68,9 @@ import { pickFolder, pickFile } from "@/lib/scope";
 const mockPickFolder = pickFolder as unknown as ReturnType<typeof vi.fn>;
 const mockPickFile = pickFile as unknown as ReturnType<typeof vi.fn>;
 
+import { evictSoundCachesMany } from "@/lib/audio/cacheUtils";
+const mockEvictSoundCachesMany = evictSoundCachesMany as ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   useAppSettingsStore.setState({ ...initialAppSettingsState });
@@ -75,6 +78,7 @@ beforeEach(() => {
   mockSaveSettings.mockClear();
   mockPickFolder.mockReset();
   mockPickFile.mockReset();
+  mockEvictSoundCachesMany.mockReset();
 });
 
 describe("ResolveMissingFolderDialog — pickFolder / pickFile integration", () => {
@@ -165,5 +169,32 @@ describe("ResolveMissingFolderDialog — pickFolder / pickFile integration", () 
     expect(mockPickFile).toHaveBeenCalledWith(
       expect.objectContaining({ filters: expect.any(Array) })
     );
+  });
+
+  it("evicts all folder sounds from cache when folder is removed", async () => {
+    const folder = createMockGlobalFolder({ id: "folder-1", path: "/music/sfx", name: "sfx" });
+    const sound1 = createMockSound({ id: "snd-1", folderId: folder.id, filePath: "/music/sfx/a.wav" });
+    const sound2 = createMockSound({ id: "snd-2", folderId: folder.id, filePath: "/music/sfx/b.wav" });
+    const otherSound = createMockSound({ id: "snd-3", folderId: "other-folder", filePath: "/music/other/c.wav" });
+
+    useAppSettingsStore.setState({
+      ...initialAppSettingsState,
+      settings: createMockAppSettings({ globalFolders: [folder] }),
+    });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound1, sound2, otherSound] });
+
+    const onClose = vi.fn();
+    render(<ResolveMissingFolderDialog folder={folder} onClose={onClose} />);
+
+    // Step 1: click "Remove Folder" to enter confirm step
+    await userEvent.click(screen.getByRole("button", { name: /remove folder/i }));
+    // Step 2: click "Remove" to confirm
+    await userEvent.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+    expect(mockEvictSoundCachesMany).toHaveBeenCalledTimes(1);
+    const evictedIds: string[] = mockEvictSoundCachesMany.mock.calls[0][0];
+    expect(evictedIds).toHaveLength(2);
+    expect(evictedIds).toEqual(expect.arrayContaining(["snd-1", "snd-2"]));
+    expect(evictedIds).not.toContain("snd-3");
   });
 });
