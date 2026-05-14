@@ -44,10 +44,14 @@ vi.mock("@/lib/scope", () => ({
 import { pickFile } from "@/lib/scope";
 const mockPickFile = pickFile as unknown as ReturnType<typeof vi.fn>;
 
+import { evictSoundCaches } from "@/lib/audio/cacheUtils";
+const mockEvictSoundCaches = evictSoundCaches as ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   useLibraryStore.setState({ ...initialLibraryState });
   mockSaveLibrary.mockClear();
   mockPickFile.mockReset();
+  mockEvictSoundCaches.mockReset();
 });
 
 describe("ResolveMissingDialog — pickFile integration", () => {
@@ -89,5 +93,51 @@ describe("ResolveMissingDialog — pickFile integration", () => {
 
     expect(mockPickFile).toHaveBeenCalledTimes(1);
     expect(mockSaveLibrary).not.toHaveBeenCalled();
+  });
+
+  it("evicts duplicate sound cache when confirming a duplicate resolution", async () => {
+    const sound = createMockSound({
+      id: "snd-missing",
+      name: "Kick",
+      filePath: "/music/old/kick.wav",
+    });
+    const dupSound = createMockSound({
+      id: "snd-dup",
+      name: "Kick",
+      filePath: "/music/new/kick.wav",
+    });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound, dupSound] });
+
+    // Same basename → bypasses name-mismatch; same filePath as dupSound → triggers duplicate branch
+    mockPickFile.mockResolvedValue("/music/new/kick.wav");
+
+    const onClose = vi.fn();
+    render(<ResolveMissingDialog sound={sound} onClose={onClose} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /locate file/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /proceed & remove duplicate/i }));
+
+    expect(mockEvictSoundCaches).toHaveBeenCalledTimes(2);
+    // dup evicted before updateLibrary, sound.id evicted after — assert ordering
+    expect(mockEvictSoundCaches.mock.calls[0][0]).toBe(dupSound.id);
+    expect(mockEvictSoundCaches.mock.calls[1][0]).toBe(sound.id);
+  });
+
+  it("evicts sound cache when removing a sound from the library", async () => {
+    const sound = createMockSound({
+      id: "snd-1",
+      name: "Kick",
+      filePath: "/music/kick.wav",
+    });
+    useLibraryStore.setState({ ...initialLibraryState, sounds: [sound] });
+
+    const onClose = vi.fn();
+    render(<ResolveMissingDialog sound={sound} onClose={onClose} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /remove from library/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+    expect(mockEvictSoundCaches).toHaveBeenCalledTimes(1);
+    expect(mockEvictSoundCaches).toHaveBeenCalledWith(sound.id);
   });
 });

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Fixed a bug where audio cache entries for removed or relocated sounds were not properly cleared, which could cause stale audio to play
+- When resolving a missing sound file that duplicates an existing library entry, the duplicate's cached audio is now correctly evicted before the library is updated
+- When removing an entire sounds folder, all cached audio for sounds in that folder is now cleared at once
 - Fixed audio streaming threshold from 20 MB down to 5 MB — more files now use efficient streaming playback
 - Improved handling of malformed file size headers: invalid or negative values no longer get cached, so the app retries correctly if the server fixes the header
 - Fixed a bug where closing the window after saving a project didn't always complete correctly due to a missing async delay before the window close call.
