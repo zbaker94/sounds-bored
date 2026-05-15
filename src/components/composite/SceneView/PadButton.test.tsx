@@ -91,7 +91,7 @@ function loadPadInStore(padOverrides = {}) {
   return pad;
 }
 
-// Creates a pad with one assigned sound instance — padSoundState === "ok", not "disabled"
+// Creates a pad with one assigned sound instance — derived PadSoundState would be "ok", but callers still pass padSoundState explicitly.
 function loadPlayablePadInStore(padOverrides = {}) {
   const inst = createMockSoundInstance();
   const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [inst] } });

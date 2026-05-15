@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal code comments and documentation updated for clarity; no functional changes to app behavior.
 - Improved performance: missing-sound detection now computed once per scene instead of once per pad, eliminating redundant recalculations across all pads when sounds change.
 - Internal test suite improvements; no user-facing changes.
 - Improved internal test reliability by properly resetting the pad lookup cache between test runs, preventing flaky test failures.
