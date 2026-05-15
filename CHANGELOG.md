@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactoring: no user-facing behavior changes.
 - Fading behavior now correctly reflects pad changes (layers added/removed, pad deleted) that happen mid-fade
 - Update notifications are now dismissed automatically when re-checking for updates or when no update is found, preventing stale alerts from lingering.
 - Download progress toast no longer flickers — it only refreshes when status or percentage actually changes.

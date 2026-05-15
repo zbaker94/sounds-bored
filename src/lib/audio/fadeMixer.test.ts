@@ -328,7 +328,7 @@ describe("fadeMixer", () => {
       const pad = createMockPad({ id: "pad-live-del", layers: [layer1] });
       const { fadePad } = await import("./fadeMixer");
 
-      let livePad: import("@/lib/schemas").Pad | undefined = pad;
+      let livePad: typeof pad | undefined = pad;
       const getPad = (padId: string) => padId === pad.id ? livePad : undefined;
 
       fadePad(pad, 1.0, 0, 500, getPad);
