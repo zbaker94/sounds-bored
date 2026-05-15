@@ -357,4 +357,60 @@ describe("SceneView", () => {
       expect(calledIds).toContain(largeB.id);
     });
   });
+
+  describe("padSoundState propagation", () => {
+    it("passes partial padSoundState to PadButton when a sound is missing", () => {
+      // Full chain: useLibraryStore.missingSoundIds → buildPadSoundStateMap →
+      // padSoundState prop on PadButton → partial-warning DOM.
+      // Pad needs BOTH a missing sound AND a playable source → "partial".
+      const missingId = "snd-missing";
+      const okId = "snd-ok";
+      const okInst = createMockSoundInstance({ soundId: okId });
+      const missingInst = createMockSoundInstance({ soundId: missingId });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [okInst, missingInst] },
+      });
+      const pad = createMockPad({ id: "pad-test", name: "Test", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+      useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set([missingId]) });
+
+      const { container } = render(<TooltipProvider><SceneView /></TooltipProvider>);
+
+      // The partial-warning amber icon should appear.
+      expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
+    });
+
+    it("updates padSoundState when missingSoundIds changes", () => {
+      // Pad has one playable and one not-yet-missing assigned sound → "ok" initially.
+      // Marking the second sound as missing flips state to "partial" and surfaces the warning.
+      const okId = "snd-ok";
+      const otherId = "snd-other";
+      const okInst = createMockSoundInstance({ soundId: okId });
+      const otherInst = createMockSoundInstance({ soundId: otherId });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [okInst, otherInst] },
+      });
+      const pad = createMockPad({ id: "pad-2", name: "Snare", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      const { container } = render(<TooltipProvider><SceneView /></TooltipProvider>);
+      expect(container.querySelector(".text-amber-400")).not.toBeInTheDocument();
+
+      act(() => {
+        useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set([otherId]) });
+      });
+
+      expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
+    });
+  });
 });

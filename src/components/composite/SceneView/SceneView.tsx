@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Scene, Sound, PadConfig } from "@/lib/schemas";
+import type { Scene, Sound, PadConfig, Pad } from "@/lib/schemas";
 import { useProjectStore } from "@/state/projectStore";
 import { useUiStore } from "@/state/uiStore";
 import { PadButton } from "./PadButton";
@@ -26,6 +26,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { useLibraryStore } from "@/state/libraryStore";
+import { buildPadSoundStateMap } from "@/lib/project.reconcile";
 import { preloadStreamingAudio, LARGE_FILE_THRESHOLD_BYTES, resolveLayerSounds, snapshotSounds } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { cn, modKey } from "@/lib/utils";
@@ -41,6 +42,7 @@ import {
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 
 const EMPTY_SCENES: Scene[] = [];
+const EMPTY_PADS: Pad[] = [];
 
 function collectLargeSceneSounds(scene: Scene, librarySounds: Sound[]): Sound[] {
   const isLarge = (s: Sound) => s.fileSizeBytes !== undefined && s.fileSizeBytes >= LARGE_FILE_THRESHOLD_BYTES;
@@ -76,6 +78,7 @@ export function SceneView() {
     [scenes, activeSceneId],
   );
   const librarySounds = useLibraryStore((s) => s.sounds);
+  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
   const addPad = useProjectStore((s) => s.addPad);
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
 
@@ -118,7 +121,11 @@ export function SceneView() {
     useUiStore.getState().setScenePage(activeScene.id, updater(currentPage));
   }, [activeScene]);
 
-  const pads = activeScene?.pads ?? [];
+  const pads = activeScene?.pads ?? EMPTY_PADS;
+  const padSoundStateMap = useMemo(
+    () => buildPadSoundStateMap(pads, missingSoundIds),
+    [pads, missingSoundIds],
+  );
   const multiFadeActive = useMultiFadeStore((s) => s.active);
 
   const handleAddPad = useCallback(() => {
@@ -243,6 +250,7 @@ export function SceneView() {
                   padId={pad.id}
                   sceneId={activeScene.id}
                   index={i}
+                  padSoundState={padSoundStateMap.get(pad.id) ?? "disabled"}
                 />
               </div>
             ))}

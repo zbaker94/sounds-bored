@@ -72,6 +72,19 @@ export function getPadSoundState(pad: Pad, missingSoundIds: Set<string>): PadSou
   return "disabled";
 }
 
+/**
+ * Builds a Map from pad ID to PadSoundState for all pads in a scene.
+ * Used by SceneView to hoist the per-pad missing-sound computation to a single
+ * O(n) pass, avoiding N simultaneous useMemo invalidations across PadButton instances.
+ */
+export function buildPadSoundStateMap(pads: Pad[], missingSoundIds: Set<string>): Map<string, PadSoundState> {
+  const map = new Map<string, PadSoundState>();
+  for (const pad of pads) {
+    map.set(pad.id, getPadSoundState(pad, missingSoundIds));
+  }
+  return map;
+}
+
 // ── getAffectedPads ───────────────────────────────────────────────────────────
 
 export type AffectedPad = {

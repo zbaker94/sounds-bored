@@ -13,6 +13,7 @@ import { PadButtonProgress } from "./PadButtonProgress";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio";
 import { getPadMapForScenes, _padMapCache } from "@/lib/padUtils";
+import type { PadSoundState } from "@/lib/project.reconcile";
 
 vi.mock("./PadButtonProgress", () => ({
   PadButtonProgress: vi.fn(() => null),
@@ -97,15 +98,15 @@ function loadPlayablePadInStore(padOverrides = {}) {
   return loadPadInStore({ layers: [layer], ...padOverrides });
 }
 
-function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}) {
+function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}, padSoundState: PadSoundState = "ok") {
   const pad = loadPadInStore(padOverrides);
-  render(<PadButton padId={pad.id} sceneId="scene-1" />);
+  render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} />);
   return pad;
 }
 
 function renderPlayableButton(padOverrides: Parameters<typeof loadPlayablePadInStore>[0] = {}) {
   const pad = loadPlayablePadInStore(padOverrides);
-  render(<PadButton padId={pad.id} sceneId="scene-1" />);
+  render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
   return pad;
 }
 
@@ -139,7 +140,7 @@ describe("PadButton", () => {
     it("shows pulse ring when pad is playing", () => {
       const pad = loadPadInStore();
       usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
-      render(<PadButton padId={pad.id} sceneId="scene-1" />);
+      render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
       expect(screen.getByTestId("pulse-ring")).toBeInTheDocument();
     });
 
@@ -273,10 +274,8 @@ describe("partial-warning overlay", () => {
     const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer1, layer2] });
     const scene = createMockScene({ id: "scene-1", pads: [pad] });
     useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
-    // Mark one sound as missing
-    useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set(["sound-missing"]) });
 
-    const { container } = render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" /></TooltipProvider>);
+    const { container } = render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState="partial" /></TooltipProvider>);
 
     // The partial-warning renders an amber-colored SVG icon via the TooltipTrigger span
     expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
@@ -284,7 +283,7 @@ describe("partial-warning overlay", () => {
 
   it("does not show warning icon when no sounds are missing", () => {
     const pad = loadPlayablePadInStore();
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     expect(screen.queryByText(/some assigned sounds are missing/i)).not.toBeInTheDocument();
   });
 });
@@ -320,7 +319,7 @@ describe("multi-fade mode", () => {
       selectedPads: new Map([["pad-1", { padId: "pad-1", levels: [0, 100] }]]),
       reopenPadId: null,
     });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     const button = screen.getByRole("button", { name: "Kick" });
     // When selected in multi-fade mode, the button gets the teal/amber selection ring class
     expect(button).toHaveClass("ring-2");
@@ -337,7 +336,7 @@ describe("multi-fade mode", () => {
       reopenPadId: null,
       toggleMultiFadePad: mockToggle,
     }));
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.pointerDown(button, { button: 0, pointerId: 1 });
     // Non-playing pad → currentVol=0; fadeTarget defaults to 0
@@ -347,7 +346,7 @@ describe("multi-fade mode", () => {
   it("does not show pulse ring when multi-fade mode is active even while playing", () => {
     const pad = loadPadInStore();
     usePlaybackStore.setState({ ...initialPlaybackState, playingPadIds: new Set(["pad-1"]) });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     // The pulse ring has a specific class — when multiFadeActive it should not render
     // (AnimatePresence removes it from DOM when condition is false)
     expect(screen.queryByTestId("pulse-ring")).not.toBeInTheDocument();
@@ -399,7 +398,7 @@ describe("right-click / context menu", () => {
   it("right-clicking sets editingPadId even when pad is unplayable", async () => {
     // Disabled pads must still be right-click-flippable so users can assign sounds.
     // createMockLayer defaults to empty instances → padSoundState === "disabled"
-    renderButton();
+    renderButton({}, "disabled");
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(button);
     expect(useUiStore.getState().editingPadId).toBe("pad-1");
@@ -408,14 +407,14 @@ describe("right-click / context menu", () => {
   it("shows PadBackFace when editingPadId matches this pad", () => {
     const pad = loadPadInStore();
     useUiStore.setState({ ...initialUiState, editingPadId: "pad-1" });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
   });
 
   it("shows PadBackFace when editMode is true", () => {
     const pad = loadPadInStore();
     useUiStore.setState({ ...initialUiState, editMode: true });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     expect(screen.getByTestId("pad-back-face")).toBeInTheDocument();
   });
 });
@@ -430,14 +429,14 @@ describe("fade popover", () => {
   it("renders the fade slider when fadePopoverPadId matches this pad", () => {
     const pad = loadPadInStore({ fadeTargetVol: 20 });
     useUiStore.setState({ ...initialUiState, fadePopoverPadId: "pad-1" });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     expect(screen.getByRole("slider")).toBeInTheDocument();
   });
 
   it("does not render the fade slider when fadePopoverPadId does not match", () => {
     const pad = loadPadInStore();
     useUiStore.setState({ ...initialUiState, fadePopoverPadId: "other-pad" });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
   });
 
@@ -458,7 +457,7 @@ describe("onMultiFade callback (handleMultiFade)", () => {
   it("clears editingPadId (not toggles editMode) when pad is individually flipped", () => {
     const pad = loadPadInStore();
     useUiStore.setState({ ...initialUiState, editingPadId: "pad-1" });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     fireEvent.click(screen.getByTestId("multi-fade-trigger"));
     const { editMode, editingPadId } = useUiStore.getState();
     expect(editingPadId).toBeNull();
@@ -468,7 +467,7 @@ describe("onMultiFade callback (handleMultiFade)", () => {
   it("turns off global editMode when pad is shown via global editMode", () => {
     const pad = loadPadInStore();
     useUiStore.setState({ ...initialUiState, editMode: true });
-    render(<PadButton padId={pad.id} sceneId="scene-1" />);
+    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
     fireEvent.click(screen.getByTestId("multi-fade-trigger"));
     expect(useUiStore.getState().editMode).toBe(false);
   });
@@ -482,10 +481,10 @@ describe("PadButton — React.memo", () => {
     MockProgress.mockClear();
     loadPadInStore();
 
-    const { rerender } = render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    const { rerender } = render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     const callsAfterMount = MockProgress.mock.calls.length;
 
-    rerender(<PadButton padId="pad-1" sceneId="scene-1" />);
+    rerender(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
   });
 
@@ -494,7 +493,7 @@ describe("PadButton — React.memo", () => {
     MockProgress.mockClear();
     loadPadInStore();
 
-    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     const callsAfterMount = MockProgress.mock.calls.length;
 
     act(() => {
@@ -509,7 +508,7 @@ describe("PadButton — React.memo", () => {
     MockProgress.mockClear();
     loadPadInStore();
 
-    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     const callsAfterMount = MockProgress.mock.calls.length;
 
     const scenesBefore = useProjectStore.getState().project?.scenes;
@@ -556,7 +555,7 @@ describe("PadButton — React.memo", () => {
       false,
     );
 
-    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     const callsAfterMount = MockProgress.mock.calls.length;
 
     const pad1Before = useProjectStore.getState().project?.scenes[0]?.pads[0];
@@ -580,13 +579,13 @@ describe("PadButton — null pad handling", () => {
 
   it("renders nothing when padId is not found in the store", () => {
     loadPadInStore();
-    const { container } = render(<PadButton padId="nonexistent-pad" sceneId="scene-1" />);
+    const { container } = render(<PadButton padId="nonexistent-pad" sceneId="scene-1" padSoundState="ok" />);
     expect(container.firstChild).toBeNull();
   });
 
   it("renders nothing after the pad is deleted, without throwing", () => {
     loadPadInStore();
-    const { container } = render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    const { container } = render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     expect(container.firstChild).not.toBeNull();
 
     act(() => {
@@ -613,7 +612,7 @@ describe("PadFrontFace — layerIds useMemo", () => {
       false,
     );
 
-    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     const firstCall = MockProgress.mock.calls.at(-1)?.[0];
     expect(firstCall?.layerIds).toBeDefined();
     const callsAfterMount = MockProgress.mock.calls.length;
@@ -645,7 +644,7 @@ describe("PadFrontFace — layerIds useMemo", () => {
       false,
     );
 
-    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    render(<PadButton padId="pad-1" sceneId="scene-1" padSoundState="ok" />);
     const firstLayerIds = MockProgress.mock.calls.at(-1)?.[0]?.layerIds;
     expect(firstLayerIds).toBeDefined();
 

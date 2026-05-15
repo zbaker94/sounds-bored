@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   reconcileProjectSounds,
   getPadSoundState,
+  buildPadSoundStateMap,
   getAffectedPads,
   applyProjectSoundReconcile,
 } from "./project.reconcile";
@@ -140,6 +141,38 @@ describe("getPadSoundState", () => {
   it("returns 'disabled' when pad has no layers", () => {
     const pad = createMockPad({ layers: [] });
     expect(getPadSoundState(pad, new Set())).toBe("disabled");
+  });
+});
+
+describe("buildPadSoundStateMap", () => {
+  it("returns empty map for empty pads array", () => {
+    const result = buildPadSoundStateMap([], new Set());
+    expect(result.size).toBe(0);
+  });
+
+  it("maps each pad id to its PadSoundState", () => {
+    const inst1 = createMockSoundInstance({ soundId: "s1" });
+    const inst2 = createMockSoundInstance({ soundId: "s2" });
+    const pad1 = createMockPad({ id: "pad-1", layers: [createMockLayer({ selection: { type: "assigned", instances: [inst1] } })] });
+    const pad2 = createMockPad({ id: "pad-2", layers: [createMockLayer({ selection: { type: "assigned", instances: [inst2] } })] });
+
+    const result = buildPadSoundStateMap([pad1, pad2], new Set(["s2"]));
+
+    expect(result.get("pad-1")).toBe("ok");
+    expect(result.get("pad-2")).toBe("disabled");
+  });
+
+  it("returns 'partial' for a pad with mixed missing/ok sounds", () => {
+    const okInst = createMockSoundInstance({ soundId: "ok" });
+    const missingInst = createMockSoundInstance({ soundId: "missing" });
+    const pad = createMockPad({
+      id: "pad-1",
+      layers: [createMockLayer({ selection: { type: "assigned", instances: [okInst, missingInst] } })],
+    });
+
+    const result = buildPadSoundStateMap([pad], new Set(["missing"]));
+
+    expect(result.get("pad-1")).toBe("partial");
   });
 });
 

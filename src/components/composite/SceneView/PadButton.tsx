@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore, selectHasOpenOverlay } from "@/state/uiStore";
-import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { usePadVolumeDisplay } from "@/hooks/usePadVolumeDisplay";
-import { getPadSoundState } from "@/lib/project.reconcile";
+import type { PadSoundState } from "@/lib/project.reconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { PadBackFace } from "./PadBackFace";
@@ -29,6 +28,7 @@ interface PadButtonProps {
   padId: string;
   sceneId: string;
   index?: number;
+  padSoundState: PadSoundState;
 }
 
 // Overdamped spring config: settles in ~5 frames instead of 22+, reducing the
@@ -140,7 +140,7 @@ interface PadFrontFaceProps {
   volumeExiting: boolean;
   displayVolume: number;
   isPopoverOpen: boolean;
-  padSoundState: ReturnType<typeof getPadSoundState>;
+  padSoundState: PadSoundState;
 }
 
 function PadFrontFace({
@@ -255,9 +255,10 @@ interface PadButtonContentProps {
   pad: Pad;
   sceneId: string;
   index: number;
+  padSoundState: PadSoundState;
 }
 
-const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }: PadButtonContentProps) {
+const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, padSoundState }: PadButtonContentProps) {
   // isPlaying drives styling (border, background, drop-shadow, pulse ring).
   // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
@@ -349,11 +350,6 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
   // are torn down. Avoids paying the subscription cost on front-facing pads.
   const showBackFace = usePadBackFaceMount(isFlipped);
 
-  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
-  const padSoundState = useMemo(
-    () => getPadSoundState(pad, missingSoundIds),
-    [pad, missingSoundIds],
-  );
   const isUnplayable = padSoundState === "disabled";
 
   // Exit whichever flip state is currently active without enabling the other.
@@ -510,10 +506,10 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
  * PadButtonContent, resetting all local state (tilt spring, volume display timer).
  * SceneView removes the PadButton from the DOM in its next render cycle.
  */
-export const PadButton = memo(function PadButton({ padId, sceneId, index = 0 }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ padId, sceneId, index = 0, padSoundState }: PadButtonProps) {
   const pad = useProjectStore(
     (s) => getPadMapForScenes(s.project?.scenes ?? null).get(padId) ?? null,
   );
   if (!pad) return null;
-  return <PadButtonContent pad={pad} sceneId={sceneId} index={index} />;
+  return <PadButtonContent pad={pad} sceneId={sceneId} index={index} padSoundState={padSoundState} />;
 });
