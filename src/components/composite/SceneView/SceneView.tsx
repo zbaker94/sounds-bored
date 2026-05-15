@@ -121,12 +121,11 @@ export function SceneView() {
     useUiStore.getState().setScenePage(activeScene.id, updater(currentPage));
   }, [activeScene]);
 
+  // EMPTY_PADS: stable module-level ref so useMemo below doesn't recompute when no scene is active.
   const pads = activeScene?.pads ?? EMPTY_PADS;
   // Hoisted from PadButton so a missingSoundIds change invalidates one O(n) memo
   // here instead of fan-out-invalidating N per-PadButton useMemos simultaneously.
-  // Must be declared before the early returns below to satisfy Rules of Hooks —
-  // pads falls back to EMPTY_PADS (stable ref) so this is effectively free when
-  // no scene is active.
+  // Must be declared before the early returns below to satisfy Rules of Hooks.
   const padSoundStateMap = useMemo(
     () => buildPadSoundStateMap(pads, missingSoundIds),
     [pads, missingSoundIds],
@@ -255,7 +254,7 @@ export function SceneView() {
                   padId={pad.id}
                   sceneId={activeScene.id}
                   index={i}
-                  padSoundState={padSoundStateMap.get(pad.id) ?? "ok"}
+                  padSoundState={padSoundStateMap.get(pad.id) ?? "ok" /* defensive: invariant guarantees every pad.id is in the map */}
                 />
               </div>
             ))}

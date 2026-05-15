@@ -16,6 +16,7 @@ import {
 import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
+// Namespace import required so vi.spyOn can intercept the named export via the live module binding.
 import * as reconcile from "@/lib/project.reconcile";
 import { SceneView } from "./SceneView";
 
@@ -428,8 +429,8 @@ describe("SceneView", () => {
       const spy = vi.spyOn(reconcile, "buildPadSoundStateMap");
       const { rerender } = render(<TooltipProvider><SceneView /></TooltipProvider>);
       const callsAfterMount = spy.mock.calls.length;
-      // Verify the spy is actually intercepting — if this fails, vi.spyOn didn't hook in.
-      expect(callsAfterMount).toBeGreaterThan(0);
+      // Self-validate the spy is intercepting — fails immediately if vi.spyOn didn't hook in.
+      expect(spy).toHaveBeenCalled();
 
       // Re-render without changing pads or missingSoundIds — useMemo must return cached result.
       rerender(<TooltipProvider><SceneView /></TooltipProvider>);
