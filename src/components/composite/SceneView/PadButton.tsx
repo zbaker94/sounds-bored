@@ -28,7 +28,7 @@ interface PadButtonProps {
   padId: string;
   sceneId: string;
   index?: number;
-  /** Sound health derived from the pad's layers vs. the current missing-sound set. See PadSoundState for semantics. */
+  /** Sound health derived from the pad's layers vs. the current missing-sound set. See getPadSoundState for state semantics. */
   padSoundState: PadSoundState;
 }
 
@@ -498,10 +498,7 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, p
  * only on reorder (intentionally re-renders for stagger animation). All props are
  * primitives (string/number/string-unions), so React.memo's shallow equality is
  * sufficient to skip re-renders when nothing the pad cares about changed.
- * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
- * The Map is rebuilt only when the `scenes` array reference changes, so store updates
- * that don't touch scenes (isDirty, folderPath, etc.) return the same Map and the same
- * pad reference — Zustand's === check then skips the re-render.
+ * Pad lookup is O(1) via getPadMapForScenes; see that module for cache invariants.
  *
  * Returning null when pad is not found (deleted or not yet committed) fully unmounts
  * PadButtonContent, resetting all local state (tilt spring, volume display timer).

@@ -16,7 +16,7 @@ import {
 import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
-// Namespace import required so vi.spyOn can intercept the named export via the live module binding.
+// Imported as namespace so the useMemo-caching test below can vi.spyOn buildPadSoundStateMap.
 import * as reconcile from "@/lib/project.reconcile";
 import { SceneView } from "./SceneView";
 
@@ -416,8 +416,6 @@ describe("SceneView", () => {
     });
 
     it("does not recompute padSoundStateMap on re-render when pads and missingSoundIds are unchanged", () => {
-      // Verifies that useMemo([pads, missingSoundIds]) actually caches: forcing a
-      // re-render without changing either dep must not call buildPadSoundStateMap again.
       const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [createMockLayer()] });
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
       useProjectStore.getState().loadProject(

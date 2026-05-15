@@ -267,7 +267,7 @@ describe("partial-warning overlay", () => {
     usePadMetricsStore.setState({ ...initialPadMetricsState });
   });
 
-  it("shows warning icon when pad has partial sound state (some sounds missing)", () => {
+  it("shows warning icon when padSoundState is 'partial'", () => {
     renderButton({}, "partial");
     expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
   });

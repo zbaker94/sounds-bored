@@ -249,7 +249,7 @@ export function SceneView() {
                   animation: padEnterAnimation(i * PAD_STAGGER_MS),
                 }}
               >
-                {/* TS narrowing: Map.get returns T | undefined; every pad.id here is guaranteed to be in the map. */}
+                {/* Map.get returns T | undefined; displayPads is a slice of pads (the array the map was built from), so this fallback is unreachable. */}
                 <PadButton
                   padId={pad.id}
                   sceneId={activeScene.id}
