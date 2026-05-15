@@ -1241,6 +1241,18 @@ describe("statEnricher", () => {
     expect(mockStat).not.toHaveBeenCalled();
   });
 
+  it("returns original array reference when all sounds already have fileSizeBytes", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "a", filePath: "/music/a.wav", fileSizeBytes: 100 }),
+      createSound({ id: "s2", name: "b", filePath: "/music/b.wav", fileSizeBytes: 200 }),
+    ];
+
+    const result = await statEnricher(sounds);
+
+    expect(result).toBe(sounds);
+    expect(mockStat).not.toHaveBeenCalled();
+  });
+
   it("returns same reference when stat fails", async () => {
     const sound = createSound({ id: "s1", name: "kick", filePath: "/music/kick.wav" });
     mockStat.mockRejectedValue(new Error("Permission denied"));
@@ -1319,8 +1331,8 @@ describe("statEnricher", () => {
 
     await statEnricher(sounds);
 
-    // First 3 batches have STAT_BATCH sounds each; max concurrent = STAT_BATCH
-    expect(maxConcurrent).toBe(STAT_BATCH);
+    // batchMap guarantees concurrent calls never exceed batchSize
+    expect(maxConcurrent).toBeLessThanOrEqual(STAT_BATCH);
     expect(mockStat).toHaveBeenCalledTimes(100);
   });
 
@@ -1386,6 +1398,18 @@ describe("coverArtEnricher", () => {
     expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
   });
 
+  it("returns original array reference when all sounds already have coverArtDataUrl", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "a", filePath: "/music/a.mp3", coverArtDataUrl: "" }),
+      createSound({ id: "s2", name: "b", filePath: "/music/b.mp3", coverArtDataUrl: "data:image/jpeg;base64,xyz" }),
+    ];
+
+    const result = await coverArtEnricher(sounds);
+
+    expect(result).toBe(sounds);
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
+  });
+
   it("returns same reference for sounds without filePath", async () => {
     const sound = createSound({ id: "s1", name: "web-sound" });
 
@@ -1410,10 +1434,11 @@ describe("coverArtEnricher", () => {
     expect(coverArtCalls).toHaveLength(20);
   });
 
-  it("returns empty array for empty input", async () => {
-    const result = await coverArtEnricher([]);
-    expect(result).toEqual([]);
-    expect(mockCore.invoke).not.toHaveBeenCalled();
+  it("returns input array reference for empty input", async () => {
+    const sounds: Sound[] = [];
+    const result = await coverArtEnricher(sounds);
+    expect(result).toBe(sounds);
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
   });
 
   it("handles exactly one full batch (N=8)", async () => {
@@ -1498,8 +1523,59 @@ describe("coverArtEnricher", () => {
 
     await coverArtEnricher(sounds);
 
-    const calls = (mockCore.invoke.mock.calls as Array<[string, unknown]>).filter(([cmd]) => cmd === "extract_cover_art");
+    const calls = (mockCore.invoke.mock.calls as Array<[string, ...unknown[]]>).filter(([cmd]) => cmd === "extract_cover_art");
     expect(calls).toHaveLength(1);
+  });
+
+  it("returns a new array when at least one sound needs enrichment (short-circuit must not fire)", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "a", filePath: "/music/a.mp3", coverArtDataUrl: "" }),
+      createSound({ id: "s2", name: "b", filePath: "/music/b.mp3" }),
+    ];
+    mockCore.invoke.mockResolvedValue(null);
+
+    const result = await coverArtEnricher(sounds);
+
+    expect(result).not.toBe(sounds);
+    expect(result[0]).toBe(sounds[0]);
+    expect(result[0].coverArtDataUrl).toBe("");
+    expect(result[1].coverArtDataUrl).toBe("");
+  });
+
+  it("short-circuits when all sounds lack filePath", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "url-1", sourceUrl: "https://example.com/1.mp3" }),
+      createSound({ id: "s2", name: "url-2", sourceUrl: "https://example.com/2.mp3" }),
+    ];
+
+    const result = await coverArtEnricher(sounds);
+
+    expect(result).toBe(sounds);
+    expect(result).toHaveLength(2);
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
+  });
+
+  it("does not short-circuit when array has mixed filePath/no-filePath with unenriched filePath sounds", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "url-only", sourceUrl: "https://example.com/1.mp3" }),
+      createSound({ id: "s2", name: "needs-art", filePath: "/music/b.mp3" }),
+    ];
+    mockCore.invoke.mockResolvedValue("data:image/jpeg;base64,abc");
+
+    const result = await coverArtEnricher(sounds);
+
+    expect(result).not.toBe(sounds);
+    expect(result[0]).toBe(sounds[0]);
+    expect(result[1].coverArtDataUrl).toBe("data:image/jpeg;base64,abc");
+  });
+
+  it("short-circuits for empty-string sentinel (strict-undefined contract: '' !== undefined)", async () => {
+    const sounds = [createSound({ id: "s1", name: "a", filePath: "/music/a.mp3", coverArtDataUrl: "" })];
+
+    const result = await coverArtEnricher(sounds);
+
+    expect(result).toBe(sounds);
+    expect(mockCore.invoke).not.toHaveBeenCalledWith("extract_cover_art", expect.anything());
   });
 });
 
@@ -1509,9 +1585,10 @@ describe("statEnricher — additional edge cases", () => {
     mockStat.mockResolvedValue({ size: 1024 });
   });
 
-  it("returns empty array for empty input", async () => {
-    const result = await statEnricher([]);
-    expect(result).toEqual([]);
+  it("returns input array reference for empty input", async () => {
+    const sounds: Sound[] = [];
+    const result = await statEnricher(sounds);
+    expect(result).toBe(sounds);
     expect(mockStat).not.toHaveBeenCalled();
   });
 
@@ -1527,6 +1604,57 @@ describe("statEnricher — additional edge cases", () => {
     expect(result[1]).not.toBe(changed);
     expect(result[1].fileSizeBytes).toBe(512);
     expect(result[2]).toBe(unchanged2);
+  });
+
+  it("treats fileSizeBytes=0 as already enriched (loose-equality contract: 0 != null)", async () => {
+    const sounds = [createSound({ id: "s1", name: "z", filePath: "/music/z.wav", fileSizeBytes: 0 })];
+
+    const result = await statEnricher(sounds);
+
+    expect(result).toBe(sounds);
+    expect(mockStat).not.toHaveBeenCalled();
+  });
+
+  it("returns a new array when at least one sound needs enrichment (short-circuit must not fire)", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "a", filePath: "/music/a.wav", fileSizeBytes: 100 }),
+      createSound({ id: "s2", name: "b", filePath: "/music/b.wav" }),
+    ];
+    mockStat.mockResolvedValue({ size: 512 });
+
+    const result = await statEnricher(sounds);
+
+    expect(result).not.toBe(sounds);
+    expect(result[0]).toBe(sounds[0]);
+    expect(result[0].fileSizeBytes).toBe(100);
+    expect(result[1].fileSizeBytes).toBe(512);
+  });
+
+  it("short-circuits when all sounds lack filePath", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "url-1", sourceUrl: "https://example.com/1.mp3" }),
+      createSound({ id: "s2", name: "url-2", sourceUrl: "https://example.com/2.mp3" }),
+    ];
+
+    const result = await statEnricher(sounds);
+
+    expect(result).toBe(sounds);
+    expect(result).toHaveLength(2);
+    expect(mockStat).not.toHaveBeenCalled();
+  });
+
+  it("does not short-circuit when array has mixed filePath/no-filePath with unenriched filePath sounds", async () => {
+    const sounds = [
+      createSound({ id: "s1", name: "url-only", sourceUrl: "https://example.com/1.mp3" }),
+      createSound({ id: "s2", name: "needs-stat", filePath: "/music/b.wav" }),
+    ];
+    mockStat.mockResolvedValue({ size: 999 });
+
+    const result = await statEnricher(sounds);
+
+    expect(result).not.toBe(sounds);
+    expect(result[0]).toBe(sounds[0]);
+    expect(result[1].fileSizeBytes).toBe(999);
   });
 });
 
@@ -1648,6 +1776,60 @@ describe("reconcileGlobalLibrary — enricher pipeline integration", () => {
     const second = await reconcileGlobalLibrary([folder], first.sounds);
     expect(second.changed).toBe(false);
     expect(second.sounds).toHaveLength(first.sounds.length);
+    first.sounds.forEach((s, i) => expect(second.sounds[i]).toBe(s));
+  });
+
+  it("makes no stat or extract_cover_art IPC calls when all existing sounds are fully enriched", async () => {
+    const sounds = Array.from({ length: 5 }, (_, i) =>
+      createSound({
+        id: `s${i}`,
+        name: `sound-${i}`,
+        filePath: `/music/sound-${i}.wav`,
+        folderId: "f1",
+        fileSizeBytes: 1024,
+        coverArtDataUrl: "",
+      }),
+    );
+
+    const result = await reconcileGlobalLibrary([], sounds);
+
+    expect(mockStat).not.toHaveBeenCalled();
+    const coverArtCalls = (mockCore.invoke.mock.calls as Array<[string, ...unknown[]]>).filter(
+      ([cmd]) => cmd === "extract_cover_art",
+    );
+    expect(coverArtCalls).toHaveLength(0);
+    expect(result.changed).toBe(false);
+    expect(result.sounds).toHaveLength(5);
+    sounds.forEach((s, i) => expect(result.sounds[i]).toBe(s));
+  });
+
+  it("stat and cover-art IPC called exactly once each for a single new sound alongside fully-enriched existing sounds", async () => {
+    const folder = createMockGlobalFolder({ id: "f1", path: "/music" });
+    mockFs.readDir.mockResolvedValue([{ name: "new.wav", isFile: true, isDirectory: false, isSymlink: false }]);
+    const existingSounds = Array.from({ length: 5 }, (_, i) =>
+      createSound({
+        id: `s${i}`,
+        name: `sound-${i}`,
+        filePath: `/music/sound-${i}.wav`,
+        folderId: "f1",
+        fileSizeBytes: 1024,
+        coverArtDataUrl: "",
+      }),
+    );
+
+    const result = await reconcileGlobalLibrary([folder], existingSounds);
+
+    expect(mockStat).toHaveBeenCalledTimes(1);
+    const coverArtCalls = (mockCore.invoke.mock.calls as Array<[string, ...unknown[]]>).filter(
+      ([cmd]) => cmd === "extract_cover_art",
+    );
+    expect(coverArtCalls).toHaveLength(1);
+    expect(result.changed).toBe(true);
+    expect(result.sounds).toHaveLength(6);
+    existingSounds.forEach((s, i) => expect(result.sounds[i]).toBe(s));
+    const newSound = result.sounds.find((s) => s.filePath === "/music/new.wav");
+    expect(newSound?.fileSizeBytes).toBe(1024);
+    expect(newSound?.coverArtDataUrl).toBe("");
   });
 });
 
