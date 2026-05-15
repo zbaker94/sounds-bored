@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes — this diff is test-only improvements to `library.reconcile.test.ts` (tightened assertions, added edge-case coverage for enricher short-circuit behavior).
 - Improved app startup performance: sound library metadata (file sizes, cover art) now skips re-scanning when all sounds are already up to date, reducing unnecessary disk and IPC calls.
 - Pads can now be moved or copied to another scene directly from the pad's back face, with a confirmation toast showing the destination scene name
 - Move closes the pad editor automatically; copy keeps it open so you can continue editing
