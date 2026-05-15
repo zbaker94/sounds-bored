@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes in this release (internal test coverage improvement only)
+- Improved internal audio engine performance by reducing memory allocations during playback state comparisons
 - Reduced CPU usage during playback: the audio engine now skips redundant per-layer work each animation frame when chain/play-order state hasn't changed, improving performance in steady-state looping/playback scenarios.
 - Internal code quality improvements to the sound library reconciliation system; no change to app behavior or functionality.
 - Improved reliability of sound library file-checking — large libraries now process in controlled batches, preventing IPC overload during missing-file detection

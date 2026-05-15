@@ -39,6 +39,7 @@ import {
 import { forEachActivePadGain, forEachActiveLayerGain } from "./gainRegistry";
 import { getLayerPlayOrder, getLayerChain, onChainCycleStateChanged } from "./chainCycleState";
 import { applyMasterVolume } from "./audioContext";
+import { recordsEqual } from "@/lib/utils";
 
 const VOLUME_EPSILON = 0.001;
 // Shared empty Set used as a sentinel when the gain-sample fast path is going to skip
@@ -411,24 +412,12 @@ function clearAllTickFields(): void {
 
 /** True when two pad/layer volume records are equal within VOLUME_EPSILON. */
 function volumesEqual(a: Record<string, number>, b: Record<string, number>): boolean {
-  const aKeys = Object.keys(a);
-  if (aKeys.length !== Object.keys(b).length) return false;
-  if (aKeys.length === 0) return true; // both empty — steady-state fast path
-  for (const k of aKeys) {
-    if (!(k in b) || Math.abs(a[k] - b[k]) > VOLUME_EPSILON) return false;
-  }
-  return true;
+  return recordsEqual(a, b, (av, bv) => Math.abs(av - bv) <= VOLUME_EPSILON);
 }
 
 /** True when two progress records are equal within PROGRESS_EPSILON. */
 function progressEqual(a: Record<string, number>, b: Record<string, number>): boolean {
-  const aKeys = Object.keys(a);
-  if (aKeys.length !== Object.keys(b).length) return false;
-  if (aKeys.length === 0) return true; // both empty — steady-state fast path
-  for (const k of aKeys) {
-    if (!(k in b) || Math.abs(a[k] - b[k]) > PROGRESS_EPSILON) return false;
-  }
-  return true;
+  return recordsEqual(a, b, (av, bv) => Math.abs(av - bv) <= PROGRESS_EPSILON);
 }
 
 /** True when two records-of-string-arrays are structurally equal (same keys,
@@ -438,15 +427,11 @@ function stringArrayRecordsEqual(
   a: Record<string, string[]>,
   b: Record<string, string[]>,
 ): boolean {
-  const aKeys = Object.keys(a);
-  if (aKeys.length !== Object.keys(b).length) return false;
-  for (const k of aKeys) {
-    const av = a[k];
-    const bv = b[k];
-    if (!(k in b) || av.length !== bv.length) return false;
+  return recordsEqual(a, b, (av, bv) => {
+    if (av.length !== bv.length) return false;
     for (let i = 0; i < av.length; i++) {
       if (av[i] !== bv[i]) return false;
     }
-  }
-  return true;
+    return true;
+  });
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { truncatePath, detectIsMac, nameFromFilename, basename } from "./utils";
+import { truncatePath, detectIsMac, nameFromFilename, basename, recordsEqual } from "./utils";
 
 describe("detectIsMac", () => {
   let originalUADataDescriptor: PropertyDescriptor | undefined;
@@ -175,6 +175,56 @@ describe("truncatePath", () => {
     expect(truncatePath(short)).toBe(short);
     const long = "/very/long/path/that/definitely/exceeds/forty/chars/file.wav";
     expect(truncatePath(long).length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("recordsEqual", () => {
+  const exact = (av: number, bv: number) => av === bv;
+
+  it("returns true for two equal records", () => {
+    expect(recordsEqual({ a: 1, b: 2 }, { a: 1, b: 2 }, exact)).toBe(true);
+  });
+
+  it("returns true for two empty records", () => {
+    expect(recordsEqual({}, {}, exact)).toBe(true);
+  });
+
+  it("returns false when a has a key missing from b", () => {
+    expect(recordsEqual({ a: 1, b: 2 }, { a: 1 }, exact)).toBe(false);
+  });
+
+  it("returns false when b has a key missing from a", () => {
+    expect(recordsEqual({ a: 1 }, { a: 1, b: 2 }, exact)).toBe(false);
+  });
+
+  it("returns false when keys match but values differ", () => {
+    expect(recordsEqual({ a: 1 }, { a: 2 }, exact)).toBe(false);
+  });
+
+  it("returns false when key counts match but keys differ", () => {
+    expect(recordsEqual({ a: 1 }, { b: 1 }, exact)).toBe(false);
+  });
+
+  it("uses the eq comparator for value comparison", () => {
+    const epsilonEq = (av: number, bv: number) => Math.abs(av - bv) <= 0.001;
+    expect(recordsEqual({ x: 1.0 }, { x: 1.0005 }, epsilonEq)).toBe(true);
+    expect(recordsEqual({ x: 1.0 }, { x: 1.002 }, epsilonEq)).toBe(false);
+  });
+
+  it("ignores inherited prototype properties on a", () => {
+    const proto = { inherited: 99 };
+    const a = Object.create(proto) as Record<string, number>;
+    a['own'] = 1;
+    const b = { own: 1 };
+    expect(recordsEqual(a, b, exact)).toBe(true);
+  });
+
+  it("ignores inherited prototype properties on b", () => {
+    const proto = { inherited: 99 };
+    const a = { own: 1 };
+    const b = Object.create(proto) as Record<string, number>;
+    b['own'] = 1;
+    expect(recordsEqual(a, b, exact)).toBe(true);
   });
 });
 

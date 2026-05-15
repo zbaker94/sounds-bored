@@ -75,3 +75,23 @@ export function nameFromFilename(filename: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 }
+
+/** True when two records have equal own-enumerable keys and values per eq. Allocation-free. */
+export function recordsEqual<T>(
+  a: Record<string, T>,
+  b: Record<string, T>,
+  eq: (av: T, bv: T) => boolean,
+): boolean {
+  let aCount = 0;
+  for (const k in a) {
+    if (!Object.prototype.hasOwnProperty.call(a, k)) continue;
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (!eq(a[k], b[k])) return false;
+    aCount++;
+  }
+  let bCount = 0;
+  for (const k in b) {
+    if (Object.prototype.hasOwnProperty.call(b, k) && ++bCount > aCount) return false;
+  }
+  return aCount === bCount;
+}
