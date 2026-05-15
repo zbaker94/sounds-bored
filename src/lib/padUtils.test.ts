@@ -278,8 +278,22 @@ describe("getPadMapForScenes", () => {
   });
 
   it("returns an empty Map for null input", () => {
+    // Seed with a non-null array so the null call actually hits the rebuild branch.
+    getPadMapForScenes([createMockScene({ pads: [createMockPad({ id: "p1" })] })]);
     const map = getPadMapForScenes(null);
     expect(map.size).toBe(0);
+    expect(_padMapCache.scenes).toBeNull();
+  });
+
+  it("does not cache previous entries — get(A) then get(B) then get(A) returns a new Map for A", () => {
+    const pad = createMockPad({ id: "p1" });
+    const scenesA = [createMockScene({ pads: [pad] })];
+    const scenesB = [createMockScene({ pads: [] })];
+    const mapA1 = getPadMapForScenes(scenesA);
+    getPadMapForScenes(scenesB); // evicts A
+    const mapA2 = getPadMapForScenes(scenesA); // cache miss — fresh build
+    expect(mapA2).not.toBe(mapA1);
+    expect(mapA2.get("p1")).toBe(pad); // still correct, just rebuilt
   });
 
   it("updates the cache when scenes goes from null to a real scenes array", () => {

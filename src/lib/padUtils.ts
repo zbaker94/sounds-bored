@@ -1,9 +1,6 @@
 import type { Layer, Pad, PadConfig, Scene } from "@/lib/schemas";
 
-/**
- * Build an O(1) lookup map of padId → Pad across all scenes. Avoids the
- * O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops.
- */
+/** Avoids the O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops. */
 export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
   const map = new Map<string, Pad>();
   for (const scene of scenes) {

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Improved internal test reliability by properly resetting the pad lookup cache between test runs, preventing flaky test failures.
+- Added test coverage verifying the pad map cache correctly evicts stale entries, ensuring pad lookups stay accurate after project changes.
 - Pad lookups are now O(1) via a cached map, reducing unnecessary work on each store update
 - Unrelated project state changes (e.g. save status, folder path) no longer cause pad buttons to re-render
 - No user-facing changes in this release (internal test coverage improvement only)

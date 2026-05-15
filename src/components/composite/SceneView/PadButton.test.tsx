@@ -12,7 +12,7 @@ import { PadButton } from "./PadButton";
 import { PadButtonProgress } from "./PadButtonProgress";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio";
-import { getPadMapForScenes } from "@/lib/padUtils";
+import { getPadMapForScenes, _padMapCache } from "@/lib/padUtils";
 
 vi.mock("./PadButtonProgress", () => ({
   PadButtonProgress: vi.fn(() => null),
@@ -77,6 +77,8 @@ function resetAllStores() {
   useMultiFadeStore.setState({ ...initialMultiFadeState });
   usePadMetricsStore.setState({ ...initialPadMetricsState });
   useLibraryStore.setState({ ...initialLibraryState });
+  _padMapCache.scenes = null;
+  _padMapCache.map = new Map();
 }
 
 function loadPadInStore(padOverrides = {}) {
@@ -511,6 +513,8 @@ describe("PadButton — React.memo", () => {
     const callsAfterMount = MockProgress.mock.calls.length;
 
     const scenesBefore = useProjectStore.getState().project?.scenes;
+    // Capture the cached Map BEFORE the mutation so we can assert it survived.
+    const mapBefore = getPadMapForScenes(scenesBefore ?? null);
 
     // Toggle isDirty without touching scenes — getPadMapForScenes returns the
     // cached Map (same scenes reference), so the selector yields the same pad
@@ -523,11 +527,9 @@ describe("PadButton — React.memo", () => {
     const scenesAfter = useProjectStore.getState().project?.scenes;
     expect(scenesAfter).toBe(scenesBefore);
 
-    // Prove the cache delivers a stable Map instance: same scenes reference
-    // before and after → same Map → same pad reference → no re-render.
-    expect(getPadMapForScenes(scenesBefore ?? null)).toBe(
-      getPadMapForScenes(scenesAfter ?? null),
-    );
+    // Prove the cache survived the mutation: the Map captured before isDirty
+    // changed must still be the same instance returned after.
+    expect(getPadMapForScenes(scenesAfter ?? null)).toBe(mapBefore);
 
     expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
 
