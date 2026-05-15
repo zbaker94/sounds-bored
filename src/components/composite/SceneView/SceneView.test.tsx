@@ -428,6 +428,8 @@ describe("SceneView", () => {
       const spy = vi.spyOn(reconcile, "buildPadSoundStateMap");
       const { rerender } = render(<TooltipProvider><SceneView /></TooltipProvider>);
       const callsAfterMount = spy.mock.calls.length;
+      // Verify the spy is actually intercepting — if this fails, vi.spyOn didn't hook in.
+      expect(callsAfterMount).toBeGreaterThan(0);
 
       // Re-render without changing pads or missingSoundIds — useMemo must return cached result.
       rerender(<TooltipProvider><SceneView /></TooltipProvider>);

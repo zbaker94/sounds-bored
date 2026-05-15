@@ -99,8 +99,8 @@ function loadPlayablePadInStore(padOverrides = {}) {
 }
 
 // TooltipProvider is required for the padSoundState="partial" code path,
-// which renders a Tooltip around the warning icon. Tests that don't reach
-// that path render PadButton directly without a provider.
+// which renders a Tooltip around the warning icon. Other tests that don't
+// exercise the partial path use direct render(<PadButton ...>) without a provider.
 function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}, padSoundState: PadSoundState = "ok") {
   const pad = loadPadInStore(padOverrides);
   render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} /></TooltipProvider>);
@@ -274,7 +274,7 @@ describe("partial-warning overlay", () => {
     expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
   });
 
-  it("does not show warning icon when no sounds are missing", () => {
+  it("does not show warning icon when padSoundState is 'ok'", () => {
     renderPlayableButton();
     expect(screen.queryByTestId("pad-partial-warning")).not.toBeInTheDocument();
   });
@@ -389,7 +389,6 @@ describe("right-click / context menu", () => {
 
   it("right-clicking sets editingPadId even when pad is unplayable", async () => {
     // Disabled pads must still be right-click-flippable so users can assign sounds.
-    // padSoundState="disabled" is passed directly as a prop — SceneView computes this for unplayable pads.
     renderButton({}, "disabled");
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(button);
