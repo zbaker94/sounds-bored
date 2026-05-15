@@ -496,9 +496,9 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, p
  * `padId` and `sceneId` are stable string props; `index` is a number that changes
  * only on reorder (intentionally re-renders for stagger animation). React.memo on
  * these primitives prevents cascade re-renders from SceneView's displayPads.map.
- * `padSoundState` is computed once in SceneView via buildPadSoundStateMap and passed
- * down as a stable string primitive, so React.memo correctly skips re-renders when
- * unrelated store fields change.
+ * `padSoundState` is computed once per scene in SceneView via buildPadSoundStateMap
+ * and passed as a string prop. React.memo's shallow equality skips re-renders when
+ * the value is unchanged, even if SceneView itself re-renders for unrelated reasons.
  *
  * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
  * The Map is rebuilt only when the `scenes` array reference changes, so store updates

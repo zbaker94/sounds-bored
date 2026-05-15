@@ -73,7 +73,7 @@ export function getPadSoundState(pad: Pad, missingSoundIds: Set<string>): PadSou
 }
 
 /**
- * Builds a Map from pad ID to PadSoundState for all pads in a scene.
+ * Builds a Map from pad ID to PadSoundState for a list of pads.
  * Used by SceneView to hoist the per-pad missing-sound computation to a single
  * O(n) pass, avoiding N simultaneous useMemo invalidations across PadButton instances.
  */

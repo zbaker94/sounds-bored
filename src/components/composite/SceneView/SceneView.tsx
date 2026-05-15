@@ -255,7 +255,7 @@ export function SceneView() {
                   padId={pad.id}
                   sceneId={activeScene.id}
                   index={i}
-                  padSoundState={padSoundStateMap.get(pad.id) ?? "disabled"}
+                  padSoundState={padSoundStateMap.get(pad.id) ?? "ok"}
                 />
               </div>
             ))}

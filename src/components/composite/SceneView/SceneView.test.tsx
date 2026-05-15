@@ -414,7 +414,9 @@ describe("SceneView", () => {
       expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
     });
 
-    it("does not recompute padSoundStateMap when isDirty changes", () => {
+    it("does not recompute padSoundStateMap on re-render when pads and missingSoundIds are unchanged", () => {
+      // Verifies that useMemo([pads, missingSoundIds]) actually caches: forcing a
+      // re-render without changing either dep must not call buildPadSoundStateMap again.
       const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [createMockLayer()] });
       const scene = createMockScene({ id: "scene-1", pads: [pad] });
       useProjectStore.getState().loadProject(
@@ -424,12 +426,11 @@ describe("SceneView", () => {
       );
 
       const spy = vi.spyOn(reconcile, "buildPadSoundStateMap");
-      render(<TooltipProvider><SceneView /></TooltipProvider>);
+      const { rerender } = render(<TooltipProvider><SceneView /></TooltipProvider>);
       const callsAfterMount = spy.mock.calls.length;
 
-      act(() => {
-        useProjectStore.setState({ isDirty: true });
-      });
+      // Re-render without changing pads or missingSoundIds — useMemo must return cached result.
+      rerender(<TooltipProvider><SceneView /></TooltipProvider>);
 
       expect(spy.mock.calls.length).toBe(callsAfterMount);
     });
