@@ -98,6 +98,9 @@ function loadPlayablePadInStore(padOverrides = {}) {
   return loadPadInStore({ layers: [layer], ...padOverrides });
 }
 
+// TooltipProvider is required for the padSoundState="partial" code path,
+// which renders a Tooltip around the warning icon. Tests that don't reach
+// that path render PadButton directly without a provider.
 function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}, padSoundState: PadSoundState = "ok") {
   const pad = loadPadInStore(padOverrides);
   render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} /></TooltipProvider>);
@@ -267,18 +270,12 @@ describe("partial-warning overlay", () => {
   });
 
   it("shows warning icon when pad has partial sound state (some sounds missing)", () => {
-    const pad = loadPadInStore();
-    render(
-      <TooltipProvider>
-        <PadButton padId={pad.id} sceneId="scene-1" padSoundState="partial" />
-      </TooltipProvider>,
-    );
+    renderButton({}, "partial");
     expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
   });
 
   it("does not show warning icon when no sounds are missing", () => {
-    const pad = loadPlayablePadInStore();
-    render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
+    renderPlayableButton();
     expect(screen.queryByTestId("pad-partial-warning")).not.toBeInTheDocument();
   });
 });
