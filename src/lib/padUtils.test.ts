@@ -277,11 +277,14 @@ describe("getPadMapForScenes", () => {
     expect(_padMapCache.scenes).toBeNull();
   });
 
-  it("returns an empty Map for null input", () => {
-    // Seed with a non-null array so the null call actually hits the rebuild branch.
-    getPadMapForScenes([createMockScene({ pads: [createMockPad({ id: "p1" })] })]);
-    const map = getPadMapForScenes(null);
-    expect(map.size).toBe(0);
+  it("returns an empty Map for null input without rebuilding", () => {
+    // Cache is already { scenes: null, map: emptyMap } from beforeEach.
+    // Calling with null hits the no-op branch (null === null) and returns
+    // the existing empty Map without triggering a rebuild.
+    const initialMap = _padMapCache.map;
+    const result = getPadMapForScenes(null);
+    expect(result.size).toBe(0);
+    expect(result).toBe(initialMap); // same Map instance — no rebuild occurred
     expect(_padMapCache.scenes).toBeNull();
   });
 
