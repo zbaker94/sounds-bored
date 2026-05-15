@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- App update notifications now show live download progress percentage instead of raw MB counts
+- Update download progress bar shows indeterminate state when server omits content-length header
+- Duplicate update check calls are now safely ignored (concurrency guard added)
+- Update install re-entry blocked if download already in progress or ready to restart
 - Fixed: existing sounds in the library are now preserved as-is during reconciliation — no unnecessary re-processing when nothing has changed
 - Fixed: newly discovered sound files are correctly enriched with file size and cover art on first scan
 - No user-facing changes — this diff is test-only improvements to `library.reconcile.test.ts` (tightened assertions, added edge-case coverage for enricher short-circuit behavior).
