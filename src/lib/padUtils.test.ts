@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { isFadeablePad, buildPadMap, padToConfig, findPadAndScene } from "@/lib/padUtils";
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  isFadeablePad,
+  buildPadMap,
+  padToConfig,
+  findPadAndScene,
+  getPadMapForScenes,
+  _padMapCache,
+} from "@/lib/padUtils";
 import { createMockPad, createMockLayer, createMockScene } from "@/test/factories";
 
 describe("buildPadMap", () => {
@@ -223,5 +230,95 @@ describe("isFadeablePad", () => {
       ],
     });
     expect(isFadeablePad(pad)).toBe(false);
+  });
+});
+
+describe("getPadMapForScenes", () => {
+  beforeEach(() => {
+    // Reset the module-level cache to a known empty state by directly
+    // clearing its fields, rather than relying on cache-miss side effects.
+    _padMapCache.scenes = null;
+    _padMapCache.map = new Map();
+  });
+
+  it("returns the correct pad for a given padId", () => {
+    const pad1 = createMockPad({ id: "p1" });
+    const pad2 = createMockPad({ id: "p2" });
+    const scenes = [createMockScene({ pads: [pad1, pad2] })];
+    const map = getPadMapForScenes(scenes);
+    expect(map.get("p1")).toBe(pad1);
+    expect(map.get("p2")).toBe(pad2);
+  });
+
+  it("returns the same Map instance when called with the same scenes reference", () => {
+    const scenes = [createMockScene({ pads: [createMockPad({ id: "p1" })] })];
+    const first = getPadMapForScenes(scenes);
+    const second = getPadMapForScenes(scenes);
+    expect(second).toBe(first);
+    // The cache key is the scenes array itself, not just a coincidentally
+    // reused Map — assert the cached reference is the scenes we passed in.
+    expect(_padMapCache.scenes).toBe(scenes);
+  });
+
+  it("returns a new Map instance when called with a different scenes reference", () => {
+    const scenesA = [createMockScene({ pads: [createMockPad({ id: "p1" })] })];
+    const scenesB = [createMockScene({ pads: [createMockPad({ id: "p2" })] })];
+    const mapA = getPadMapForScenes(scenesA);
+    const mapB = getPadMapForScenes(scenesB);
+    expect(mapB).not.toBe(mapA);
+    expect(mapB.get("p2")).toBeDefined();
+  });
+
+  it("updates the cache when scenes goes from a real array to null", () => {
+    const scenes = [createMockScene({ pads: [createMockPad({ id: "p1" })] })];
+    getPadMapForScenes(scenes); // seed cache
+    const map = getPadMapForScenes(null); // transition to null
+    expect(map.size).toBe(0);
+    expect(_padMapCache.scenes).toBeNull();
+  });
+
+  it("returns an empty Map for null input without rebuilding", () => {
+    // Cache is already { scenes: null, map: emptyMap } from beforeEach.
+    // Calling with null hits the no-op branch (null === null) and returns
+    // the existing empty Map without triggering a rebuild.
+    const initialMap = _padMapCache.map;
+    const result = getPadMapForScenes(null);
+    expect(result.size).toBe(0);
+    expect(result).toBe(initialMap); // same Map instance — no rebuild occurred
+    expect(_padMapCache.scenes).toBeNull();
+  });
+
+  it("does not cache previous entries — get(A) then get(B) then get(A) returns a new Map for A", () => {
+    const pad = createMockPad({ id: "p1" });
+    const scenesA = [createMockScene({ pads: [pad] })];
+    const scenesB = [createMockScene({ pads: [] })];
+    const mapA1 = getPadMapForScenes(scenesA);
+    getPadMapForScenes(scenesB); // evicts A
+    const mapA2 = getPadMapForScenes(scenesA); // cache miss — fresh build
+    expect(mapA2).not.toBe(mapA1);
+    expect(mapA2.get("p1")).toBe(pad); // still correct, just rebuilt
+  });
+
+  it("updates the cache when scenes goes from null to a real scenes array", () => {
+    const nullMap = getPadMapForScenes(null);
+    expect(nullMap.size).toBe(0);
+
+    const pad = createMockPad({ id: "p1" });
+    const scenes = [createMockScene({ pads: [pad] })];
+    const map = getPadMapForScenes(scenes);
+    expect(map).not.toBe(nullMap);
+    expect(map.get("p1")).toBe(pad);
+    expect(_padMapCache.scenes).toBe(scenes);
+  });
+
+  it("is keyed by reference equality, not deep equality", () => {
+    const pad = createMockPad({ id: "p1" });
+    const scenes1 = [createMockScene({ id: "s1", pads: [pad] })];
+    const scenes2 = [createMockScene({ id: "s1", pads: [pad] })];
+    const map1 = getPadMapForScenes(scenes1);
+    const map2 = getPadMapForScenes(scenes2);
+    expect(map1).not.toBe(map2);
+    expect(_padMapCache.scenes).toBe(scenes2);
+    expect(map2.get("p1")).toBeDefined(); // map2 actually has the pad
   });
 });

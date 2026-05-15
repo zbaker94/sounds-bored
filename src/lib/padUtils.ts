@@ -1,9 +1,6 @@
 import type { Layer, Pad, PadConfig, Scene } from "@/lib/schemas";
 
-/**
- * Build an O(1) lookup map of padId → Pad across all scenes. Avoids the
- * O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops.
- */
+/** Avoids the O(scenes × pads) cost of scenes.flatMap(...).find(...) inside per-pad loops. */
 export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
   const map = new Map<string, Pad>();
   for (const scene of scenes) {
@@ -12,6 +9,30 @@ export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
     }
   }
   return map;
+}
+
+/** Internal cache for getPadMapForScenes — exposed for test introspection only. */
+export const _padMapCache: { scenes: Scene[] | null; map: Map<string, Pad> } = {
+  scenes: null,
+  map: new Map(),
+};
+
+/**
+ * Returns a cached O(1) padId → Pad lookup map for the given scenes array.
+ *
+ * The map is rebuilt only when the `scenes` array reference changes. Immer's
+ * structural sharing guarantees the reference is stable when unrelated
+ * projectStore fields (e.g. `isDirty`) change, so callers reading this map per
+ * frame avoid rebuilding it on every unrelated store update.
+ *
+ * Designed for the single-active-project case; the cache holds one entry.
+ */
+export function getPadMapForScenes(scenes: Scene[] | null): Map<string, Pad> {
+  if (scenes !== _padMapCache.scenes) {
+    _padMapCache.scenes = scenes;
+    _padMapCache.map = buildPadMap(scenes ?? []);
+  }
+  return _padMapCache.map;
 }
 
 /**

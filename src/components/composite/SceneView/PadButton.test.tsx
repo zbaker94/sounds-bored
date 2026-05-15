@@ -12,6 +12,7 @@ import { PadButton } from "./PadButton";
 import { PadButtonProgress } from "./PadButtonProgress";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio";
+import { getPadMapForScenes, _padMapCache } from "@/lib/padUtils";
 
 vi.mock("./PadButtonProgress", () => ({
   PadButtonProgress: vi.fn(() => null),
@@ -76,6 +77,8 @@ function resetAllStores() {
   useMultiFadeStore.setState({ ...initialMultiFadeState });
   usePadMetricsStore.setState({ ...initialPadMetricsState });
   useLibraryStore.setState({ ...initialLibraryState });
+  _padMapCache.scenes = null;
+  _padMapCache.map = new Map();
 }
 
 function loadPadInStore(padOverrides = {}) {
@@ -499,6 +502,43 @@ describe("PadButton — React.memo", () => {
     });
 
     expect(MockProgress.mock.calls.length).toBeGreaterThan(callsAfterMount);
+  });
+
+  it("does not re-render when isDirty changes but scenes do not", () => {
+    const MockProgress = vi.mocked(PadButtonProgress);
+    MockProgress.mockClear();
+    loadPadInStore();
+
+    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    const callsAfterMount = MockProgress.mock.calls.length;
+
+    const scenesBefore = useProjectStore.getState().project?.scenes;
+    // Capture the cached Map BEFORE the mutation so we can assert it survived.
+    const mapBefore = getPadMapForScenes(scenesBefore ?? null);
+
+    // Toggle isDirty without touching scenes — getPadMapForScenes returns the
+    // cached Map (same scenes reference), so the selector yields the same pad
+    // reference and React.memo prevents a re-render.
+    act(() => {
+      useProjectStore.setState({ isDirty: true });
+    });
+
+    // Confirm scenes reference was untouched by the isDirty mutation.
+    const scenesAfter = useProjectStore.getState().project?.scenes;
+    expect(scenesAfter).toBe(scenesBefore);
+
+    // Prove the cache survived the mutation: the Map captured before isDirty
+    // changed must still be the same instance returned after.
+    expect(getPadMapForScenes(scenesAfter ?? null)).toBe(mapBefore);
+
+    expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
+
+    // A second, unrelated mutation also leaves the scenes reference (and thus
+    // the cached Map and pad reference) untouched — still no re-render.
+    act(() => {
+      useProjectStore.setState({ folderPath: "/some/other/path" });
+    });
+    expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
   });
 
   it("does not re-render when a sibling pad is mutated", () => {

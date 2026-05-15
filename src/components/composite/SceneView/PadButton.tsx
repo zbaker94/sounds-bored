@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useMemo, useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { Pad } from "@/lib/schemas";
+import { getPadMapForScenes } from "@/lib/padUtils";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -500,9 +501,10 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
  * only on reorder (intentionally re-renders for stagger animation). React.memo on
  * these primitives prevents cascade re-renders from SceneView's displayPads.map.
  *
- * The selector walks scenes/pads on every store update (including isDirty, folderPath,
- * etc.), but Immer structural sharing means it returns the same pad reference for
- * unchanged pads, and Zustand's === check then skips the re-render.
+ * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
+ * The Map is rebuilt only when the `scenes` array reference changes, so store updates
+ * that don't touch scenes (isDirty, folderPath, etc.) return the same Map and the same
+ * pad reference — Zustand's === check then skips the re-render.
  *
  * Returning null when pad is not found (deleted or not yet committed) fully unmounts
  * PadButtonContent, resetting all local state (tilt spring, volume display timer).
@@ -510,7 +512,7 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
  */
 export const PadButton = memo(function PadButton({ padId, sceneId, index = 0 }: PadButtonProps) {
   const pad = useProjectStore(
-    (s) => s.project?.scenes.find((sc) => sc.id === sceneId)?.pads.find((p) => p.id === padId) ?? null,
+    (s) => getPadMapForScenes(s.project?.scenes ?? null).get(padId) ?? null,
   );
   if (!pad) return null;
   return <PadButtonContent pad={pad} sceneId={sceneId} index={index} />;
