@@ -122,6 +122,11 @@ export function SceneView() {
   }, [activeScene]);
 
   const pads = activeScene?.pads ?? EMPTY_PADS;
+  // Hoisted from PadButton so a missingSoundIds change invalidates one O(n) memo
+  // here instead of fan-out-invalidating N per-PadButton useMemos simultaneously.
+  // Must be declared before the early returns below to satisfy Rules of Hooks —
+  // pads falls back to EMPTY_PADS (stable ref) so this is effectively free when
+  // no scene is active.
   const padSoundStateMap = useMemo(
     () => buildPadSoundStateMap(pads, missingSoundIds),
     [pads, missingSoundIds],

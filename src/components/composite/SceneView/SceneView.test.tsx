@@ -16,6 +16,7 @@ import {
 import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import * as reconcile from "@/lib/project.reconcile";
 import { SceneView } from "./SceneView";
 
 vi.mock("@/lib/audio/streamingCache", async () => {
@@ -379,10 +380,10 @@ describe("SceneView", () => {
       );
       useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set([missingId]) });
 
-      const { container } = render(<TooltipProvider><SceneView /></TooltipProvider>);
+      render(<TooltipProvider><SceneView /></TooltipProvider>);
 
       // The partial-warning amber icon should appear.
-      expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
     });
 
     it("updates padSoundState when missingSoundIds changes", () => {
@@ -403,14 +404,35 @@ describe("SceneView", () => {
         false,
       );
 
-      const { container } = render(<TooltipProvider><SceneView /></TooltipProvider>);
-      expect(container.querySelector(".text-amber-400")).not.toBeInTheDocument();
+      render(<TooltipProvider><SceneView /></TooltipProvider>);
+      expect(screen.queryByTestId("pad-partial-warning")).not.toBeInTheDocument();
 
       act(() => {
         useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set([otherId]) });
       });
 
-      expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
+      expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
+    });
+
+    it("does not recompute padSoundStateMap when isDirty changes", () => {
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [createMockLayer()] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      const spy = vi.spyOn(reconcile, "buildPadSoundStateMap");
+      render(<TooltipProvider><SceneView /></TooltipProvider>);
+      const callsAfterMount = spy.mock.calls.length;
+
+      act(() => {
+        useProjectStore.setState({ isDirty: true });
+      });
+
+      expect(spy.mock.calls.length).toBe(callsAfterMount);
+      spy.mockRestore();
     });
   });
 });

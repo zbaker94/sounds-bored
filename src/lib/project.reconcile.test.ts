@@ -174,6 +174,22 @@ describe("buildPadSoundStateMap", () => {
 
     expect(result.get("pad-1")).toBe("partial");
   });
+
+  it("returns all three states in a single call", () => {
+    const okInst = createMockSoundInstance({ soundId: "ok" });
+    const missingInst = createMockSoundInstance({ soundId: "missing" });
+    const partialInst = createMockSoundInstance({ soundId: "partial-ok" });
+
+    const okPad = createMockPad({ id: "p-ok", layers: [createMockLayer({ selection: { type: "assigned", instances: [okInst] } })] });
+    const disabledPad = createMockPad({ id: "p-disabled", layers: [createMockLayer({ selection: { type: "assigned", instances: [missingInst] } })] });
+    const partialPad = createMockPad({ id: "p-partial", layers: [createMockLayer({ selection: { type: "assigned", instances: [partialInst, missingInst] } })] });
+
+    const result = buildPadSoundStateMap([okPad, disabledPad, partialPad], new Set(["missing"]));
+
+    expect(result.get("p-ok")).toBe("ok");
+    expect(result.get("p-disabled")).toBe("disabled");
+    expect(result.get("p-partial")).toBe("partial");
+  });
 });
 
 // ── getAffectedPads ───────────────────────────────────────────────────────────

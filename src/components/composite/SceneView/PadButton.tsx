@@ -238,7 +238,7 @@ function PadFrontFace({
       {padSoundState === "partial" && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="absolute bottom-1 right-1 z-20 pointer-events-auto">
+            <span data-testid="pad-partial-warning" className="absolute bottom-1 right-1 z-20 pointer-events-auto">
               <HugeiconsIcon icon={Alert02Icon} size={16} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
             </span>
           </TooltipTrigger>
@@ -496,6 +496,9 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, p
  * `padId` and `sceneId` are stable string props; `index` is a number that changes
  * only on reorder (intentionally re-renders for stagger animation). React.memo on
  * these primitives prevents cascade re-renders from SceneView's displayPads.map.
+ * `padSoundState` is computed once in SceneView via buildPadSoundStateMap and passed
+ * down as a stable string primitive, so React.memo correctly skips re-renders when
+ * unrelated store fields change.
  *
  * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
  * The Map is rebuilt only when the `scenes` array reference changes, so store updates

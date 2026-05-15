@@ -100,13 +100,13 @@ function loadPlayablePadInStore(padOverrides = {}) {
 
 function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}, padSoundState: PadSoundState = "ok") {
   const pad = loadPadInStore(padOverrides);
-  render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} />);
+  render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} /></TooltipProvider>);
   return pad;
 }
 
-function renderPlayableButton(padOverrides: Parameters<typeof loadPlayablePadInStore>[0] = {}) {
+function renderPlayableButton(padOverrides: Parameters<typeof loadPlayablePadInStore>[0] = {}, padSoundState: PadSoundState = "ok") {
   const pad = loadPlayablePadInStore(padOverrides);
-  render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
+  render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} /></TooltipProvider>);
   return pad;
 }
 
@@ -397,7 +397,7 @@ describe("right-click / context menu", () => {
 
   it("right-clicking sets editingPadId even when pad is unplayable", async () => {
     // Disabled pads must still be right-click-flippable so users can assign sounds.
-    // createMockLayer defaults to empty instances → padSoundState === "disabled"
+    // padSoundState="disabled" is passed directly as a prop — SceneView computes this for unplayable pads.
     renderButton({}, "disabled");
     const button = screen.getByRole("button", { name: "Kick" });
     fireEvent.contextMenu(button);
