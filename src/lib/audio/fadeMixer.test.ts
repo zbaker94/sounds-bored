@@ -1,4 +1,4 @@
-// src/lib/audio/fadeMixer.test.ts
+﻿// src/lib/audio/fadeMixer.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockPad, createMockLayer } from "@/test/factories";
 
@@ -128,7 +128,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fadeout" });
 
-      fadePad(pad, 1.0, 0, 1000);
+      fadePad(pad, 1.0, 0, 1000, undefined);
 
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 1);
       expect(isPadFadingOut("pad-fadeout")).toBe(true);
@@ -148,7 +148,7 @@ describe("fadeMixer", () => {
       const { resetPadGain } = await import("./gainManager");
       const pad = createMockPad({ id: "pad-fadeout-stop", layers: [layer] });
 
-      fadePad(pad, 1.0, 0, 500);
+      fadePad(pad, 1.0, 0, 500, undefined);
       vi.advanceTimersByTime(600);
 
       // Verifies the full inline-stopPad contract: chain + cycle + play-order + voices all cleared
@@ -169,7 +169,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-null-ended" });
 
-      fadePad(pad, 1.0, 0, 1000);
+      fadePad(pad, 1.0, 0, 1000, undefined);
 
       // Prevents chain-continuation callbacks from firing during the fade window
       expect(mockVoice.setOnEnded).toHaveBeenCalledWith(null);
@@ -198,7 +198,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-stale-guard", layers: [layer] });
 
-      fadePad(pad, 1.0, 0, 500);
+      fadePad(pad, 1.0, 0, 500, undefined);
       expect(isPadFadingOut("pad-stale-guard")).toBe(true);
 
       // Simulate: fade state cleared without cancelling timeout (e.g., by a re-trigger
@@ -221,7 +221,7 @@ describe("fadeMixer", () => {
       const { resetPadGain } = await import("./gainManager");
       const pad = createMockPad({ id: "pad-partial-fade" });
 
-      fadePad(pad, 1.0, 0.3, 500);
+      fadePad(pad, 1.0, 0.3, 500, undefined);
       vi.advanceTimersByTime(600);
 
       expect(resetPadGain).not.toHaveBeenCalled();
@@ -236,7 +236,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-partial-retrigger" });
 
-      fadePad(pad, 1.0, 0.3, 500);
+      fadePad(pad, 1.0, 0.3, 500, undefined);
       expect(isPadFadingOut("pad-partial-retrigger")).toBe(true);
 
       cancelFade("pad-partial-retrigger");
@@ -254,7 +254,7 @@ describe("fadeMixer", () => {
       const { usePlaybackStore } = await import("@/state/playbackStore");
       const pad = createMockPad({ id: "pad-store-mirror" });
 
-      fadePad(pad, 1.0, 0, 1000);
+      fadePad(pad, 1.0, 0, 1000, undefined);
 
       expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(true);
       expect(usePlaybackStore.getState().fadingPadIds.has(pad.id)).toBe(true);
@@ -356,7 +356,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-equal-vol" });
 
-      expect(() => fadePad(pad, 0.5, 0.5, 1000)).not.toThrow();
+      expect(() => fadePad(pad, 0.5, 0.5, 1000, undefined)).not.toThrow();
 
       // fadingDown = (0.5 < 0.5) = false → nullPadOnEnded must not be called
       expect(mockVoice.setOnEnded).not.toHaveBeenCalledWith(null);
@@ -370,7 +370,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-equal-ramp" });
 
-      fadePad(pad, 0.5, 0.5, 1000);
+      fadePad(pad, 0.5, 0.5, 1000, undefined);
 
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, expect.any(Number));
     });
@@ -386,7 +386,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fadein" });
 
-      fadePad(pad, 0.3, 1.0, 1000);
+      fadePad(pad, 0.3, 1.0, 1000, undefined);
 
       expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.3, 0);
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, 1);
@@ -400,7 +400,7 @@ describe("fadeMixer", () => {
       const { fadePad } = await import("./fadeMixer");
       const pad = createMockPad({ id: "pad-fadein-vol" });
 
-      fadePad(pad, 0.2, 0.7, 1000);
+      fadePad(pad, 0.2, 0.7, 1000, undefined);
 
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, 1);
     });
@@ -444,7 +444,7 @@ describe("fadeMixer", () => {
       const pad = createMockPad({ id: "pad-fpi" });
       const startPad = vi.fn().mockResolvedValue(undefined);
 
-      await fadePadIn(pad, 0.8, 1000, startPad);
+      await fadePadIn(pad, 0.8, 1000, startPad, undefined);
 
       expect(startPad).toHaveBeenCalledWith(pad);
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, 1);
@@ -463,7 +463,7 @@ describe("fadeMixer", () => {
         removeFadingInPad("pad-fpi-bail");
       });
 
-      await fadePadIn(pad, 0.8, 1000, startPad);
+      await fadePadIn(pad, 0.8, 1000, startPad, undefined);
 
       expect(mockGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
     });
@@ -480,7 +480,7 @@ describe("fadeMixer", () => {
       const pad = createMockPad({ id: "pad-fpi-stop", layers: [layer] });
       const startPad = vi.fn().mockResolvedValue(undefined);
 
-      await fadePadIn(pad, 0, 500, startPad);
+      await fadePadIn(pad, 0, 500, startPad, undefined);
       vi.advanceTimersByTime(600);
 
       expect(getLayerChain("layer-fpi-stop")).toBeUndefined();
@@ -498,7 +498,7 @@ describe("fadeMixer", () => {
       const pad = createMockPad({ id: "pad-fpi-nonzero", layers: [layer] });
       const startPad = vi.fn().mockResolvedValue(undefined);
 
-      await fadePadIn(pad, 0.8, 500, startPad);
+      await fadePadIn(pad, 0.8, 500, startPad, undefined);
       vi.advanceTimersByTime(600);
 
       // Chain should remain — stopPadInternal was not called
@@ -521,7 +521,7 @@ describe("fadeMixer", () => {
       const pad = createMockPad({ id: "pad-fpi-cancel", layers: [layer] });
       const startPad = vi.fn().mockResolvedValue(undefined);
 
-      await fadePadIn(pad, 0, 500, startPad);
+      await fadePadIn(pad, 0, 500, startPad, undefined);
 
       cancelFade("pad-fpi-cancel");
       vi.advanceTimersByTime(600);

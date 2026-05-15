@@ -56,7 +56,7 @@ export function stopPadInternal(pad: Pad): void {
  *    fading-out, stops voices + resets gain after completion when toVolume === 0.
  *  - Fading up (toVolume >= fromVolume): reverses any in-progress fade-out.
  */
-export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number, getPad?: (padId: string) => Pad | undefined): void {
+export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number, getPad: ((padId: string) => Pad | undefined) | undefined): void {
   coordinator.padStoppedReversing(pad.id);
   const fadingDown = toVolume < fromVolume;
 
@@ -86,7 +86,7 @@ export async function fadePadIn(
   toVolume: number,
   durationMs: number,
   startPad: (pad: Pad) => Promise<void>,
-  getPad?: (padId: string) => Pad | undefined,
+  getPad: ((padId: string) => Pad | undefined) | undefined,
 ): Promise<void> {
   cancelFade(pad.id);
   // addFadingIn is local-only — playbackStore mirror happens inside startFade after await resolves.
