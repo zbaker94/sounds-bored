@@ -1,7 +1,7 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import type { Pad } from "@/lib/schemas";
+import type { Pad, Scene } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/kbd";
@@ -33,6 +33,8 @@ interface PadBackFaceProps {
   onMultiFade: () => void;
 }
 
+const EMPTY_SCENES: Scene[] = [];
+
 export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade }: PadBackFaceProps) {
   const updatePad = useProjectStore((s) => s.updatePad);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -41,8 +43,8 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const setPadColor = useProjectStore((s) => s.setPadColor);
   const movePadToScene = useProjectStore((s) => s.movePadToScene);
   const copyPadToScene = useProjectStore((s) => s.copyPadToScene);
-  const scenes = useProjectStore((s) => s.project?.scenes ?? []);
-  const otherScenes = scenes.filter((s) => s.id !== sceneId);
+  const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
+  const otherScenes = useMemo(() => scenes.filter((scene) => scene.id !== sceneId), [scenes, sceneId]);
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
