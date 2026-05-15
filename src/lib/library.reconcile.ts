@@ -31,6 +31,8 @@ export type EnricherContext = Record<string, unknown>;
  * - Return the same Sound reference for sounds they did not modify (load-bearing
  *   for change detection in `reconcileGlobalLibrary`).
  * - Be idempotent — skip sounds that already have the target field populated.
+ * - MAY return the input array reference itself when no sound was modified
+ *   (optimization for fully-enriched libraries — callers must not assume a copy).
  * Enrichers have no dependency on Zustand stores, making them independently testable.
  */
 export type SoundEnricher = (sounds: Sound[], context?: EnricherContext) => Promise<Sound[]>;
@@ -122,11 +124,14 @@ async function scanFoldersForNewSounds(
 
 /**
  * Enriches sounds with their file size. Idempotent: skips sounds that already
- * have `fileSizeBytes` set. Returns a new array; unchanged sounds keep their
- * original reference. Processes in bounded batches to limit concurrent IPC calls.
+ * have `fileSizeBytes` set. Unchanged sounds keep their original reference.
+ * Returns the input array itself when no enrichment is needed (callers must not
+ * assume a copy); otherwise returns a new array. Processes in bounded batches
+ * to limit concurrent IPC calls.
  */
-export const statEnricher: SoundEnricher = (sounds) =>
-  batchMap(sounds, STAT_BATCH, async (sound) => {
+export const statEnricher: SoundEnricher = (sounds) => {
+  if (!sounds.some((s) => s.filePath && s.fileSizeBytes == null)) return Promise.resolve(sounds);
+  return batchMap(sounds, STAT_BATCH, async (sound) => {
     if (!sound.filePath || sound.fileSizeBytes != null) return sound;
     try {
       const info = await stat(sound.filePath);
@@ -135,17 +140,21 @@ export const statEnricher: SoundEnricher = (sounds) =>
       return sound;
     }
   });
+};
 
 /**
  * Enriches sounds with embedded cover art. Idempotent: skips sounds whose
  * `coverArtDataUrl` is already set (including the empty-string sentinel `""`
  * that means "checked, no art found" — prevents perpetual re-extraction).
- * Returns a new array; unchanged sounds keep their original reference.
- * Processes in bounded batches to limit concurrent IPC calls — cover-art
- * extraction is the costliest enricher, so it uses the smallest batch size.
+ * Unchanged sounds keep their original reference. Returns the input array
+ * itself when no enrichment is needed (callers must not assume a copy);
+ * otherwise returns a new array. Processes in bounded batches to limit
+ * concurrent IPC calls — cover-art extraction is the costliest enricher,
+ * so it uses the smallest batch size.
  */
-export const coverArtEnricher: SoundEnricher = (sounds) =>
-  batchMap(sounds, COVER_ART_BATCH, async (sound) => {
+export const coverArtEnricher: SoundEnricher = (sounds) => {
+  if (!sounds.some((s) => s.filePath && s.coverArtDataUrl === undefined)) return Promise.resolve(sounds);
+  return batchMap(sounds, COVER_ART_BATCH, async (sound) => {
     if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
     try {
       const dataUrl = await invoke<string | null>("extract_cover_art", { path: sound.filePath });
@@ -154,6 +163,7 @@ export const coverArtEnricher: SoundEnricher = (sounds) =>
       return sound;
     }
   });
+};
 
 /**
  * Run `enrichers` sequentially over `sounds`, passing each output as input to
