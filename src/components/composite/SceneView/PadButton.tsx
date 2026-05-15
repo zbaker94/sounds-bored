@@ -28,7 +28,7 @@ interface PadButtonProps {
   padId: string;
   sceneId: string;
   index?: number;
-  /** Pre-computed sound health for this pad. Hoisted to the parent so a single O(n) recompute serves all pads instead of fanning out across N independent memos. See PadSoundState for semantics. */
+  /** Sound health derived from the pad's layers vs. the current missing-sound set. See PadSoundState for semantics. */
   padSoundState: PadSoundState;
 }
 

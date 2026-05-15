@@ -429,8 +429,7 @@ describe("SceneView", () => {
       const spy = vi.spyOn(reconcile, "buildPadSoundStateMap");
       const { rerender } = render(<TooltipProvider><SceneView /></TooltipProvider>);
       const callsAfterMount = spy.mock.calls.length;
-      // Self-validate: spy must have intercepted at least one call on mount, otherwise
-      // the final toBe(callsAfterMount) would pass trivially even if the memo was removed.
+      // Spy must have intercepted at least one mount call; otherwise the equality assertion below would trivially pass.
       expect(callsAfterMount).toBeGreaterThan(0);
 
       // Re-render without changing pads or missingSoundIds — useMemo must return cached result.

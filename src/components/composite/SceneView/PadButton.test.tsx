@@ -91,16 +91,14 @@ function loadPadInStore(padOverrides = {}) {
   return pad;
 }
 
-// Creates a pad with one assigned sound instance — derived PadSoundState would be "ok", but callers still pass padSoundState explicitly.
+// Pad has one playable instance; tests pass padSoundState explicitly because the prop is required and not derived in PadButton.
 function loadPlayablePadInStore(padOverrides = {}) {
   const inst = createMockSoundInstance();
   const layer = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [inst] } });
   return loadPadInStore({ layers: [layer], ...padOverrides });
 }
 
-// TooltipProvider is required for the padSoundState="partial" code path,
-// which renders a Tooltip around the warning icon. Other tests that don't
-// exercise the partial path use direct render(<PadButton ...>) without a provider.
+// TooltipProvider is required because padSoundState="partial" renders a Tooltip around the warning icon.
 function renderButton(padOverrides: Parameters<typeof loadPadInStore>[0] = {}, padSoundState: PadSoundState = "ok") {
   const pad = loadPadInStore(padOverrides);
   render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState={padSoundState} /></TooltipProvider>);

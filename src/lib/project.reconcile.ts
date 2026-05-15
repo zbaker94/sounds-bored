@@ -72,11 +72,7 @@ export function getPadSoundState(pad: Pad, missingSoundIds: Set<string>): PadSou
   return "disabled";
 }
 
-/**
- * Builds a Map from pad ID to PadSoundState for a list of pads in a single O(n) pass.
- * Callers can cache the result against (pads, missingSoundIds) to avoid redundant
- * per-pad recomputation when neither input changes.
- */
+/** Builds a Map from pad ID to PadSoundState for a list of pads in a single O(n) pass. */
 export function buildPadSoundStateMap(pads: Pad[], missingSoundIds: Set<string>): Map<string, PadSoundState> {
   const map = new Map<string, PadSoundState>();
   for (const pad of pads) {

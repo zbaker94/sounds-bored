@@ -125,7 +125,6 @@ export function SceneView() {
   const pads = activeScene?.pads ?? EMPTY_PADS;
   // Computed once per scene so a missingSoundIds change invalidates a single O(n) memo
   // instead of triggering N independent recomputes inside each PadButton.
-  // Must be declared before the early returns below to satisfy Rules of Hooks.
   const padSoundStateMap = useMemo(
     () => buildPadSoundStateMap(pads, missingSoundIds),
     [pads, missingSoundIds],
@@ -250,7 +249,7 @@ export function SceneView() {
                   animation: padEnterAnimation(i * PAD_STAGGER_MS),
                 }}
               >
-                {/* Map.get() is typed T | undefined even when every key is present; "ok" is the safe default if a future refactor ever breaks the invariant. */}
+                {/* Defensive default: PadButton requires a non-undefined PadSoundState. */}
                 <PadButton
                   padId={pad.id}
                   sceneId={activeScene.id}
