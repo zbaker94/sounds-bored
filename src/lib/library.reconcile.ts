@@ -129,7 +129,7 @@ async function scanFoldersForNewSounds(
  * assume a copy); otherwise returns a new array. Processes in bounded batches
  * to limit concurrent IPC calls.
  */
-export const statEnricher: SoundEnricher = (sounds) => {
+export const statEnricher: SoundEnricher = (sounds, _context) => {
   if (!sounds.some((s) => s.filePath && s.fileSizeBytes == null)) return Promise.resolve(sounds);
   return batchMap(sounds, STAT_BATCH, async (sound) => {
     if (!sound.filePath || sound.fileSizeBytes != null) return sound;
@@ -152,7 +152,7 @@ export const statEnricher: SoundEnricher = (sounds) => {
  * concurrent IPC calls — cover-art extraction is the costliest enricher,
  * so it uses the smallest batch size.
  */
-export const coverArtEnricher: SoundEnricher = (sounds) => {
+export const coverArtEnricher: SoundEnricher = (sounds, _context) => {
   if (!sounds.some((s) => s.filePath && s.coverArtDataUrl === undefined)) return Promise.resolve(sounds);
   return batchMap(sounds, COVER_ART_BATCH, async (sound) => {
     if (!sound.filePath || sound.coverArtDataUrl !== undefined) return sound;
@@ -232,6 +232,7 @@ export async function reconcileGlobalLibrary(
 
   // Reference inequality is the change signal — enrichers contractually return
   // the same Sound ref when no-op (required by the SoundEnricher contract).
+  // enrichedNew changes are NOT checked here: newSounds.length > 0 already covers that.
   const anyEnricherUpdated = enrichedExisting.some((s, i) => s !== reconciledExisting[i]);
 
   return {

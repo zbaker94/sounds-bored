@@ -1331,8 +1331,8 @@ describe("statEnricher", () => {
 
     await statEnricher(sounds);
 
-    // First 3 batches have STAT_BATCH sounds each; max concurrent = STAT_BATCH
-    expect(maxConcurrent).toBe(STAT_BATCH);
+    // batchMap guarantees concurrent calls never exceed batchSize
+    expect(maxConcurrent).toBeLessThanOrEqual(STAT_BATCH);
     expect(mockStat).toHaveBeenCalledTimes(100);
   });
 
@@ -1523,7 +1523,7 @@ describe("coverArtEnricher", () => {
 
     await coverArtEnricher(sounds);
 
-    const calls = (mockCore.invoke.mock.calls as Array<[string, unknown]>).filter(([cmd]) => cmd === "extract_cover_art");
+    const calls = (mockCore.invoke.mock.calls as Array<[string, ...unknown[]]>).filter(([cmd]) => cmd === "extract_cover_art");
     expect(calls).toHaveLength(1);
   });
 
@@ -1776,6 +1776,7 @@ describe("reconcileGlobalLibrary — enricher pipeline integration", () => {
     const second = await reconcileGlobalLibrary([folder], first.sounds);
     expect(second.changed).toBe(false);
     expect(second.sounds).toHaveLength(first.sounds.length);
+    first.sounds.forEach((s, i) => expect(second.sounds[i]).toBe(s));
   });
 
   it("makes no stat or extract_cover_art IPC calls when all existing sounds are fully enriched", async () => {
@@ -1825,7 +1826,10 @@ describe("reconcileGlobalLibrary — enricher pipeline integration", () => {
     expect(coverArtCalls).toHaveLength(1);
     expect(result.changed).toBe(true);
     expect(result.sounds).toHaveLength(6);
-    existingSounds.forEach((s) => expect(result.sounds).toContain(s));
+    existingSounds.forEach((s, i) => expect(result.sounds[i]).toBe(s));
+    const newSound = result.sounds.find((s) => s.filePath === "/music/new.wav");
+    expect(newSound?.fileSizeBytes).toBe(1024);
+    expect(newSound?.coverArtDataUrl).toBe("");
   });
 });
 

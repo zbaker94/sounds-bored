@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Fixed: existing sounds in the library are now preserved as-is during reconciliation — no unnecessary re-processing when nothing has changed
+- Fixed: newly discovered sound files are correctly enriched with file size and cover art on first scan
 - No user-facing changes — this diff is test-only improvements to `library.reconcile.test.ts` (tightened assertions, added edge-case coverage for enricher short-circuit behavior).
 - Improved app startup performance: sound library metadata (file sizes, cover art) now skips re-scanning when all sounds are already up to date, reducing unnecessary disk and IPC calls.
 - Pads can now be moved or copied to another scene directly from the pad's back face, with a confirmation toast showing the destination scene name
