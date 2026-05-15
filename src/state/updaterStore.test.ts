@@ -71,12 +71,16 @@ describe('checkForUpdates', () => {
     mockCheck.mockResolvedValueOnce({ available: false });
 
     const promise = useUpdaterStore.getState().checkForUpdates();
-    const state = useUpdaterStore.getState();
-    expect(state.availableVersion).toBeNull();
-    expect(state.progress).toBeNull();
-    expect(state._pendingUpdate).toBeNull();
+    const mid = useUpdaterStore.getState();
+    expect(mid.availableVersion).toBeNull();
+    expect(mid.progress).toBeNull();
+    expect(mid._pendingUpdate).toBeNull();
 
     await promise;
+
+    const state = useUpdaterStore.getState();
+    expect(state.status).toBe('idle');
+    expect(state.hasChecked).toBe(true);
   });
 
   it('handles null return from check()', async () => {

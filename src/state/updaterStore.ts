@@ -61,7 +61,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             break;
           case 'Progress': {
             downloaded += event.data.chunkLength;
-            const progress = total ? Math.round((downloaded / total) * 100) : null;
+            const progress = total != null ? Math.round((downloaded / total) * 100) : null;
             set({ progress });
             break;
           }

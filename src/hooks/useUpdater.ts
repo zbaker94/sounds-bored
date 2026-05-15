@@ -5,9 +5,12 @@ import { useUpdaterStore } from '@/state/updaterStore';
 import { logError } from '@/lib/logger';
 
 // Module-scoped so HMR / remount cycles don't re-trigger the update check on each render.
+// The flag has no effect on explicit checkForUpdates() calls (e.g. via SettingsDialog).
 let updateChecked = false;
 const TOAST_ID = 'app-updater';
 const STICKY = { duration: Infinity } as const;
+// Error toasts auto-dismiss — intentionally not using STICKY here.
+const ERROR_TOAST_DURATION_MS = 8000;
 
 // fallow-ignore-next-line unused-export
 export function _resetUpdateChecked() {
@@ -17,11 +20,20 @@ export function _resetUpdateChecked() {
 export function useUpdater() {
   useEffect(() => {
     let prevStatus = useUpdaterStore.getState().status;
+    let prevProgress = useUpdaterStore.getState().progress;
 
     const unsubscribe = useUpdaterStore.subscribe((state) => {
       const { status, progress, availableVersion } = state;
       const statusChanged = status !== prevStatus;
+      const progressChanged = progress !== prevProgress;
       prevStatus = status;
+      prevProgress = progress;
+
+      // Dismiss stale "Update available" toast when a re-check starts or confirms no update.
+      if (statusChanged && (status === 'checking' || status === 'idle')) {
+        toast.dismiss(TOAST_ID);
+        return;
+      }
 
       if (statusChanged && status === 'available') {
         toast(`Update ${availableVersion} available`, {
@@ -36,7 +48,7 @@ export function useUpdater() {
         return;
       }
 
-      if (status === 'downloading') {
+      if (status === 'downloading' && (statusChanged || progressChanged)) {
         const description = progress !== null ? `${progress}% downloaded` : 'Starting download…';
         toast.loading('Downloading update…', {
           id: TOAST_ID,
@@ -65,14 +77,14 @@ export function useUpdater() {
         toast.error('Update failed', {
           id: TOAST_ID,
           description: 'Could not install the update. Try again later.',
-          duration: 8000,
+          duration: ERROR_TOAST_DURATION_MS,
         });
       }
     });
 
     if (!updateChecked) {
       updateChecked = true;
-      useUpdaterStore.getState().checkForUpdates();
+      useUpdaterStore.getState().checkForUpdates().catch(() => {});
     }
 
     return unsubscribe;

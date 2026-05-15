@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Update notifications are now dismissed automatically when re-checking for updates or when no update is found, preventing stale alerts from lingering.
+- Download progress toast no longer flickers — it only refreshes when status or percentage actually changes.
+- Fixed download progress calculation when the file's total size is reported as zero.
+- Update check errors are now handled silently, preventing unhandled promise rejections from surfacing in the app.
 - App update notifications now show live download progress percentage instead of raw MB counts
 - Update download progress bar shows indeterminate state when server omits content-length header
 - Duplicate update check calls are now safely ignored (concurrency guard added)

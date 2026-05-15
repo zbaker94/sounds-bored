@@ -3,11 +3,12 @@ import { renderHook, act } from '@testing-library/react';
 import { useUpdaterStore, initialUpdaterState } from '@/state/updaterStore';
 import { useUpdater, _resetUpdateChecked } from './useUpdater';
 
-const { mockToast, mockToastLoading, mockToastSuccess, mockToastError, mockRelaunch, mockLogError, mockCheckForUpdates } = vi.hoisted(() => ({
+const { mockToast, mockToastLoading, mockToastSuccess, mockToastError, mockToastDismiss, mockRelaunch, mockLogError, mockCheckForUpdates } = vi.hoisted(() => ({
   mockToast: vi.fn(),
   mockToastLoading: vi.fn(),
   mockToastSuccess: vi.fn(),
   mockToastError: vi.fn(),
+  mockToastDismiss: vi.fn(),
   mockRelaunch: vi.fn().mockResolvedValue(undefined),
   mockLogError: vi.fn(),
   mockCheckForUpdates: vi.fn().mockResolvedValue(undefined),
@@ -18,6 +19,7 @@ vi.mock('sonner', () => ({
     loading: mockToastLoading,
     success: mockToastSuccess,
     error: mockToastError,
+    dismiss: mockToastDismiss,
   }),
 }));
 
@@ -43,6 +45,7 @@ beforeEach(() => {
   mockToastLoading.mockReset();
   mockToastSuccess.mockReset();
   mockToastError.mockReset();
+  mockToastDismiss.mockReset();
   mockRelaunch.mockReset().mockResolvedValue(undefined);
   mockLogError.mockReset();
   mockCheckForUpdates.mockReset().mockResolvedValue({ available: false });
@@ -148,6 +151,7 @@ describe('useUpdater', () => {
 
     const successArgs = mockToastSuccess.mock.calls[0];
     const action = (successArgs[1] as { action: { onClick: () => void } }).action;
+    // act() flushes sync state updates; vi.waitFor polls until the async rejection resolves.
     act(() => { action.onClick(); });
 
     await vi.waitFor(() => {
@@ -192,6 +196,25 @@ describe('useUpdater', () => {
     act(() => { useUpdaterStore.setState({ status: 'available', availableVersion: '2.0.0' }); });
 
     expect(mockToast).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses stale toast when status transitions to checking', () => {
+    renderHook(() => useUpdater());
+
+    act(() => { useUpdaterStore.setState({ status: 'available', availableVersion: '2.0.0' }); });
+    act(() => { useUpdaterStore.setState({ status: 'checking' }); });
+
+    expect(mockToastDismiss).toHaveBeenCalledWith('app-updater');
+  });
+
+  it('dismisses stale toast when status transitions to idle (no update found)', () => {
+    renderHook(() => useUpdater());
+
+    act(() => { useUpdaterStore.setState({ status: 'available', availableVersion: '2.0.0' }); });
+    act(() => { useUpdaterStore.setState({ status: 'checking' }); });
+    act(() => { useUpdaterStore.setState({ status: 'idle', hasChecked: true }); });
+
+    expect(mockToastDismiss).toHaveBeenCalledWith('app-updater');
   });
 
   it('unsubscribes from store on unmount', () => {
