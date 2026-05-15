@@ -1,16 +1,13 @@
 import { create } from 'zustand';
 import { check, Update } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { toast } from 'sonner';
+import { logError } from '@/lib/logger';
 
 type UpdaterStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
-
-const TOAST_ID = 'app-updater';
 
 interface UpdaterState {
   status: UpdaterStatus;
   availableVersion: string | null;
-  /** Download progress 0–100, only populated while status === 'downloading' */
+  /** null when content-length header is absent — UI should show indeterminate spinner */
   progress: number | null;
   /** True after at least one check has completed (success or failure) */
   hasChecked: boolean;
@@ -20,14 +17,19 @@ interface UpdaterState {
   install: () => Promise<void>;
 }
 
-export const useUpdaterStore = create<UpdaterState>((set, get) => ({
+export const initialUpdaterState: Omit<UpdaterState, 'checkForUpdates' | 'install'> = {
   status: 'idle',
   availableVersion: null,
   progress: null,
   hasChecked: false,
   _pendingUpdate: null,
+};
+
+export const useUpdaterStore = create<UpdaterState>((set, get) => ({
+  ...initialUpdaterState,
 
   checkForUpdates: async () => {
+    if (get().status === 'checking') return;
     set({ status: 'checking', availableVersion: null, progress: null, _pendingUpdate: null });
     try {
       const update = await check();
@@ -36,25 +38,20 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
       } else {
         set({ status: 'idle', hasChecked: true });
       }
-    } catch {
-      set({ status: 'error', hasChecked: true });
+    } catch (err) {
+      logError('updater check failed', err instanceof Error ? err : { error: String(err) });
+      set({ status: 'error', hasChecked: true, availableVersion: null, _pendingUpdate: null });
     }
   },
 
   install: async () => {
-    const { _pendingUpdate } = get();
-    if (!_pendingUpdate) return;
+    const { _pendingUpdate, status } = get();
+    if (!_pendingUpdate || status === 'downloading' || status === 'ready') return;
 
     let downloaded = 0;
     let total: number | undefined;
 
-    set({ status: 'downloading', progress: 0 });
-
-    toast.loading('Downloading update…', {
-      id: TOAST_ID,
-      description: 'Starting download…',
-      duration: Infinity,
-    });
+    set({ status: 'downloading', progress: null });
 
     try {
       await _pendingUpdate.downloadAndInstall((event) => {
@@ -64,33 +61,17 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
             break;
           case 'Progress': {
             downloaded += event.data.chunkLength;
-            const progress = total ? Math.round((downloaded / total) * 100) : null;
-            const description = total
-              ? `${progress}% of ${(total / 1024 / 1024).toFixed(1)} MB`
-              : `${(downloaded / 1024 / 1024).toFixed(1)} MB downloaded`;
+            const progress = total != null ? Math.round((downloaded / total) * 100) : null;
             set({ progress });
-            toast.loading('Downloading update…', { id: TOAST_ID, description, duration: Infinity });
             break;
           }
-          case 'Finished':
-            break;
         }
       });
 
       set({ status: 'ready', progress: null });
-      toast.success('Update ready', {
-        id: TOAST_ID,
-        description: 'Restart the app to apply the update.',
-        action: { label: 'Restart now', onClick: () => relaunch() },
-        duration: Infinity,
-      });
-    } catch {
+    } catch (err) {
+      logError('updater install failed', err instanceof Error ? err : { error: String(err) });
       set({ status: 'error', progress: null });
-      toast.error('Update failed', {
-        id: TOAST_ID,
-        description: 'Could not install the update. Try again later.',
-        duration: 8000,
-      });
     }
   },
 }));

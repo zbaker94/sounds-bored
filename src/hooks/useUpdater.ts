@@ -1,28 +1,92 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { useUpdaterStore } from '@/state/updaterStore';
+import { logError } from '@/lib/logger';
 
+// Module-scoped so HMR / remount cycles don't re-trigger the update check on each render.
+// The flag has no effect on explicit checkForUpdates() calls (e.g. via SettingsDialog).
 let updateChecked = false;
 const TOAST_ID = 'app-updater';
+const STICKY = { duration: Infinity } as const;
+// Error toasts auto-dismiss — intentionally not using STICKY here.
+const ERROR_TOAST_DURATION_MS = 8000;
+
+// fallow-ignore-next-line unused-export
+export function _resetUpdateChecked() {
+  updateChecked = false;
+}
 
 export function useUpdater() {
   useEffect(() => {
-    if (updateChecked) return;
-    updateChecked = true;
+    let prevStatus = useUpdaterStore.getState().status;
+    let prevProgress = useUpdaterStore.getState().progress;
 
-    useUpdaterStore.getState().checkForUpdates().then(() => {
-      const { status, availableVersion, install } = useUpdaterStore.getState();
-      if (status !== 'available') return;
+    const unsubscribe = useUpdaterStore.subscribe((state) => {
+      const { status, progress, availableVersion } = state;
+      const statusChanged = status !== prevStatus;
+      const progressChanged = progress !== prevProgress;
+      prevStatus = status;
+      prevProgress = progress;
 
-      toast(`Update ${availableVersion} available`, {
-        id: TOAST_ID,
-        description: 'A new version of SoundsBored is ready to install.',
-        action: {
-          label: 'Install now',
-          onClick: install,
-        },
-        duration: Infinity,
-      });
+      // Dismiss stale "Update available" toast when a re-check starts or confirms no update.
+      if (statusChanged && (status === 'checking' || status === 'idle')) {
+        toast.dismiss(TOAST_ID);
+        return;
+      }
+
+      if (statusChanged && status === 'available') {
+        toast(`Update ${availableVersion} available`, {
+          id: TOAST_ID,
+          description: 'A new version of SoundsBored is ready to install.',
+          action: {
+            label: 'Install now',
+            onClick: () => useUpdaterStore.getState().install(),
+          },
+          ...STICKY,
+        });
+        return;
+      }
+
+      if (status === 'downloading' && (statusChanged || progressChanged)) {
+        const description = progress !== null ? `${progress}% downloaded` : 'Starting download…';
+        toast.loading('Downloading update…', {
+          id: TOAST_ID,
+          description,
+          ...STICKY,
+        });
+        return;
+      }
+
+      if (statusChanged && status === 'ready') {
+        toast.success('Update ready', {
+          id: TOAST_ID,
+          description: 'Restart the app to apply the update.',
+          action: {
+            label: 'Restart now',
+            onClick: () => {
+              relaunch().catch((err: unknown) => logError('updater relaunch failed', err instanceof Error ? err : { error: String(err) }));
+            },
+          },
+          ...STICKY,
+        });
+        return;
+      }
+
+      if (statusChanged && status === 'error') {
+        toast.error('Update failed', {
+          id: TOAST_ID,
+          description: 'Could not install the update. Try again later.',
+          duration: ERROR_TOAST_DURATION_MS,
+        });
+      }
     });
+
+    if (!updateChecked) {
+      updateChecked = true;
+      useUpdaterStore.getState().checkForUpdates().catch(() => {});
+    }
+
+    return unsubscribe;
   }, []);
 }
