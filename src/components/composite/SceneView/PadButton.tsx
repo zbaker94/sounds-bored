@@ -28,6 +28,7 @@ interface PadButtonProps {
   padId: string;
   sceneId: string;
   index?: number;
+  /** Computed once per scene by SceneView via buildPadSoundStateMap. String-union enables React.memo to short-circuit re-renders when unchanged. */
   padSoundState: PadSoundState;
 }
 
@@ -496,10 +497,6 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, p
  * `padId` and `sceneId` are stable string props; `index` is a number that changes
  * only on reorder (intentionally re-renders for stagger animation). React.memo on
  * these primitives prevents cascade re-renders from SceneView's displayPads.map.
- * `padSoundState` is computed once per scene in SceneView via buildPadSoundStateMap
- * and passed as a string-union prop. React.memo's shallow equality skips re-renders
- * when the value is unchanged, even if SceneView itself re-renders for unrelated reasons.
- *
  * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
  * The Map is rebuilt only when the `scenes` array reference changes, so store updates
  * that don't touch scenes (isDirty, folderPath, etc.) return the same Map and the same

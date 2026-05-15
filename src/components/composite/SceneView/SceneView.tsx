@@ -250,11 +250,12 @@ export function SceneView() {
                   animation: padEnterAnimation(i * PAD_STAGGER_MS),
                 }}
               >
+                {/* defensive fallback: buildPadSoundStateMap invariant guarantees every pad.id is in the map */}
                 <PadButton
                   padId={pad.id}
                   sceneId={activeScene.id}
                   index={i}
-                  padSoundState={padSoundStateMap.get(pad.id) ?? "ok" /* defensive: invariant guarantees every pad.id is in the map */}
+                  padSoundState={padSoundStateMap.get(pad.id) ?? "ok"}
                 />
               </div>
             ))}
