@@ -16,6 +16,8 @@ import {
 import { LARGE_FILE_THRESHOLD_BYTES } from "@/lib/audio";
 import { PADS_PER_PAGE } from "@/lib/constants";
 import { TooltipProvider } from "@/components/ui/tooltip";
+// Imported as namespace so the useMemo-caching test below can vi.spyOn buildPadSoundStateMap.
+import * as reconcile from "@/lib/project.reconcile";
 import { SceneView } from "./SceneView";
 
 vi.mock("@/lib/audio/streamingCache", async () => {
@@ -355,6 +357,83 @@ describe("SceneView", () => {
       expect(preloadStreamingAudio).toHaveBeenCalled();
       const calledIds = vi.mocked(preloadStreamingAudio).mock.calls.map((c) => c[0].id);
       expect(calledIds).toContain(largeB.id);
+    });
+  });
+
+  describe("padSoundState propagation", () => {
+    it("passes partial padSoundState to PadButton when a sound is missing", () => {
+      // Full chain: useLibraryStore.missingSoundIds → buildPadSoundStateMap →
+      // padSoundState prop on PadButton → partial-warning DOM.
+      // Pad needs BOTH a missing sound AND a playable source → "partial".
+      const missingId = "snd-missing";
+      const okId = "snd-ok";
+      const okInst = createMockSoundInstance({ soundId: okId });
+      const missingInst = createMockSoundInstance({ soundId: missingId });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [okInst, missingInst] },
+      });
+      const pad = createMockPad({ id: "pad-test", name: "Test", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+      useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set([missingId]) });
+
+      render(<TooltipProvider><SceneView /></TooltipProvider>);
+
+      // The partial-warning amber icon should appear.
+      expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
+    });
+
+    it("updates padSoundState when missingSoundIds changes", () => {
+      // Pad has one playable and one not-yet-missing assigned sound → "ok" initially.
+      // Marking the second sound as missing flips state to "partial" and surfaces the warning.
+      const okId = "snd-ok";
+      const otherId = "snd-other";
+      const okInst = createMockSoundInstance({ soundId: okId });
+      const otherInst = createMockSoundInstance({ soundId: otherId });
+      const layer = createMockLayer({
+        selection: { type: "assigned", instances: [okInst, otherInst] },
+      });
+      const pad = createMockPad({ id: "pad-2", name: "Snare", layers: [layer] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      render(<TooltipProvider><SceneView /></TooltipProvider>);
+      expect(screen.queryByTestId("pad-partial-warning")).not.toBeInTheDocument();
+
+      act(() => {
+        useLibraryStore.setState({ ...initialLibraryState, missingSoundIds: new Set([otherId]) });
+      });
+
+      expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
+    });
+
+    it("does not recompute padSoundStateMap on re-render when pads and missingSoundIds are unchanged", () => {
+      const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [createMockLayer()] });
+      const scene = createMockScene({ id: "scene-1", pads: [pad] });
+      useProjectStore.getState().loadProject(
+        createMockHistoryEntry(),
+        createMockProject({ scenes: [scene] }),
+        false,
+      );
+
+      const spy = vi.spyOn(reconcile, "buildPadSoundStateMap");
+      const { rerender } = render(<TooltipProvider><SceneView /></TooltipProvider>);
+      const callsAfterMount = spy.mock.calls.length;
+      // Spy must have intercepted at least one mount call; otherwise the equality assertion below would trivially pass.
+      expect(callsAfterMount).toBeGreaterThan(0);
+
+      // Re-render without changing pads or missingSoundIds — useMemo must return cached result.
+      rerender(<TooltipProvider><SceneView /></TooltipProvider>);
+
+      expect(spy.mock.calls.length).toBe(callsAfterMount);
     });
   });
 });

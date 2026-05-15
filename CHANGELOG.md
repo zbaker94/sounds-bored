@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved performance: missing-sound detection now computed once per scene instead of once per pad, eliminating redundant recalculations across all pads when sounds change.
 - Internal test suite improvements; no user-facing changes.
 - Improved internal test reliability by properly resetting the pad lookup cache between test runs, preventing flaky test failures.
 - Added test coverage verifying the pad map cache correctly evicts stale entries, ensuring pad lookups stay accurate after project changes.

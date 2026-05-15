@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/state/projectStore";
 import { usePlaybackStore } from "@/state/playbackStore";
 import { useUiStore, selectHasOpenOverlay } from "@/state/uiStore";
-import { useLibraryStore } from "@/state/libraryStore";
 import { useMultiFadeStore } from "@/state/multiFadeStore";
 import { usePadGesture } from "@/hooks/usePadGesture";
 import { usePadVolumeDisplay } from "@/hooks/usePadVolumeDisplay";
-import { getPadSoundState } from "@/lib/project.reconcile";
+import type { PadSoundState } from "@/lib/project.reconcile";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { PadBackFace } from "./PadBackFace";
@@ -29,6 +28,8 @@ interface PadButtonProps {
   padId: string;
   sceneId: string;
   index?: number;
+  /** Sound health derived from the pad's layers vs. the current missing-sound set. See getPadSoundState for state semantics. */
+  padSoundState: PadSoundState;
 }
 
 // Overdamped spring config: settles in ~5 frames instead of 22+, reducing the
@@ -140,7 +141,7 @@ interface PadFrontFaceProps {
   volumeExiting: boolean;
   displayVolume: number;
   isPopoverOpen: boolean;
-  padSoundState: ReturnType<typeof getPadSoundState>;
+  padSoundState: PadSoundState;
 }
 
 function PadFrontFace({
@@ -238,7 +239,7 @@ function PadFrontFace({
       {padSoundState === "partial" && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="absolute bottom-1 right-1 z-20 pointer-events-auto">
+            <span data-testid="pad-partial-warning" className="absolute bottom-1 right-1 z-20 pointer-events-auto">
               <HugeiconsIcon icon={Alert02Icon} size={16} className="text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
             </span>
           </TooltipTrigger>
@@ -255,9 +256,10 @@ interface PadButtonContentProps {
   pad: Pad;
   sceneId: string;
   index: number;
+  padSoundState: PadSoundState;
 }
 
-const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }: PadButtonContentProps) {
+const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, padSoundState }: PadButtonContentProps) {
   // isPlaying drives styling (border, background, drop-shadow, pulse ring).
   // Heavy RAF-driven subscriptions (activeLayers, layerProgress) live in PadButtonProgress.
   const isPlaying = usePlaybackStore((s) => s.playingPadIds.has(pad.id));
@@ -349,11 +351,6 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
   // are torn down. Avoids paying the subscription cost on front-facing pads.
   const showBackFace = usePadBackFaceMount(isFlipped);
 
-  const missingSoundIds = useLibraryStore((s) => s.missingSoundIds);
-  const padSoundState = useMemo(
-    () => getPadSoundState(pad, missingSoundIds),
-    [pad, missingSoundIds],
-  );
   const isUnplayable = padSoundState === "disabled";
 
   // Exit whichever flip state is currently active without enabling the other.
@@ -498,22 +495,19 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index }:
 /**
  * Selects the pad from the project store by ID and renders PadButtonContent.
  * `padId` and `sceneId` are stable string props; `index` is a number that changes
- * only on reorder (intentionally re-renders for stagger animation). React.memo on
- * these primitives prevents cascade re-renders from SceneView's displayPads.map.
- *
- * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
- * The Map is rebuilt only when the `scenes` array reference changes, so store updates
- * that don't touch scenes (isDirty, folderPath, etc.) return the same Map and the same
- * pad reference — Zustand's === check then skips the re-render.
+ * only on reorder (intentionally re-renders for stagger animation). All props are
+ * primitives (string/number/string-unions), so React.memo's shallow equality is
+ * sufficient to skip re-renders when nothing the pad cares about changed.
+ * Pad lookup is O(1) via getPadMapForScenes; see that module for cache invariants.
  *
  * Returning null when pad is not found (deleted or not yet committed) fully unmounts
  * PadButtonContent, resetting all local state (tilt spring, volume display timer).
  * SceneView removes the PadButton from the DOM in its next render cycle.
  */
-export const PadButton = memo(function PadButton({ padId, sceneId, index = 0 }: PadButtonProps) {
+export const PadButton = memo(function PadButton({ padId, sceneId, index = 0, padSoundState }: PadButtonProps) {
   const pad = useProjectStore(
     (s) => getPadMapForScenes(s.project?.scenes ?? null).get(padId) ?? null,
   );
   if (!pad) return null;
-  return <PadButtonContent pad={pad} sceneId={sceneId} index={index} />;
+  return <PadButtonContent pad={pad} sceneId={sceneId} index={index} padSoundState={padSoundState} />;
 });
