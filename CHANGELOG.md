@@ -1,8 +1,8 @@
 # Changelog
 
 ## Current Changes
+- No user-facing changes — internal test suite improvements only (refactored test helpers and assertions for pad warning indicators).
 - Fixed a performance issue where updating any project property (e.g. saving) could trigger unnecessary pad state recalculations across all pads simultaneously
-- Pads with partially missing sounds now show a warning indicator more reliably, with improved internal detection logic
 - Improved performance: missing-sound detection now computed once per scene instead of once per pad, reducing redundant work when sounds are missing.
 - Internal test suite improvements; no user-facing changes.
 - Improved internal test reliability by properly resetting the pad lookup cache between test runs, preventing flaky test failures.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
@@ -360,6 +360,10 @@ describe("SceneView", () => {
   });
 
   describe("padSoundState propagation", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it("passes partial padSoundState to PadButton when a sound is missing", () => {
       // Full chain: useLibraryStore.missingSoundIds → buildPadSoundStateMap →
       // padSoundState prop on PadButton → partial-warning DOM.
@@ -432,7 +436,6 @@ describe("SceneView", () => {
       });
 
       expect(spy.mock.calls.length).toBe(callsAfterMount);
-      spy.mockRestore();
     });
   });
 });

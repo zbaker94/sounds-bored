@@ -267,24 +267,19 @@ describe("partial-warning overlay", () => {
   });
 
   it("shows warning icon when pad has partial sound state (some sounds missing)", () => {
-    const okInst = createMockSoundInstance({ id: "inst-ok", soundId: "sound-ok" });
-    const missingInst = createMockSoundInstance({ id: "inst-bad", soundId: "sound-missing" });
-    const layer1 = createMockLayer({ id: "layer-1", selection: { type: "assigned", instances: [okInst] } });
-    const layer2 = createMockLayer({ id: "layer-2", selection: { type: "assigned", instances: [missingInst] } });
-    const pad = createMockPad({ id: "pad-1", name: "Kick", layers: [layer1, layer2] });
-    const scene = createMockScene({ id: "scene-1", pads: [pad] });
-    useProjectStore.getState().loadProject(createMockHistoryEntry(), createMockProject({ scenes: [scene] }), false);
-
-    const { container } = render(<TooltipProvider><PadButton padId={pad.id} sceneId="scene-1" padSoundState="partial" /></TooltipProvider>);
-
-    // The partial-warning renders an amber-colored SVG icon via the TooltipTrigger span
-    expect(container.querySelector(".text-amber-400")).toBeInTheDocument();
+    const pad = loadPadInStore();
+    render(
+      <TooltipProvider>
+        <PadButton padId={pad.id} sceneId="scene-1" padSoundState="partial" />
+      </TooltipProvider>,
+    );
+    expect(screen.getByTestId("pad-partial-warning")).toBeInTheDocument();
   });
 
   it("does not show warning icon when no sounds are missing", () => {
     const pad = loadPlayablePadInStore();
     render(<PadButton padId={pad.id} sceneId="scene-1" padSoundState="ok" />);
-    expect(screen.queryByText(/some assigned sounds are missing/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pad-partial-warning")).not.toBeInTheDocument();
   });
 });
 
