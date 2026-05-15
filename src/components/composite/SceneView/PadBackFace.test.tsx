@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useProjectStore, initialProjectState } from "@/state/projectStore";
 import { useUiStore, initialUiState } from "@/state/uiStore";
@@ -8,6 +9,10 @@ import { usePadMetricsStore, initialPadMetricsState } from "@/state/padMetricsSt
 import { createMockPad, createMockLayer, createMockHistoryEntry, createMockProject, createMockScene } from "@/test/factories";
 import type { Pad } from "@/lib/schemas";
 import { PadBackFace } from "./PadBackFace";
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 vi.mock("@/lib/audio/padPlayer", () => ({
   triggerPad: vi.fn().mockResolvedValue(undefined),
@@ -79,6 +84,7 @@ describe("PadBackFace", () => {
     useUiStore.setState({ ...initialUiState });
     usePlaybackStore.setState({ ...initialPlaybackState });
     usePadMetricsStore.setState({ ...initialPadMetricsState });
+    vi.mocked(toast.success).mockClear();
   });
 
   it("renders pad name in an input", () => {
@@ -280,61 +286,158 @@ describe("PadBackFace", () => {
 
     it("shows scene selector with other scenes, excluding current scene", () => {
       const { pad } = loadPadMultiScene();
-      render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
-      expect(screen.getByLabelText("Target scene")).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "Scene B" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "Scene C" })).toBeInTheDocument();
-      expect(screen.queryByRole("option", { name: "Scene A" })).not.toBeInTheDocument();
+      renderBackFace(pad);
+      const select = screen.getByLabelText("Target scene");
+      expect(select).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Scene B" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Scene C" })).toBeInTheDocument();
+      expect(within(select).queryByRole("option", { name: "Scene A" })).not.toBeInTheDocument();
     });
 
     it("defaults to first other scene as initial selection", () => {
       const { pad } = loadPadMultiScene();
-      render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+      renderBackFace(pad);
       const select = screen.getByLabelText("Target scene") as HTMLSelectElement;
       expect(select.value).toBe("scene-2");
     });
 
-    it("does not show scene selector when project has only one scene", () => {
+    it("does not show scene selector or move/copy buttons when project has only one scene", () => {
       const { pad } = loadPad();
-      render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+      renderBackFace(pad);
       expect(screen.queryByLabelText("Target scene")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /move pad to selected scene/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /copy pad to selected scene/i })).not.toBeInTheDocument();
     });
 
     it("resets selection to first available scene when current target is removed", async () => {
       const { pad } = loadPadMultiScene();
-      render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+      renderBackFace(pad);
 
       const select = screen.getByLabelText("Target scene") as HTMLSelectElement;
       await userEvent.selectOptions(select, "scene-3");
       expect(select.value).toBe("scene-3");
 
-      useProjectStore.setState((s) => ({
-        project: s.project
-          ? { ...s.project, scenes: s.project.scenes.filter((sc) => sc.id !== "scene-3") }
-          : null,
-      }));
+      useProjectStore.getState().deleteScene("scene-3");
 
       await waitFor(() => {
         expect(select.value).toBe("scene-2");
       });
     });
 
-    it("moves pad to selected scene when Move is clicked", async () => {
+    it("resets selection when the default (first) target scene is removed", async () => {
       const { pad } = loadPadMultiScene();
-      render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+      renderBackFace(pad);
+
+      const select = screen.getByLabelText("Target scene") as HTMLSelectElement;
+      expect(select.value).toBe("scene-2");
+
+      useProjectStore.getState().deleteScene("scene-2");
+
+      await waitFor(() => {
+        expect(select.value).toBe("scene-3");
+      });
+    });
+
+    it("hides scene controls when all other scenes are removed", async () => {
+      const { pad } = loadPadMultiScene();
+      renderBackFace(pad);
+
+      expect(screen.getByLabelText("Target scene")).toBeInTheDocument();
+
+      useProjectStore.getState().deleteScene("scene-2");
+      useProjectStore.getState().deleteScene("scene-3");
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText("Target scene")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /move pad to selected scene/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /copy pad to selected scene/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it("uses reset selection for move after target scene is removed and re-defaulted", async () => {
+      const { pad } = loadPadMultiScene();
+      renderBackFace(pad);
+
+      const select = screen.getByLabelText("Target scene") as HTMLSelectElement;
+      await userEvent.selectOptions(select, "scene-3");
+      useProjectStore.getState().deleteScene("scene-3");
+
+      await waitFor(() => expect(select.value).toBe("scene-2"));
+
       await userEvent.click(screen.getByRole("button", { name: /move pad to selected scene/i }));
+
       const state = useProjectStore.getState().project!;
       expect(state.scenes.find((s) => s.id === "scene-1")?.pads).toHaveLength(0);
       expect(state.scenes.find((s) => s.id === "scene-2")?.pads).toHaveLength(1);
     });
 
-    it("copies pad to selected scene when Copy is clicked", async () => {
+    it("moves pad to default target scene, closes back face, marks project dirty, shows toast", async () => {
       const { pad } = loadPadMultiScene();
-      render(<PadBackFace pad={pad} sceneId="scene-1" onMultiFade={vi.fn()} />);
+      useUiStore.getState().setEditingPadId("pad-1");
+      renderBackFace(pad);
+
+      await userEvent.click(screen.getByRole("button", { name: /move pad to selected scene/i }));
+
+      const { project, isDirty } = useProjectStore.getState();
+      expect(project!.scenes.find((s) => s.id === "scene-1")?.pads).toHaveLength(0);
+      expect(project!.scenes.find((s) => s.id === "scene-2")?.pads).toHaveLength(1);
+      expect(isDirty).toBe(true);
+      expect(useUiStore.getState().editingPadId).toBeNull();
+      expect(toast.success).toHaveBeenCalledTimes(1);
+      expect(toast.success).toHaveBeenCalledWith('Moved "Kick" to Scene B');
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("moves pad to user-selected target scene, not the default", async () => {
+      const { pad } = loadPadMultiScene();
+      renderBackFace(pad);
+
+      const select = screen.getByLabelText("Target scene") as HTMLSelectElement;
+      await userEvent.selectOptions(select, "scene-3");
+      await userEvent.click(screen.getByRole("button", { name: /move pad to selected scene/i }));
+
+      const state = useProjectStore.getState().project!;
+      expect(state.scenes.find((s) => s.id === "scene-1")?.pads).toHaveLength(0);
+      expect(state.scenes.find((s) => s.id === "scene-3")?.pads).toHaveLength(1);
+      expect(state.scenes.find((s) => s.id === "scene-2")?.pads).toHaveLength(0);
+    });
+
+    it("copies pad to default target scene with new ids, preserves source, does not close back face", async () => {
+      const { pad } = loadPadMultiScene();
+      useUiStore.getState().setEditingPadId("pad-1");
+      renderBackFace(pad);
+
       await userEvent.click(screen.getByRole("button", { name: /copy pad to selected scene/i }));
+
+      const { project, isDirty } = useProjectStore.getState();
+      const sourcePad = project!.scenes.find((s) => s.id === "scene-1")?.pads[0];
+      expect(sourcePad?.id).toBe("pad-1");
+      expect(sourcePad?.layers[0].id).toBe("layer-1");
+      const copiedPad = project!.scenes.find((s) => s.id === "scene-2")?.pads[0];
+      expect(copiedPad).toBeDefined();
+      expect(copiedPad!.id).not.toBe("pad-1");
+      expect(copiedPad!.name).toBe("Kick");
+      expect(copiedPad!.layers).toHaveLength(1);
+      expect(copiedPad!.layers[0].id).not.toBe("layer-1");
+      expect(isDirty).toBe(true);
+      expect(useUiStore.getState().editingPadId).toBe("pad-1");
+      expect(toast.success).toHaveBeenCalledTimes(1);
+      expect(toast.success).toHaveBeenCalledWith('Copied "Kick" to Scene B');
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("copies pad to user-selected target scene, not the default", async () => {
+      const { pad } = loadPadMultiScene();
+      renderBackFace(pad);
+
+      const select = screen.getByLabelText("Target scene") as HTMLSelectElement;
+      await userEvent.selectOptions(select, "scene-3");
+      await userEvent.click(screen.getByRole("button", { name: /copy pad to selected scene/i }));
+
       const state = useProjectStore.getState().project!;
       expect(state.scenes.find((s) => s.id === "scene-1")?.pads).toHaveLength(1);
-      expect(state.scenes.find((s) => s.id === "scene-2")?.pads).toHaveLength(1);
+      expect(state.scenes.find((s) => s.id === "scene-3")?.pads).toHaveLength(1);
+      expect(state.scenes.find((s) => s.id === "scene-2")?.pads).toHaveLength(0);
     });
   });
 });

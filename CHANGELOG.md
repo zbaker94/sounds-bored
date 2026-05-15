@@ -1,6 +1,9 @@
 # Changelog
 
 ## Current Changes
+- Pads can now be moved or copied to another scene directly from the pad's back face, with a confirmation toast showing the destination scene name
+- Move closes the pad editor automatically; copy keeps it open so you can continue editing
+- Scene selector and move/copy buttons are hidden when only one scene exists
 - Pads can now be moved or copied to another scene directly from the pad's back face controls
 - When multiple scenes exist, a target scene selector appears on the pad back face, defaulting to the first available scene
 - Improved performance: missing-sound detection now computed once per scene instead of once per pad, eliminating redundant recalculations across all pads when sounds change.
