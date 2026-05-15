@@ -1,7 +1,7 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, memo, useMemo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import type { Pad } from "@/lib/schemas";
+import type { Pad, Scene } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Kbd } from "@/components/ui/kbd";
@@ -33,6 +33,8 @@ interface PadBackFaceProps {
   onMultiFade: () => void;
 }
 
+const EMPTY_SCENES: Scene[] = [];
+
 export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade }: PadBackFaceProps) {
   const updatePad = useProjectStore((s) => s.updatePad);
   const duplicatePad = useProjectStore((s) => s.duplicatePad);
@@ -41,8 +43,8 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const setPadColor = useProjectStore((s) => s.setPadColor);
   const movePadToScene = useProjectStore((s) => s.movePadToScene);
   const copyPadToScene = useProjectStore((s) => s.copyPadToScene);
-  const scenes = useProjectStore((s) => s.project?.scenes ?? []);
-  const otherScenes = scenes.filter((s) => s.id !== sceneId);
+  const scenes = useProjectStore((s) => s.project?.scenes ?? EMPTY_SCENES);
+  const otherScenes = useMemo(() => scenes.filter((scene) => scene.id !== sceneId), [scenes, sceneId]);
   const setEditingPadId = useUiStore((s) => s.setEditingPadId);
   const openOverlay = useUiStore((s) => s.openOverlay);
   const closeOverlay = useUiStore((s) => s.closeOverlay);
@@ -71,14 +73,14 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
   const [selectedTargetSceneId, setSelectedTargetSceneId] = useState<string>(() => otherScenes[0]?.id ?? "");
 
   useEffect(() => {
-    if (otherScenes.length > 0 && !otherScenes.some(s => s.id === selectedTargetSceneId)) {
+    if (otherScenes.length > 0 && !otherScenes.some(scene => scene.id === selectedTargetSceneId)) {
       setSelectedTargetSceneId(otherScenes[0].id);
     }
   }, [otherScenes, selectedTargetSceneId]);
 
   function handleMovePad() {
     if (!selectedTargetSceneId) return;
-    const targetScene = otherScenes.find(s => s.id === selectedTargetSceneId);
+    const targetScene = otherScenes.find(scene => scene.id === selectedTargetSceneId);
     movePadToScene(sceneId, pad.id, selectedTargetSceneId);
     setEditingPadId(null);
     toast.success(`Moved "${pad.name}" to ${targetScene?.name ?? "scene"}`);
@@ -86,7 +88,7 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
 
   function handleCopyPad() {
     if (!selectedTargetSceneId) return;
-    const targetScene = otherScenes.find(s => s.id === selectedTargetSceneId);
+    const targetScene = otherScenes.find(scene => scene.id === selectedTargetSceneId);
     copyPadToScene(sceneId, pad.id, selectedTargetSceneId);
     toast.success(`Copied "${pad.name}" to ${targetScene?.name ?? "scene"}`);
   }
@@ -188,8 +190,8 @@ export const PadBackFace = memo(function PadBackFace({ pad, sceneId, onMultiFade
               className="flex-1 min-w-0 bg-background border border-border rounded text-xs px-1 py-0.5 outline-none"
               aria-label="Target scene"
             >
-              {otherScenes.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {otherScenes.map((scene) => (
+                <option key={scene.id} value={scene.id}>{scene.name}</option>
               ))}
             </select>
             <button
