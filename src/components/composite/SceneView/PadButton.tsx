@@ -495,9 +495,9 @@ const PadButtonContent = memo(function PadButtonContent({ pad, sceneId, index, p
 /**
  * Selects the pad from the project store by ID and renders PadButtonContent.
  * `padId` and `sceneId` are stable string props; `index` is a number that changes
- * only on reorder (intentionally re-renders for stagger animation). `padSoundState`
- * is a string union so reference equality equals value equality — React.memo on
- * these primitives prevents cascade re-renders from SceneView's displayPads.map.
+ * only on reorder (intentionally re-renders for stagger animation). All props are
+ * primitives (string/number/string-unions), so React.memo's shallow equality is
+ * sufficient to skip re-renders when nothing the pad cares about changed.
  * The selector resolves the pad via getPadMapForScenes, an O(1) cached Map lookup.
  * The Map is rebuilt only when the `scenes` array reference changes, so store updates
  * that don't touch scenes (isDirty, folderPath, etc.) return the same Map and the same

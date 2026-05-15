@@ -249,7 +249,7 @@ export function SceneView() {
                   animation: padEnterAnimation(i * PAD_STAGGER_MS),
                 }}
               >
-                {/* Defensive default: PadButton requires a non-undefined PadSoundState. */}
+                {/* TS narrowing: Map.get returns T | undefined; every pad.id here is guaranteed to be in the map. */}
                 <PadButton
                   padId={pad.id}
                   sceneId={activeScene.id}
