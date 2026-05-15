@@ -1,6 +1,8 @@
 # Changelog
 
 ## Current Changes
+- Pad lookups are now O(1) via a cached map, reducing unnecessary work on each store update
+- Unrelated project state changes (e.g. save status, folder path) no longer cause pad buttons to re-render
 - No user-facing changes in this release (internal test coverage improvement only)
 - Improved internal audio engine performance by reducing memory allocations during playback state comparisons
 - Reduced CPU usage during playback: the audio engine now skips redundant per-layer work each animation frame when chain/play-order state hasn't changed, improving performance in steady-state looping/playback scenarios.

@@ -14,6 +14,30 @@ export function buildPadMap(scenes: Scene[]): Map<string, Pad> {
   return map;
 }
 
+/** Internal cache for getPadMapForScenes — exposed for test introspection only. */
+export const _padMapCache: { scenes: Scene[] | null; map: Map<string, Pad> } = {
+  scenes: null,
+  map: new Map(),
+};
+
+/**
+ * Returns a cached O(1) padId → Pad lookup map for the given scenes array.
+ *
+ * The map is rebuilt only when the `scenes` array reference changes. Immer's
+ * structural sharing guarantees the reference is stable when unrelated
+ * projectStore fields (e.g. `isDirty`) change, so callers reading this map per
+ * frame avoid rebuilding it on every unrelated store update.
+ *
+ * Designed for the single-active-project case; the cache holds one entry.
+ */
+export function getPadMapForScenes(scenes: Scene[] | null): Map<string, Pad> {
+  if (scenes !== _padMapCache.scenes) {
+    _padMapCache.scenes = scenes;
+    _padMapCache.map = buildPadMap(scenes ?? []);
+  }
+  return _padMapCache.map;
+}
+
 /**
  * Find a pad by id, returning both the pad and its parent scene in a single
  * pass. Returns null when no pad with the given id exists across all scenes.

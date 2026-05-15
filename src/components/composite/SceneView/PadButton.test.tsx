@@ -12,6 +12,7 @@ import { PadButton } from "./PadButton";
 import { PadButtonProgress } from "./PadButtonProgress";
 import { fireEvent, act } from "@testing-library/react";
 import { setPadVolume } from "@/lib/audio";
+import { getPadMapForScenes } from "@/lib/padUtils";
 
 vi.mock("./PadButtonProgress", () => ({
   PadButtonProgress: vi.fn(() => null),
@@ -499,6 +500,43 @@ describe("PadButton — React.memo", () => {
     });
 
     expect(MockProgress.mock.calls.length).toBeGreaterThan(callsAfterMount);
+  });
+
+  it("does not re-render when isDirty changes but scenes do not", () => {
+    const MockProgress = vi.mocked(PadButtonProgress);
+    MockProgress.mockClear();
+    loadPadInStore();
+
+    render(<PadButton padId="pad-1" sceneId="scene-1" />);
+    const callsAfterMount = MockProgress.mock.calls.length;
+
+    const scenesBefore = useProjectStore.getState().project?.scenes;
+
+    // Toggle isDirty without touching scenes — getPadMapForScenes returns the
+    // cached Map (same scenes reference), so the selector yields the same pad
+    // reference and React.memo prevents a re-render.
+    act(() => {
+      useProjectStore.setState({ isDirty: true });
+    });
+
+    // Confirm scenes reference was untouched by the isDirty mutation.
+    const scenesAfter = useProjectStore.getState().project?.scenes;
+    expect(scenesAfter).toBe(scenesBefore);
+
+    // Prove the cache delivers a stable Map instance: same scenes reference
+    // before and after → same Map → same pad reference → no re-render.
+    expect(getPadMapForScenes(scenesBefore ?? null)).toBe(
+      getPadMapForScenes(scenesAfter ?? null),
+    );
+
+    expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
+
+    // A second, unrelated mutation also leaves the scenes reference (and thus
+    // the cached Map and pad reference) untouched — still no re-render.
+    act(() => {
+      useProjectStore.setState({ folderPath: "/some/other/path" });
+    });
+    expect(MockProgress.mock.calls.length).toBe(callsAfterMount);
   });
 
   it("does not re-render when a sibling pad is mutated", () => {
