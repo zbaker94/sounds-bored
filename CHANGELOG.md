@@ -1,6 +1,10 @@
 # Changelog
 
 ## Current Changes
+- Fixed a rare audio glitch where fade effects could interfere with project switching or loading
+- Internal audio engine refactor: no user-facing behavior changes in this release.
+- Internal audio engine refactoring: no user-facing behavior changes.
+- Fading behavior now correctly reflects pad changes (layers added/removed, pad deleted) that happen mid-fade
 - Update notifications are now dismissed automatically when re-checking for updates or when no update is found, preventing stale alerts from lingering.
 - Download progress toast no longer flickers — it only refreshes when status or percentage actually changes.
 - Fixed download progress calculation when the file's total size is reported as zero.

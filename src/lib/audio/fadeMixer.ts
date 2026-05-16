@@ -12,18 +12,7 @@ import { nullPadOnEnded } from "./voiceRegistry";
 import { stopPad } from "./stopHandler";
 import { rampGainTo, resetPadGain } from "./gainManager";
 import * as coordinator from './playbackStateCoordinator';
-import { useProjectStore } from "@/state/projectStore";
-import { buildPadMap } from "@/lib/padUtils";
 import type { Pad } from "@/lib/schemas";
-
-// Pre-#423 stopgap: look up the live pad at timeout fire time so that layers
-// added or removed via the pad config drawer during a long fade are reflected
-// in the cleanup pass. Falls back to the captured reference if the pad was
-// deleted mid-fade.
-// TODO(#423): FadeCoordinator will own the timeout body — this lookup becomes natural.
-function resolveLivePad(pad: Pad): Pad {
-  return buildPadMap(useProjectStore.getState().project?.scenes ?? []).get(pad.id) ?? pad;
-}
 
 /**
  * Freeze a pad's gain at its current value — cancels any in-progress ramp
@@ -67,7 +56,7 @@ export function stopPadInternal(pad: Pad): void {
  *    fading-out, stops voices + resets gain after completion when toVolume === 0.
  *  - Fading up (toVolume >= fromVolume): reverses any in-progress fade-out.
  */
-export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number): void {
+export function fadePad(pad: Pad, fromVolume: number, toVolume: number, durationMs: number, getPad: ((padId: string) => Pad | undefined) | undefined): void {
   coordinator.padStoppedReversing(pad.id);
   const fadingDown = toVolume < fromVolume;
 
@@ -85,7 +74,7 @@ export function fadePad(pad: Pad, fromVolume: number, toVolume: number, duration
     durationMs,
     fadingDown && toVolume === 0
       ? () => {
-          stopPadInternal(resolveLivePad(pad));
+          stopPadInternal(getPad?.(pad.id) ?? pad);
           resetPadGain(pad.id);
         }
       : undefined,
@@ -97,6 +86,7 @@ export async function fadePadIn(
   toVolume: number,
   durationMs: number,
   startPad: (pad: Pad) => Promise<void>,
+  getPad: ((padId: string) => Pad | undefined) | undefined,
 ): Promise<void> {
   cancelFade(pad.id);
   // addFadingIn is local-only — playbackStore mirror happens inside startFade after await resolves.
@@ -116,7 +106,7 @@ export async function fadePadIn(
     false,
     durationMs,
     toVolume === 0
-      ? () => { stopPadInternal(resolveLivePad(pad)); }
+      ? () => { stopPadInternal(getPad?.(pad.id) ?? pad); }
       : undefined,
   );
 }

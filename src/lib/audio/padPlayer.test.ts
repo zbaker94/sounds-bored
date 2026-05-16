@@ -1716,7 +1716,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
   it("schedules a gain ramp to 0 on the pad gain node", async () => {
     const pad = createMockPad({ id: "fade-out-pad" });
 
-    fadePad(pad, 1.0, 0, 1000);
+    fadePad(pad, 1.0, 0, 1000, undefined);
 
     const gain = getPadGain(pad.id);
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
@@ -1730,7 +1730,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
 
     usePlaybackStore.setState({ playingPadIds: new Set([pad.id]) });
 
-    fadePad(pad, 1.0, 0, 500);
+    fadePad(pad, 1.0, 0, 500, undefined);
     vi.advanceTimersByTime(510);
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
@@ -1744,7 +1744,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
 
     usePlaybackStore.setState({ playingPadIds: new Set([pad.id]) });
 
-    fadePad(pad, 1.0, 0.3, 500);
+    fadePad(pad, 1.0, 0.3, 500, undefined);
     vi.advanceTimersByTime(510);
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
@@ -1755,7 +1755,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
   it("marks pad as fading when fade starts", async () => {
     const pad = createMockPad({ id: "fade-out-vol-pad" });
 
-    fadePad(pad, 1.0, 0, 1000);
+    fadePad(pad, 1.0, 0, 1000, undefined);
 
     expect(isPadFading(pad.id)).toBe(true);
     clearAllFadeTracking();
@@ -1765,7 +1765,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
     vi.useFakeTimers();
     const pad = createMockPad({ id: "fade-out-clear-pad" });
 
-    fadePad(pad, 1.0, 0, 500);
+    fadePad(pad, 1.0, 0, 500, undefined);
     expect(isPadFading(pad.id)).toBe(true);
 
     vi.advanceTimersByTime(510);
@@ -2791,7 +2791,7 @@ describe("stopAllPads clears fade tracking", () => {
     await triggerPad(pad);
     await vi.runAllTimersAsync();
 
-    fadePad(pad, 1.0, 0, 500);
+    fadePad(pad, 1.0, 0, 500, undefined);
     stopAllPads();
     vi.advanceTimersByTime(600);
 
@@ -2805,7 +2805,7 @@ describe("stopAllPads clears fade tracking", () => {
     const { stopAllPads } = await import("./padPlayer");
     const pad = createMockPad({ id: "stop-mid-fade-pad" });
 
-    fadePad(pad, 1.0, 0, 500);
+    fadePad(pad, 1.0, 0, 500, undefined);
     expect(isPadFading(pad.id)).toBe(true);
 
     stopAllPads();
@@ -2830,7 +2830,7 @@ describe("stopAllPads clears fade tracking", () => {
     await triggerPad(pad);
     await vi.runAllTimersAsync();
 
-    fadePad(pad, 1.0, 0, 500);
+    fadePad(pad, 1.0, 0, 500, undefined);
     expect(isPadFadingOut(pad.id)).toBe(true);
 
     stopAllPads();
@@ -3330,7 +3330,7 @@ describe("fadePad â€” custom toVolume (via padPlayer re-export)", () => {
   it("ramps to specified toVolume instead of 0", async () => {
     const pad = createMockPad({ id: "fade-custom-to-pad" });
 
-    fadePad(pad, 1.0, 0.3, 1000);
+    fadePad(pad, 1.0, 0.3, 1000, undefined);
 
     const gain = getPadGain(pad.id);
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
@@ -3656,7 +3656,7 @@ describe("skipLayerForward", () => {
     await tick();
 
     // Start a fade-out â€” pad is now fading
-    fadePad(pad, 1.0, 0, 2000);
+    fadePad(pad, 1.0, 0, 2000, undefined);
     expect(isPadFadingOut(pad.id)).toBe(true);
 
     // Skip forward â€” should cancel the fade so the cleanup timeout cannot kill the new voice
@@ -3688,7 +3688,7 @@ describe("skipLayerForward", () => {
     setLayerPlayOrder(layer.id, sounds);
     setLayerCycleIndex(layer.id, 0);
 
-    fadePad(pad, 1.0, 0, 2000);
+    fadePad(pad, 1.0, 0, 2000, undefined);
     expect(isPadFadingOut(pad.id)).toBe(true);
 
     skipLayerForward(pad, layer.id);
@@ -3909,7 +3909,7 @@ describe("skipLayerBack", () => {
     await tick();
 
     // Start a fade-out â€” pad is now fading
-    fadePad(pad, 1.0, 0, 2000);
+    fadePad(pad, 1.0, 0, 2000, undefined);
     expect(isPadFadingOut(pad.id)).toBe(true);
 
     // Skip back â€” should cancel the fade so the cleanup timeout cannot kill the new voice
@@ -3942,7 +3942,7 @@ describe("skipLayerBack", () => {
     setLayerPlayOrder(layer.id, sounds);
     setLayerCycleIndex(layer.id, 2); // cursor at index 2 (C playing, next would be A)
 
-    fadePad(pad, 1.0, 0, 2000);
+    fadePad(pad, 1.0, 0, 2000, undefined);
     expect(isPadFadingOut(pad.id)).toBe(true);
 
     skipLayerBack(pad, layer.id);
@@ -4256,7 +4256,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
     await triggerPad(pad);
-    fadePad(pad, 1.0, 0, 2000);
+    fadePad(pad, 1.0, 0, 2000, undefined);
     expect(isPadFadingOut(pad.id)).toBe(true);
 
     mockGain.gain.linearRampToValueAtTime.mockClear();
@@ -4889,7 +4889,7 @@ describe("pending leak guards", () => {
     const pad = createMockPad({ layers: [layer] });
 
     // Start a fade-out (schedules a 500ms cleanup timeout)
-    fadePad(pad, 1.0, 0, 500);
+    fadePad(pad, 1.0, 0, 500, undefined);
 
     // Re-trigger during the fade window â€” triggerPad should cancel the stale cleanup
     await triggerPad(pad);

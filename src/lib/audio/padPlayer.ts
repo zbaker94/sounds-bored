@@ -5,7 +5,8 @@ import * as coordinator from './playbackStateCoordinator';
 import { usePadMetricsStore } from "@/state/padMetricsStore";
 import type { Pad, Scene } from "@/lib/schemas";
 import { snapshotSounds } from "./resolveSounds";
-import { isFadeablePad } from "@/lib/padUtils";
+import { isFadeablePad, getPadMapForScenes } from "@/lib/padUtils";
+import { useProjectStore } from "@/state/projectStore";
 import { emitAudioError } from "./audioEvents";
 import { startAudioTick } from "./audioTick";
 
@@ -64,8 +65,15 @@ import {
 } from "./layerTrigger";
 
 
+// Safe to call from fade-completion closures: clearAllAudioState() cancels all
+// in-flight fades before any project transition, so this never runs against
+// a torn-down or replaced project.
+function getPadFromProject(padId: string): Pad | undefined {
+  return getPadMapForScenes(useProjectStore.getState().project?.scenes ?? null).get(padId);
+}
+
 export async function triggerAndFade(pad: Pad, toVolume: number, durationMs: number): Promise<void> {
-  return fadePadIn(pad, toVolume, durationMs, (p) => triggerPad(p, 0));
+  return fadePadIn(pad, toVolume, durationMs, (p) => triggerPad(p, 0), getPadFromProject);
 }
 
 /**
@@ -83,14 +91,14 @@ export function reverseFade(pad: Pad, globalFadeDurationMs?: number): void {
 
   const currentVol = getLivePadVolume(pad.id) ?? reverseTarget;
 
-  fadePad(pad, currentVol, reverseTarget, duration);
+  fadePad(pad, currentVol, reverseTarget, duration, getPadFromProject);
   coordinator.padReversing(pad.id);
 }
 
 export function crossfadePads(fadingOut: Pad[], fadingIn: Pad[], globalFadeDurationMs?: number): void {
   fadingOut.forEach((pad) => {
     const currentVol = getLivePadVolume(pad.id) ?? ((pad.volume ?? 100) / 100);
-    fadePad(pad, currentVol, (pad.fadeTargetVol ?? 0) / 100, resolveFadeDuration(pad, globalFadeDurationMs));
+    fadePad(pad, currentVol, (pad.fadeTargetVol ?? 0) / 100, resolveFadeDuration(pad, globalFadeDurationMs), getPadFromProject);
   });
   fadingIn.forEach((pad) =>
     triggerAndFade(pad, 1.0, resolveFadeDuration(pad, globalFadeDurationMs)).catch((err: unknown) => {
@@ -103,7 +111,7 @@ function reverseActiveFade(pad: Pad, highVol: number, lowVol: number, duration: 
   const reverseTarget = getFadeFromVolume(pad.id);
   const currentVol = getLivePadVolume(pad.id) ?? (reverseTarget ?? highVol);
   const targetVol = reverseTarget ?? (isFadingOut(pad.id) ? highVol : lowVol);
-  fadePad(pad, currentVol, targetVol, duration);
+  fadePad(pad, currentVol, targetVol, duration, getPadFromProject);
 }
 
 /**
@@ -125,7 +133,7 @@ function applyFadeToggle(pad: Pad, duration: number): Promise<void> {
     } else {
       const currentVol = getPadGain(pad.id).gain.value;
       const atLow = Math.abs(currentVol - lowVol) <= 0.02;
-      fadePad(pad, currentVol, atLow ? highVol : lowVol, duration);
+      fadePad(pad, currentVol, atLow ? highVol : lowVol, duration, getPadFromProject);
     }
     return Promise.resolve();
   }
