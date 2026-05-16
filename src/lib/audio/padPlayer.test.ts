@@ -4,7 +4,7 @@ import { clearAllSizeCache } from "./streamingCache";
 import { getPadProgress, clearAllAudioState } from "./audioState";
 import { isLayerActive } from "./voiceRegistry";
 import { isLayerPending } from "./chainCycleState";
-import { isPadFading, isPadFadingOut, clearAllFadeTracking } from "./fadeCoordinator";
+import { isFading, isFadingOut, clearAllFades, startFade } from "./fadeCoordinator";
 import { getPadGain } from "./gainRegistry";
 import { isPadStreaming } from "./streamingAudioLifecycle";
 import { fadePad, resolveFadeDuration, freezePadAtCurrentVolume } from "./fadeMixer";
@@ -180,6 +180,13 @@ function makeMockGain() {
 }
 
 // â”€â”€ Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+/**
+ * Fade duration used in tests that need a fade to remain active for the entire
+ * synchronous portion of the test. Set well above any realistic test runtime so
+ * the fade completion timeout never fires before assertions.
+ */
+const NEVER_COMPLETES_MS = 10_000;
 
 const createdSources: MockSource[] = [];
 
@@ -1721,7 +1728,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
     const gain = getPadGain(pad.id);
     expect(gain.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("calls stopPad and resetPadGain after the fade duration", async () => {
@@ -1734,7 +1741,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
     vi.advanceTimersByTime(510);
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
-    clearAllFadeTracking();
+    clearAllFades();
     vi.useRealTimers();
   });
 
@@ -1748,7 +1755,7 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
     vi.advanceTimersByTime(510);
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(true);
-    clearAllFadeTracking();
+    clearAllFades();
     vi.useRealTimers();
   });
 
@@ -1757,8 +1764,8 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
 
     fadePad(pad, 1.0, 0, 1000, undefined);
 
-    expect(isPadFading(pad.id)).toBe(true);
-    clearAllFadeTracking();
+    expect(isFading(pad.id)).toBe(true);
+    clearAllFades();
   });
 
   it("clears fading state after the fade duration", async () => {
@@ -1766,11 +1773,11 @@ describe("fadePad â€” fading down (via padPlayer re-export)", () => {
     const pad = createMockPad({ id: "fade-out-clear-pad" });
 
     fadePad(pad, 1.0, 0, 500, undefined);
-    expect(isPadFading(pad.id)).toBe(true);
+    expect(isFading(pad.id)).toBe(true);
 
     vi.advanceTimersByTime(510);
-    expect(isPadFading(pad.id)).toBe(false);
-    clearAllFadeTracking();
+    expect(isFading(pad.id)).toBe(false);
+    clearAllFades();
     vi.useRealTimers();
   });
 });
@@ -1827,8 +1834,8 @@ describe("triggerAndFade", () => {
     await triggerAndFade(pad, 1.0, 1000);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    expect(isPadFading(pad.id)).toBe(true);
-    clearAllFadeTracking();
+    expect(isFading(pad.id)).toBe(true);
+    clearAllFades();
   });
 });
 
@@ -1847,8 +1854,8 @@ describe("crossfadePads", () => {
 
     crossfadePads([padOut], [padIn]);
 
-    expect(isPadFading(padOut.id)).toBe(true);
-    clearAllFadeTracking();
+    expect(isFading(padOut.id)).toBe(true);
+    clearAllFades();
   });
 });
 
@@ -1874,8 +1881,8 @@ describe("executeFadeTap", () => {
     await triggerPad(pad);
     executeFadeTap(pad);
 
-    expect(isPadFading(pad.id)).toBe(true);
-    clearAllFadeTracking();
+    expect(isFading(pad.id)).toBe(true);
+    clearAllFades();
   });
 
   it("reverses fade-out when pad has active voices and is already fading out", async () => {
@@ -1897,13 +1904,13 @@ describe("executeFadeTap", () => {
     await triggerPad(pad);
     // First tap: starts fade-out
     executeFadeTap(pad);
-    expect(isPadFading(pad.id)).toBe(true);
+    expect(isFading(pad.id)).toBe(true);
 
     // Second tap: reverses the fade-out
     executeFadeTap(pad);
 
-    expect(isPadFading(pad.id)).toBe(true);
-    clearAllFadeTracking();
+    expect(isFading(pad.id)).toBe(true);
+    clearAllFades();
   });
 
   it("fades in when pad has no active voices", async () => {
@@ -1927,9 +1934,9 @@ describe("executeFadeTap", () => {
     executeFadeTap(pad);
 
     await vi.waitFor(() => {
-      expect(isPadFading(pad.id)).toBe(true);
+      expect(isFading(pad.id)).toBe(true);
     });
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("is a no-op for a hold-mode pad", async () => {
@@ -1951,7 +1958,7 @@ describe("executeFadeTap", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(mockLoadBuffer).not.toHaveBeenCalled();
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("is a no-op for a mixed-mode pad (hold + non-hold layers)", async () => {
@@ -1975,7 +1982,7 @@ describe("executeFadeTap", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(mockLoadBuffer).not.toHaveBeenCalled();
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -2005,11 +2012,11 @@ describe("executeCrossfadeSelection", () => {
     await triggerPad(padOut);
     executeCrossfadeSelection([padOut, padIn]);
 
-    expect(isPadFading(padOut.id)).toBe(true);
+    expect(isFading(padOut.id)).toBe(true);
     await vi.waitFor(() => {
-      expect(isPadFading(padIn.id)).toBe(true);
+      expect(isFading(padIn.id)).toBe(true);
     });
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("does not fade out pads with no active voices", async () => {
@@ -2020,9 +2027,9 @@ describe("executeCrossfadeSelection", () => {
     // Neither pad has active voices â€” both would be treated as fade-in targets
     executeCrossfadeSelection([padA, padB]);
 
-    expect(isPadFading(padA.id)).toBe(false);
-    expect(isPadFading(padB.id)).toBe(false);
-    clearAllFadeTracking();
+    expect(isFading(padA.id)).toBe(false);
+    expect(isFading(padB.id)).toBe(false);
+    clearAllFades();
   });
 
   it("ignores hold-mode pads passed directly", async () => {
@@ -2043,7 +2050,7 @@ describe("executeCrossfadeSelection", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(mockLoadBuffer).not.toHaveBeenCalled();
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("filters out mixed-mode pads from the selection, processing only fadeable pads", async () => {
@@ -2073,10 +2080,10 @@ describe("executeCrossfadeSelection", () => {
     executeCrossfadeSelection([fadeablePad, mixedPad]);
 
     // fadeablePad is active â€” it should be faded out
-    expect(isPadFading(fadeablePad.id)).toBe(true);
+    expect(isFading(fadeablePad.id)).toBe(true);
     // mixedPad is filtered by isFadeablePad â€” it should not be crossfaded
-    expect(isPadFading(mixedPad.id)).toBe(false);
-    clearAllFadeTracking();
+    expect(isFading(mixedPad.id)).toBe(false);
+    clearAllFades();
   });
 });
 
@@ -2796,7 +2803,7 @@ describe("stopAllPads clears fade tracking", () => {
     vi.advanceTimersByTime(600);
 
     expect(usePlaybackStore.getState().playingPadIds.has(pad.id)).toBe(false);
-    clearAllFadeTracking();
+    clearAllFades();
     vi.useRealTimers();
   });
 
@@ -2806,12 +2813,12 @@ describe("stopAllPads clears fade tracking", () => {
     const pad = createMockPad({ id: "stop-mid-fade-pad" });
 
     fadePad(pad, 1.0, 0, 500, undefined);
-    expect(isPadFading(pad.id)).toBe(true);
+    expect(isFading(pad.id)).toBe(true);
 
     stopAllPads();
-    expect(isPadFading(pad.id)).toBe(false);
+    expect(isFading(pad.id)).toBe(false);
 
-    clearAllFadeTracking();
+    clearAllFades();
     vi.useRealTimers();
   });
 
@@ -2831,7 +2838,7 @@ describe("stopAllPads clears fade tracking", () => {
     await vi.runAllTimersAsync();
 
     fadePad(pad, 1.0, 0, 500, undefined);
-    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isFadingOut(pad.id)).toBe(true);
 
     stopAllPads();
 
@@ -2844,11 +2851,11 @@ describe("stopAllPads clears fade tracking", () => {
     vi.advanceTimersByTime(600);
 
     expect(newVoice.stop).not.toHaveBeenCalled();
-    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(isFadingOut(pad.id)).toBe(false);
     expect(usePlaybackStore.getState().fadingOutPadIds.has(pad.id)).toBe(false);
     expect(isLayerActive(layer.id)).toBe(true);
 
-    clearAllFadeTracking();
+    clearAllFades();
     vi.useRealTimers();
   });
 });
@@ -3247,7 +3254,7 @@ describe("crossfadePads error handling", () => {
 
     // The audio engine now emits errors via the bus rather than calling toast directly.
     expect(mockEmitAudioError).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -3269,7 +3276,7 @@ describe("executeFadeTap error handling", () => {
 
     // The audio engine now emits errors via the bus rather than calling toast directly.
     expect(mockEmitAudioError).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -3334,7 +3341,7 @@ describe("fadePad â€” custom toVolume (via padPlayer re-export)", () => {
 
     const gain = getPadGain(pad.id);
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -3360,7 +3367,7 @@ describe("triggerAndFade â€” custom toVolume", () => {
     await triggerAndFade(pad, 0.7, 1000);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.7, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -3388,7 +3395,7 @@ describe("executeFadeTap â€” pad.fadeTargetVol and pad.volume", () => {
     executeFadeTap(pad);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("fades in to fadeTargetVol when pad is not active", async () => {
@@ -3412,7 +3419,7 @@ describe("executeFadeTap â€” pad.fadeTargetVol and pad.volume", () => {
     await tick();
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -3637,7 +3644,7 @@ describe("skipLayerForward", () => {
 
   it("cancels an in-progress fade-out before starting the skip voice (chain mode)", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { isFadingOut } = await import("./fadeCoordinator");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3657,18 +3664,18 @@ describe("skipLayerForward", () => {
 
     // Start a fade-out â€” pad is now fading
     fadePad(pad, 1.0, 0, 2000, undefined);
-    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isFadingOut(pad.id)).toBe(true);
 
     // Skip forward â€” should cancel the fade so the cleanup timeout cannot kill the new voice
     skipLayerForward(pad, layer.id);
     await tick();
 
     // Fade should be cancelled
-    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(isFadingOut(pad.id)).toBe(false);
   });
 
   it("cancels an in-progress fade-out before starting the skip voice (cycle mode)", async () => {
-    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { isFadingOut } = await import("./fadeCoordinator");
     const { setLayerPlayOrder, setLayerCycleIndex } = await import("./chainCycleState");
 
     const sounds = [
@@ -3689,18 +3696,18 @@ describe("skipLayerForward", () => {
     setLayerCycleIndex(layer.id, 0);
 
     fadePad(pad, 1.0, 0, 2000, undefined);
-    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isFadingOut(pad.id)).toBe(true);
 
     skipLayerForward(pad, layer.id);
     await tick();
 
-    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(isFadingOut(pad.id)).toBe(false);
   });
 
   // Note: a fake-timer “voice survives” test (as in PR #248’s triggerPad analog) is
   // not included here because skipLayerForward is synchronous â€” its internal async
   // chain (ensureResumed â†’ loadBuffer â†’ createBufferSource) has multiple microtask
-  // hops that cannot be awaited externally. The isPadFadingOut assertions above prove
+  // hops that cannot be awaited externally. The isFadingOut assertions above prove
   // cancelFade() is called (clearing the stale setTimeout and fadingOut tracking).
   // The cancelFade unit tests in fadeCoordinator.test.ts verify that behaviour directly.
 
@@ -3889,7 +3896,7 @@ describe("skipLayerBack", () => {
 
   it("cancels an in-progress fade-out before starting the skip voice (chain mode)", async () => {
     const { triggerPad } = await import("./padPlayer");
-    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { isFadingOut } = await import("./fadeCoordinator");
 
     const sounds = [
       createMockSound({ filePath: "a.wav" }),
@@ -3910,18 +3917,18 @@ describe("skipLayerBack", () => {
 
     // Start a fade-out â€” pad is now fading
     fadePad(pad, 1.0, 0, 2000, undefined);
-    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isFadingOut(pad.id)).toBe(true);
 
     // Skip back â€” should cancel the fade so the cleanup timeout cannot kill the new voice
     skipLayerBack(pad, layer.id);
     await tick();
 
     // Fade should be cancelled
-    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(isFadingOut(pad.id)).toBe(false);
   });
 
   it("cancels an in-progress fade-out before starting the skip voice (cycle mode)", async () => {
-    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { isFadingOut } = await import("./fadeCoordinator");
     const { setLayerPlayOrder, setLayerCycleIndex } = await import("./chainCycleState");
 
     const sounds = [
@@ -3943,16 +3950,16 @@ describe("skipLayerBack", () => {
     setLayerCycleIndex(layer.id, 2); // cursor at index 2 (C playing, next would be A)
 
     fadePad(pad, 1.0, 0, 2000, undefined);
-    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isFadingOut(pad.id)).toBe(true);
 
     skipLayerBack(pad, layer.id);
     await tick();
 
-    expect(isPadFadingOut(pad.id)).toBe(false);
+    expect(isFadingOut(pad.id)).toBe(false);
   });
 
   // Note: a fake-timer “voice survives” test is not included â€” same reasoning as
-  // the equivalent comment in skipLayerForward above. The isPadFadingOut assertions
+  // the equivalent comment in skipLayerForward above. The isFadingOut assertions
   // prove cancelFade() is invoked; fadeCoordinator.test.ts verifies it clears the timeout.
 
   it("reports an error via emitAudioError when ensureResumed rejects during skip (chained mode)", async () => {
@@ -4017,7 +4024,7 @@ describe("triggerPad default startVolume", () => {
     await triggerPad(pad);
 
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.75, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("uses 1.0 when volume is not set", async () => {
@@ -4040,7 +4047,7 @@ describe("triggerPad default startVolume", () => {
     await triggerPad(pad);
 
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("respects explicit startVolume override (e.g. 0 for silent-start gesture)", async () => {
@@ -4064,7 +4071,7 @@ describe("triggerPad default startVolume", () => {
     await triggerPad(pad, 0);
 
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -4094,7 +4101,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     executeFadeTap(pad, 1000);
 
     expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("starts fade-out from current gain, not from volume, when pad is playing", async () => {
@@ -4126,7 +4133,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     // Ramp should start from current gain (0.6), not from volume (0.8)
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("inactive fade-in starts from silence (0) and ramps to fadeTargetVol", async () => {
@@ -4154,7 +4161,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     // Inactive fade-in: from silence to the fade target, not to pad.volume
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("shows volume transition when pad is playing (default levels)", async () => {
@@ -4176,8 +4183,8 @@ describe("executeFadeTap â€” toggle state machine", () => {
     await triggerPad(pad);
     executeFadeTap(pad, 1000);
 
-    expect(isPadFading(pad.id)).toBe(true);
-    clearAllFadeTracking();
+    expect(isFading(pad.id)).toBe(true);
+    clearAllFades();
   });
 
   it("is a no-op when pad is not playing and fadeTargetVol is 0", async () => {
@@ -4203,9 +4210,9 @@ describe("executeFadeTap â€” toggle state machine", () => {
     executeFadeTap(pad, 1000);
     await tick();
 
-    expect(isPadFading(pad.id)).toBe(false);
+    expect(isFading(pad.id)).toBe(false);
     expect(mockGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("ramps gain to fadeTargetVol (not 1.0) when pad is not playing", async () => {
@@ -4232,7 +4239,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     await vi.waitFor(() => {
       expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.6, expect.any(Number));
     });
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("reverses an in-progress fade-out to volume instead of starting a new fade-out", async () => {
@@ -4242,7 +4249,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     mockCtx.createGain.mockReturnValue(mockGain);
 
     const { triggerPad, executeFadeTap } = await import("./padPlayer");
-    const { isPadFadingOut } = await import("./fadeCoordinator");
+    const { isFadingOut } = await import("./fadeCoordinator");
     const pad = createMockPad({
       id: "fpl-reverse-fadeout-pad",
       fadeTargetVol: 0,
@@ -4257,15 +4264,15 @@ describe("executeFadeTap â€” toggle state machine", () => {
 
     await triggerPad(pad);
     fadePad(pad, 1.0, 0, 2000, undefined);
-    expect(isPadFadingOut(pad.id)).toBe(true);
+    expect(isFadingOut(pad.id)).toBe(true);
 
     mockGain.gain.linearRampToValueAtTime.mockClear();
     executeFadeTap(pad, 1000);
 
     // Should ramp UP to volume=100 (gain 1.0), not DOWN to fadeTargetVol=0
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
-    expect(isPadFadingOut(pad.id)).toBe(false);
-    clearAllFadeTracking();
+    expect(isFadingOut(pad.id)).toBe(false);
+    clearAllFades();
   });
 
   it("reverses an in-progress fade-in by ramping down from current gain to fadeTargetVol", async () => {
@@ -4291,7 +4298,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     triggerAndFade(pad, 0.8, 2000);
     await tick();
 
-    expect(isPadFading(pad.id)).toBe(true);
+    expect(isFading(pad.id)).toBe(true);
 
     // Simulate mid-fade-in: gain is partway between 0 and 0.8.
     // Set gain.value directly — reverseActiveFade reads getLivePadVolume() which reads the GainNode.
@@ -4304,7 +4311,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
 
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.4, expect.any(Number));
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("reverses to fade-in when pad has settled at non-zero fadeTargetVol", async () => {
@@ -4337,7 +4344,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
 
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.2, expect.any(Number));
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("fades out when playing mid-range (not settled at low)", async () => {
@@ -4368,7 +4375,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
     executeFadeTap(pad, 1000);
 
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("fades in when playing at gain settled near lowVol (within epsilon)", async () => {
@@ -4400,7 +4407,7 @@ describe("executeFadeTap â€” toggle state machine", () => {
 
     expect(mockGain.gain.setValueAtTime).toHaveBeenCalledWith(0.31, expect.any(Number));
     expect(mockGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.9, expect.any(Number));
-    clearAllFadeTracking();
+    clearAllFades();
   });
 
   it("is a no-op when pad is not playing and already fading", async () => {
@@ -4410,7 +4417,6 @@ describe("executeFadeTap â€” toggle state machine", () => {
     mockCtx.createGain.mockReturnValue(mockGain);
 
     const { executeFadeTap } = await import("./padPlayer");
-    const { setFadePadTimeout } = await import("./fadeCoordinator");
     const pad = createMockPad({
       id: "fpl-noop-fading-pad",
       fadeTargetVol: 50,
@@ -4422,16 +4428,16 @@ describe("executeFadeTap â€” toggle state machine", () => {
       sets: [],
     } as unknown as Parameters<typeof useLibraryStore.setState>[0]);
 
-    const fakeTimeout = setTimeout(() => {}, 99999);
-    setFadePadTimeout(pad.id, fakeTimeout);
-    expect(isPadFading(pad.id)).toBe(true);
+    // Put pad into fading state atomically using the modern API. Use a long
+    // duration so the completion timeout cannot fire during this synchronous test.
+    startFade(pad.id, 0, false, NEVER_COMPLETES_MS);
+    expect(isFading(pad.id)).toBe(true);
 
     mockGain.gain.linearRampToValueAtTime.mockClear();
     executeFadeTap(pad, 1000);
 
     expect(mockGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
-    clearTimeout(fakeTimeout);
-    clearAllFadeTracking();
+    clearAllFades();
   });
 });
 
@@ -4849,7 +4855,7 @@ describe("pending leak guards", () => {
 
   it("cancels in-progress fade-out when pad is re-triggered (clears both flag and timeout)", async () => {
     vi.useFakeTimers();
-    const { addFadingOutPad, isPadFadingOut, isPadFading, setFadePadTimeout } = await import("./fadeCoordinator");
+    const { startFade, isFadingOut, isFading } = await import("./fadeCoordinator");
     const { triggerPad } = await import("./padPlayer");
 
     const sound = createMockSound({ filePath: "a.wav" });
@@ -4860,18 +4866,17 @@ describe("pending leak guards", () => {
     });
     const pad = createMockPad({ layers: [layer] });
 
-    // Put pad into fading-out state with a live timeout (as if fadePad was called previously)
-    addFadingOutPad(pad.id);
-    const timeoutId = setTimeout(() => {}, 10000);
-    setFadePadTimeout(pad.id, timeoutId);
-    expect(isPadFadingOut(pad.id)).toBe(true);
-    expect(isPadFading(pad.id)).toBe(true);
+    // Put pad into fading-out state with a live timeout atomically via the
+    // modern API (as if fadePad was called previously).
+    startFade(pad.id, 1, true, 10000);
+    expect(isFadingOut(pad.id)).toBe(true);
+    expect(isFading(pad.id)).toBe(true);
 
     await triggerPad(pad);
 
     // triggerPad should cancel the in-progress fade (both flag and timeout cleared)
-    expect(isPadFadingOut(pad.id)).toBe(false);
-    expect(isPadFading(pad.id)).toBe(false);
+    expect(isFadingOut(pad.id)).toBe(false);
+    expect(isFading(pad.id)).toBe(false);
     vi.useRealTimers();
   });
 

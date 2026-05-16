@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Improved internal audio fade system reliability by consolidating fade state management, reducing the risk of audio glitches during pad re-triggers or crossfades.
 - Fixed a rare audio glitch where fade effects could interfere with project switching or loading
 - Internal audio engine refactor: no user-facing behavior changes in this release.
 - Internal audio engine refactoring: no user-facing behavior changes.

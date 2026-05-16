@@ -13,8 +13,6 @@ import {
   getFadeFromVolume,
   isAnyFadeActive,
   clearAllFades,
-  cancelPadFade,
-  removeFadingOutPad,
 } from "./fadeCoordinator";
 import { usePlaybackStore, initialPlaybackState } from "@/state/playbackStore";
 
@@ -125,20 +123,6 @@ describe("startFade", () => {
     vi.advanceTimersByTime(500);
     expect(secondOnComplete).toHaveBeenCalledOnce();
   });
-
-  it("stale guard — onComplete NOT called if fadingOutPadIds was cleared mid-flight", () => {
-    const onComplete = vi.fn();
-    startFade("pad-stale", 1.0, true, 500, onComplete);
-
-    // Simulate the race: a legacy caller cleared fadingOut membership WITHOUT
-    // cancelling the pending timeout. removeFadingOutPad is the only legacy
-    // primitive that touches just the fadingOut set — exactly the inconsistent
-    // mid-flight state the guard at startFade's timeout body protects against.
-    removeFadingOutPad("pad-stale");
-
-    vi.advanceTimersByTime(600);
-    expect(onComplete).not.toHaveBeenCalled();
-  });
 });
 
 // ── addFadingIn / removeFadingIn / isFadingIn ────────────────────────────────
@@ -214,25 +198,6 @@ describe("clearAllFades", () => {
     vi.advanceTimersByTime(1000);
     expect(cb1).not.toHaveBeenCalled();
     expect(cb2).not.toHaveBeenCalled();
-  });
-});
-
-// ── legacy primitives ────────────────────────────────────────────────────────
-
-describe("legacy primitives", () => {
-  it("cancelPadFade does not touch playbackStore (unlike cancelFade)", () => {
-    // startFade seeds both fadingPad + fadingOutPad in the store
-    startFade("pad-1", 0.7, true, 500);
-    expect(usePlaybackStore.getState().fadingPadIds.has("pad-1")).toBe(true);
-    expect(usePlaybackStore.getState().fadingOutPadIds.has("pad-1")).toBe(true);
-
-    // cancelPadFade is the legacy local-only cancel — store must remain unchanged
-    cancelPadFade("pad-1");
-
-    expect(usePlaybackStore.getState().fadingPadIds.has("pad-1")).toBe(true);
-    expect(usePlaybackStore.getState().fadingOutPadIds.has("pad-1")).toBe(true);
-    expect(isFading("pad-1")).toBe(false);
-    expect(isFadingOut("pad-1")).toBe(false);
   });
 });
 
