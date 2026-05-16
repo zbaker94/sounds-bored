@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Fixed a rare audio glitch where fade effects could interfere with project switching or loading
 - Internal audio engine refactor: no user-facing behavior changes in this release.
 - Internal audio engine refactoring: no user-facing behavior changes.
 - Fading behavior now correctly reflects pad changes (layers added/removed, pad deleted) that happen mid-fade

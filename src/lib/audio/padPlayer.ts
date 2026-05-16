@@ -65,6 +65,9 @@ import {
 } from "./layerTrigger";
 
 
+// Safe to call from fade-completion closures: clearAllAudioState() cancels all
+// in-flight fades before any project transition, so this never runs against
+// a torn-down or replaced project.
 function getPadFromProject(padId: string): Pad | undefined {
   return getPadMapForScenes(useProjectStore.getState().project?.scenes ?? null).get(padId);
 }
