@@ -1,6 +1,7 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine cleanup: removed redundant pad ID tracking from layer gain nodes, reducing memory overhead and simplifying the audio pipeline.
 - Internal audio engine refactor: layer playback state (chain queue, cycle index, play order, pending flag, failure tracking) consolidated into a single `LayerPlaybackContext` object per layer, reducing risk of state desync during complex pad interactions.
 - Fixed an audio engine bug where sounds could stop against a disconnected audio graph, potentially causing glitches when closing a project or stopping all playback.
 - Internal audio engine refactor: per-layer playback state is now consolidated into a single unified context object, improving correctness of teardown when closing or switching projects.

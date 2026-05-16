@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   ensureLayerContext,
   getLayerContext,
-  getOrCreateLayerContext,
-  deleteLayerContext,
+  _getOrCreateLayerContext,
+  _deleteLayerContext,
   clearAllLayerContexts,
   clearAllLayerChainFields,
   clearLayerContextProgress,
@@ -37,10 +37,9 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('ensureLayerContext', () => {
-  it('creates a new context with padId empty string when layer is unknown', () => {
+  it('creates a new context with null gain when layer is unknown', () => {
     const ctx = ensureLayerContext('layer-1');
     expect(ctx.layerId).toBe('layer-1');
-    expect(ctx.padId).toBe('');
     expect(ctx.gain).toBeNull();
     expect(ctx.chainQueue).toBeUndefined();
     expect(ctx.cycleIndex).toBeUndefined();
@@ -89,24 +88,21 @@ describe('getLayerContext', () => {
 // getOrCreateLayerContext
 // ---------------------------------------------------------------------------
 
-describe('getOrCreateLayerContext', () => {
-  it('creates a new context with the given padId and gain', () => {
+describe('_getOrCreateLayerContext', () => {
+  it('creates a new context with the given gain', () => {
     const gain = makeMockGain();
-    const ctx = getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    const ctx = _getOrCreateLayerContext('layer-1', gain);
     expect(ctx.layerId).toBe('layer-1');
-    expect(ctx.padId).toBe('pad-1');
     expect(ctx.gain).toBe(gain);
   });
 
-  it('updates gain and padId on an existing context', () => {
+  it('updates gain on an existing context', () => {
     const first = ensureLayerContext('layer-1');
-    expect(first.padId).toBe('');
     expect(first.gain).toBeNull();
 
     const gain = makeMockGain();
-    const updated = getOrCreateLayerContext('layer-1', 'pad-99', gain);
+    const updated = _getOrCreateLayerContext('layer-1', gain);
     expect(updated).toBe(first); // same object
-    expect(updated.padId).toBe('pad-99');
     expect(updated.gain).toBe(gain);
   });
 
@@ -117,7 +113,7 @@ describe('getOrCreateLayerContext', () => {
     ctx.consecutiveFailures = 3;
 
     const gain = makeMockGain();
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
 
     expect(ctx.chainQueue).toEqual([]);
     expect(ctx.cycleIndex).toBe(2);
@@ -127,16 +123,16 @@ describe('getOrCreateLayerContext', () => {
   it('disconnects old gain when replacing it with a new one', () => {
     const oldGain = makeMockGain();
     const newGain = makeMockGain();
-    getOrCreateLayerContext('layer-1', 'pad-1', oldGain);
-    getOrCreateLayerContext('layer-1', 'pad-1', newGain);
+    _getOrCreateLayerContext('layer-1', oldGain);
+    _getOrCreateLayerContext('layer-1', newGain);
     expect(oldGain.disconnect).toHaveBeenCalledOnce();
     expect(newGain.disconnect).not.toHaveBeenCalled();
   });
 
   it('does not disconnect when same gain is re-passed', () => {
     const gain = makeMockGain();
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
     expect(gain.disconnect).not.toHaveBeenCalled();
   });
 
@@ -144,14 +140,14 @@ describe('getOrCreateLayerContext', () => {
     const oldGain = makeMockGain();
     const newGain = makeMockGain();
     (oldGain.disconnect as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('already disconnected'); });
-    getOrCreateLayerContext('layer-1', 'pad-1', oldGain);
-    expect(() => getOrCreateLayerContext('layer-1', 'pad-1', newGain)).not.toThrow();
+    _getOrCreateLayerContext('layer-1', oldGain);
+    expect(() => _getOrCreateLayerContext('layer-1', newGain)).not.toThrow();
     expect(getLayerContext('layer-1')?.gain).toBe(newGain);
   });
 
   it('adds a new entry to the context map', () => {
     const gain = makeMockGain();
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
     expect(_getContextMap().size).toBe(1);
   });
 });
@@ -164,18 +160,18 @@ describe('deleteLayerContext', () => {
   it('removes the context entry', () => {
     ensureLayerContext('layer-1');
     expect(_getContextMap().size).toBe(1);
-    deleteLayerContext('layer-1');
+    _deleteLayerContext('layer-1');
     expect(_getContextMap().size).toBe(0);
   });
 
   it('is a no-op for unknown layer ID', () => {
-    expect(() => deleteLayerContext('layer-unknown')).not.toThrow();
+    expect(() => _deleteLayerContext('layer-unknown')).not.toThrow();
   });
 
   it('disconnects the gain node before deleting', () => {
     const gain = makeMockGain();
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
-    deleteLayerContext('layer-1');
+    _getOrCreateLayerContext('layer-1', gain);
+    _deleteLayerContext('layer-1');
     expect(gain.disconnect).toHaveBeenCalledOnce();
     expect(getLayerContext('layer-1')).toBeUndefined();
   });
@@ -183,14 +179,14 @@ describe('deleteLayerContext', () => {
   it('does not throw if gain.disconnect() fails', () => {
     const gain = makeMockGain();
     (gain.disconnect as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('already disconnected'); });
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
-    expect(() => deleteLayerContext('layer-1')).not.toThrow();
+    _getOrCreateLayerContext('layer-1', gain);
+    expect(() => _deleteLayerContext('layer-1')).not.toThrow();
     expect(_getContextMap().size).toBe(0);
   });
 
   it('does not disconnect when gain is null', () => {
     ensureLayerContext('layer-1'); // gain starts as null
-    expect(() => deleteLayerContext('layer-1')).not.toThrow();
+    expect(() => _deleteLayerContext('layer-1')).not.toThrow();
   });
 });
 
@@ -210,8 +206,8 @@ describe('clearAllLayerContexts', () => {
   it('disconnects all gain nodes', () => {
     const gainA = makeMockGain();
     const gainB = makeMockGain();
-    getOrCreateLayerContext('layer-a', 'pad-1', gainA);
-    getOrCreateLayerContext('layer-b', 'pad-1', gainB);
+    _getOrCreateLayerContext('layer-a', gainA);
+    _getOrCreateLayerContext('layer-b', gainB);
     clearAllLayerContexts();
     expect(gainA.disconnect).toHaveBeenCalledOnce();
     expect(gainB.disconnect).toHaveBeenCalledOnce();
@@ -220,7 +216,7 @@ describe('clearAllLayerContexts', () => {
   it('does not throw when gains.disconnect() fails', () => {
     const gain = makeMockGain();
     (gain.disconnect as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('already disconnected'); });
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
     expect(() => clearAllLayerContexts()).not.toThrow();
     expect(_getContextMap().size).toBe(0);
   });
@@ -237,7 +233,7 @@ describe('clearAllLayerContexts', () => {
 describe('clearLayerContextGain', () => {
   it('disconnects and nulls the gain for the specified layer', () => {
     const gain = makeMockGain();
-    const ctx = getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    const ctx = _getOrCreateLayerContext('layer-1', gain);
     clearLayerContextGain('layer-1');
     expect(gain.disconnect).toHaveBeenCalledOnce();
     expect(ctx.gain).toBeNull();
@@ -254,7 +250,7 @@ describe('clearLayerContextGain', () => {
 
   it('does not delete the context entry', () => {
     const gain = makeMockGain();
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
     clearLayerContextGain('layer-1');
     expect(getLayerContext('layer-1')).toBeDefined();
   });
@@ -262,7 +258,7 @@ describe('clearLayerContextGain', () => {
   it('does not throw when disconnect() fails', () => {
     const gain = makeMockGain();
     (gain.disconnect as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('already disconnected'); });
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
     expect(() => clearLayerContextGain('layer-1')).not.toThrow();
     expect(getLayerContext('layer-1')?.gain).toBeNull();
   });
@@ -272,8 +268,8 @@ describe('clearAllLayerContextGains', () => {
   it('disconnects all gains and nulls them without deleting contexts', () => {
     const gainA = makeMockGain();
     const gainB = makeMockGain();
-    getOrCreateLayerContext('layer-a', 'pad-1', gainA);
-    getOrCreateLayerContext('layer-b', 'pad-1', gainB);
+    _getOrCreateLayerContext('layer-a', gainA);
+    _getOrCreateLayerContext('layer-b', gainB);
     clearAllLayerContextGains();
     expect(gainA.disconnect).toHaveBeenCalledOnce();
     expect(gainB.disconnect).toHaveBeenCalledOnce();
@@ -290,7 +286,7 @@ describe('clearAllLayerContextGains', () => {
   it('does not throw when disconnect() fails', () => {
     const gain = makeMockGain();
     (gain.disconnect as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('already disconnected'); });
-    getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    _getOrCreateLayerContext('layer-1', gain);
     expect(() => clearAllLayerContextGains()).not.toThrow();
     expect(_getContextMap().size).toBe(1); // context preserved
   });
@@ -304,8 +300,8 @@ describe('clearLayerContextGainsForIds', () => {
   it('disconnects gain for specified IDs and preserves context entries', () => {
     const gainA = makeMockGain();
     const gainB = makeMockGain();
-    getOrCreateLayerContext('layer-a', 'pad-1', gainA);
-    getOrCreateLayerContext('layer-b', 'pad-1', gainB);
+    _getOrCreateLayerContext('layer-a', gainA);
+    _getOrCreateLayerContext('layer-b', gainB);
     clearLayerContextGainsForIds(new Set(['layer-a']));
     expect(gainA.disconnect).toHaveBeenCalledOnce();
     expect(gainB.disconnect).not.toHaveBeenCalled();
@@ -322,8 +318,8 @@ describe('clearLayerContextGainsForIds', () => {
 describe('forEachLayerContextWithGain', () => {
   it('calls the callback only for contexts with an active gain in the active set', () => {
     const gainA = makeMockGain();
-    getOrCreateLayerContext('layer-a', 'pad-1', gainA);
-    getOrCreateLayerContext('layer-b', 'pad-1', makeMockGain());
+    _getOrCreateLayerContext('layer-a', gainA);
+    _getOrCreateLayerContext('layer-b', makeMockGain());
     ensureLayerContext('layer-c'); // no gain
 
     const visited = new Map<string, GainNode>();
@@ -336,7 +332,7 @@ describe('forEachLayerContextWithGain', () => {
   });
 
   it('does not call callback when active set is empty', () => {
-    getOrCreateLayerContext('layer-a', 'pad-1', makeMockGain());
+    _getOrCreateLayerContext('layer-a', makeMockGain());
     const cb = vi.fn();
     forEachLayerContextWithGain(new Set(), cb);
     expect(cb).not.toHaveBeenCalled();
@@ -350,7 +346,7 @@ describe('forEachLayerContextWithGain', () => {
 describe('clearAllLayerChainFields', () => {
   it('zeroes chain/cycle/pending/failure fields but preserves gain and progressInfo', () => {
     const gain = makeMockGain();
-    const ctx = getOrCreateLayerContext('layer-1', 'pad-1', gain);
+    const ctx = _getOrCreateLayerContext('layer-1', gain);
     ctx.chainQueue = [];
     ctx.cycleIndex = 3;
     ctx.playOrder = [];
@@ -456,7 +452,7 @@ describe('_getContextMap', () => {
   it('reflects deletion via deleteLayerContext', () => {
     ensureLayerContext('layer-1');
     ensureLayerContext('layer-2');
-    deleteLayerContext('layer-1');
+    _deleteLayerContext('layer-1');
     expect(_getContextMap().size).toBe(1);
   });
 });

@@ -341,7 +341,7 @@ describe("clearAllAudioState", () => {
     const { isPadActive } = await import("./voiceRegistry");
 
     const padGain = getPadGain("pad-clearall");
-    getOrCreateLayerGain("layer-clearall", "pad-test", 0.8, padGain);
+    getOrCreateLayerGain("layer-clearall", 0.8, padGain);
     setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
     setLayerChain("layer-clearall", []);
     setLayerCycleIndex("layer-clearall", 2);

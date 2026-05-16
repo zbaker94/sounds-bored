@@ -30,8 +30,6 @@ export interface LayerProgressInfo {
 export interface LayerPlaybackContext {
   /** Immutable — set at creation; identity key. */
   readonly layerId: string;
-  /** Written by gainRegistry.getOrCreateLayerGain; '' until a GainNode is wired. */
-  padId: string;
   /** Written by gainRegistry; read by gainRegistry and audioTick. */
   gain: GainNode | null;
   /** Written/read by chainCycleState (and layerTrigger directly in trigger path). */
@@ -67,12 +65,11 @@ export function getLayerContext(layerId: string): LayerPlaybackContext | undefin
 }
 
 /**
- * Get or create context, updating gain and padId on an existing entry.
- * Called by gainRegistry when a new GainNode is wired for a layer.
+ * Get or create context, updating gain on an existing entry.
+ * Exported for test use only — production code uses ensureLayerContext.
  */
-export function getOrCreateLayerContext(
+export function _getOrCreateLayerContext(
   layerId: string,
-  padId: string,
   gain: GainNode,
 ): LayerPlaybackContext {
   const existing = _contexts.get(layerId);
@@ -81,12 +78,10 @@ export function getOrCreateLayerContext(
       try { existing.gain.disconnect(); } catch { /* already disconnected */ }
     }
     existing.gain = gain;
-    existing.padId = padId;
     return existing;
   }
   const ctx: LayerPlaybackContext = {
     layerId,
-    padId,
     gain,
     chainQueue: undefined,
     cycleIndex: undefined,
@@ -108,7 +103,6 @@ export function ensureLayerContext(layerId: string): LayerPlaybackContext {
   if (existing) return existing;
   const ctx: LayerPlaybackContext = {
     layerId,
-    padId: '',
     gain: null,
     chainQueue: undefined,
     cycleIndex: undefined,
@@ -121,7 +115,8 @@ export function ensureLayerContext(layerId: string): LayerPlaybackContext {
   return ctx;
 }
 
-export function deleteLayerContext(layerId: string): void {
+/** Exported for test use only — production teardown uses clearAllLayerContexts(). */
+export function _deleteLayerContext(layerId: string): void {
   const ctx = _contexts.get(layerId);
   if (!ctx) return;
   if (ctx.gain) {

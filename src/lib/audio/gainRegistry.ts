@@ -70,20 +70,16 @@ export function forEachActiveLayerGain(
  * Get or create a GainNode for the given layer, connecting it to `padGain`.
  *
  * @param layerId - The layer ID.
- * @param padId - The pad ID that owns this layer (used to populate LayerPlaybackContext.padId).
  * @param normalizedVolume - Normalized gain in [0,1]. Non-finite values (NaN, Infinity) clamp to 1.
  * @param padGain - The pad-level GainNode to connect the layer gain to.
  */
-export function getOrCreateLayerGain(layerId: string, padId: string, normalizedVolume: number, padGain: GainNode): GainNode {
+export function getOrCreateLayerGain(layerId: string, normalizedVolume: number, padGain: GainNode): GainNode {
   const clamped = Number.isFinite(normalizedVolume) ? Math.max(0, Math.min(1, normalizedVolume)) : 1;
   const audioCtx = getAudioContext();
 
   const layerCtx = ensureLayerContext(layerId);
 
   if (layerCtx.gain) {
-    // Update padId in case it was previously empty (created by a chain/progress setter
-    // before gainRegistry had a chance to wire up the GainNode for the first time).
-    layerCtx.padId = padId;
     layerCtx.gain.gain.cancelScheduledValues(audioCtx.currentTime);
     layerCtx.gain.gain.setValueAtTime(clamped, audioCtx.currentTime);
     return layerCtx.gain;
@@ -92,7 +88,6 @@ export function getOrCreateLayerGain(layerId: string, padId: string, normalizedV
   const gain = audioCtx.createGain();
   gain.gain.value = clamped;
   gain.connect(padGain);
-  layerCtx.padId = padId;
   layerCtx.gain = gain;
   return gain;
 }

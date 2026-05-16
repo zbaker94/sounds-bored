@@ -145,47 +145,47 @@ describe("getOrCreateLayerGain", () => {
 
   it("sets gain.value to the normalized [0,1] volume on creation", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-vol-test", "pad-test", 0.8, padGain);
+    const layerGain = getOrCreateLayerGain("layer-vol-test", 0.8, padGain);
     expect(layerGain.gain.value).toBe(0.8);
   });
 
   it("sets gain.value to 0 when volume is 0", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-zero", "pad-test", 0, padGain);
+    const layerGain = getOrCreateLayerGain("layer-zero", 0, padGain);
     expect(layerGain.gain.value).toBe(0);
   });
 
   it("sets gain.value to 1 when volume is 1", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-full", "pad-test", 1, padGain);
+    const layerGain = getOrCreateLayerGain("layer-full", 1, padGain);
     expect(layerGain.gain.value).toBe(1);
   });
 
   it("connects the new gain node to padGain", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-connect", "pad-test", 0.5, padGain);
+    const layerGain = getOrCreateLayerGain("layer-connect", 0.5, padGain);
     expect(layerGain.connect).toHaveBeenCalledWith(padGain);
   });
 
   it("does not call cancelScheduledValues on first creation", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-first-create", "pad-test", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    const layerGain = getOrCreateLayerGain("layer-first-create", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
     expect(layerGain.gain.cancelScheduledValues).not.toHaveBeenCalled();
   });
 
   it("returns the cached gain node on subsequent calls for the same layerId", () => {
     const padGain = getPadGain("pad-gain-test");
     const countBefore = mockCtx.createGain.mock.calls.length;
-    const first = getOrCreateLayerGain("layer-cache", "pad-test", 0.8, padGain);
-    const second = getOrCreateLayerGain("layer-cache", "pad-test", 0.8, padGain);
+    const first = getOrCreateLayerGain("layer-cache", 0.8, padGain);
+    const second = getOrCreateLayerGain("layer-cache", 0.8, padGain);
     expect(second).toBe(first);
     expect(mockCtx.createGain.mock.calls.length - countBefore).toBe(1);
   });
 
   it("calls cancelScheduledValues before setValueAtTime on cache hit", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-cancel", "pad-test", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
-    getOrCreateLayerGain("layer-cancel", "pad-test", 0.5, padGain);
+    const layerGain = getOrCreateLayerGain("layer-cancel", 0.8, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    getOrCreateLayerGain("layer-cancel", 0.5, padGain);
     expect(layerGain.gain.cancelScheduledValues).toHaveBeenCalledWith(mockCtx.currentTime);
     const cancelOrder = layerGain.gain.cancelScheduledValues.mock.invocationCallOrder[0];
     const setOrder = layerGain.gain.setValueAtTime.mock.invocationCallOrder[0];
@@ -194,26 +194,26 @@ describe("getOrCreateLayerGain", () => {
 
   it("calls setValueAtTime with the normalized [0,1] volume on cache hit", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-sync", "pad-test", 0.8, padGain);
-    getOrCreateLayerGain("layer-sync", "pad-test", 0.5, padGain);
+    const layerGain = getOrCreateLayerGain("layer-sync", 0.8, padGain);
+    getOrCreateLayerGain("layer-sync", 0.5, padGain);
     expect(layerGain.gain.setValueAtTime).toHaveBeenLastCalledWith(0.5, mockCtx.currentTime);
   });
 
   it("clamps volume > 1 to 1", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-over", "pad-test", 1.5, padGain);
+    const layerGain = getOrCreateLayerGain("layer-over", 1.5, padGain);
     expect(layerGain.gain.value).toBe(1);
   });
 
   it("clamps negative volume to 0", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-neg", "pad-test", -0.5, padGain);
+    const layerGain = getOrCreateLayerGain("layer-neg", -0.5, padGain);
     expect(layerGain.gain.value).toBe(0);
   });
 
   it("defaults to 1 for NaN volume to avoid Web Audio RangeError", () => {
     const padGain = getPadGain("pad-gain-test");
-    const layerGain = getOrCreateLayerGain("layer-nan", "pad-test", NaN, padGain);
+    const layerGain = getOrCreateLayerGain("layer-nan", NaN, padGain);
     expect(layerGain.gain.value).toBe(1);
   });
 });
@@ -221,8 +221,8 @@ describe("getOrCreateLayerGain", () => {
 describe("clearAllLayerGains", () => {
   it("disconnects all layer gain nodes before clearing", () => {
     const padGain = getPadGain("pad-1");
-    const layerGain1 = getOrCreateLayerGain("layer-1", "pad-test", 0.8, padGain);
-    const layerGain2 = getOrCreateLayerGain("layer-2", "pad-test", 0.5, padGain);
+    const layerGain1 = getOrCreateLayerGain("layer-1", 0.8, padGain);
+    const layerGain2 = getOrCreateLayerGain("layer-2", 0.5, padGain);
 
     clearAllLayerGains();
 
@@ -232,9 +232,9 @@ describe("clearAllLayerGains", () => {
 
   it("empties the map so a subsequent getOrCreateLayerGain call creates a new node", () => {
     const padGain = getPadGain("pad-1");
-    const first = getOrCreateLayerGain("layer-1", "pad-test", 0.8, padGain);
+    const first = getOrCreateLayerGain("layer-1", 0.8, padGain);
     clearAllLayerGains();
-    const second = getOrCreateLayerGain("layer-1", "pad-test", 0.8, padGain);
+    const second = getOrCreateLayerGain("layer-1", 0.8, padGain);
     expect(second).not.toBe(first);
   });
 
@@ -401,9 +401,9 @@ describe("forEachActivePadGain", () => {
 describe("forEachActiveLayerGain", () => {
   it("iterates only layer IDs from the passed-in active set", () => {
     const padGain = getPadGain("pad-1");
-    getOrCreateLayerGain("layer-A", "pad-test", 0.5, padGain);
-    getOrCreateLayerGain("layer-B", "pad-test", 0.5, padGain);
-    getOrCreateLayerGain("layer-C", "pad-test", 0.5, padGain);
+    getOrCreateLayerGain("layer-A", 0.5, padGain);
+    getOrCreateLayerGain("layer-B", 0.5, padGain);
+    getOrCreateLayerGain("layer-C", 0.5, padGain);
 
     const visited: string[] = [];
     forEachActiveLayerGain(new Set(["layer-A", "layer-C"]), (layerId) => {
@@ -416,8 +416,8 @@ describe("forEachActiveLayerGain", () => {
 
   it("passes the correct GainNode for each active layer ID to the callback", () => {
     const padGain = getPadGain("pad-1");
-    const layerA = getOrCreateLayerGain("layer-A", "pad-test", 0.5, padGain);
-    const layerB = getOrCreateLayerGain("layer-B", "pad-test", 0.5, padGain);
+    const layerA = getOrCreateLayerGain("layer-A", 0.5, padGain);
+    const layerB = getOrCreateLayerGain("layer-B", 0.5, padGain);
 
     const seen = new Map<string, GainNode>();
     forEachActiveLayerGain(new Set(["layer-A", "layer-B"]), (layerId, gain) => {
@@ -430,7 +430,7 @@ describe("forEachActiveLayerGain", () => {
 
   it("silently skips active layer IDs with no registered GainNode", () => {
     const padGain = getPadGain("pad-1");
-    getOrCreateLayerGain("layer-real", "pad-test", 0.5, padGain);
+    getOrCreateLayerGain("layer-real", 0.5, padGain);
 
     const visited: string[] = [];
     expect(() =>
@@ -444,7 +444,7 @@ describe("forEachActiveLayerGain", () => {
 
   it("never calls the callback when activeLayerIds is empty", () => {
     const padGain = getPadGain("pad-1");
-    getOrCreateLayerGain("layer-A", "pad-test", 0.5, padGain);
+    getOrCreateLayerGain("layer-A", 0.5, padGain);
     const cb = vi.fn();
     forEachActiveLayerGain(new Set(), cb);
     expect(cb).not.toHaveBeenCalled();
@@ -465,7 +465,7 @@ describe("getLivePadVolume", () => {
 describe("clearLayerGainsForIds", () => {
   it("disconnects and removes only the specified layer IDs", () => {
     const padGain = getPadGain("pad-1");
-    const layerA = getOrCreateLayerGain("layer-A", "pad-test", 0.5, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    const layerA = getOrCreateLayerGain("layer-A", 0.5, padGain) as unknown as ReturnType<typeof makeMockGain>;
 
     clearLayerGainsForIds(new Set(["layer-A"]));
 
@@ -475,8 +475,8 @@ describe("clearLayerGainsForIds", () => {
 
   it("leaves other layer IDs intact", () => {
     const padGain = getPadGain("pad-1");
-    const layerA = getOrCreateLayerGain("layer-A", "pad-test", 0.5, padGain) as unknown as ReturnType<typeof makeMockGain>;
-    const layerB = getOrCreateLayerGain("layer-B", "pad-test", 0.5, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    const layerA = getOrCreateLayerGain("layer-A", 0.5, padGain) as unknown as ReturnType<typeof makeMockGain>;
+    const layerB = getOrCreateLayerGain("layer-B", 0.5, padGain) as unknown as ReturnType<typeof makeMockGain>;
 
     clearLayerGainsForIds(new Set(["layer-A"]));
 
@@ -487,7 +487,7 @@ describe("clearLayerGainsForIds", () => {
 
   it("is a no-op for unknown layer IDs", () => {
     const padGain = getPadGain("pad-1");
-    getOrCreateLayerGain("layer-A", "pad-test", 0.5, padGain);
+    getOrCreateLayerGain("layer-A", 0.5, padGain);
 
     expect(() => clearLayerGainsForIds(new Set(["layer-ghost"]))).not.toThrow();
     expect(getLayerGain("layer-A")).toBeDefined();
@@ -501,7 +501,7 @@ describe("getLayerGain", () => {
 
   it("returns the same GainNode created by getOrCreateLayerGain", () => {
     const padGain = getPadGain("pad-1");
-    const created = getOrCreateLayerGain("layer-1", "pad-test", 0.5, padGain);
+    const created = getOrCreateLayerGain("layer-1", 0.5, padGain);
     expect(getLayerGain("layer-1")).toBe(created);
   });
 });
@@ -565,7 +565,7 @@ describe("LayerPlaybackContext integration — chain fields and gain coexist on 
     setLayerChain("layer-shared", []);
 
     const padGain = getPadGain("pad-1");
-    getOrCreateLayerGain("layer-shared", "pad-test", 0.8, padGain);
+    getOrCreateLayerGain("layer-shared", 0.8, padGain);
 
     const ctx = getLayerContext("layer-shared");
     expect(ctx).toBeDefined();
@@ -578,7 +578,7 @@ describe("LayerPlaybackContext integration — chain fields and gain coexist on 
 
   it("clearAll deletes layer contexts so context map is empty after clearAll", () => {
     const padGain = getPadGain("pad-1");
-    getOrCreateLayerGain("layer-1", "pad-test", 0.8, padGain);
+    getOrCreateLayerGain("layer-1", 0.8, padGain);
     clearAll();
     expect(getLayerContext("layer-1")).toBeUndefined();
   });

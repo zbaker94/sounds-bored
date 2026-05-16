@@ -723,7 +723,7 @@ export async function triggerLayerOfPad(
 ): Promise<void> {
   try {
     const isLayerPlaying = isLayerActive(layer.id);
-    const layerGain = getOrCreateLayerGain(layer.id, pad.id, getLayerNormalizedVolume(layer), padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
     // Context is guaranteed to exist: getOrCreateLayerGain calls ensureLayerContext.
     const layerCtx = getLayerContext(layer.id)!;
 
@@ -930,7 +930,7 @@ function startSoundInLayer(pad: Pad, layer: Layer, sound: Sound, resolved: Sound
   cancelFade(pad.id);
   ensureResumed().then((ctx) => {
     const padGain = getPadGain(pad.id);
-    const layerGain = getOrCreateLayerGain(layer.id, pad.id, getLayerNormalizedVolume(layer), padGain);
+    const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
     startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved).catch(emitAudioError);
     coordinator.padStarted(pad.id);
   }).catch((err: unknown) => { emitAudioError(err); });
