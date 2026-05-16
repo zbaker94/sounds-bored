@@ -260,6 +260,27 @@ describe("computeAllPadProgress", () => {
   });
 });
 
+describe("computeAllLayerProgress — contexts with only chain fields (no progressInfo)", () => {
+  it("returns empty object when all contexts have undefined progressInfo and no streaming layers", async () => {
+    // Set up a context with chain fields but no progressInfo — should not appear in output
+    const { setLayerChain } = await import("./chainCycleState");
+    setLayerChain("layer-chain-only", []);
+    expect(computeAllLayerProgress()).toEqual({});
+  });
+
+  it("excludes stopped layers (contexts with undefined progressInfo) from progress output", async () => {
+    const { ensureLayerContext } = await import("./layerPlaybackContext");
+    ensureLayerContext("layer-stopped"); // context exists but no progressInfo
+
+    setLayerProgressInfo("layer-active", { startedAt: 0, duration: 4, isLooping: false });
+    mockCtx.currentTime = 2;
+
+    const result = computeAllLayerProgress();
+    expect(result["layer-stopped"]).toBeUndefined();
+    expect(result["layer-active"]).toBeCloseTo(0.5);
+  });
+});
+
 describe("computeAllLayerProgress — streaming path uses cached best element", () => {
   it("returns progress for a streaming layer using the cached best element", () => {
     const el = makeAudio(10, 4);
@@ -320,7 +341,7 @@ describe("clearAllAudioState", () => {
     const { isPadActive } = await import("./voiceRegistry");
 
     const padGain = getPadGain("pad-clearall");
-    getOrCreateLayerGain("layer-clearall", 0.8, padGain);
+    getOrCreateLayerGain("layer-clearall", "pad-test", 0.8, padGain);
     setPadProgressInfo("pad-clearall", { startedAt: 0, duration: 1, isLooping: false });
     setLayerChain("layer-clearall", []);
     setLayerCycleIndex("layer-clearall", 2);

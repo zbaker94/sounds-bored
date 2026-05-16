@@ -119,7 +119,7 @@ describe("gainManager", () => {
       });
       const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync");
-      getOrCreateLayerGain("layer-sync", 0.8, padGain);
+      getOrCreateLayerGain("layer-sync", "pad-test", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync", 0.5);
@@ -143,7 +143,7 @@ describe("gainManager", () => {
       });
       const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync-hi");
-      getOrCreateLayerGain("layer-sync-hi", 0.8, padGain);
+      getOrCreateLayerGain("layer-sync-hi", "pad-test", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync-hi", 1.5);
@@ -162,7 +162,7 @@ describe("gainManager", () => {
       });
       const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync-lo");
-      getOrCreateLayerGain("layer-sync-lo", 0.8, padGain);
+      getOrCreateLayerGain("layer-sync-lo", "pad-test", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync-lo", -0.5);
@@ -181,7 +181,7 @@ describe("gainManager", () => {
       });
       const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-sync-nan");
-      getOrCreateLayerGain("layer-sync-nan", 0.8, padGain);
+      getOrCreateLayerGain("layer-sync-nan", "pad-test", 0.8, padGain);
       const { syncLayerVolume } = await import("./gainManager");
 
       syncLayerVolume("layer-sync-nan", NaN);
@@ -202,7 +202,7 @@ describe("gainManager", () => {
       });
       const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-setlvol");
-      getOrCreateLayerGain("layer-setlvol", 0.8, padGain);
+      getOrCreateLayerGain("layer-setlvol", "pad-test", 0.8, padGain);
       const { setLayerVolume } = await import("./gainManager");
 
       setLayerVolume("layer-setlvol", 0.75);
@@ -231,7 +231,7 @@ describe("gainManager", () => {
       });
       const { getPadGain, getOrCreateLayerGain } = await import("./gainRegistry");
       const padGain = getPadGain("pad-clamp");
-      getOrCreateLayerGain("layer-clamp", 0.5, padGain);
+      getOrCreateLayerGain("layer-clamp", "pad-test", 0.5, padGain);
       const { setLayerVolume } = await import("./gainManager");
 
       setLayerVolume("layer-clamp", 1.5);

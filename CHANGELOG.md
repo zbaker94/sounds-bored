@@ -1,6 +1,11 @@
 # Changelog
 
 ## Current Changes
+- Internal audio engine refactor: layer playback state (chain queue, cycle index, play order, pending flag, failure tracking) consolidated into a single `LayerPlaybackContext` object per layer, reducing risk of state desync during complex pad interactions.
+- Fixed an audio engine bug where sounds could stop against a disconnected audio graph, potentially causing glitches when closing a project or stopping all playback.
+- Internal audio engine refactor: per-layer playback state is now consolidated into a single unified context object, improving correctness of teardown when closing or switching projects.
+- Fixed a bug where deleting a layer chain or play order for an unknown layer ID could incorrectly trigger audio tick redraws.
+- Audio gain nodes are now properly disconnected before cleanup during project close, preventing potential resource leaks.
 - Improved internal audio fade system reliability by consolidating fade state management, reducing the risk of audio glitches during pad re-triggers or crossfades.
 - Fixed a rare audio glitch where fade effects could interfere with project switching or loading
 - Internal audio engine refactor: no user-facing behavior changes in this release.

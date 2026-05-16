@@ -3,7 +3,7 @@
  *
  * INVARIANT: Never call stopAllVoices() without first clearing chain queues and
  *   fade tracking — voice.stop() fires onended synchronously which reads
- *   chainCycleState.layerChainQueue; clearing first prevents chain restarts.
+ *   LayerPlaybackContext.chainQueue; clearing first prevents chain restarts.
  *
  * INVARIANT: Always use padPlayer.stopAllPads() as the single stop entry point.
  */
@@ -14,9 +14,16 @@ import { isGainRampPending, clearAll as clearAllGainRegistry, resetGainRampDeadl
 import { getActivePadIds, nullAllOnEnded, stopAllVoices } from "./voiceRegistry";
 import { clearAll as clearAllChainCycleState } from "./chainCycleState";
 import { clearAllFades, isAnyFadeActive } from "./fadeCoordinator";
+import {
+  type LayerProgressInfo,
+  ensureLayerContext,
+  getLayerContext,
+  clearLayerContextProgress,
+  clearAllLayerContextProgress,
+  getAllLayerContextEntries,
+} from "./layerPlaybackContext";
 
 const padProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
-const layerProgressInfo = new Map<string, { startedAt: number; duration: number; isLooping: boolean }>();
 
 let globalStopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 const pendingStopCleanupTimeouts = new Set<ReturnType<typeof setTimeout>>();
@@ -62,11 +69,19 @@ export function computeAllPadProgress(): Record<string, number> {
 }
 
 export function computeAllLayerProgress(): Record<string, number> {
-  if (layerProgressInfo.size === 0 && !hasAnyStreamingLayer()) return {};
+  // Check if any context has progressInfo, or if streaming layers exist
+  let hasAnyProgress = false;
+  for (const [, ctx] of getAllLayerContextEntries()) {
+    if (ctx.progressInfo !== undefined) { hasAnyProgress = true; break; }
+  }
+  if (!hasAnyProgress && !hasAnyStreamingLayer()) return {};
+
   const result: Record<string, number> = {};
-  if (layerProgressInfo.size > 0) {
+  if (hasAnyProgress) {
     const ctx = getAudioContext();
-    for (const [layerId, info] of layerProgressInfo) {
+    for (const [layerId, layerCtx] of getAllLayerContextEntries()) {
+      const info = layerCtx.progressInfo;
+      if (!info) continue;
       const elapsed = ctx.currentTime - info.startedAt;
       if (info.isLooping && info.duration > 0) {
         result[layerId] = (elapsed % info.duration) / info.duration;
@@ -99,20 +114,20 @@ export function clearAllPadProgressInfo(): void {
   padProgressInfo.clear();
 }
 
-export function setLayerProgressInfo(layerId: string, info: { startedAt: number; duration: number; isLooping: boolean }): void {
-  layerProgressInfo.set(layerId, info);
+export function setLayerProgressInfo(layerId: string, info: LayerProgressInfo): void {
+  ensureLayerContext(layerId).progressInfo = info;
 }
 
-export function getLayerProgressInfo(layerId: string): { startedAt: number; duration: number; isLooping: boolean } | undefined {
-  return layerProgressInfo.get(layerId);
+export function getLayerProgressInfo(layerId: string): LayerProgressInfo | undefined {
+  return getLayerContext(layerId)?.progressInfo;
 }
 
 export function clearLayerProgressInfo(layerId: string): void {
-  layerProgressInfo.delete(layerId);
+  clearLayerContextProgress(layerId);
 }
 
 export function clearAllLayerProgressInfo(): void {
-  layerProgressInfo.clear();
+  clearAllLayerContextProgress();
 }
 
 export function setGlobalStopTimeout(id: ReturnType<typeof setTimeout>): void {
@@ -145,13 +160,16 @@ export function clearAllAudioState(): void {
   cancelGlobalStopTimeout();
   clearAllStopCleanupTimeouts();
   // Clear chains + fades before stopping voices — prevents onended from restarting chains.
+  // clearAllChainCycleState() zeroes chain/cycle/pending/failure fields only;
+  // context entries and layer GainNodes remain intact so voices stop against a valid graph.
   clearAllFades();
   clearAllChainCycleState();
   nullAllOnEnded();
   clearAllStreamingAudio();
   clearAllPadProgressInfo();
   clearAllLayerProgressInfo();
-  // Stop voices BEFORE disconnecting gain nodes so voice.stop() completes with a valid graph.
+  // stopAllVoices() runs while layer GainNodes are still connected — original invariant preserved.
+  // clearAllGainRegistry() then disconnects pad GainNodes, limiters, and all layer contexts.
   stopAllVoices();
   clearAllGainRegistry();
 }

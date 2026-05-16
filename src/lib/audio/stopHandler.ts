@@ -16,23 +16,21 @@ import {
   deleteLayerChain,
   deleteLayerCycleIndex,
   deleteLayerPlayOrder,
-  clearAllLayerChains,
-  clearAllLayerCycleIndexes,
-  clearAllLayerPlayOrders,
-  clearAllLayerPending,
 } from "./chainCycleState";
+import { clearAllLayerChainFields } from "./layerPlaybackContext";
 import { nullAllOnEnded, nullPadOnEnded, stopPadVoices } from "./voiceRegistry";
 import { stopAudioTick } from "./audioTick";
 
 // Chain queues and fade tracking must be cleared before voice.stop() fires — voice.stop()
 // triggers onended synchronously, which reads chainCycleState; clearing first prevents
 // onended from restarting chains or advancing fade sequences.
+//
+// clearAllLayerChainFields() performs a single-pass bulk clear of all chain/cycle/
+// pending/failure fields (including consecutiveFailures) on every existing context
+// — O(n) in one pass instead of four separate O(n) iterations.
 export function stopAllPads(): void {
   clearAllFades();
-  clearAllLayerChains();
-  clearAllLayerCycleIndexes();
-  clearAllLayerPlayOrders();
-  clearAllLayerPending();
+  clearAllLayerChainFields();
   nullAllOnEnded();
   stopAudioTick();
 }
