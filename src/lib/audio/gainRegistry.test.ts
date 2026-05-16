@@ -53,6 +53,8 @@ import {
   resetGainRampDeadline,
   clearAll,
 } from "./gainRegistry";
+import { setLayerChain, getLayerChain } from "./chainCycleState";
+import { getLayerContext } from "./layerPlaybackContext";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -552,5 +554,32 @@ describe("markGainRamp / isGainRampPending", () => {
     resetGainRampDeadline();
 
     expect(isGainRampPending()).toBe(false);
+  });
+});
+
+// ── Context map integration (M6) ─────────────────────────────────────────────
+
+describe("LayerPlaybackContext integration — chain fields and gain coexist on same context", () => {
+  it("setLayerChain followed by getOrCreateLayerGain for the same layerId stores both on one context", () => {
+    // Simulate: chain setter runs first (before gainRegistry), then gain is wired.
+    setLayerChain("layer-shared", []);
+
+    const padGain = getPadGain("pad-1");
+    getOrCreateLayerGain("layer-shared", 0.8, padGain);
+
+    const ctx = getLayerContext("layer-shared");
+    expect(ctx).toBeDefined();
+    expect(ctx?.chainQueue).toEqual([]); // chain preserved
+    expect(ctx?.gain).toBeDefined();     // gain set
+    expect(ctx?.gain).not.toBeNull();
+    expect(getLayerChain("layer-shared")).toEqual([]); // still readable via chainCycleState
+    expect(getLayerGain("layer-shared")).toBeDefined(); // still readable via gainRegistry
+  });
+
+  it("clearAll deletes layer contexts so context map is empty after clearAll", () => {
+    const padGain = getPadGain("pad-1");
+    getOrCreateLayerGain("layer-1", 0.8, padGain);
+    clearAll();
+    expect(getLayerContext("layer-1")).toBeUndefined();
   });
 });

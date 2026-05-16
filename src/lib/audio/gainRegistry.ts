@@ -5,6 +5,11 @@
  * (source(s) -> voiceGain -> layerGain -> padGain -> padLimiter -> masterGain -> destination)
  * and the gain-ramp deadline used by the audioTick fast-path.
  *
+ * Layer GainNodes are now stored in LayerPlaybackContext (layerPlaybackContext.ts) rather
+ * than a local Map. The public API surface is unchanged — callers continue to use
+ * getOrCreateLayerGain / getLayerGain / clearAllLayerGains / clearLayerGainsForIds /
+ * forEachActiveLayerGain exactly as before.
+ *
  * This module is voice-agnostic: callers (audioTick / audioState) pass in the
  * set of currently-active pad or layer IDs from the voice registry. Keeping
  * the read of voiceMap on the caller side avoids a circular import between
@@ -13,10 +18,17 @@
 
 import { getAudioContext, getMasterGain } from "./audioContext";
 import { createLimiterNode } from "./gainNormalization";
+import {
+  ensureLayerContext,
+  getLayerContext,
+  clearAllLayerContexts,
+  clearAllLayerContextGains,
+  clearLayerContextGainsForIds,
+  forEachLayerContextWithGain,
+} from "./layerPlaybackContext";
 
 const padGainMap = new Map<string, GainNode>();
 const padLimiterMap = new Map<string, DynamicsCompressorNode>();
-const layerGainMap = new Map<string, GainNode>();
 let gainRampDeadline = -Infinity;
 
 export function getPadGain(padId: string): GainNode {
@@ -51,35 +63,38 @@ export function forEachActiveLayerGain(
   activeLayerIds: ReadonlySet<string>,
   fn: (layerId: string, gain: GainNode) => void,
 ): void {
-  for (const layerId of activeLayerIds) {
-    const gain = layerGainMap.get(layerId);
-    if (gain) fn(layerId, gain);
-  }
+  forEachLayerContextWithGain(activeLayerIds, fn);
 }
 
 /**
  * Get or create a GainNode for the given layer, connecting it to `padGain`.
  *
+ * @param layerId - The layer ID.
  * @param normalizedVolume - Normalized gain in [0,1]. Non-finite values (NaN, Infinity) clamp to 1.
+ * @param padGain - The pad-level GainNode to connect the layer gain to.
  */
 export function getOrCreateLayerGain(layerId: string, normalizedVolume: number, padGain: GainNode): GainNode {
   const clamped = Number.isFinite(normalizedVolume) ? Math.max(0, Math.min(1, normalizedVolume)) : 1;
-  const ctx = getAudioContext();
-  const existing = layerGainMap.get(layerId);
-  if (existing) {
-    existing.gain.cancelScheduledValues(ctx.currentTime);
-    existing.gain.setValueAtTime(clamped, ctx.currentTime);
-    return existing;
+  const audioCtx = getAudioContext();
+
+  const layerCtx = ensureLayerContext(layerId);
+
+  if (layerCtx.gain) {
+    layerCtx.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    layerCtx.gain.gain.setValueAtTime(clamped, audioCtx.currentTime);
+    return layerCtx.gain;
   }
-  const gain = ctx.createGain();
+
+  const gain = audioCtx.createGain();
   gain.gain.value = clamped;
   gain.connect(padGain);
-  layerGainMap.set(layerId, gain);
+  layerCtx.gain = gain;
   return gain;
 }
 
 export function getLayerGain(layerId: string): GainNode | undefined {
-  return layerGainMap.get(layerId);
+  const gain = getLayerContext(layerId)?.gain;
+  return gain ?? undefined;
 }
 
 export function clearAllPadGains(): void {
@@ -90,8 +105,7 @@ export function clearAllPadGains(): void {
 }
 
 export function clearAllLayerGains(): void {
-  for (const gain of layerGainMap.values()) gain.disconnect();
-  layerGainMap.clear();
+  clearAllLayerContextGains();
 }
 
 /**
@@ -129,13 +143,7 @@ export function clearPadGainsForIds(padIds: ReadonlySet<string>): void {
 }
 
 export function clearLayerGainsForIds(layerIds: ReadonlySet<string>): void {
-  for (const layerId of layerIds) {
-    const gain = layerGainMap.get(layerId);
-    if (gain) {
-      gain.disconnect();
-      layerGainMap.delete(layerId);
-    }
-  }
+  clearLayerContextGainsForIds(layerIds);
 }
 
 /**
@@ -178,7 +186,9 @@ export function clearAll(): void {
   padGainMap.clear();
   for (const limiter of padLimiterMap.values()) limiter.disconnect();
   padLimiterMap.clear();
-  for (const gain of layerGainMap.values()) gain.disconnect();
-  layerGainMap.clear();
+  // Disconnect and delete all layer contexts. chainCycleState.clearAll() only zeroes
+  // chain fields — context/gain teardown is this module's responsibility, running
+  // after stopAllVoices() so voices stop while the downstream graph is still connected.
+  clearAllLayerContexts();
   gainRampDeadline = -Infinity;
 }

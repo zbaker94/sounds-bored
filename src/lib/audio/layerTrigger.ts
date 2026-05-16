@@ -65,12 +65,14 @@ import {
   getLayerCycleIndex,
   getLayerPlayOrder,
   incrementLayerConsecutiveFailures,
+  notifyChainCycleStateChanged,
   resetLayerConsecutiveFailures,
   setLayerChain,
   setLayerCycleIndex,
   setLayerPending,
   setLayerPlayOrder,
 } from "./chainCycleState";
+import { getLayerContext, type LayerPlaybackContext } from "./layerPlaybackContext";
 import { register as registerStreaming, dispose as disposeStreaming } from "./streamingAudioLifecycle";
 
 /**
@@ -452,8 +454,14 @@ export type RetriggerAction = "skip" | "proceed" | "chain-advanced";
  *   `triggerLayer` uses this to schedule a deferred `removePlayingPad` check;
  *   `triggerPad` omits it (the pad-level store state is managed globally).
  */
-function handleStopRetrigger(pad: Pad, layer: Layer, resolved: Sound[], afterStopCleanup?: () => void): RetriggerAction {
-  deleteLayerChain(layer.id);
+function handleStopRetrigger(pad: Pad, layer: Layer, resolved: Sound[], afterStopCleanup?: () => void, layerCtx?: LayerPlaybackContext): RetriggerAction {
+  // Use ctx directly in trigger path if available; fall back to module-level API otherwise.
+  if (layerCtx) {
+    layerCtx.chainQueue = undefined;
+    notifyChainCycleStateChanged();
+  } else {
+    deleteLayerChain(layer.id);
+  }
   // rampStopLayerVoices nulls onended before stopping, so the normal cleanup
   // callback won't fire — delete the layer's streaming entry explicitly.
   disposeStreaming(pad.id, layer.id);
@@ -461,23 +469,38 @@ function handleStopRetrigger(pad: Pad, layer: Layer, resolved: Sound[], afterSto
   afterStopCleanup?.();
   // Cycle mode: advance cursor so next trigger plays the next sound.
   if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-    const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
-    if (nextIndex >= resolved.length) {
-      deleteLayerCycleIndex(layer.id);
+    if (layerCtx) {
+      const nextIndex = (layerCtx.cycleIndex ?? 0) + 1;
+      layerCtx.cycleIndex = nextIndex >= resolved.length ? undefined : nextIndex;
     } else {
-      setLayerCycleIndex(layer.id, nextIndex);
+      const nextIndex = (getLayerCycleIndex(layer.id) ?? 0) + 1;
+      if (nextIndex >= resolved.length) {
+        deleteLayerCycleIndex(layer.id);
+      } else {
+        setLayerCycleIndex(layer.id, nextIndex);
+      }
     }
   }
   return "skip";
 }
 
-function handleRestartRetrigger(pad: Pad, layer: Layer, resolved: Sound[]): void {
-  deleteLayerChain(layer.id);
+function handleRestartRetrigger(pad: Pad, layer: Layer, resolved: Sound[], layerCtx?: LayerPlaybackContext): void {
+  if (layerCtx) {
+    layerCtx.chainQueue = undefined;
+    notifyChainCycleStateChanged();
+  } else {
+    deleteLayerChain(layer.id);
+  }
   stopLayerVoices(pad.id, layer.id);
   // Cycle mode: back cursor up so the same sound replays.
   if (layer.cycleMode && isChained(layer.arrangement) && resolved.length > 0) {
-    const cur = getLayerCycleIndex(layer.id) ?? 0;
-    setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
+    if (layerCtx) {
+      const cur = layerCtx.cycleIndex ?? 0;
+      layerCtx.cycleIndex = cur === 0 ? resolved.length - 1 : cur - 1;
+    } else {
+      const cur = getLayerCycleIndex(layer.id) ?? 0;
+      setLayerCycleIndex(layer.id, cur === 0 ? resolved.length - 1 : cur - 1);
+    }
   }
 }
 
@@ -501,13 +524,19 @@ async function handleNextRetrigger(
   ctx: AudioContext,
   layerGain: GainNode,
   resolved: Sound[],
+  layerCtx?: LayerPlaybackContext,
 ): Promise<RetriggerAction> {
   // Capture queue before clearing it.
-  const remaining = [...(getLayerChain(layer.id) ?? [])];
+  const remaining = [...((layerCtx ? layerCtx.chainQueue : getLayerChain(layer.id)) ?? [])];
   // Null onended BEFORE stopLayerVoices — stop() fires onended synchronously;
   // nulling first prevents the chain-advance callback from re-firing.
   for (const v of getLayerVoices(layer.id)) v.setOnEnded(null);
-  deleteLayerChain(layer.id);
+  if (layerCtx) {
+    layerCtx.chainQueue = undefined;
+    notifyChainCycleStateChanged();
+  } else {
+    deleteLayerChain(layer.id);
+  }
   disposeStreaming(pad.id, layer.id);
   stopLayerVoices(pad.id, layer.id);
   clearPadProgressInfo(pad.id);
@@ -542,19 +571,20 @@ export async function applyRetriggerMode(
   layerGain: GainNode,
   resolved: Sound[],
   afterStopCleanup?: () => void,
+  layerCtx?: LayerPlaybackContext,
 ): Promise<RetriggerAction> {
   switch (layer.retriggerMode) {
     case "stop":
-      if (isLayerPlaying) return handleStopRetrigger(pad, layer, resolved, afterStopCleanup);
+      if (isLayerPlaying) return handleStopRetrigger(pad, layer, resolved, afterStopCleanup, layerCtx);
       break;
     case "continue":
       if (isLayerPlaying) return "skip";
       break;
     case "restart":
-      if (isLayerPlaying) handleRestartRetrigger(pad, layer, resolved);
+      if (isLayerPlaying) handleRestartRetrigger(pad, layer, resolved, layerCtx);
       break;
     case "next":
-      if (isLayerPlaying) return handleNextRetrigger(pad, layer, ctx, layerGain, resolved);
+      if (isLayerPlaying) return handleNextRetrigger(pad, layer, ctx, layerGain, resolved, layerCtx);
       break;
   }
   return "proceed";
@@ -579,42 +609,82 @@ export async function startLayerPlayback(
   ctx: AudioContext,
   layerGain: GainNode,
   resolved: Sound[],
+  layerCtx?: LayerPlaybackContext,
 ): Promise<void> {
   // A fresh user trigger always starts a clean failure sequence — reset the
   // circuit-breaker counter so failures from a previous play don't carry over
   // and prematurely suppress toasts on the new trigger's sounds.
-  resetLayerConsecutiveFailures(layer.id);
+  if (layerCtx) {
+    layerCtx.consecutiveFailures = 0;
+  } else {
+    resetLayerConsecutiveFailures(layer.id);
+  }
   clearLayerProgressInfo(layer.id);
-  setLayerPending(layer.id);
+  if (layerCtx) {
+    layerCtx.pending = true;
+  } else {
+    setLayerPending(layer.id);
+  }
   try {
     const playOrder = buildPlayOrder(layer.arrangement, resolved);
-    setLayerPlayOrder(layer.id, playOrder);
+    if (layerCtx) {
+      layerCtx.playOrder = playOrder;
+      notifyChainCycleStateChanged();
+    } else {
+      setLayerPlayOrder(layer.id, playOrder);
+    }
 
     if (layer.cycleMode && isChained(layer.arrangement)) {
       // Cycle mode: play exactly one sound per trigger, advancing the cursor.
       // No chain queue — onended will not auto-advance.
-      deleteLayerChain(layer.id);
-      const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
-      const sound = playOrder[cycleIndex % playOrder.length];
-      const nextIndex = cycleIndex + 1;
-      if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
-        deleteLayerCycleIndex(layer.id);
+      if (layerCtx) {
+        layerCtx.chainQueue = undefined;
+        notifyChainCycleStateChanged();
+        const cycleIndex = layerCtx.cycleIndex ?? 0;
+        const sound = playOrder[cycleIndex % playOrder.length];
+        const nextIndex = cycleIndex + 1;
+        layerCtx.cycleIndex = (nextIndex >= playOrder.length && layer.playbackMode === "one-shot")
+          ? undefined
+          : nextIndex % playOrder.length;
+        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       } else {
-        setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
+        deleteLayerChain(layer.id);
+        const cycleIndex = getLayerCycleIndex(layer.id) ?? 0;
+        const sound = playOrder[cycleIndex % playOrder.length];
+        const nextIndex = cycleIndex + 1;
+        if (nextIndex >= playOrder.length && layer.playbackMode === "one-shot") {
+          deleteLayerCycleIndex(layer.id);
+        } else {
+          setLayerCycleIndex(layer.id, nextIndex % playOrder.length);
+        }
+        await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       }
-      await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
     } else if (isChained(layer.arrangement)) {
       const [first, ...rest] = playOrder;
-      setLayerChain(layer.id, rest);
+      if (layerCtx) {
+        layerCtx.chainQueue = rest;
+        notifyChainCycleStateChanged();
+      } else {
+        setLayerChain(layer.id, rest);
+      }
       await startLayerSound(pad, layer, first, ctx, layerGain, getVoiceVolume(layer, first), resolved);
     } else {
-      deleteLayerChain(layer.id);
+      if (layerCtx) {
+        layerCtx.chainQueue = undefined;
+        notifyChainCycleStateChanged();
+      } else {
+        deleteLayerChain(layer.id);
+      }
       for (const sound of playOrder) {
         await startLayerSound(pad, layer, sound, ctx, layerGain, getVoiceVolume(layer, sound), resolved);
       }
     }
   } finally {
-    clearLayerPending(layer.id);
+    if (layerCtx) {
+      layerCtx.pending = false;
+    } else {
+      clearLayerPending(layer.id);
+    }
   }
 }
 
@@ -654,17 +724,19 @@ export async function triggerLayerOfPad(
   try {
     const isLayerPlaying = isLayerActive(layer.id);
     const layerGain = getOrCreateLayerGain(layer.id, getLayerNormalizedVolume(layer), padGain);
+    // Context is guaranteed to exist: getOrCreateLayerGain calls ensureLayerContext.
+    const layerCtx = getLayerContext(layer.id)!;
 
     const action = await applyRetriggerMode(
-      pad, layer, isLayerPlaying, ctx, layerGain, resolved, opts?.afterStopCleanup,
+      pad, layer, isLayerPlaying, ctx, layerGain, resolved, opts?.afterStopCleanup, layerCtx,
     );
     if (action === "skip" || action === "chain-advanced") {
-      clearLayerPending(layer.id);
+      layerCtx.pending = false;
       return;
     }
 
     if (opts?.clearProgressOnProceed) clearPadProgressInfo(pad.id);
-    await startLayerPlayback(pad, layer, ctx, layerGain, resolved);
+    await startLayerPlayback(pad, layer, ctx, layerGain, resolved, layerCtx);
     // startLayerPlayback clears pending in its own finally block
   } catch (err) {
     clearLayerPending(layer.id);

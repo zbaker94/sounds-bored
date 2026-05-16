@@ -5,26 +5,23 @@ import {
   getLayerChain,
   setLayerChain,
   deleteLayerChain,
-  clearAllLayerChains,
   getLayerCycleIndex,
   setLayerCycleIndex,
   deleteLayerCycleIndex,
-  clearAllLayerCycleIndexes,
   setLayerPlayOrder,
   getLayerPlayOrder,
   deleteLayerPlayOrder,
-  clearAllLayerPlayOrders,
   isLayerPending,
   setLayerPending,
   clearLayerPending,
-  clearAllLayerPending,
   getLayerConsecutiveFailures,
   incrementLayerConsecutiveFailures,
   resetLayerConsecutiveFailures,
-  clearAllLayerConsecutiveFailures,
+  notifyChainCycleStateChanged,
   onChainCycleStateChanged,
   clearAll,
 } from './chainCycleState';
+import { _getContextMap, clearAllLayerContexts } from './layerPlaybackContext';
 
 vi.mock('@/lib/logger', () => ({
   logWarn: vi.fn(),
@@ -33,7 +30,10 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 beforeEach(() => {
+  // clearAll() zeroes chain fields only (contexts survive per new ownership model).
+  // clearAllLayerContexts() deletes the context entries for full test isolation.
   clearAll();
+  clearAllLayerContexts();
 });
 
 // ── Layer chain queue ────────────────────────────────────────────────────────
@@ -83,14 +83,6 @@ describe('layerChainQueue', () => {
     expect(() => deleteLayerChain('unknown')).not.toThrow();
   });
 
-  it('clearAllLayerChains removes all entries', () => {
-    setLayerChain('layer-1', [createMockSound()]);
-    setLayerChain('layer-2', [createMockSound()]);
-    clearAllLayerChains();
-    expect(getLayerChain('layer-1')).toBeUndefined();
-    expect(getLayerChain('layer-2')).toBeUndefined();
-  });
-
   it('getLayerChain returns the stored reference (not a copy)', () => {
     const chain = [createMockSound()];
     setLayerChain('layer-1', chain);
@@ -122,13 +114,6 @@ describe('layerCycleIndex', () => {
     expect(getLayerCycleIndex('layer-1')).toBeUndefined();
   });
 
-  it('clearAllLayerCycleIndexes removes all entries', () => {
-    setLayerCycleIndex('layer-1', 0);
-    setLayerCycleIndex('layer-2', 5);
-    clearAllLayerCycleIndexes();
-    expect(getLayerCycleIndex('layer-1')).toBeUndefined();
-    expect(getLayerCycleIndex('layer-2')).toBeUndefined();
-  });
 });
 
 // ── Layer play order ─────────────────────────────────────────────────────────
@@ -162,13 +147,6 @@ describe('layerPlayOrder', () => {
     expect(() => deleteLayerPlayOrder('nonexistent')).not.toThrow();
   });
 
-  it('clearAllLayerPlayOrders removes all entries', () => {
-    setLayerPlayOrder('layer-1', [createMockSound()]);
-    setLayerPlayOrder('layer-2', [createMockSound()]);
-    clearAllLayerPlayOrders();
-    expect(getLayerPlayOrder('layer-1')).toBeUndefined();
-    expect(getLayerPlayOrder('layer-2')).toBeUndefined();
-  });
 });
 
 // ── Layer pending ────────────────────────────────────────────────────────────
@@ -200,14 +178,6 @@ describe('layerPending', () => {
   it('clearLayerPending is a no-op on a layer that was never pending', () => {
     expect(() => clearLayerPending('unknown')).not.toThrow();
     expect(isLayerPending('unknown')).toBe(false);
-  });
-
-  it('clearAllLayerPending removes all entries', () => {
-    setLayerPending('layer-1');
-    setLayerPending('layer-2');
-    clearAllLayerPending();
-    expect(isLayerPending('layer-1')).toBe(false);
-    expect(isLayerPending('layer-2')).toBe(false);
   });
 
   it('tracks each layer independently', () => {
@@ -256,13 +226,6 @@ describe('layerConsecutiveFailures', () => {
     expect(getLayerConsecutiveFailures('layer-2')).toBe(1);
   });
 
-  it('clearAllLayerConsecutiveFailures removes all entries', () => {
-    incrementLayerConsecutiveFailures('layer-1');
-    incrementLayerConsecutiveFailures('layer-2');
-    clearAllLayerConsecutiveFailures();
-    expect(getLayerConsecutiveFailures('layer-1')).toBe(0);
-    expect(getLayerConsecutiveFailures('layer-2')).toBe(0);
-  });
 });
 
 // ── clearAll ─────────────────────────────────────────────────────────────────
@@ -331,11 +294,20 @@ describe('onChainCycleStateChanged', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('fires the listener once for deleteLayerChain', () => {
+  it('fires the listener once for deleteLayerChain when the layer exists', () => {
     const listener = vi.fn();
     unsubscribe = onChainCycleStateChanged(listener);
+    setLayerChain('l1', []); // creates the context
+    listener.mockClear();    // clear the setLayerChain notification
     deleteLayerChain('l1');
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire the listener for deleteLayerChain on an unknown layer (L3 fix)', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    deleteLayerChain('l1-unknown');
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('fires the listener once for setLayerPlayOrder', () => {
@@ -345,11 +317,20 @@ describe('onChainCycleStateChanged', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('fires the listener once for deleteLayerPlayOrder', () => {
+  it('fires the listener once for deleteLayerPlayOrder when the layer exists', () => {
     const listener = vi.fn();
     unsubscribe = onChainCycleStateChanged(listener);
+    setLayerPlayOrder('l1', []); // creates the context
+    listener.mockClear();        // clear the setLayerPlayOrder notification
     deleteLayerPlayOrder('l1');
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire the listener for deleteLayerPlayOrder on an unknown layer (L3 fix)', () => {
+    const listener = vi.fn();
+    unsubscribe = onChainCycleStateChanged(listener);
+    deleteLayerPlayOrder('l1-unknown');
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('does NOT fire the listener for non-notifying mutations', () => {
@@ -358,8 +339,6 @@ describe('onChainCycleStateChanged', () => {
     setLayerCycleIndex('l1', 0);
     setLayerPending('l1');
     incrementLayerConsecutiveFailures('l1');
-    clearAllLayerChains();
-    clearAllLayerPlayOrders();
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -398,5 +377,61 @@ describe('onChainCycleStateChanged', () => {
     // listenerB is cleaned up by afterEach (via `unsubscribe`); unsubA is already
     // a no-op since registering listenerB evicted listenerA.
     unsubA();
+  });
+});
+
+// ── notifyChainCycleStateChanged (exported for direct-write paths) ────────────
+
+describe('notifyChainCycleStateChanged', () => {
+  let unsubNotify: (() => void) | undefined;
+  afterEach(() => { unsubNotify?.(); unsubNotify = undefined; });
+
+  it('fires the registered listener when called directly', () => {
+    const listener = vi.fn();
+    unsubNotify = onChainCycleStateChanged(listener);
+    notifyChainCycleStateChanged();
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it('is a no-op when no listener is registered', () => {
+    expect(() => notifyChainCycleStateChanged()).not.toThrow();
+  });
+});
+
+// ── clearAll scope: chain fields only ────────────────────────────────────────
+
+describe('clearAll — chain fields only', () => {
+  it('zeroes chain fields but preserves context entries', () => {
+    setLayerChain('l1', []);
+    expect(_getContextMap().size).toBe(1);
+    clearAll();
+    // Context entry survives — only chain fields are cleared.
+    expect(_getContextMap().size).toBe(1);
+    expect(_getContextMap().get('l1')?.chainQueue).toBeUndefined();
+  });
+
+  it('does not disconnect gain nodes', () => {
+    const mockGain = {
+      gain: { value: 1 },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    } as unknown as GainNode;
+
+    setLayerChain('l1', []);
+    const ctx = _getContextMap().get('l1') as { gain: GainNode | null } | undefined;
+    expect(ctx).toBeDefined();
+    if (ctx) ctx.gain = mockGain;
+
+    clearAll();
+
+    expect(mockGain.disconnect).not.toHaveBeenCalled();
+    expect(_getContextMap().size).toBe(1);
+  });
+
+  it('full context teardown requires clearAllLayerContexts', () => {
+    setLayerChain('l1', []);
+    clearAll();
+    clearAllLayerContexts();
+    expect(_getContextMap().size).toBe(0);
   });
 });

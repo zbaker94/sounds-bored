@@ -76,7 +76,7 @@ let prevLayerChain: Record<string, string[]> = {};
 
 // Track the last observed Sound[] source reference per layer so we can skip
 // the .map(s => s.id) allocation when the source array reference is unchanged.
-// These Sound[] arrays in chainCycleState's layerPlayOrderMap / layerChainQueue only
+// These Sound[] arrays in LayerPlaybackContext.playOrder / chainQueue only
 // swap to a new reference on explicit writes, so reference equality is sufficient.
 const prevLayerPlayOrderSource = new Map<string, readonly unknown[]>();
 const prevLayerChainSource = new Map<string, readonly unknown[]>();

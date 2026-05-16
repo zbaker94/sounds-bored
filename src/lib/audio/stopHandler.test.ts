@@ -5,10 +5,10 @@ vi.mock("./chainCycleState", () => ({
   deleteLayerChain: vi.fn(),
   deleteLayerCycleIndex: vi.fn(),
   deleteLayerPlayOrder: vi.fn(),
-  clearAllLayerChains: vi.fn(),
-  clearAllLayerCycleIndexes: vi.fn(),
-  clearAllLayerPlayOrders: vi.fn(),
-  clearAllLayerPending: vi.fn(),
+}));
+
+vi.mock("./layerPlaybackContext", () => ({
+  clearAllLayerChainFields: vi.fn(),
 }));
 
 vi.mock("./voiceRegistry", () => ({
@@ -27,6 +27,7 @@ vi.mock("./audioTick", () => ({
 
 import { stopAllPads, stopPad } from "./stopHandler";
 import * as chainCycleState from "./chainCycleState";
+import * as layerPlaybackContext from "./layerPlaybackContext";
 import * as voiceRegistry from "./voiceRegistry";
 import * as fadeCoordinator from "./fadeCoordinator";
 import * as audioTick from "./audioTick";
@@ -40,10 +41,7 @@ describe("stopHandler", () => {
     it("clears chain and fade state before nullAllOnEnded — prevents onended from restarting chains during ramp", () => {
       const callOrder: string[] = [];
       vi.mocked(fadeCoordinator.clearAllFades).mockImplementation(() => { callOrder.push("clearAllFades"); });
-      vi.mocked(chainCycleState.clearAllLayerChains).mockImplementation(() => { callOrder.push("clearAllLayerChains"); });
-      vi.mocked(chainCycleState.clearAllLayerCycleIndexes).mockImplementation(() => { callOrder.push("clearAllLayerCycleIndexes"); });
-      vi.mocked(chainCycleState.clearAllLayerPlayOrders).mockImplementation(() => { callOrder.push("clearAllLayerPlayOrders"); });
-      vi.mocked(chainCycleState.clearAllLayerPending).mockImplementation(() => { callOrder.push("clearAllLayerPending"); });
+      vi.mocked(layerPlaybackContext.clearAllLayerChainFields).mockImplementation(() => { callOrder.push("clearAllLayerChainFields"); });
       vi.mocked(voiceRegistry.nullAllOnEnded).mockImplementation(() => { callOrder.push("nullAllOnEnded"); });
       vi.mocked(audioTick.stopAudioTick).mockImplementation(() => { callOrder.push("stopAudioTick"); });
 
@@ -51,20 +49,14 @@ describe("stopHandler", () => {
 
       const nullIdx = callOrder.indexOf("nullAllOnEnded");
       expect(callOrder.indexOf("clearAllFades")).toBeLessThan(nullIdx);
-      expect(callOrder.indexOf("clearAllLayerChains")).toBeLessThan(nullIdx);
-      expect(callOrder.indexOf("clearAllLayerCycleIndexes")).toBeLessThan(nullIdx);
-      expect(callOrder.indexOf("clearAllLayerPlayOrders")).toBeLessThan(nullIdx);
-      expect(callOrder.indexOf("clearAllLayerPending")).toBeLessThan(nullIdx);
+      expect(callOrder.indexOf("clearAllLayerChainFields")).toBeLessThan(nullIdx);
     });
 
-    it("calls all seven teardown functions", () => {
+    it("calls clearAllFades, clearAllLayerChainFields, nullAllOnEnded, and stopAudioTick", () => {
       stopAllPads();
 
       expect(fadeCoordinator.clearAllFades).toHaveBeenCalledOnce();
-      expect(chainCycleState.clearAllLayerChains).toHaveBeenCalledOnce();
-      expect(chainCycleState.clearAllLayerCycleIndexes).toHaveBeenCalledOnce();
-      expect(chainCycleState.clearAllLayerPlayOrders).toHaveBeenCalledOnce();
-      expect(chainCycleState.clearAllLayerPending).toHaveBeenCalledOnce();
+      expect(layerPlaybackContext.clearAllLayerChainFields).toHaveBeenCalledOnce();
       expect(voiceRegistry.nullAllOnEnded).toHaveBeenCalledOnce();
       expect(audioTick.stopAudioTick).toHaveBeenCalledOnce();
     });
