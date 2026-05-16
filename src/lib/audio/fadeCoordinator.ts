@@ -1,11 +1,10 @@
 /**
  * fadeCoordinator.ts — Atomic owner of all pad fade state.
  *
- * Replaces the previous pattern where 8-9 separate function calls were needed
- * to start or cancel a fade (cancelPadFade + addFadingOutPad + setPadFadeFromVolume
- * + setFadePadTimeout + addFadingPad + addFadingOutPad on playbackStore + ...).
- *
- * The atomic per-pad API is `startFade` and `cancelFade`. Together they keep:
+ * Consolidates what used to be several independent mutations (clearing the
+ * pending completion timeout, updating fadingOut membership, snapshotting the
+ * fromVolume, and mirroring fade signals to playbackStore) into a single
+ * atomic per-pad API: `startFade` and `cancelFade`. Together they keep:
  *   - local fade timeouts
  *   - fadingOut membership
  *   - fromVolume snapshots
@@ -17,11 +16,6 @@
  * playbackStore (no UI surface depends on them). `clearAllFades` is a bulk
  * local teardown for project-close — see its docstring for the playbackStore
  * caveat.
- *
- * The legacy primitives (cancelPadFade, addFadingOutPad, setFadePadTimeout, ...)
- * remain exported for backward compatibility while consumers migrate to the
- * atomic API. They mutate local state only — playbackStore coordination is the
- * caller's responsibility, matching the previous audioState behavior exactly.
  */
 
 import { usePlaybackStore } from "@/state/playbackStore";
@@ -76,6 +70,11 @@ export function startFade(
 
   const timeoutId = setTimeout(() => {
     fadePadTimeouts.delete(padId);
+    // Defense-in-depth: no public API path can currently reach the timeout
+    // callback after `fadingOutPadIds` has been cleared without also cancelling
+    // the timeout (cancelFade clears both atomically). Retained as a safety net
+    // in case a future caller bypasses cancelFade and mutates fadingOutPadIds
+    // directly — preventing a stale completion from stopping a now-active pad.
     if (fadingOut && !fadingOutPadIds.has(padId)) return;
     fadingOutPadIds.delete(padId);
     padFadeFromVolumes.delete(padId);
@@ -166,110 +165,4 @@ export function clearAllFades(): void {
   fadingOutPadIds.clear();
   fadingInPadIds.clear();
   padFadeFromVolumes.clear();
-}
-
-// ---------------------------------------------------------------------------
-// Legacy primitives — local-state-only mutators retained for callers that have
-// not yet migrated to the atomic API. They do NOT touch playbackStore; callers
-// (gainManager.resetPadGain, ...) handle that mirror at the call site as before.
-// ---------------------------------------------------------------------------
-
-/** @deprecated Use isFadingOut from the atomic API instead — same behavior, modern name. */
-export function isPadFadingOut(padId: string): boolean {
-  return fadingOutPadIds.has(padId);
-}
-
-/** @deprecated Use isFading from the atomic API instead — same behavior, modern name. */
-export function isPadFading(padId: string): boolean {
-  return fadePadTimeouts.has(padId);
-}
-
-/** @deprecated Use isFadingIn from the atomic API instead — same behavior, modern name. */
-export function isPadFadingIn(padId: string): boolean {
-  return fadingInPadIds.has(padId);
-}
-
-/**
- * Cancel all fade-related local resources for a pad (pending timeout,
- * fadingOut tracking, fromVolume). Does NOT clear playbackStore signals or
- * fadingInPadIds — see the cancelFade docblock for the fadingIn rationale.
- *
- * @deprecated Use cancelFade instead — cancelPadFade leaves
- *   playbackStore.fadingPadIds / fadingOutPadIds set, which causes UI signals
- *   to leak past the cancellation point. Only retained for the gainManager
- *   circular-dep workaround and pre-existing test seams.
- */
-export function cancelPadFade(padId: string): void {
-  const tId = fadePadTimeouts.get(padId);
-  if (tId !== undefined) {
-    clearTimeout(tId);
-    fadePadTimeouts.delete(padId);
-  }
-  fadingOutPadIds.delete(padId);
-  padFadeFromVolumes.delete(padId);
-}
-
-/**
- * @deprecated Use startFade with `fadingOut=true` instead — startFade also
- *   sets playbackStore.fadingPadIds / fadingOutPadIds and schedules the
- *   completion timeout, which addFadingOutPad alone does not do.
- */
-export function addFadingOutPad(padId: string): void {
-  fadingOutPadIds.add(padId);
-}
-
-/**
- * @deprecated Use cancelFade instead — removeFadingOutPad does not clear the
- *   pending timeout or playbackStore signals, leaving partially-cancelled
- *   fade state that can fire later and stop a pad that is now active.
- */
-export function removeFadingOutPad(padId: string): void {
-  fadingOutPadIds.delete(padId);
-}
-
-/** @deprecated Use addFadingIn instead — same behavior, modern name. */
-export function addFadingInPad(padId: string): void {
-  fadingInPadIds.add(padId);
-}
-
-/** @deprecated Use removeFadingIn instead — same behavior, modern name. */
-export function removeFadingInPad(padId: string): void {
-  fadingInPadIds.delete(padId);
-}
-
-/**
- * @deprecated Use startFade instead — startFade records fromVolume as part of
- *   the atomic transition; calling this directly leaves the timeout and store
- *   signals out of sync with the recorded volume.
- */
-export function setPadFadeFromVolume(padId: string, fromVolume: number): void {
-  padFadeFromVolumes.set(padId, fromVolume);
-}
-
-/** @deprecated Use getFadeFromVolume from the atomic API instead — same behavior, modern name. */
-export function getPadFadeFromVolume(padId: string): number | undefined {
-  return padFadeFromVolumes.get(padId);
-}
-
-/**
- * @deprecated Use startFade instead — startFade schedules the timeout
- *   together with the fadingOut/fromVolume/playbackStore writes so they can
- *   never get out of sync. setFadePadTimeout alone leaks the other three.
- */
-export function setFadePadTimeout(padId: string, timeoutId: ReturnType<typeof setTimeout>): void {
-  fadePadTimeouts.set(padId, timeoutId);
-}
-
-/**
- * @deprecated Use cancelFade instead — deleteFadePadTimeout leaves
- *   fadingOut, fromVolume, and playbackStore signals set, producing the same
- *   stale-state hazard the atomic API was introduced to eliminate.
- */
-export function deleteFadePadTimeout(padId: string): void {
-  fadePadTimeouts.delete(padId);
-}
-
-/** @deprecated Use clearAllFades instead — same behavior, modern name. */
-export function clearAllFadeTracking(): void {
-  clearAllFades();
 }

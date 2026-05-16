@@ -58,11 +58,6 @@ vi.mock("@/lib/audio/voiceRegistry", async (importOriginal) => {
   return { ...actual, isPadActive: vi.fn().mockReturnValue(false), onLayerVoiceSetChanged: vi.fn().mockReturnValue(() => {}) };
 });
 
-vi.mock("@/lib/audio/fadeCoordinator", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/audio/fadeCoordinator")>();
-  return { ...actual, isPadFading: vi.fn().mockReturnValue(false) };
-});
-
 vi.mock("@dnd-kit/sortable", () => ({
   useSortable: () => ({
     attributes: {},

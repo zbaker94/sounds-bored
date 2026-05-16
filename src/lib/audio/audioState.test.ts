@@ -51,22 +51,22 @@ import {
   clearAllAudioState,
 } from "./audioState";
 import {
-  cancelPadFade,
-  clearAllFadeTracking,
-  isPadFadingOut,
-  isPadFading,
-  addFadingOutPad,
-  addFadingInPad,
-  isPadFadingIn,
-  setFadePadTimeout,
-  setPadFadeFromVolume,
-  getPadFadeFromVolume,
+  startFade,
+  clearAllFades,
+  addFadingIn,
 } from "./fadeCoordinator";
 import { register as registerStreaming, clearAll as clearAllStreaming, dispose as disposeStreaming, isPadStreaming } from "./streamingAudioLifecycle";
 import { recordLayerVoice, clearAll as clearAllVoiceRegistry } from "./voiceRegistry";
 import { clearAll as clearAllGainRegistry, markGainRamp } from "./gainRegistry";
 import { clearAll as clearAllChainCycleState } from "./chainCycleState";
 import type { AudioVoice } from "./audioVoice";
+
+/**
+ * Fade duration used in tests that need a fade to remain active for the entire
+ * synchronous portion of the test. Set well above any realistic test runtime so
+ * the fade completion timeout never fires before assertions.
+ */
+const NEVER_COMPLETES_MS = 10_000;
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ beforeEach(() => {
   clearAllChainCycleState();
   clearAllStreaming();
   clearAllPadProgressInfo();
-  clearAllFadeTracking();
+  clearAllFades();
   clearAllLayerProgressInfo();
   clearAllVoiceRegistry();
 });
@@ -206,89 +206,6 @@ describe("getPadProgress", () => {
   });
 });
 
-// ── cancelPadFade ────────────────────────────────────────────────────────────
-
-describe("cancelPadFade", () => {
-  it("is idempotent when no fade is registered", () => {
-    // Should not throw
-    expect(() => cancelPadFade("pad-1")).not.toThrow();
-    expect(isPadFadingOut("pad-1")).toBe(false);
-    expect(isPadFading("pad-1")).toBe(false);
-  });
-
-  it("clears fade state for a pad that has an active fade", () => {
-    addFadingOutPad("pad-1");
-    setFadePadTimeout("pad-1", setTimeout(() => {}, 9999));
-    expect(isPadFadingOut("pad-1")).toBe(true);
-    expect(isPadFading("pad-1")).toBe(true);
-
-    cancelPadFade("pad-1");
-
-    expect(isPadFadingOut("pad-1")).toBe(false);
-    expect(isPadFading("pad-1")).toBe(false);
-  });
-
-  it("clears fadingOutPadIds for a pad with an active fade-out", () => {
-    addFadingOutPad("pad-sync");
-
-    cancelPadFade("pad-sync");
-
-    expect(isPadFadingOut("pad-sync")).toBe(false);
-  });
-
-  it("clears padFadeFromVolumes", () => {
-    setPadFadeFromVolume("pad-1", 0.5);
-    cancelPadFade("pad-1");
-    expect(getPadFadeFromVolume("pad-1")).toBeUndefined();
-  });
-});
-
-// ── addFadingOutPad ──────────────────────────────────────────────────────────
-
-describe("addFadingOutPad", () => {
-  it("marks fading-out on audioState", () => {
-    addFadingOutPad("pad-add");
-
-    expect(isPadFadingOut("pad-add")).toBe(true);
-  });
-});
-
-// ── clearAllFadeTracking ─────────────────────────────────────────────────────
-
-describe("clearAllFadeTracking", () => {
-  it("clears all fade state across multiple pads", () => {
-    addFadingOutPad("pad-1");
-    addFadingOutPad("pad-2");
-    setFadePadTimeout("pad-1", setTimeout(() => {}, 9999));
-    setFadePadTimeout("pad-2", setTimeout(() => {}, 9999));
-    expect(isPadFadingOut("pad-1")).toBe(true);
-    expect(isPadFadingOut("pad-2")).toBe(true);
-    expect(isPadFading("pad-1")).toBe(true);
-    expect(isPadFading("pad-2")).toBe(true);
-
-    clearAllFadeTracking();
-
-    expect(isPadFadingOut("pad-1")).toBe(false);
-    expect(isPadFadingOut("pad-2")).toBe(false);
-    expect(isPadFading("pad-1")).toBe(false);
-    expect(isPadFading("pad-2")).toBe(false);
-    // clearAllFadeTracking does not write tick-managed fields (padVolumes etc.) —
-    // audioTick owns those and stopAudioTick handles clearing.
-  });
-
-  it("clears padFadeFromVolumes", () => {
-    setPadFadeFromVolume("pad-1", 0.8);
-    clearAllFadeTracking();
-    expect(getPadFadeFromVolume("pad-1")).toBeUndefined();
-  });
-
-  it("clears fadingInPadIds", () => {
-    addFadingInPad("pad-1");
-    clearAllFadeTracking();
-    expect(isPadFadingIn("pad-1")).toBe(false);
-  });
-});
-
 // ── computeAllPadProgress / computeAllLayerProgress ──────────────────────────
 
 describe("computeAllPadProgress", () => {
@@ -397,7 +314,7 @@ describe("clearAllAudioState", () => {
       getPadProgressInfo,
       setGlobalStopTimeout,
     } = await import("./audioState");
-    const { addFadingOutPad, isPadFadingOut } = await import("./fadeCoordinator");
+    const { startFade, isFadingOut } = await import("./fadeCoordinator");
     const { setLayerChain, setLayerCycleIndex, setLayerPlayOrder, setLayerPending, getLayerChain, getLayerCycleIndex, getLayerPlayOrder, isLayerPending } = await import("./chainCycleState");
     const { getPadGain, getOrCreateLayerGain, getLayerGain } = await import("./gainRegistry");
     const { isPadActive } = await import("./voiceRegistry");
@@ -409,7 +326,7 @@ describe("clearAllAudioState", () => {
     setLayerCycleIndex("layer-clearall", 2);
     setLayerPlayOrder("layer-clearall", []);
     setLayerPending("layer-clearall");
-    addFadingOutPad("pad-clearall");
+    startFade("pad-clearall", 1.0, true, NEVER_COMPLETES_MS);
 
     // Register a streaming audio element so isPadStreaming returns true before clear
     const mockAudio = { pause: vi.fn(), currentTime: 0, duration: 10, addEventListener: vi.fn() } as unknown as HTMLAudioElement;
@@ -423,7 +340,7 @@ describe("clearAllAudioState", () => {
 
     clearAllAudioState();
 
-    expect(isPadFadingOut("pad-clearall")).toBe(false);          // fade tracking cleared
+    expect(isFadingOut("pad-clearall")).toBe(false);             // fade tracking cleared
     expect(getLayerChain("layer-clearall")).toBeUndefined();     // layer chains cleared
     expect(getLayerCycleIndex("layer-clearall")).toBeUndefined(); // cycle indexes cleared
     expect(getLayerPlayOrder("layer-clearall")).toBeUndefined(); // play orders cleared
@@ -501,17 +418,17 @@ describe("isAnyGainChanging — fade tracking portion", () => {
   });
 
   it("returns true when a pad is fading out", () => {
-    addFadingOutPad("pad-fade");
+    startFade("pad-fade", 1.0, true, NEVER_COMPLETES_MS);
     expect(isAnyGainChanging()).toBe(true);
   });
 
   it("returns true when a fade timeout is pending", () => {
-    setFadePadTimeout("pad-fade", setTimeout(() => {}, 9999));
+    startFade("pad-fade", 1.0, false, NEVER_COMPLETES_MS);
     expect(isAnyGainChanging()).toBe(true);
   });
 
   it("returns true when a pad is fading in", () => {
-    addFadingInPad("pad-1");
+    addFadingIn("pad-1");
     expect(isAnyGainChanging()).toBe(true);
   });
 });
